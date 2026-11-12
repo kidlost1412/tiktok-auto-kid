@@ -1,0 +1,48 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "graphics": [
+  {
+   "id": "bad_cl",
+   "type": "checklist",
+   "f0": 0,
+   "f1": 20,
+   "x": 90,
+   "y": 1200,
+   "items": [
+    {
+     "text": "RAU MÀU",
+     "f": 0
+    },
+    {
+     "text": "CÀ PHÊ",
+     "f": 5
+    }
+   ]
+  }
+ ],
+ "style": {
+  "graphics_scale": 1.0,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF"
+  }
+ }
+}

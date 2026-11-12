@@ -1,0 +1,63 @@
+{
+  "duong_dan": {},
+  "giong": {
+    "model": "eleven_v4",
+    "stability": 0.3,
+    "toc_do": 1.1,
+    "danh_sach": {
+      "XuanLuong": "Vr1jwoqy1MDvyAPwDY9C",
+      "NhatPhong": "6adFm46eyy74snVn6YrT"
+    }
+  },
+  "nhac": {
+    "thap_hon_giong_db": 16,
+    "goi_mac_dinh_url": "",
+    "goi_mac_dinh_sha256": "",
+    "nguon": [],
+    "_ghi_chu": "Nguồn nhạc/SFX thêm: [{duong_dan, loai: nhac|sfx, bat}]. goi_mac_dinh_url: link gói nhạc mặc định (zip hoặc .json chỉ mục)."
+  },
+  "video": {
+    "w": 1080,
+    "h": 1920,
+    "fps": 30,
+    "thoi_luong_min": 20.0,
+    "thoi_luong_max": 25.0
+  },
+  "lo": {
+    "video_moi_giong": 2
+  },
+  "claude": {
+    "model": "opus",
+    "effort": "high"
+  },
+  "che_do": "ekip",
+  "dung_lai": false,
+  "trypost": {
+    "cong": 8766,
+    "khoa": "",
+    "giu_sau_dang_ngay": 30
+  },
+  "kho_qua": {},
+  "tai_khoan": [
+    {
+      "ma": "tk1",
+      "ten": "Tài khoản 1",
+      "thu_muc": null
+    }
+  ],
+  "tu_dong": {
+    "bat": false,
+    "kiem_moi_phut": 15,
+    "san_pham": {}
+  },
+  "tai_khoan_dung": "tu_dong",
+  "tu_duyet": {
+    "bat": true,
+    "dat_tu": 6.0,
+    "bo_duoi": 0
+  },
+  "hoc_canh": {
+    "model": "flash",
+    "song_song": 2
+  }
+}

@@ -1,0 +1,48 @@
+; TikTok Auto Kid native Windows - php.ini (copied to runtime\php\php.ini by setup.ps1)
+; Duong dan tuong doi so voi thu muc chua php.exe de bundle copy sang may khac van chay.
+extension_dir = "ext"
+memory_limit = 512M
+upload_max_filesize = 1G
+post_max_size = 1G
+max_execution_time = 120
+max_input_vars = 5000
+date.timezone = UTC
+default_charset = "UTF-8"
+
+display_errors = Off
+log_errors = On
+error_reporting = E_ALL
+; error_log duoc setup.ps1 ghi them (duong dan tuyet doi cua may hien tai)
+
+opcache.enable = 1
+opcache.enable_cli = 0
+opcache.memory_consumption = 128
+opcache.max_accelerated_files = 10000
+opcache.validate_timestamps = 1
+opcache.revalidate_freq = 2
+
+; Windows: realpath cache lon de bot stat() cham.
+realpath_cache_size = 4096K
+realpath_cache_ttl = 600
+
+cgi.fix_pathinfo = 1
+cgi.force_redirect = 0
+fastcgi.impersonate = 0
+
+extension = curl
+extension = exif
+extension = fileinfo
+extension = gd
+extension = intl
+extension = mbstring
+extension = openssl
+extension = pdo_pgsql
+extension = pgsql
+extension = sodium
+extension = sockets
+extension = zip
+
+[curl]
+curl.cainfo = "cacert.pem"
+[openssl]
+openssl.cafile = "cacert.pem"

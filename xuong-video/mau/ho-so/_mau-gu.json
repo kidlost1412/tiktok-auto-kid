@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "owner": "<tên người nhờ edit>",
+  "nguoi_dung": {
+    "ten": "",
+    "xung_ho_ai": "",
+    "goi_nguoi_dung": "",
+    "ngon_ngu": ""
+  },
+  "status": "Hồ sơ mới — điền từ câu trả lời của người nhờ edit và từ góp ý sau mỗi bản xuất. Mục nào trống thì AI dùng tay nghề chung (TU-DUY-EDIT-CAP-CAO.vi.md) và ghi rõ là 'mặc định'. Gu suy ra từ video mẫu là TẠM cho tới khi người này đồng ý.",
+  "gu": {
+    "muc_tieu": "",
+    "uy_tin": "",
+    "cong_dung": "",
+    "nhac": "",
+    "sfx": "",
+    "hieu_ung": "",
+    "bo_cuc": "",
+    "nhip": "",
+    "phu_de": "",
+    "chu_khac": "",
+    "am_luong": "",
+    "tranh": []
+  },
+  "cau_hoi_khoi_dau": [
+    "Bạn tên gì? Bạn muốn AI xưng là gì và gọi bạn là gì? Trả lời bằng ngôn ngữ nào?",
+    "Video để làm gì (bán hàng giỏ hàng / thương hiệu / hướng dẫn)?",
+    "Có muốn nhạc nền không? Nếu có, kiểu gì?",
+    "Gửi 1–3 video mẫu bạn thích (thích điểm gì ở đó)?",
+    "Có kho video người dùng thật / affiliate không?",
+    "Điều gì tuyệt đối không muốn thấy?"
+  ]
+}

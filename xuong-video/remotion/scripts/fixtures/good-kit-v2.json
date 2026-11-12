@@ -1,0 +1,201 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "style": {
+  "graphics_scale": 1.0,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF",
+   "title_fill": "#FFE14D"
+  },
+  "scale_by_type": {
+   "checklist": 0.85,
+   "cta": 0.9
+  }
+ },
+ "graphics": [
+  {
+   "id": "k_big1",
+   "type": "big_text",
+   "f0": 0,
+   "f1": 40,
+   "text": "1 CHAI PHA ĐƯỢC",
+   "accent": "5 BÌNH 20 LÍT",
+   "cy": 470
+  },
+  {
+   "id": "k_big2",
+   "type": "big_text",
+   "f0": 40,
+   "f1": 80,
+   "text": "100ML",
+   "cy": 800
+  },
+  {
+   "id": "k_big_tt",
+   "type": "big_text",
+   "f0": 80,
+   "f1": 120,
+   "text": "5 BÌNH 20 LÍT",
+   "accent": "1 CHAI PHA",
+   "cy": 1050
+  },
+  {
+   "id": "k_cl",
+   "type": "checklist",
+   "f0": 120,
+   "f1": 200,
+   "x": 90,
+   "y": 300,
+   "highlight_active": true,
+   "items": [
+    {
+     "text": "PHUN XỊT",
+     "f": 121
+    },
+    {
+     "text": "TƯỚI GỐC",
+     "f": 135
+    },
+    {
+     "text": "NHỎ GIỌT",
+     "f": 170
+    }
+   ]
+  },
+  {
+   "id": "k_cta",
+   "type": "cta",
+   "f0": 200,
+   "f1": 260,
+   "text": "NHẤN GIỎ HÀNG NGAY",
+   "y": 700
+  },
+  {
+   "id": "k_circle",
+   "type": "circle",
+   "f0": 0,
+   "f1": 60,
+   "label": null,
+   "keys": [
+    {
+     "f": 0,
+     "cx": 500,
+     "cy": 700,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 6,
+     "cx": 524,
+     "cy": 694,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 12,
+     "cx": 548,
+     "cy": 688,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 18,
+     "cx": 572,
+     "cy": 682,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 24,
+     "cx": 596,
+     "cy": 676,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 30,
+     "cx": 620,
+     "cy": 670,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 36,
+     "cx": 644,
+     "cy": 664,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 42,
+     "cx": 668,
+     "cy": 658,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 48,
+     "cx": 692,
+     "cy": 652,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 54,
+     "cx": 716,
+     "cy": 646,
+     "rx": 200,
+     "ry": 100
+    },
+    {
+     "f": 59,
+     "cx": 736,
+     "cy": 641,
+     "rx": 200,
+     "ry": 100
+    }
+   ]
+  },
+  {
+   "id": "k_arrow",
+   "type": "arrow",
+   "f0": 60,
+   "f1": 100,
+   "from": [
+    250,
+    600
+   ],
+   "to": [
+    560,
+    880
+   ]
+  },
+  {
+   "id": "k_title",
+   "type": "title_behind",
+   "f0": 100,
+   "f1": 140,
+   "text": "KÍCH RỄ",
+   "y": 640,
+   "fill": "title_fill"
+  }
+ ]
+}

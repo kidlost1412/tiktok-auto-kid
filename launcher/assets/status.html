@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TikTok Auto Kid - Đang khởi động</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#14171c;--mut:#667085;--bd:#e4e7ec;--ok:#12a150;--run:#2563eb;--err:#d92d20;--pend:#98a2b3;--code:#f2f4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--fg:#e8ebf0;--mut:#8b95a5;--bd:#2a313c;--ok:#32d583;--run:#6aa1ff;--err:#f97066;--pend:#667085;--code:#0b0e13}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:640px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 20px}
+.bar{height:6px;background:var(--bd);border-radius:99px;overflow:hidden;margin-bottom:20px}
+.bar i{display:block;height:100%;width:0;background:var(--run);transition:width .4s}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:6px 0}
+.row{display:flex;gap:12px;align-items:flex-start;padding:9px 16px}
+.row+.row{border-top:1px solid var(--bd)}
+.dot{width:12px;height:12px;border-radius:50%;margin-top:6px;flex:none;background:var(--pend)}
+.ok .dot{background:var(--ok)}.error .dot{background:var(--err)}.skipped .dot{opacity:.5}
+.running .dot{background:var(--run);animation:p 1s infinite}
+@keyframes p{50%{opacity:.3}}
+.name{font-weight:600}.kind{color:var(--mut);font-size:12px;margin-left:6px}
+.state{margin-left:auto;color:var(--mut);font-size:13px;white-space:nowrap;padding-top:2px}
+.error .state{color:var(--err)}.ok .state{color:var(--ok)}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Consolas,monospace;overflow:auto;max-height:260px;margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
+.grow{flex:1;min-width:0}
+.err-box{margin-top:16px;border:1px solid var(--err);border-radius:12px;padding:14px 16px;display:none}
+.err-box.on{display:block}
+button{margin-top:10px;background:var(--run);color:#fff;border:0;border-radius:8px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.foot{color:var(--mut);font-size:13px;margin-top:16px}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Đang khởi động TikTok Auto Kid…</h1>
+  <p class="sub" id="msg">Vui lòng chờ, lần đầu có thể mất 1–2 phút.</p>
+  <div class="bar"><i id="bar"></i></div>
+  <div class="card" id="list"></div>
+  <div class="err-box" id="errbox">
+    <div id="errmsg"></div>
+    <button id="retry">Thử lại</button>
+  </div>
+  <p class="foot">Trang này sẽ tự chuyển sang ứng dụng khi sẵn sàng.</p>
+</main>
+<script>
+var LABEL={pending:"Chờ",running:"Đang chạy…",ok:"Sẵn sàng",skipped:"Bỏ qua",external:"Chạy bên ngoài",error:"Lỗi"};
+var redirected=false;
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function render(s){
+  var list=document.getElementById("list");list.textContent="";
+  var done=0;
+  s.items.forEach(function(it){
+    if(it.state==="ok"||it.state==="skipped")done++;
+    var row=el("div","row "+it.state);
+    row.appendChild(el("span","dot"));
+    var g=el("div","grow");
+    var n=el("div","");n.appendChild(el("span","name",it.name));
+    n.appendChild(el("span","kind",it.kind==="step"?"bước chuẩn bị":"dịch vụ"));
+    g.appendChild(n);
+    if(it.detail)g.appendChild(el("div","kind",it.detail));
+    if(it.log&&it.log.length)g.appendChild(el("pre","",it.log.join("\n")));
+    row.appendChild(g);
+    row.appendChild(el("span","state",LABEL[it.state]||it.state));
+    list.appendChild(row);
+  });
+  document.getElementById("bar").style.width=(s.items.length?Math.round(done*100/s.items.length):0)+"%";
+  var eb=document.getElementById("errbox");
+  if(s.state==="error"){
+    document.getElementById("title").textContent="Khởi động gặp lỗi";
+    document.getElementById("msg").textContent="Xem chi tiết bên dưới rồi bấm Thử lại.";
+    document.getElementById("errmsg").textContent=s.message;eb.classList.add("on");
+  }else if(s.state==="ready"){
+    document.getElementById("title").textContent="Sẵn sàng!";
+    document.getElementById("msg").textContent="Đang mở ứng dụng…";
+    eb.classList.remove("on");
+    if(!redirected){redirected=true;setTimeout(function(){location.replace(s.app_url)},600)}
+  }else{
+    document.getElementById("title").textContent="Đang khởi động TikTok Auto Kid…";
+    document.getElementById("msg").textContent=s.message||"Vui lòng chờ, lần đầu có thể mất 1–2 phút.";
+    eb.classList.remove("on");
+  }
+}
+function poll(){
+  fetch("/api/status",{cache:"no-store"}).then(function(r){return r.json()}).then(render)
+   .catch(function(){document.getElementById("msg").textContent="Mất kết nối với trình khởi động…"})
+   .then(function(){if(!redirected)setTimeout(poll,1000)});
+}
+document.getElementById("retry").onclick=function(){
+  var b=this;b.disabled=true;
+  fetch("/api/retry",{method:"POST",headers:{"X-TTA":"1"}}).then(function(){setTimeout(function(){b.disabled=false},3000)});
+};
+poll();
+</script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+{
+  "app_url": "http://localhost:8010",
+  "status_port": 8009,
+  "vars": {
+    "XUONG_DATA": "du-lieu/xuong-video",
+    "XUONG_PYTHON": "runtime/xuong-venv/Scripts/python.exe"
+  },
+  "services": [
+    {
+      "name": "postgres",
+      "cmd": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/native/run-postgres.ps1"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": {
+        "type": "tcp",
+        "port": 5433,
+        "timeout_sec": 60
+      },
+      "depends_on": [],
+      "restart": "always",
+      "stop": {
+        "cmd": "runtime/pgsql/bin/pg_ctl.exe",
+        "args": [
+          "stop",
+          "-D",
+          "runtime/data/pg",
+          "-m",
+          "fast",
+          "-w"
+        ]
+      },
+      "stop_timeout_sec": 30
+    },
+    {
+      "name": "php-cgi-1",
+      "cmd": "runtime/php/php-cgi.exe",
+      "args": [
+        "-b",
+        "127.0.0.1:9101"
+      ],
+      "cwd": ".",
+      "env": {
+        "PHP_FCGI_MAX_REQUESTS": "2000"
+      },
+      "health": {
+        "type": "tcp",
+        "port": 9101
+      },
+      "depends_on": [
+        "postgres"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "php-cgi-2",
+      "cmd": "runtime/php/php-cgi.exe",
+      "args": [
+        "-b",
+        "127.0.0.1:9102"
+      ],
+      "cwd": ".",
+      "env": {
+        "PHP_FCGI_MAX_REQUESTS": "2000"
+      },
+      "health": {
+        "type": "tcp",
+        "port": 9102
+      },
+      "depends_on": [
+        "postgres"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "web",
+      "cmd": "runtime/caddy/caddy.exe",
+      "args": [
+        "run",
+        "--config",
+        "scripts/native/Caddyfile",
+        "--adapter",
+        "caddyfile"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": {
+        "type": "http",
+        "url": "http://127.0.0.1:8010/up",
+        "timeout_sec": 60
+      },
+      "depends_on": [
+        "php-cgi-1",
+        "php-cgi-2"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "queue-main",
+      "cmd": "runtime/php/php.exe",
+      "args": [
+        "artisan",
+        "queue:work",
+        "database",
+        "--queue=default",
+        "--sleep=2",
+        "--tries=1",
+        "--timeout=630",
+        "--max-time=3600"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": null,
+      "depends_on": [
+        "postgres"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "queue-social",
+      "cmd": "runtime/php/php.exe",
+      "args": [
+        "artisan",
+        "queue:work",
+        "database",
+        "--queue=social-tiktok",
+        "--sleep=2",
+        "--tries=1",
+        "--timeout=930",
+        "--max-time=3600"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": null,
+      "depends_on": [
+        "postgres"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "scheduler",
+      "cmd": "runtime/php/php.exe",
+      "args": [
+        "artisan",
+        "schedule:work"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": null,
+      "depends_on": [
+        "postgres"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "chrome-launcher",
+      "cmd": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "tools/fork/chrome-launcher/chrome-launcher.ps1"
+      ],
+      "cwd": ".",
+      "env": {},
+      "health": null,
+      "depends_on": [
+        "web"
+      ],
+      "restart": "always"
+    },
+    {
+      "name": "xuong-video",
+      "cmd": "${XUONG_PYTHON}",
+      "args": [
+        "-X",
+        "utf8",
+        "app/server.py",
+        "--khong-mo",
+        "--log",
+        "auto"
+      ],
+      "cwd": "xuong-video",
+      "env": {
+        "PYTHONIOENCODING": "utf-8",
+        "XUONG_DATA": "${XUONG_DATA}"
+      },
+      "path_add": [
+        "${LOCALAPPDATA}/Microsoft/WinGet/Links",
+        "${ProgramFiles}/nodejs",
+        "${APPDATA}/npm",
+        "${ROOT}/runtime/node",
+        "${ROOT}/runtime/ffmpeg/bin"
+      ],
+      "health": {
+        "type": "http",
+        "url": "http://127.0.0.1:8765/health",
+        "timeout_sec": 30
+      },
+      "depends_on": [],
+      "restart": "always",
+      "optional": true,
+      "requires_path": "${XUONG_PYTHON}",
+      "missing_message": "Chưa cài Xưởng Video",
+      "no_restart_exit_codes": [
+        3
+      ],
+      "stop": {
+        "mode": "kill_pid"
+      }
+    }
+  ],
+  "first_run": [
+    {
+      "name": "initdb",
+      "cmd": "runtime/pgsql/bin/initdb.exe",
+      "args": [
+        "-D",
+        "runtime/data/pg",
+        "-U",
+        "postgres",
+        "-A",
+        "trust",
+        "--encoding=UTF8",
+        "--locale=C"
+      ],
+      "only_if_missing": "runtime/data/pg/PG_VERSION"
+    },
+    {
+      "name": "bootstrap-db",
+      "cmd": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/native/bootstrap.ps1"
+      ]
+    }
+  ],
+  "backup": {
+    "cmd": "runtime/pgsql/bin/pg_dump.exe",
+    "args": [
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "5433",
+      "-U",
+      "postgres",
+      "--no-owner",
+      "-f",
+      "{out}",
+      "tiktok_auto"
+    ]
+  }
+}

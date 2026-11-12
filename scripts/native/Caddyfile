@@ -1,0 +1,70 @@
+# Caddy cho ban chay tren Windows. Chay voi thu muc hien tai = thu muc goc du an
+# (duong dan public/, storage/ la tuong doi). Cong 8010 chi nghe tren loopback.
+{
+	admin off
+	auto_https off
+	persist_config off
+	log {
+		output stderr
+		level WARN
+	}
+}
+
+# Snippet hub_ra_root (thu muc <FORK_HUB_PATH>/ra), sinh boi scripts/native/setup.ps1 tu .env
+import ../../runtime/hub-root.caddy
+
+http://localhost:8010, http://127.0.0.1:8010 {
+	bind 127.0.0.1 ::1
+	root * public
+	encode zstd gzip
+
+	request_body {
+		max_size 1GB
+	}
+
+	# Chan file an (.env, .git...), tru .well-known
+	@hidden {
+		path /.* */.*
+		not path /.well-known/*
+	}
+	respond @hidden 404
+
+	# Thay cho `php artisan storage:link` (Windows can quyen tao symlink)
+	handle_path /storage/* {
+		root * storage/app/public
+		file_server
+	}
+
+	# Media (mp4/anh bia) do Caddy phat truc tiep, Range/206 ok, khong giu worker php-cgi (chi co 2 worker).
+	# PHP (auto/kho/video/{id}[/cover]) kiem quyen roi 302 toi cac URL nay. Chi 2 thu muc media duoc phat:
+	# <FORK_HUB_PATH>/ra (snippet hub_ra_root, sinh boi scripts/native/setup.ps1 vao runtime/hub-root.caddy)
+	# va storage/app/hub-cache. KHONG bao gio la goc hub (config.json/.env) hay storage. Chi nghe loopback.
+	handle_path /media/ra/* {
+		route {
+			import hub_ra_root
+			@media path_regexp \.(mp4|jpe?g|png|webp)$
+			file_server @media
+			respond 404
+		}
+	}
+	handle_path /media/cache/* {
+		route {
+			root * storage/app/hub-cache
+			@media path_regexp \.(mp4|jpe?g)$
+			file_server @media
+			respond 404
+		}
+	}
+
+	handle {
+		php_fastcgi 127.0.0.1:9101 127.0.0.1:9102 {
+			lb_policy least_conn
+			lb_try_duration 8s
+			lb_try_interval 250ms
+			dial_timeout 3s
+			read_timeout 180s
+			write_timeout 180s
+		}
+		file_server
+	}
+}

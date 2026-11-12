@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xưởng Video</title>
+<script>
+/* Nhúng trong TikTok Auto Kid: ?nhung=1&theme=dark|light&tab=san-xuat|kho|san-pham|gu|cai-dat (tab cũng nhận #tab=...) */
+(() => {
+  const q = new URLSearchParams(location.search), h = document.documentElement;
+  const nhung = q.get('nhung') === '1';
+  let th = q.get('theme');
+  if (th !== 'dark' && th !== 'light') th = nhung ? 'dark' : 'light';
+  h.dataset.theme = th;
+  if (nhung) h.dataset.nhung = '1';
+  const bg = q.get('bg');                       // tuỳ chọn: ?bg=%23101418 → nền trùng hẳn màu trang cha
+  if (bg && /^#[0-9a-fA-F]{3,8}$/.test(bg)) h.style.setProperty('--bg', bg);
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4FBF5; --card:#FFFFFF; --ink:#1F2D24; --mute:#6B7C70; --line:#DCEBDF;
+  --green:#2E9E44; --green-soft:#E2F5E6; --red:#D7262E; --red-soft:#FDE7E8; --yellow:#FFD400; --yellow-soft:#FFF6CC;
+  --blue:#2B7BD8; --blue-soft:#E4F0FD; --shadow:0 6px 22px rgba(46,158,68,.10); --r:20px;
+  --input:#FFFFFF; --y-ink:#8a6d00; --w-ink:#6b5500; color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0F1612; --card:#18221C; --ink:#E3F0E7; --mute:#93A89A; --line:#2A3A30;
+  --green:#43C25E; --green-soft:#1B3624; --red:#FF6B71; --red-soft:#3B1C1F; --yellow-soft:#3A3314;
+  --blue:#6EA9F0; --blue-soft:#172739; --shadow:0 6px 22px rgba(0,0,0,.35);
+  --input:#111A15; --y-ink:#F0D06A; --w-ink:#F0D06A; color-scheme:dark;
+}
+/* chế độ nhúng: bỏ logo + tên app (trang cha đã có), giữ thanh tab, nền trùng trang cha */
+:root[data-nhung] header{position:static;padding:10px 24px;background:transparent}
+:root[data-nhung] header .logo, :root[data-nhung] header .brand{display:none}
+:root[data-nhung] nav{margin-left:0}
+:root[data-nhung] main{padding-top:18px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif;font-size:16px}
+header{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--card);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:5}
+.logo{width:44px;height:44px;border-radius:14px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px}
+header h1{font-size:22px;margin:0;font-weight:900}
+header .sub{color:var(--mute);font-size:13px;font-weight:700}
+nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+nav button{border:0;background:transparent;padding:10px 16px;border-radius:14px;font:800 15px Nunito;color:var(--mute);cursor:pointer}
+nav button.on{background:var(--green-soft);color:var(--green)}
+main{max-width:1760px;margin:0 auto;padding:24px 32px 80px}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:22px;border:1px solid var(--line)}
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:1.25fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+h2{font-size:20px;margin:0 0 14px;font-weight:900}
+h3{font-size:16px;margin:0 0 10px;font-weight:800}
+label{font-weight:800;font-size:14px;color:var(--mute);display:block;margin:0 0 6px}
+select,input[type=number],textarea,input[type=text]{width:100%;padding:12px 14px;border:2px solid var(--line);border-radius:14px;font:700 16px Nunito;color:var(--ink);background:var(--input)}
+textarea{min-height:120px;resize:vertical;line-height:1.5}
+.btn{border:0;border-radius:16px;padding:14px 22px;font:900 17px Nunito;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn.big{padding:18px 30px;font-size:20px}
+.btn.go{background:var(--green);color:#fff;box-shadow:0 6px 0 #1f7a31}
+.btn.go:active{transform:translateY(3px);box-shadow:0 3px 0 #1f7a31}
+.btn.stop{background:var(--red);color:#fff;box-shadow:0 6px 0 #9b161c}
+.btn.soft{background:var(--green-soft);color:var(--green)}
+.btn.ghost{background:var(--card);border:2px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:800;font-size:13px}
+.pill.g{background:var(--green-soft);color:var(--green)} .pill.r{background:var(--red-soft);color:var(--red)}
+.pill.y{background:var(--yellow-soft);color:var(--y-ink)} .pill.b{background:var(--blue-soft);color:var(--blue)}
+.bar{height:16px;background:var(--green-soft);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#3fc25a,var(--green));width:0;transition:width .6s}
+.log{background:#13201A;color:#CFEBD6;border-radius:16px;padding:14px;height:330px;overflow:auto;font:600 13px/1.55 Consolas,monospace;white-space:pre-wrap}
+.log .ok{color:#7CE38F} .log .bad{color:#FF8D8D} .log .warn{color:#FFD86B}
+.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat div{background:var(--bg);border-radius:16px;padding:14px;text-align:center}
+.stat b{display:block;font-size:26px;font-weight:900}
+.stat span{color:var(--mute);font-weight:800;font-size:13px}
+.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+.vid{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;border:2px solid var(--line);display:flex;flex-direction:column}
+.vid.dat{border-color:#8fd9a0} .vid.bo{border-color:#f3a5a8;opacity:.75}
+.thumb{position:relative;aspect-ratio:9/16;background:#000;cursor:pointer}
+.thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .play{position:absolute;inset:0;display:grid;place-items:center;font-size:54px;color:#fff;text-shadow:0 2px 12px #000a}
+.thumb .score{position:absolute;top:10px;left:10px}
+.vid .info{padding:12px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.vid .t{font-weight:900;font-size:15px}
+.vid .m{color:var(--mute);font-weight:700;font-size:13px}
+.vid .act{display:flex;gap:8px;margin-top:auto}
+.vid .act button{flex:1;padding:10px 6px;border-radius:12px;border:0;font:900 15px Nunito;cursor:pointer}
+.b-ok{background:var(--green-soft);color:var(--green)} .b-no{background:var(--red-soft);color:var(--red)} .b-cp{background:var(--blue-soft);color:var(--blue)}
+.modal{position:fixed;inset:0;background:rgba(15,30,20,.72);display:none;z-index:20;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.mbox{background:var(--card);border-radius:24px;display:grid;grid-template-columns:auto minmax(420px,560px);max-height:94vh;overflow:hidden;max-width:96vw}
+.mbox video{height:min(92vh,960px);aspect-ratio:9/16;background:#000;display:block}
+.mside{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.mside .x{align-self:flex-end;border:0;background:var(--bg);border-radius:12px;padding:8px 14px;font:900 16px Nunito;cursor:pointer}
+.cap{background:var(--bg);border-radius:14px;padding:12px;font-weight:700;white-space:pre-wrap;font-size:14px}
+.note{color:var(--mute);font-weight:700;font-size:14px;line-height:1.5}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:14px;font-weight:800;display:none;z-index:30}
+.list li{margin:4px 0;font-weight:700}
+.warnbox{background:var(--yellow-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--w-ink)}
+.errbox{background:var(--red-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--red)}
+.hidden{display:none!important}
+.khothem{margin-top:12px;background:var(--bg);border-radius:16px;padding:12px 14px}
+.khothem .ds{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.khothem label.kt{display:flex;align-items:center;gap:10px;margin:0;padding:8px 12px 8px 8px;border-radius:14px;background:var(--card);border:2px solid var(--line);cursor:pointer;color:var(--ink);font-size:14px}
+.khothem label.kt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.khothem label.kt input{width:18px;height:18px;flex:none}
+.khothem label.kt small{display:block;color:var(--mute);font-weight:700;font-size:12px}
+.khothem details summary{cursor:pointer;font-weight:800;color:var(--mute);font-size:13px;margin-top:10px}
+.sp-anh{width:44px;height:44px;border-radius:12px;object-fit:cover;background:var(--green-soft);border:1px solid var(--line);flex:none;display:block}
+.sp-anh.lg{width:96px;height:96px;border-radius:18px}
+.shop-tim{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.shop-tim input{padding:8px 12px;font-size:14px;border-radius:12px}
+.shop-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px;max-height:258px;overflow:auto;padding:2px}
+.shop-it{display:flex;flex-direction:column;gap:5px;padding:5px;border:2px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;font:700 12px/1.3 Nunito;position:relative}
+.shop-it:hover{border-color:var(--green)}
+.shop-it.chon{border-color:var(--green);background:var(--green-soft)}
+.shop-it img,.shop-it .rong{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--green-soft);display:grid;place-items:center;font-size:24px}
+.shop-it span.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+.shop-it .gan{position:absolute;top:8px;left:8px;background:var(--green);color:#fff;border-radius:8px;padding:1px 6px;font:800 10px Nunito;font-style:normal}
+.shop-chon{display:flex;gap:10px;align-items:center;margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--green-soft)}
+.shop-chon .sp-anh{width:44px;height:44px}
+.sp-anh.rong{display:grid;place-items:center;font-size:20px}
+.sp-anh.lg.rong{font-size:40px}
+.sp-ten{display:flex;align-items:center;gap:10px}
+.nowrap{flex-wrap:nowrap}
+.tmbox{background:var(--card);border:1px solid var(--line);border-radius:24px;width:min(640px,96vw);max-height:90vh;display:flex;flex-direction:column;padding:20px;gap:12px}
+.tmbox h2{margin:0}
+.tmcrumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tmcrumb button{border:0;background:var(--green-soft);color:var(--green);border-radius:10px;padding:5px 10px;font:800 14px Nunito;cursor:pointer}
+.tmds{overflow:auto;min-height:240px;flex:1;border:2px solid var(--line);border-radius:16px;background:var(--input)}
+.tmit{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 14px;font:800 15px Nunito;text-align:left;cursor:pointer}
+.tmit:hover{background:var(--green-soft)}
+.tmit .ten{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input.pick{background:var(--bg);cursor:default}
+@media (max-width:900px){.g2{grid-template-columns:1fr}.mbox{grid-template-columns:1fr}.mbox video{height:60vh}header{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">X</div>
+  <div class="brand"><h1>Xưởng Video</h1><div class="sub" id="hdrSub">ê-kíp AI</div></div>
+  <nav>
+    <button data-tab="sx" class="on">🎬 Sản xuất</button>
+    <button data-tab="kho">📺 Kho video</button>
+    <button data-tab="sp">🎁 Sản phẩm &amp; quà</button>
+    <button data-tab="gu">💬 Gu &amp; bài học</button>
+    <button data-tab="cd">⚙️ Cài đặt</button>
+  </nav>
+</header>
+
+<main>
+<!-- SẢN XUẤT -->
+<section id="sx">
+  <div class="grid g2">
+    <div class="card">
+      <h2>Làm video mới</h2>
+      <div class="grid" style="grid-template-columns:1.4fr 1fr;gap:14px">
+        <div><label>Sản phẩm</label><div class="row nowrap" style="gap:10px"><span id="chonAnh"></span><select id="spChon" style="flex:1;min-width:0"></select></div></div>
+        <div><label>Số video</label><input id="soVideo" type="number" min="1" max="200" value="10"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1.4fr 1fr;gap:14px;margin-top:12px">
+        <div><label>Chạy bằng tài khoản Claude</label><select id="tkDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
+        <div><label>&nbsp;</label><label class="row" style="gap:8px;margin:10px 0 0;color:var(--ink);font-size:15px">
+          <input type="checkbox" id="tkChuyen" style="width:20px;height:20px"> Hết thì tự chuyển tài khoản khác</label></div>
+      </div>
+      <div class="khothem hidden" id="khoThem"></div>
+      <p class="note" id="uocTinh"></p>
+      <div class="row" style="margin-top:6px">
+        <button class="btn go big" id="btnChay">▶ Bắt đầu làm</button>
+        <button class="btn stop hidden" id="btnDung">■ Dừng</button>
+      </div>
+      <div id="trangThai" style="margin-top:18px"></div>
+      <div style="margin-top:16px"><div class="bar"><i id="barFill"></i></div>
+        <p class="note" id="barText" style="margin:8px 0 0">Chưa chạy.</p></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Hôm nay <span class="note" id="stMoc"></span></h2>
+        <button class="btn ghost" id="btnDemLai" style="padding:8px 14px;font-size:14px">↺ Đếm lại từ bây giờ</button></div>
+      <div class="note" id="stUsd" style="margin:6px 0 10px"></div>
+      <div class="stat">
+        <div><b id="stVideo">–</b><span>video đã làm</span></div>
+        <div><b id="stLuot">–</b><span>lượt gọi AI</span></div>
+        <div><b id="stToken">–</b><span>token đã dùng</span></div>
+        <div><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+      </div>
+      <div style="margin-top:16px" id="tkBox"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📊 Chi phí từng lô</h2>
+      <span class="note">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</span></div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px" id="loBang"></table></div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">🤖 Tự động giữ kho video</h2>
+      <label class="row" style="gap:8px;margin:0;font-size:16px;color:var(--ink)"><input type="checkbox" id="tdBat" style="width:22px;height:22px"> Bật tự động</label>
+    </div>
+    <p class="note">App tự đếm video còn <b>tồn</b> (chưa đăng, chưa bị ❌). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
+      App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
+      <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video chưa đăng, chưa bị ❌ (đỏ = dưới mức) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
+      <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px" id="tdBang"></table>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <span class="note" id="tdTrangThai"></span>
+      <div class="row"><span class="note">Kiểm mỗi</span><input type="number" id="tdPhut" min="5" value="15" style="width:90px"><span class="note">phút</span>
+        <button class="btn go" id="btnLuuTd">💾 Lưu tự động</button></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Nhật ký đang làm gì</h2>
+      <span class="note">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</span></div>
+    <div class="log" id="log" style="margin-top:12px">…</div>
+  </div>
+</section>
+
+<!-- KHO VIDEO -->
+<section id="kho" class="hidden">
+  <div class="card" style="margin-bottom:18px">
+    <div class="row">
+      <div style="width:220px"><label>Ngày</label><select id="ngayChon"></select></div>
+      <div style="width:220px"><label>Lọc</label><select id="locChon">
+        <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng ✅</option><option value="bo">Anh bỏ ❌</option></select></div>
+      <div style="margin-left:auto" class="row">
+        <button class="btn soft" id="btnMoThuMuc">📂 Mở thư mục</button>
+        <button class="btn ghost" id="btnTaiLai">↻ Tải lại</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);gap:10px">
+      <label class="row" style="gap:8px;margin:0;color:var(--ink);font-size:15px"><input type="checkbox" id="tdyBat" style="width:20px;height:20px"> 🤖 Tự duyệt theo điểm giám khảo</label>
+      <span class="note">Đạt (✅) khi điểm ≥</span><input type="number" id="tdyDat" min="0" max="10" step="0.5" value="7" style="width:80px">
+      <span class="note">· Tự bỏ (❌) khi điểm &lt;</span><input type="number" id="tdyBo" min="0" max="10" step="0.5" value="0" style="width:80px"><span class="note">(0 = không tự bỏ)</span>
+      <button class="btn go" id="btnTdy" style="padding:10px 16px;font-size:15px">💾 Lưu &amp; áp dụng</button>
+      <button class="btn soft" id="btnLamLaiAll" style="padding:10px 16px;font-size:15px">🔁 Làm lại các video ❌ (theo góp ý)</button>
+    </div>
+    <p class="note" style="margin:8px 0 0">Tự duyệt chỉ áp cho video anh CHƯA đánh giá, không đè đánh giá tay. Làm lại: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý anh ghi; bản cũ cất vào _ban-chua-dat.</p>
+    <p class="note" style="margin:12px 0 0">Bấm vào video để xem to. ✅ Ưng / ❌ Bỏ kèm một dòng góp ý → ê-kíp AI đọc sổ gu này ở mọi lần làm sau.</p>
+  </div>
+  <div class="vids" id="vids"></div>
+</section>
+
+<!-- SẢN PHẨM -->
+<section id="sp" class="hidden">
+  <div class="card" style="margin-bottom:18px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📦 Tất cả sản phẩm <span class="note" id="tqTom"></span></h2>
+      <button class="btn ghost" id="btnTqMoi">↻ Đếm lại</button></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:12px" id="tqBang"></table>
+    <p class="note">🗑 Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm KHÔNG bị xoá.</p>
+  </div>
+  <div class="grid g2" style="margin-bottom:18px">
+    <div class="card"><h2>➕ Thêm sản phẩm mới</h2>
+      <div style="margin-bottom:12px"><label>Loại</label>
+        <select id="mLoai"><option value="ban">Sản phẩm bán (làm video bán hàng)</option><option value="kho-chung">Kho cảnh chung (chỉ cho sản phẩm khác mượn cảnh)</option></select></div>
+      <div id="mShopBox" style="margin-bottom:12px"><label>① Chọn sản phẩm từ TikTok Shop</label>
+        <div id="mShopLuoi"></div>
+        <div class="shop-chon hidden" id="mShopChon"></div>
+        <div class="note" style="margin-top:6px"><a href="#" id="mTay">Không có trên Shop? Thêm tay</a></div></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        <div><label id="mTenNhan">Tên gọi trong video</label><input type="text" id="mTenSp" placeholder="vd. Đạm cá Toàn Cầu"></div>
+        <div id="mDocWrap"><label>Cách đọc tên (nếu có chữ/số khó đọc)</label><input type="text" id="mDoc" placeholder="vd. TC01=Tê Xê Không Một"></div>
+      </div>
+      <div style="margin-top:12px"><label id="mKhoNhan">② Thư mục kho video</label>
+        <div class="row nowrap" style="gap:10px"><input type="text" id="mKho" class="pick" placeholder="Bấm &quot;Chọn thư mục&quot; bên cạnh" style="flex:1;min-width:0">
+          <button class="btn soft" id="btnMKho" style="white-space:nowrap">📁 Chọn thư mục</button></div></div>
+      <div style="margin-top:12px" id="mAnhTay" class="hidden"><label>Ảnh sản phẩm (để dễ nhận ra)</label>
+        <div class="row nowrap" style="gap:14px"><span id="mAnhXem"><span class="sp-anh lg rong">📦</span></span>
+          <div><div class="row" style="gap:8px"><button class="btn soft" id="btnMAnhFile" style="padding:10px 14px;font-size:15px">🖼 Chọn ảnh</button>
+            <button class="btn soft" id="btnMAnhVid" style="padding:10px 14px;font-size:15px">🎞 Lấy ảnh từ video</button></div>
+            <div class="note" style="margin-top:6px">Không chọn cũng được — hub tự lấy 1 khung hình từ video. <a href="#" id="mShopLai">← Chọn từ TikTok Shop</a></div></div></div></div>
+      <div class="row" style="margin-top:12px"><button class="btn go" id="btnTaoSp">➕ Tạo sản phẩm</button>
+        <span class="note" id="mGhiChu">Tạo xong: điền sự thật + quà tặng bên dưới → bấm "Chuẩn bị kho".</span></div>
+    </div>
+    <div class="card"><h2>🎞 Kho cảnh của sản phẩm</h2>
+      <div class="row nowrap" style="gap:14px;align-items:flex-start"><span id="khoAnh"></span><div id="khoInfo" class="note" style="min-width:0">Chọn sản phẩm bên dưới.</div></div>
+      <div class="row" style="margin-top:12px"><button class="btn go" id="btnHoc">🧠 Học cảnh</button>
+        <button class="btn ghost" id="btnAgy2" title="Trạng thái Antigravity / model" style="padding:8px 12px;font-size:14px">⚙ Antigravity</button>
+        <button class="btn soft" id="btnKho">🧩 Chuẩn bị kho (nạp cảnh + AI soát)</button>
+        <button class="btn soft" id="btnKiem">🩺 Kiểm định dạng</button></div>
+      <div id="hocBox" class="hidden" style="margin-top:12px"><div class="bar"><i id="hocFill"></i></div>
+        <p class="note" id="hocText" style="margin:8px 0 0"></p></div>
+      <div id="hocSetup" class="hidden" style="margin-top:12px;border:2px solid var(--line);border-radius:16px;padding:10px 14px">
+        <div class="row nowrap" style="gap:10px"><b id="agyTt" style="flex:1">Antigravity: …</b>
+          <button class="btn soft hidden" id="btnAgyMo" style="padding:8px 14px;font-size:14px">Mở Antigravity</button>
+          <select id="hsModel" title="Model học cảnh" style="max-width:170px"></select>
+          <button class="btn ghost" id="btnHsDong" title="Thu gọn" style="padding:4px 10px;font-size:14px">✕</button></div>
+      </div>
+      <div id="hocLoi" class="note" style="margin-top:6px"></div>
+      <div id="kdBox" class="hidden" style="margin-top:12px;border:2px solid var(--line);border-radius:16px;padding:14px"></div>
+      <p class="note">Bấm <b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
+        <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</p>
+      <div class="log" id="khoLog" style="height:120px;margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="row nowrap" style="gap:16px"><span id="spAnh"></span>
+        <div style="width:280px"><label>Sản phẩm</label><select id="spSua"></select>
+          <div class="row" style="gap:8px;margin-top:8px"><button class="btn soft" id="btnSAnhFile" style="padding:8px 12px;font-size:14px">🖼 Chọn ảnh</button>
+            <button class="btn soft" id="btnSAnhVid" style="padding:8px 12px;font-size:14px">🎞 Lấy ảnh từ video</button>
+            <button class="btn soft" id="btnSAnhShop" style="padding:8px 12px;font-size:14px">🛍 Đổi ảnh: lấy từ TikTok Shop</button></div></div></div>
+      <button class="btn go" id="btnLuuSp">💾 Lưu</button>
+    </div>
+    <div id="sShopBox" class="hidden" style="margin-top:12px"><div id="sShopLuoi"></div></div>
+    <div class="warnbox hidden" id="spChungNote" style="margin-top:14px;background:var(--green-soft);color:var(--green)">Kho cảnh chung: chỉ để sản phẩm khác mượn cảnh khi làm video. Không bán, không quà tặng, không có lời nói.</div>
+    <label class="row hidden" id="spChungMd" style="gap:8px;margin:12px 0 0;color:var(--ink);font-size:15px"><input type="checkbox" id="spTron" style="width:20px;height:20px"> Tự trộn vào video của mọi sản phẩm (khi anh chưa chọn kho phụ)</label>
+    <div class="grid g2" id="spBan1" style="margin-top:18px">
+      <div><h3>🎁 Quà tặng chương trình (mỗi dòng 1 mức)</h3>
+        <textarea id="qua" style="min-height:190px" placeholder="Mua 1 chai: tặng 1 gói siêu kali bo"></textarea>
+        <p class="note">Biên kịch chỉ được nói đúng các mức quà ở đây. Đổi quà (vd. Nano Lân) thì sửa rồi bấm Lưu. Không ghi giá.</p></div>
+      <div><h3>🚫 Không được nói</h3><textarea id="cam" style="min-height:190px"></textarea></div>
+    </div>
+    <div class="grid" style="grid-template-columns:2fr 1fr;gap:12px;margin-top:12px">
+      <div><label>Thư mục kho video</label><div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn soft" id="btnSKho" style="white-space:nowrap">📁 Chọn thư mục</button></div></div>
+      <div id="spBan2"><label>Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
+    </div>
+    <div id="spBan3"><div class="row" style="margin-top:12px;justify-content:space-between"><h3 style="margin:0">✔ Sự thật được nói về sản phẩm (anh đã xác nhận)</h3>
+      <button class="btn soft" id="btnDocNhan">🔍 AI đọc nhãn, điền gợi ý</button></div>
+    <p class="note">AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới. Anh kiểm, xoá dòng sai, rồi bấm Lưu.</p>
+    <textarea id="suThat" style="min-height:170px"></textarea></div>
+  </div>
+</section>
+
+<!-- GU -->
+<section id="gu" class="hidden">
+  <div class="grid g2">
+    <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Sổ gu của anh</h2>
+      <button class="btn go" id="btnLuuGu">💾 Lưu</button></div>
+      <p class="note">Ghi điều anh thích / không thích. Biên kịch, đạo diễn và giám khảo đều đọc trước khi làm.</p>
+      <textarea id="soGu" style="min-height:420px" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
+    <div class="card"><h2>Bài học giám khảo tự ghi</h2>
+      <p class="note">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn tránh lặp lại.</p>
+      <div class="cap" id="baiHoc" style="min-height:420px"></div></div>
+  </div>
+</section>
+
+<!-- CÀI ĐẶT -->
+<section id="cd" class="hidden">
+  <div class="grid g2">
+    <div class="card" style="grid-column:1/-1"><div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">🔑 Tài khoản Claude (hub tự chuyển tài khoản còn dư)</h2>
+      <div class="row"><button class="btn ghost" id="btnKiemTk">↻ Làm mới</button><button class="btn soft" id="btnThemTk">➕ Thêm tài khoản</button></div></div>
+      <div id="tkChiTiet" style="margin-top:12px" class="note">Đang kiểm…</div>
+      <p class="note">Mỗi tài khoản đăng nhập riêng: bấm 🔑 Đăng nhập → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
+        Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
+        tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi cả 3 đều hết.</p>
+    </div>
+    <div class="card"><h2>🔗 Kết nối app TikTok Auto Kid</h2>
+      <div class="note">Kết nối tự động, không cần nhập gì. Cổng nội bộ: <b id="tpDiaChi">…</b></div>
+      <p class="note">App chỉ lấy video anh đã bấm ✅ Ưng và chưa đăng. Đăng xong / lỗi đăng sẽ hiện ngay trong Kho video.</p>
+    </div>
+    <div class="card"><h2>💾 Ổ đĩa</h2>
+      <div id="oDia" class="note">Đang tính…</div>
+      <p class="note">Hub tự dọn file tạm (bản dựng dở, giọng cũ hơn 7 ngày, bản giám khảo chưa đạt cũ hơn 5 ngày) sau mỗi lô và mỗi lần mở app.
+        Video thành phẩm KHÔNG bao giờ tự xoá — ngày nào đã đăng xong anh tự chép ra ổ khác hoặc xoá.</p>
+    </div>
+    <div class="card" style="grid-column:1/-1"><h2>🎵 Nhạc &amp; âm thanh</h2>
+      <div id="nhMacDinh" class="row" style="justify-content:space-between;gap:12px"><span class="note">Đang kiểm…</span></div>
+      <div id="nhTai" class="note hidden" style="margin-top:8px"></div>
+      <div class="grid g2" style="margin-top:14px;gap:18px">
+        <div><label>Thư mục nhạc của tôi</label><div id="nhDsNhac"></div>
+          <button class="btn soft" id="btnNhacThem" style="margin-top:8px">📁 Chọn thư mục</button></div>
+        <div><label>Thư mục âm thanh (SFX) của tôi</label><div id="nhDsSfx"></div>
+          <button class="btn soft" id="btnSfxThem" style="margin-top:8px">📁 Chọn thư mục</button></div>
+      </div>
+      <p class="note">Hub chọn nhạc/âm thanh từ kho mặc định + mọi thư mục đang bật. Nhạc của anh không có nhãn nên coi là "chung" (hợp mọi kiểu video), chỉ dùng bài dài từ 40 giây.
+        SFX được xếp nhóm theo tên thư mục con hoặc tên file (whoosh, impact, click, ding, coin…); file không đoán được thì bỏ qua. Hỗ trợ mp3, wav, m4a, ogg, flac.</p>
+    </div>
+    <div class="card"><h2>Chất lượng AI</h2>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px">
+        <div><label>Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
+        <div><label>Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
+        <div><label>Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
+      </div>
+      <div class="row" style="margin-top:14px"><button class="btn go" id="btnLuuCd">💾 Lưu cài đặt</button></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="modal" id="modal"><div class="mbox">
+  <video id="mVideo" controls playsinline></video>
+  <div class="mside">
+    <button class="x" id="mDong">✕ Đóng</button>
+    <div class="t" id="mTen" style="font-weight:900;font-size:17px"></div>
+    <div id="mPills" class="row"></div>
+    <div><h3>Caption để đăng</h3><div class="cap" id="mCap"></div>
+      <div class="row" style="margin-top:8px"><button class="btn soft" id="mCopy">📋 Chép caption</button>
+        <a class="btn ghost" id="mBia" download>🖼 Tải ảnh bìa</a></div></div>
+    <div id="mGk"></div>
+    <div><h3>Đánh giá của anh</h3>
+      <textarea id="mGop" style="min-height:80px" placeholder="Góp ý 1 dòng (không bắt buộc): vd. mở đầu chậm, cảnh rễ đẹp…"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn go" id="mOk">✅ Ưng</button><button class="btn stop" id="mNo">❌ Bỏ</button>
+        <button class="btn soft" id="mLamLai">🔁 Làm lại theo góp ý</button></div></div>
+    <details><summary class="note">Lời đọc</summary><div class="note" id="mLoi"></div></details>
+  </div>
+</div></div>
+<div class="modal" id="tmModal"><div class="tmbox">
+  <h2 id="tmTieuDe">📁 Chọn thư mục kho video</h2>
+  <div class="tmcrumb" id="tmCrumb"></div>
+  <div class="tmds" id="tmDs"></div>
+  <div class="note" id="tmInfo"></div>
+  <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="tmDong">Đóng</button>
+    <button class="btn go" id="tmChon" disabled>✔ Chọn thư mục này</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = (u, b) => fetch(u, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}).then(r => r.json());
+const toast = t => { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 2600); };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+// ---------- ẢNH SẢN PHẨM
+const anhSp = (u, c = '') => u ? `<img class="sp-anh ${c}" src="${esc(u)}" alt="" loading="lazy" onerror="anhLoi(this)">` : `<span class="sp-anh rong ${c}">📦</span>`;
+function anhLoi(i) { const s = document.createElement('span'); s.className = i.className + ' rong'; s.textContent = '📦'; i.replaceWith(s); }
+const urlAnh = ma => ma ? ((((typeof ST !== 'undefined' && ST.san_pham) || []).find(p => p.ma === ma) || {}).anh || '/api/anh-sp/' + ma) : '';
+// ---------- DÙNG THÊM CẢNH TỪ KHO KHÁC (kho phụ)
+const KT = {ma: null};
+function khoThemChon() { return [...document.querySelectorAll('#khoThem input[data-kt]:checked')].map(i => i.dataset.kt); }
+function veKhoThem() {
+  const box = $('#khoThem'), ma = $('#spChon').value, sp = ((typeof ST !== 'undefined' && ST.san_pham) || []).find(p => p.ma === ma);
+  if (!sp) { box.classList.add('hidden'); return; }
+  if (KT.ma === ma && box.innerHTML) return;           // cùng sản phẩm: giữ nguyên ô đã tích (capNhat chạy 3 giây/lần)
+  KT.ma = ma;
+  const chon = new Set(sp.kho_them || []);
+  const lab = p => `<label class="kt">${anhSp(p.anh)}<input type="checkbox" data-kt="${esc(p.ma)}" ${chon.has(p.ma) ? 'checked' : ''}><span>${esc(p.ten)}<small>${p.so_dung_duoc ?? p.so_canh} cảnh dùng được</small></span></label>`;
+  const chung = ST.san_pham.filter(p => p.loai === 'kho-chung' && p.so_canh > 0);
+  const khac = ST.san_pham.filter(p => p.loai !== 'kho-chung' && p.ma !== ma && p.so_canh > 0);
+  if (!chung.length && !khac.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = `<b>Dùng thêm cảnh từ kho khác?</b> <span class="note">Chỉ làm cảnh phụ (b-roll), tối đa khoảng 30% số cảnh; cảnh chính vẫn từ kho của sản phẩm. Hub nhớ lựa chọn này cho lần sau và cho chế độ tự động.</span>` +
+    (chung.length ? `<div class="ds">${chung.map(lab).join('')}</div>` : '') +
+    (khac.length ? `<details ${khac.some(p => chon.has(p.ma)) ? 'open' : ''}><summary>Kho của sản phẩm khác (${khac.length})</summary><div class="ds">${khac.map(lab).join('')}</div></details>` : '');
+  box.querySelectorAll('input[data-kt]').forEach(i => i.onchange = async () => {
+    const ds = khoThemChon(); sp.kho_them = ds;
+    const r = await api('/api/kho-them', {san_pham: ma, kho_them: ds}); toast(r.ok ? 'Đã nhớ lựa chọn kho phụ' : (r.loi || 'Không lưu được'));
+  });
+}
+function hienAnhChon() { const v = $('#spChon').value; $('#chonAnh').innerHTML = v ? anhSp(urlAnh(v)) : ''; }
+function hienAnhSua(url) { const m = $('#spSua').value; url = url || urlAnh(m); $('#spAnh').innerHTML = anhSp(url, 'lg'); $('#khoAnh').innerHTML = anhSp(url, 'lg'); }
+// đọc file ảnh → thu nhỏ (cạnh dài ≤ 800px) → data URL jpg; không đọc được thì gửi nguyên bản
+function docAnh(file) {
+  return new Promise((ok, loi) => {
+    const fr = new FileReader();
+    fr.onerror = () => loi(new Error('Không đọc được file ảnh'));
+    fr.onload = () => {
+      const im = new Image();
+      im.onerror = () => ok(fr.result);
+      im.onload = () => {
+        const k = Math.min(1, 800 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+        ok(c.toDataURL('image/jpeg', 0.9));
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function chonFileAnh() {
+  return new Promise(ok => {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
+    i.onchange = async () => { if (!i.files[0]) return ok(null); try { ok(await docAnh(i.files[0])); } catch (e) { toast(e.message); ok(null); } };
+    i.click();
+  });
+}
+// ---------- TRÌNH CHỌN THƯ MỤC
+const TM = {cb: null, cur: '', am: false};
+function moThuMuc(giaTri, cb, am) { TM.cb = cb; TM.am = !!am; $('#tmTieuDe').textContent = am ? '📁 Chọn thư mục nhạc / âm thanh' : '📁 Chọn thư mục kho video'; $('#tmModal').classList.add('on'); tmTai((giaTri || '').trim() || undefined); }
+async function tmTai(p) {
+  $('#tmDs').innerHTML = '<div class="note" style="padding:14px">⏳ Đang mở…</div>'; $('#tmChon').disabled = true;
+  let r;
+  try { r = await api('/api/thu-muc' + (p === undefined ? '' : '?p=' + encodeURIComponent(p))); } catch (e) { r = {ok: false, loi: 'Không kết nối được app.'}; }
+  TM.cur = r.ok && !r.la_o_dia ? r.duong_dan : '';
+  const nut = (t, d) => `<button data-p="${esc(d)}">${esc(t)}</button>`;
+  $('#tmCrumb').innerHTML = nut('💽 Các ổ đĩa', '@') + (r.duong || []).map(x => '<span class="note">›</span>' + nut(x.ten, x.duong_dan)).join('');
+  let h = '';
+  if (r.cha) h += `<button class="tmit" data-p="${esc(r.cha)}"><span>⬆️</span><span class="ten">Lên thư mục trên</span></button>`;
+  if (!r.ok) h += `<div class="errbox" style="margin:12px">${esc(r.loi || 'Không mở được.')}</div>`;
+  else {
+    h += (r.muc || []).map(m => `<button class="tmit" data-p="${esc(m.duong_dan)}"><span>${r.la_o_dia ? '💽' : '📁'}</span>
+      <span class="ten">${esc(m.ten)}${m.mo_ta ? ` <span class="note">${esc(m.mo_ta)}</span>` : ''}</span>` +
+      (m.so_video && !TM.am ? `<span class="pill g">🎥 ${m.so_video} video</span>` : '') + '</button>').join('');
+    if (!(r.muc || []).length) h += '<div class="note" style="padding:14px">Thư mục này không có thư mục con.</div>';
+    if (r.cat_bot) h += '<div class="note" style="padding:10px 14px">Chỉ hiện 500 thư mục đầu.</div>';
+  }
+  $('#tmDs').innerHTML = h; $('#tmDs').scrollTop = 0;
+  $('#tmInfo').innerHTML = r.ok && !r.la_o_dia ? (TM.am ? `📍 ${esc(r.duong_dan)}` : `📍 ${esc(r.duong_dan)} — có <b>${r.so_video || 0}</b> video ngay trong thư mục này`) : (r.ok ? 'Chọn ổ đĩa rồi mở dần vào thư mục anh cần.' : '');
+  $('#tmChon').disabled = !TM.cur;
+  document.querySelectorAll('#tmCrumb [data-p], #tmDs [data-p]').forEach(b => b.onclick = () => tmTai(b.dataset.p));
+}
+$('#tmDong').onclick = () => $('#tmModal').classList.remove('on');
+$('#tmChon').onclick = () => { $('#tmModal').classList.remove('on'); if (TM.cb && TM.cur) TM.cb(TM.cur); };
+let ST = {}, VIDS = [], CUR = null;
+
+const TAB_TEN = {sx: 'san-xuat', kho: 'kho', sp: 'san-pham', gu: 'gu', cd: 'cai-dat'};
+const TAB_MA = Object.fromEntries(Object.entries(TAB_TEN).map(([k, v]) => [v, k]));
+const CHA = /^http:\/\/(localhost|127\.0\.0\.1):8010$/;          // chỉ nghe lệnh từ TikTok Auto Kid
+function moTab(ten, bao = true) {
+  const b = document.querySelector(`nav button[data-tab="${TAB_MA[ten] || ten}"]`);
+  if (b) { b._bao = bao; b.click(); }
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  const ten = TAB_TEN[b.dataset.tab] || b.dataset.tab;
+  const q = new URLSearchParams(location.search); q.set('tab', ten);   // giữ URL đúng tab (tải lại vẫn đúng chỗ)
+  history.replaceState(null, '', location.pathname + '?' + q.toString());
+  if (window.parent !== window && b._bao !== false) window.parent.postMessage({type: 'xuong-video:tab', tab: ten}, '*');
+  b._bao = true;
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('main>section').forEach(s => s.classList.toggle('hidden', s.id !== b.dataset.tab));
+  if (b.dataset.tab === 'kho') { taiNgay(); taiTdy(); }
+  if (b.dataset.tab === 'sp') { taiSp(); taiTongQuan(); }
+  if (b.dataset.tab === 'gu') taiGu();
+  if (b.dataset.tab === 'cd') taiCd();
+});
+
+function mau(l) {
+  if (/HẾT HẠN|LỖI|lỗi|DỪNG/.test(l)) return 'bad';
+  if (/CHƯA ĐẠT|cảnh báo|dựng lại|loại/.test(l)) return 'warn';
+  if (/XONG|ĐẠT|\[\d+\/\d+\]|OK/.test(l)) return 'ok';
+  return '';
+}
+async function capNhat() {
+  ST = await api('/api/trang-thai');
+  const sel = $('#spChon');
+  if (!sel.options.length) {
+    ST.san_pham.filter(p => p.loai !== 'kho-chung').forEach(p => { const o = new Option(`${p.ten} (${p.so_canh} cảnh)${p.san_sang ? '' : ' — thiếu: ' + p.thieu.join(', ')}`, p.ma); o.disabled = !p.san_sang; sel.add(o); });
+    const tot = ST.san_pham.find(p => p.san_sang && p.ma === 'tc01') || ST.san_pham.find(p => p.san_sang); if (tot) sel.value = tot.ma;
+  }
+  if (!$('#spSua').options.length) { ST.san_pham.forEach(p => $('#spSua').add(new Option(p.ten, p.ma))); hienAnhSua(); }
+  hienAnhChon(); veKhoThem();
+  const td = ST.tien_do, chay = ST.dang_chay;
+  $('#btnChay').classList.toggle('hidden', chay); $('#btnDung').classList.toggle('hidden', !chay || ST.chay_ngoai_app);
+  const pct = td.tong ? Math.round(100 * td.xong / td.tong) : 0;
+  $('#barFill').style.width = (chay ? Math.max(4, pct) : (td.da_xong ? 100 : pct)) + '%';
+  $('#barText').textContent = chay ? `Đang làm: ${td.xong}/${td.tong} video xong${ST.chay_ngoai_app ? ' (đang chạy từ cửa sổ lệnh)' : ''}…`
+    : td.da_xong ? `Lô gần nhất xong: ${td.xong}/${td.tong} video.` : (td.tong ? `Lô gần nhất dừng ở ${td.xong}/${td.tong}.` : 'Chưa chạy.');
+  $('#trangThai').innerHTML = td.het_han_muc && !chay
+    ? `<div class="errbox">⛔ Hết hạn mức Claude. Vào ⚙️ Cài đặt → Đăng nhập / Đổi tài khoản, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '';
+  const lg = $('#log'), dinh = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
+  lg.innerHTML = (ST.nhat_ky.length ? ST.nhat_ky : ['(chưa có nhật ký)']).map(l => `<div class="${mau(l)}">${esc(l)}</div>`).join('');
+  if (dinh) lg.scrollTop = lg.scrollHeight;
+  $('#stLuot').textContent = ST.token.luot; $('#stVideo').textContent = ST.token.video;
+  $('#stKyTu').textContent = (ST.token.ky_tu || 0).toLocaleString('vi-VN');
+  $('#stMoc').textContent = ST.token.moc && ST.token.moc !== '00:00' ? '(từ ' + ST.token.moc + ')' : '';
+  $('#stUsd').textContent = ST.token.luot ? `Quy đổi ≈ ${ST.token.usd} USD (CLI tự tính để so độ hao hạn mức; gói đăng ký không bị trừ tiền)` +
+    (ST.token.video ? ` · ≈ ${Math.round(ST.token.token / ST.token.video / 1000)}k token/video` : '') : ''; $('#stToken').textContent = ST.token.token > 999999 ? (ST.token.token / 1e6).toFixed(2) + ' tr' : Math.round(ST.token.token / 1000) + ' k';
+  $('#hdrSub').textContent = `Ê-kíp AI · ${ST.claude.model === 'opus' ? 'Opus 5.5' : 'Sonnet 5.5'} · suy nghĩ ${({high: 'cao', medium: 'vừa', low: 'thấp'})[ST.claude.effort] || ''}`;
+  const n = +$('#soVideo').value || 0;
+  $('#uocTinh').textContent = `Ước tính: khoảng ${Math.max(1, Math.round(n * 2.8))} phút · ${Math.ceil(n / ST.video_moi_giong)} lời đọc × ${ST.video_moi_giong} đạo diễn. Có thể tắt màn hình, máy vẫn làm.`;
+}
+$('#btnDemLai').onclick = async () => { if (!confirm('Đặt lại số "Hôm nay" về 0, đếm từ bây giờ?')) return; await api('/api/dem-lai', {}); toast('Đã đặt lại'); capNhat(); };
+async function demHomNay() { return;
+  const ngay = new Date().toLocaleDateString('sv');
+  const v = await api('/api/video?ngay=' + ngay); $('#stVideo').textContent = v.length;
+}
+function vach(o, nhan) {
+  if (!o) return `<div class="note">${nhan}: chưa có số</div>`;
+  const qua = o.reset && o.reset * 1000 < Date.now(); const p = qua ? 0 : Math.round((o.pct || 0) * 100);
+  const mau = p >= 90 ? 'var(--red)' : p >= 70 ? '#e0a100' : 'var(--green)';
+  const gio = o.reset ? new Date(o.reset * 1000).toLocaleString('vi-VN', {hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'}) : '';
+  return `<div class="note" style="margin:2px 0">${nhan}: <b style="color:${mau}">${p}%</b>${gio && !qua ? ` · reset ${gio}` : ''}</div>
+    <div class="bar" style="height:8px"><i style="width:${p}%;background:${mau}"></i></div>`;
+}
+async function taiTk(moi) {
+  const ds = await api('/api/tai-khoan-ds' + (moi ? '?moi=1' : ''));
+  const the = t => {
+    const het = t.het_den && t.het_den * 1000 > Date.now();
+    const tt = !t.dang_nhap ? '<span class="pill r">Chưa đăng nhập</span>' : het ? `<span class="pill r">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g">Sẵn sàng</span>';
+    return `<div style="border:2px solid var(--line);border-radius:16px;padding:12px">
+      <div class="row" style="justify-content:space-between"><b>${esc(t.ten)}</b>${tt}</div>
+      <div class="note" style="margin:4px 0 8px">${esc(t.email || '—')} ${t.goi ? '· gói ' + esc(t.goi) : ''}</div>
+      ${vach(t.five_hour, 'Phiên 5 giờ')}${vach(t.seven_day, 'Cả tuần')}
+      <div class="note" style="margin:6px 0 0;font-size:12px">${t.cap_nhat ? 'cập nhật lúc ' + new Date(t.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'chưa cập nhật'}</div>
+      <div class="row" style="margin-top:10px;gap:6px">
+        <button class="btn go" style="padding:6px 10px;font-size:14px" data-dung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>▶ Dùng TK này</button>
+        <button class="btn soft" style="padding:6px 10px;font-size:14px" data-dn="${t.ma}">🔑 Đăng nhập</button>
+        <button class="btn ghost" style="padding:6px 10px;font-size:14px" data-kiem="${t.ma}">📊 Kiểm hạn mức</button>
+        <button class="btn ghost" style="padding:6px 10px;font-size:14px;color:var(--red)" data-bo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
+  };
+  const sel = $('#tkDung'), giu = ST.tai_khoan_dung || sel.value;
+  sel.innerHTML = '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => {
+    const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
+    const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
+    const het = t.het_den && t.het_den * 1000 > Date.now();
+    return `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : het ? 'HẾT hạn mức' : `5 giờ ${p ?? '?'}% · tuần ${w ?? '?'}%`}</option>`; }).join('');
+  sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
+  $('#tkChuyen').checked = ST.tu_chuyen !== false;
+  $('#tkChiTiet').innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${ds.map(the).join('')}</div>`;
+  $('#tkBox').innerHTML = '<h3>Tài khoản Claude</h3>' + ds.map(t => { const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
+    return `<div class="note">${esc(t.ten)}: ${t.dang_nhap ? (p === null ? 'chưa có số' : `5 giờ ${p}%` + (t.seven_day ? ` · tuần ${Math.round(t.seven_day.pct * 100)}%` : '')) : '<b style="color:var(--red)">chưa đăng nhập</b>'}</div>`; }).join('');
+  document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => { await api('/api/cai-dat', {tai_khoan_dung: b.dataset.dung});
+    ST.tai_khoan_dung = b.dataset.dung; toast('Hub sẽ chạy bằng tài khoản này'); taiTk(); });
+  document.querySelectorAll('[data-dn]').forEach(b => b.onclick = async () => { await api('/api/tai-khoan-dang-nhap/' + b.dataset.dn, {}); toast('Đã mở cửa sổ đăng nhập'); });
+  document.querySelectorAll('[data-kiem]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳…';
+    const r = await api('/api/tai-khoan-kiem/' + b.dataset.kiem, {}); toast(r.ok ? 'Đã cập nhật hạn mức' : r.loi); taiTk(); });
+  document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => { if (!confirm('Bỏ "' + b.dataset.ten + '" khỏi danh sách hub dùng?')) return;
+    const r = await api('/api/tai-khoan-bo/' + b.dataset.bo, {}); toast(r.ok ? 'Đã bỏ' : r.loi); taiTk(true); });
+}
+setInterval(() => { if (!document.hidden) taiTk().catch(() => {}); }, 60000);   // tự làm mới số hạn mức mỗi 60 giây
+$('#tkDung').onchange = async () => { await api('/api/cai-dat', {tai_khoan_dung: $('#tkDung').value}); ST.tai_khoan_dung = $('#tkDung').value;
+  toast($('#tkDung').value === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản đã chọn'); };
+$('#tkChuyen').onchange = async () => { await api('/api/cai-dat', {tu_chuyen: $('#tkChuyen').checked}); ST.tu_chuyen = $('#tkChuyen').checked; };
+$('#btnThemTk').onclick = async () => { const ten = prompt('Tên tài khoản (vd. Tài khoản 4):'); if (ten === null) return;
+  await api('/api/tai-khoan-them', {ten}); toast('Đã thêm — bấm 🔑 Đăng nhập ở thẻ mới'); taiTk(true); };
+$('#soVideo').oninput = capNhat;
+$('#btnChay').onclick = async () => {
+  const sp = $('#spChon').value, n = +$('#soVideo').value;
+  if (!confirm(`Làm ${n} video cho ${$('#spChon').selectedOptions[0].text}?`)) return;
+  const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon()});
+  toast(r.ok ? 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.' : r.loi); capNhat();
+};
+$('#btnDung').onclick = async () => { if (confirm('Dừng lô đang làm? Video đã xong vẫn giữ.')) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
+
+// ---------- KHO VIDEO
+async function taiNgay() {
+  const ds = await api('/api/ngay'); const s = $('#ngayChon'); const cu = s.value; s.innerHTML = '';
+  ds.forEach(d => s.add(new Option(d.split('-').reverse().join('/'), d))); if (cu) s.value = cu; taiVideo();
+}
+async function taiVideo() { VIDS = await api('/api/video?ngay=' + $('#ngayChon').value); veVideo(); }
+function veVideo() {
+  const loc = $('#locChon').value;
+  const ds = VIDS.filter(v => !loc || (loc === 'chua' ? !v.danh_gia.ket_qua : v.danh_gia.ket_qua === loc));
+  $('#vids').innerHTML = ds.length ? ds.map((v, i) => {
+    const dg = v.danh_gia.ket_qua; const diem = v.diem ? `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'} score">⭐ ${v.diem}/10</span>` : '';
+    return `<div class="vid ${dg || ''}" data-f="${esc(v.file)}">
+      <div class="thumb" data-i="${VIDS.indexOf(v)}">${v.bia ? `<img src="${v.bia}" style="width:100%;height:100%;object-fit:cover;display:block">` : `<video src="${v.url}#t=1.2" preload="metadata" muted></video>`}<div class="play">▶</div>${diem}</div>
+      <div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
+        <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + v.luc : ''}</div>
+        ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : 'r'}">${v.danh_gia.tu_dong ? '🤖 ' : ''}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt ✅' : '✅ Anh ưng') : (v.danh_gia.tu_dong ? 'Tự bỏ ❌' : '❌ Anh bỏ')}</span>` : ''}
+        ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">📤 Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
+        ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">⚠ Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}
+        <div class="act"><button class="b-ok" data-dg="dat">✅</button><button class="b-no" data-dg="bo">❌</button><button class="b-cp">📋 Caption</button></div></div></div>`;
+  }).join('') : '<div class="card note">Chưa có video ngày này.</div>';
+  document.querySelectorAll('.thumb').forEach(t => t.onclick = () => moVideo(VIDS[+t.dataset.i]));
+  document.querySelectorAll('.vid').forEach(c => {
+    const v = VIDS.find(x => x.file === c.dataset.f);
+    c.querySelectorAll('[data-dg]').forEach(b => b.onclick = () => danhGia(v, b.dataset.dg, ''));
+    c.querySelector('.b-cp').onclick = () => { navigator.clipboard.writeText(v.caption); toast('Đã chép caption'); };
+  });
+}
+$('#ngayChon').onchange = taiVideo; $('#locChon').onchange = veVideo; $('#btnTaiLai').onclick = taiVideo;
+$('#btnMoThuMuc').onclick = () => api('/api/mo-thu-muc', {ngay: $('#ngayChon').value});
+async function danhGia(v, kq, gy) {
+  await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy}); v.danh_gia = {ket_qua: kq, gop_y: gy};
+  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : 'Đã ghi: anh bỏ ❌'); veVideo();
+}
+function moVideo(v) {
+  CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
+  $('#mLoi').textContent = v.loi || ''; $('#mGop').value = v.danh_gia.gop_y || '';
+  $('#mPills').innerHTML = [v.diem && `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'}">⭐ Giám khảo ${v.diem}/10</span>`,
+    v.gu && `<span class="pill b">🎬 ${esc(v.gu.replaceAll('_', ' '))}</span>`, v.cong_thuc && `<span class="pill g">${esc(v.cong_thuc)}</span>`,
+    v.nhac && `<span class="pill y">🎵 ${esc(v.nhac)}</span>`,
+    v.token && `<span class="pill b">🧠 ${Math.round(v.token / 1000)}k token</span>`,
+    v.ky_tu_giong && `<span class="pill b">🎙 ${v.ky_tu_giong} ký tự${v.dung_chung_giong > 1 ? ' (chung ' + v.dung_chung_giong + ' video)' : ''}</span>`,
+    v.thoi_luong && `<span class="pill g">⏱ ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
+    v.dang_bai && `<span class="pill y">📝 ${esc(v.dang_bai)}</span>`,
+    v.lam_lai_tu && `<span class="pill r">🔁 làm lại</span>`].filter(Boolean).join('');
+  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `<div class="note">${v.y_tuong ? '💡 ' + esc(v.y_tuong) : ''}</div>${v.loi_gk ? `<details class="note"><summary>Giám khảo góp ý</summary>${esc(v.loi_gk)}</details>` : ''}` : '';
+  $('#modal').classList.add('on'); $('#mVideo').play().catch(() => {});
+}
+$('#mDong').onclick = () => { $('#mVideo').pause(); $('#modal').classList.remove('on'); };
+$('#modal').onclick = e => { if (e.target.id === 'modal') $('#mDong').onclick(); };
+$('#mCopy').onclick = () => { navigator.clipboard.writeText(CUR.caption); toast('Đã chép caption'); };
+$('#mLamLai').onclick = async () => {
+  const gy = $('#mGop').value.trim();
+  if (!gy && !confirm('Chưa ghi góp ý — vẫn làm lại (đạo diễn tự dựng khác đi)?')) return;
+  await api('/api/danh-gia', {file: CUR.file, ket_qua: 'bo', gop_y: gy});
+  const r = await api('/api/lam-lai', {ds: [{file: CUR.duong_dan, gop_y: gy}]});
+  toast(r.ok ? 'Đang làm lại — xem nhật ký ở màn Sản xuất' : r.loi); if (r.ok) $('#mDong').onclick();
+};
+$('#btnLamLaiAll').onclick = async () => {
+  const ds = VIDS.filter(v => v.danh_gia.ket_qua === 'bo' && !v.danh_gia.tu_dong).map(v => ({file: v.duong_dan, gop_y: v.danh_gia.gop_y || ''}));
+  if (!ds.length) return toast('Ngày này không có video anh bấm ❌');
+  if (!confirm(`Làm lại ${ds.length} video anh đã ❌ (theo góp ý từng video)?`)) return;
+  const r = await api('/api/lam-lai', {ds}); toast(r.ok ? `Đang làm lại ${r.so} video` + (r.con_lai ? ` (còn ${r.con_lai} video sản phẩm khác — bấm lại sau khi xong)` : '') : r.loi);
+};
+async function taiTdy() { const t = ST.tu_duyet || {}; $('#tdyBat').checked = !!t.bat; $('#tdyDat').value = t.dat_tu ?? 7; $('#tdyBo').value = t.bo_duoi ?? 0; }
+$('#btnTdy').onclick = async () => {
+  const r = await api('/api/tu-duyet', {bat: $('#tdyBat').checked, dat_tu: +$('#tdyDat').value, bo_duoi: +$('#tdyBo').value, ap_dung: true});
+  toast(r.ok ? (r.tu_duyet.bat ? `Đã lưu — vừa tự duyệt ${r.da_duyet} video` : 'Đã tắt tự duyệt') : 'Lỗi'); ST.tu_duyet = r.tu_duyet; taiVideo();
+};
+$('#mOk').onclick = () => { danhGia(CUR, 'dat', $('#mGop').value); $('#mDong').onclick(); };
+$('#mNo').onclick = () => { danhGia(CUR, 'bo', $('#mGop').value); $('#mDong').onclick(); };
+
+// ---------- SẢN PHẨM
+$('#btnDocNhan').onclick = async () => {
+  const b = $('#btnDocNhan'); b.disabled = true; b.textContent = '⏳ AI đang đọc nhãn (~1 phút)…';
+  const r = await api('/api/doc-nhan/' + $('#spSua').value, {});
+  b.disabled = false; b.textContent = '🔍 AI đọc nhãn, điền gợi ý';
+  if (r.loi) return toast(r.loi);
+  const cu = $('#suThat').value.trim(); const nl = String.fromCharCode(10);
+  const moi = (r.su_that || []).concat((r.chua_ro || []).map(x => '(CHƯA RÕ — anh kiểm) ' + x));
+  $('#suThat').value = (cu ? cu + nl : '') + moi.join(nl);
+  toast('Đã điền ' + moi.length + ' gợi ý — anh kiểm rồi bấm Lưu');
+};
+async function taiTongQuan(moi) {
+  const ds = await api('/api/tong-quan' + (moi ? '?moi=1' : ''));
+  const sx = ds.filter(p => p.loai !== 'kho-chung');
+  $('#tqTom').textContent = `· ${sx.length} sản phẩm, ${sx.filter(p => p.san_sang).length} sẵn sàng làm video, ${ds.reduce((a, p) => a + p.da_lam, 0)} video đã làm`;
+  const th = s => `<td style="padding:8px 6px;font-weight:800;color:var(--mute);font-size:13px">${s}</td>`;
+  $('#tqBang').innerHTML = '<tr>' + ['Sản phẩm', 'Video gốc', 'Đã mô tả', 'Cảnh dùng được', 'Video đã làm', 'Còn tồn', 'Trạng thái', ''].map(th).join('') + '</tr>' +
+    ds.map(p => `<tr style="border-top:1px solid var(--line)">
+      <td style="padding:8px 6px;font-weight:800"><div class="sp-ten">${anhSp(p.anh)}<div>${esc(p.ten)}<div class="note" style="font-size:12px">${esc(p.ma)}</div></div></div></td>
+      <td>${p.video_kho}</td><td>${p.mo_ta}${p.video_kho > p.mo_ta ? ` <span class="pill y">thiếu ${p.video_kho - p.mo_ta}</span>` : ''}</td>
+      <td>${p.so_canh}</td><td><b>${p.da_lam}</b></td><td>${p.ton}</td>
+      <td>${p.loai === 'kho-chung' ? `<span class="pill b">Kho cảnh chung · ${p.so_dung_duoc ?? p.so_canh} cảnh</span>` : p.san_sang ? '<span class="pill g">Sẵn sàng</span>' : `<span class="pill y">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`}</td>
+      <td style="white-space:nowrap"><button class="btn soft" style="padding:6px 12px;font-size:14px" data-sua="${p.ma}">✏️ Sửa</button>
+        <button class="btn ghost" style="padding:6px 12px;font-size:14px;color:var(--red)" data-xoa="${p.ma}" data-ten="${esc(p.ten)}">🗑 Xoá</button></td></tr>`).join('');
+  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => { $('#spSua').value = b.dataset.sua; taiSp(); $('#spSua').scrollIntoView({behavior: 'smooth'}); });
+  document.querySelectorAll('[data-xoa]').forEach(b => b.onclick = async () => {
+    if (!confirm(`Xoá sản phẩm "${b.dataset.ten}" khỏi app?
+Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm vẫn giữ.`)) return;
+    const r = await api('/api/xoa-san-pham/' + b.dataset.xoa, {});
+    if (!r.ok) return toast(r.loi);
+    toast('Đã xoá' + (r.bo_canh_qua && r.bo_canh_qua.length ? ' (bỏ luôn cảnh quà: ' + r.bo_canh_qua.join(', ') + ')' : ''));
+    [...$('#spSua').options].filter(o => o.value === b.dataset.xoa).forEach(o => o.remove()); $('#spChon').innerHTML = ''; KT.ma = null;
+    taiTongQuan(true); capNhat();
+  });
+}
+$('#btnTqMoi').onclick = () => taiTongQuan(true);
+async function taiKho() {
+  const k = await api('/api/kho/' + $('#spSua').value);
+  $('#khoInfo').innerHTML = !k.kho ? '⚠ Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.'
+    : !k.kho_ton_tai ? '⚠ Không tìm thấy thư mục: ' + esc(k.kho)
+    : `📁 ${esc(k.kho)}<br>🎥 ${k.so_video} video · 📝 ${k.so_mo_ta} bản mô tả · 🎞 ${k.so_canh} cảnh · 👁 AI đã soát ${k.so_soat}` +
+      (k.so_video > k.so_mo_ta ? `<br><b style="color:var(--red)">${k.so_video - k.so_mo_ta} video chưa có mô tả cảnh → bấm "🧠 Học cảnh" (Antigravity tự xem, xong hub tự chuẩn bị kho).</b>` : '');
+  $('#btnKho').disabled = k.dang_chay || !k.kho_ton_tai || !k.so_mo_ta; $('#btnKho').textContent = k.dang_chay ? '⏳ Đang chuẩn bị kho…' : '🧩 Chuẩn bị kho (nạp cảnh + AI soát)';
+  $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)'; taiHoc();
+  if (k.dang_chay) setTimeout(taiKho, 4000);
+}
+$('#linkTay').onclick = async e => { e.preventDefault(); const r = await api('/api/lenh-gemini/' + $('#spSua').value); try { await navigator.clipboard.writeText(r.lenh); toast('Đã chép lệnh — dán vào Antigravity, làm xong bấm Chuẩn bị kho'); } catch (x) { toast('Không chép được — thử lại'); } };
+const HOC = {t: null, h: null, xongBao: null, moTay: false, ra: null};
+async function taiHoc() {
+  clearTimeout(HOC.t);
+  const ma = $('#spSua').value; if (!ma) return;
+  const h = await api('/api/hoc-canh/' + ma); if (h.loi || !h.agy) return;
+  HOC.h = h; const j = h.job, mo = h.agy.mo, chay = !!(j && j.dang_chay);
+  $('#agyTt').textContent = mo ? '✓ Antigravity đang mở' + (h.agy.phien_ban ? ' · ' + h.agy.phien_ban : '') : '✗ Antigravity chưa mở';
+  $('#agyTt').style.color = mo ? '' : 'var(--red)';
+  $('#btnAgyMo').classList.toggle('hidden', mo);
+  const sel = $('#hsModel');
+  if (sel.dataset.m !== h.model || !sel.options.length) {
+    sel.innerHTML = h.models.map(m => `<option value="${esc(m.v)}">${esc(m.t)}</option>`).join(''); sel.value = h.model; sel.dataset.m = h.model;
+  }
+  if (!mo || HOC.moTay) $('#hocSetup').classList.remove('hidden'); else $('#hocSetup').classList.add('hidden');
+  $('#btnAgy2').classList.toggle('hidden', !$('#hocSetup').classList.contains('hidden'));
+  let hien = false;
+  if (j && (chay || (j.thong_bao && j.trang_thai !== 'nghi'))) {
+    hien = true; const pc = j.tong ? Math.round(100 * j.xong / j.tong) : (j.trang_thai === 'xong' ? 100 : 0);
+    $('#hocFill').style.width = pc + '%';
+    let t = j.thong_bao || '';
+    if (chay && j.tong) t = `Đã học ${j.xong}/${j.tong} video` + (j.hien_tai ? ' — đang xem: ' + j.hien_tai.slice(0, 70) : '');
+    if (j.loi && j.loi.length) t += ` · ${j.loi.length} video lỗi (bỏ qua, lần Học cảnh sau sẽ thử lại)`;
+    $('#hocLoi').innerHTML = (j.loi || []).length ? '<details><summary>Xem lỗi từng video</summary><ul style="margin:6px 0 0 18px;padding:0">' + j.loi.map(x => `<li><b>${esc(String(x.video).split(/[\/]/).pop())}</b>: ${esc(x.loi)}</li>`).join('') + '</ul></details>' : '';
+    $('#hocText').textContent = t;
+    $('#hocText').style.color = ['het_luot', 'can_mo', 'loi'].includes(j.trang_thai) ? 'var(--red)' : '';
+    if (j.trang_thai === 'xong' && HOC.xongBao !== j.bat_dau) { HOC.xongBao = j.bat_dau; taiKho(); }
+  }
+  $('#hocBox').classList.toggle('hidden', !hien);
+  const hb = $('#btnHoc'); hb.textContent = chay ? '⏹ Dừng học' : '🧠 Học cảnh'; hb.disabled = !!h.job_khac || (!chay && h.dang_chay_lo);
+  hb.title = h.dang_chay_lo ? 'Đang làm video — đợi xong' : '';
+  if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
+}
+$('#btnHoc').onclick = async () => {
+  const h = HOC.h || {}, chay = h.job && h.job.dang_chay, ma = $('#spSua').value;
+  if (chay) { await api('/api/hoc-canh-dung', {}); toast('Đang dừng — các video đang xem sẽ làm nốt…'); return taiHoc(); }
+  if (!h.agy || !h.agy.mo) { HOC.moTay = true; $('#hocSetup').classList.remove('hidden'); toast('Mở Antigravity trước rồi bấm Học cảnh'); return taiHoc(); }
+  const r = await api('/api/hoc-canh/' + ma, {});
+  if (!r.ok) { toast(r.loi || 'Không bắt đầu được'); if (r.can) HOC.moTay = true; return taiHoc(); }
+  toast('Bắt đầu học cảnh…'); taiHoc();
+};
+$('#btnHsDong').onclick = () => { HOC.moTay = false; $('#hocSetup').classList.add('hidden'); $('#btnAgy2').classList.remove('hidden'); };
+$('#btnAgy2').onclick = () => { HOC.moTay = true; taiHoc(); };
+$('#btnAgyMo').onclick = async () => { const r = await api('/api/agy-mo', {}); toast(r.ok ? 'Đang mở Antigravity…' : (r.loi || 'Không mở được')); taiHoc(); };
+$('#hsModel').onchange = async () => { const r = await api('/api/hoc-canh-model', {model: $('#hsModel').value}); toast(r.ok ? 'Đã lưu model' : r.loi); };
+const KD_T = {t: null};
+function kdVe(b, dangChay, tien) {
+  const box = $('#kdBox'); box.classList.remove('hidden');
+  if (dangChay || !b) { box.innerHTML = '⏳ Đang kiểm các bản mô tả… ' + (tien || ''); return; }
+  if (b.loi) { box.innerHTML = `<b style="color:var(--red)">Lỗi: ${esc(b.loi)}</b>`; return; }
+  const thu = b.che_do !== 'that';
+  const ds = (arr, f) => arr.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + arr.map(f).join('') + '</ul>' : '';
+  const ten = x => esc(String(x).split(/[\\/]/).pop().slice(0, 60));
+  box.innerHTML = `<div class="row" style="gap:8px;margin-bottom:8px"><b>🩺 Kết quả kiểm</b>
+      <span class="pill g">✓ đúng sẵn ${b.da_dung}</span><span class="pill ${b.so_da_sua ? 'y' : 'g'}">${thu ? 'cần sửa' : 'đã sửa'} ${b.so_da_sua}</span>
+      <span class="pill ${b.so_hong ? 'r' : 'g'}">hỏng ${b.so_hong}</span><span class="pill ${b.so_thieu_mo_ta ? 'y' : 'g'}">thiếu mô tả ${b.so_thieu_mo_ta}</span></div>
+    <div class="note">${esc(b.tom_tat || '')}${b.bo_canh ? `<br><b>${thu ? 'Sẽ bỏ' : 'Đã bỏ'} ${b.bo_canh} cảnh sai giờ.</b>` : ''}</div>
+    ${b.so_hong ? '<details open style="margin-top:8px"><summary><b>File hỏng (không tự sửa được)</b></summary>' + ds(b.hong, x => `<li>${ten(x.file)} — ${esc(x.loi)}</li>`) + '</details>' : ''}
+    ${b.so_da_sua ? `<details style="margin-top:8px"><summary><b>${thu ? 'Sẽ sửa' : 'Đã sửa'} ${b.so_da_sua} file</b> (bấm để xem)</summary>` + ds(b.da_sua, x => `<li>${ten(x.file)}: ${esc(x.sua.join('; ').slice(0, 220))}</li>`) + '</details>' : ''}
+    ${b.so_thieu_mo_ta ? `<details style="margin-top:8px"><summary><b>Video chưa có mô tả: ${b.so_thieu_mo_ta}</b> → bấm 🧠 Học cảnh</summary>` + ds(b.thieu_mo_ta, x => `<li>${ten(x.video || x)}</li>`) + '</details>' : ''}
+    ${b.so_mo_coi ? `<details style="margin-top:8px"><summary>Mô tả không còn video: ${b.so_mo_coi}</summary>` + ds(b.mo_coi, x => `<li>${ten(x)}</li>`) + '</details>' : ''}
+    ${b.so_trung ? `<details style="margin-top:8px"><summary>Video có 2 bản mô tả: ${b.so_trung} (hub chỉ lấy 1, không xoá)</summary>` + ds(b.trung, x => `<li>${ten(x.video)}</li>`) + '</details>' : ''}
+    ${b.so_canh_bao ? `<details style="margin-top:8px"><summary>Lưu ý: ${b.so_canh_bao}</summary>` + ds(b.canh_bao, x => `<li>${ten(x.file)}: ${esc(x.ghi_chu)}</li>`) + '</details>' : ''}
+    ${thu && b.so_da_sua ? '<div class="row" style="margin-top:12px"><button class="btn go" id="btnKiemSua">✅ Sửa luôn (giữ bản gốc trong _goc-kiem)</button></div>' : ''}`;
+  const bs = $('#btnKiemSua'); if (bs) bs.onclick = () => kdChay(true);
+}
+async function kdTai() {
+  clearTimeout(KD_T.t); const k = await api('/api/kiem-dinh/' + $('#spSua').value);
+  kdVe(k.bao_cao, k.dang_chay, k.tong ? `${k.xong}/${k.tong}` : '');
+  if (k.dang_chay) KD_T.t = setTimeout(kdTai, 1500);
+}
+async function kdChay(sua) { const r = await api('/api/kiem-dinh/' + $('#spSua').value, {sua}); if (!r.ok) toast(r.loi); kdVe(null, true); setTimeout(kdTai, 600); }
+$('#btnKiem').onclick = () => kdChay(false);
+$('#btnKho').onclick = async () => { const r = await api('/api/chuan-bi-kho/' + $('#spSua').value, {}); toast(r.ok ? 'Đang chuẩn bị kho (vài phút)…' : r.loi); taiKho(); };
+// ---------- CHỌN SẢN PHẨM TỪ TIKTOK SHOP (ảnh thật; dữ liệu lấy từ app TikTok Auto Kid)
+const SHOP = {ds: null, loi: '', dang: false};
+const VE_SHOP = [];
+function veShopTatCa() { VE_SHOP.forEach(f => f()); }
+async function taiShop(moi) {
+  SHOP.dang = true; veShopTatCa();
+  try { const r = await api('/api/shop-sp' + (moi ? '?moi=1' : '')); SHOP.ds = r.ds || []; SHOP.loi = r.ok ? '' : (r.loi || 'Chưa kết nối được TikTok Auto Kid.'); }
+  catch (e) { SHOP.ds = SHOP.ds || []; SHOP.loi = 'Chưa kết nối được TikTok Auto Kid.'; }
+  SHOP.dang = false; veShopTatCa();
+}
+function tenGon(t) {          // tên ngắn gọn từ tiêu đề dài trên Shop
+  let x = String(t || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').split(/\s[-–|]\s|[,;:|]|-\s/)[0].replace(/\s+/g, ' ').trim();
+  if (x.length > 38) { x = x.slice(0, 38); x = x.slice(0, Math.max(x.lastIndexOf(' '), 12)); }
+  return x || String(t || '').slice(0, 38);
+}
+function luoiShop(host, getChon, onPick) {
+  host.innerHTML = '<div class="shop-tim"><input type="text" class="shq" placeholder="🔎 Tìm sản phẩm trên Shop…"><button type="button" class="btn ghost shlai" style="padding:7px 12px;font-size:14px" title="Tải lại từ TikTok Auto Kid">↻</button></div><div class="shop-luoi"></div><div class="note shgc"></div>';
+  const q = host.querySelector('.shq'), L = host.querySelector('.shop-luoi'), G = host.querySelector('.shgc');
+  const ve = () => {
+    const k = q.value.trim().toLowerCase(), ds = (SHOP.ds || []).filter(x => !k || (x.tieu_de + ' ' + x.ma.join(' ')).toLowerCase().includes(k)), chon = getChon();
+    L.innerHTML = ds.map(x => `<button type="button" class="shop-it${x.id === chon ? ' chon' : ''}" data-id="${esc(x.id)}" title="${esc(x.tieu_de)}">${x.anh ? `<img src="${esc(x.anh)}" alt="" loading="lazy" onerror="anhLoi(this)">` : '<span class="rong">📦</span>'}${x.ma.length ? `<i class="gan">đã gắn ${esc(x.ma[0])}</i>` : ''}<span class="t">${esc(x.tieu_de)}</span></button>`).join('');
+    G.textContent = SHOP.dang ? '⏳ Đang tải sản phẩm từ TikTok Auto Kid…' : SHOP.loi ? SHOP.loi : !(SHOP.ds || []).length ? 'Chưa có sản phẩm nào từ Shop. Vào TikTok Auto Kid → Giỏ hàng → "Lấy sản phẩm từ shop".' : ds.length ? '' : 'Không thấy sản phẩm nào khớp.';
+  };
+  q.oninput = ve; host.querySelector('.shlai').onclick = () => taiShop(true);
+  L.onclick = e => { const b = e.target.closest('.shop-it'); if (b) onPick((SHOP.ds || []).find(x => x.id === b.dataset.id)); };
+  VE_SHOP.push(ve); ve(); if (SHOP.ds === null && !SHOP.dang) taiShop(false);
+}
+const MA = {data: null, shop: null, tay: false};
+function mCheDo() {
+  const c = $('#mLoai').value === 'kho-chung';
+  $('#mShopBox').classList.toggle('hidden', c || MA.tay); $('#mAnhTay').classList.toggle('hidden', !c && !MA.tay);
+  $('#mShopLai').classList.toggle('hidden', c); $('#mKhoNhan').textContent = c ? 'Thư mục kho video' : '② Thư mục kho video';
+}
+function mVeChon() {
+  const x = MA.shop, h = $('#mShopChon'); h.classList.toggle('hidden', !x);
+  if (x) h.innerHTML = `${anhSp(x.anh)}<div style="min-width:0"><b style="font-size:14px">${esc(tenGon(x.tieu_de))}</b><div class="note" style="font-size:12px">${x.ma.length ? 'Đã gắn giỏ hàng cho: ' + esc(x.ma.join(', ')) : 'Nhớ gắn giỏ hàng trong TikTok Auto Kid sau khi tạo.'}</div></div>`;
+  veShopTatCa();
+}
+luoiShop($('#mShopLuoi'), () => MA.shop && MA.shop.id, x => { if (!x) return; MA.shop = x; $('#mTenSp').value = tenGon(x.tieu_de); mVeChon(); });
+$('#mTay').onclick = e => { e.preventDefault(); MA.tay = true; MA.shop = null; mVeChon(); mCheDo(); };
+$('#mShopLai').onclick = e => { e.preventDefault(); MA.tay = false; MA.data = null; $('#mAnhXem').innerHTML = anhSp('', 'lg'); mCheDo(); };
+$('#mLoai').onchange = () => { const c = $('#mLoai').value === 'kho-chung'; mCheDo();
+  $('#mDocWrap').classList.toggle('hidden', c); $('#mTenNhan').textContent = c ? 'Tên kho cảnh' : 'Tên gọi trong video';
+  $('#mTenSp').placeholder = c ? 'vd. Cảnh chăm cây' : 'vd. Đạm cá Toàn Cầu';
+  $('#mGhiChu').textContent = c ? 'Tạo xong: bấm "Chuẩn bị kho". Kho chung không cần sự thật hay quà tặng.' : 'Tạo xong: điền sự thật + quà tặng bên dưới → bấm "Chuẩn bị kho".'; };
+$('#btnMKho').onclick = () => moThuMuc($('#mKho').value, p => { $('#mKho').value = p; });
+$('#btnMAnhFile').onclick = async () => { const d = await chonFileAnh(); if (d) { MA.data = d; $('#mAnhXem').innerHTML = anhSp(d, 'lg'); } };
+$('#btnMAnhVid').onclick = async () => {
+  const b = $('#btnMAnhVid'); if (!$('#mKho').value.trim()) return toast('Chọn thư mục kho video trước nhé');
+  b.disabled = true; const t = b.textContent; b.textContent = '⏳ Đang lấy…';
+  const r = await api('/api/anh-khung', {kho: $('#mKho').value}); b.disabled = false; b.textContent = t;
+  if (!r.ok) return toast(r.loi); MA.data = r.data; $('#mAnhXem').innerHTML = anhSp(r.data, 'lg');
+};
+$('#btnTaoSp').onclick = async () => {
+  const chung = $('#mLoai').value === 'kho-chung', theoShop = !chung && !MA.tay;
+  if (theoShop && !MA.shop) return toast('Chọn 1 sản phẩm từ TikTok Shop trước nhé (hoặc bấm "Thêm tay")');
+  const r = await api('/api/san-pham-moi', {ten: $('#mTenSp').value, kho: $('#mKho').value, doc_la: $('#mDoc').value, loai: $('#mLoai').value, ...(theoShop ? {shop_id: MA.shop.id} : {})});
+  if (!r.ok) return toast(r.loi);
+  if (theoShop) { if (r.canh_bao) toast(r.canh_bao); taiTongQuan(true); MA.shop = null; mVeChon(); }
+  else if (MA.data) { const a = await api('/api/anh-sp/' + r.ma, {data: MA.data}); if (!a.ok) toast(a.loi); MA.data = null; $('#mAnhXem').innerHTML = anhSp(''); }
+  else api('/api/anh-sp/' + r.ma, {tu_video: true}).then(() => { taiTongQuan(true); capNhat(); });      // không chọn ảnh → tự lấy 1 khung từ video
+  toast('Đã tạo. Điền sự thật + quà tặng rồi Lưu.'); $('#spSua').add(new Option($('#mTenSp').value, r.ma)); $('#spSua').value = r.ma;
+  $('#spChon').innerHTML = ''; KT.ma = null; taiSp(); capNhat();
+};
+async function taiSp() {
+  taiKho(); hienAnhSua();
+  const sp = await api('/api/san-pham/' + $('#spSua').value);
+  SUA_SHOP = sp.shop_product_id || null; veShopTatCa(); $('#sShopBox').classList.add('hidden');
+  $('#spKho').value = sp.kho_video || ''; $('#spGio').value = typeof sp.ten_gio === 'string' ? sp.ten_gio : '';
+  const chung = sp.loai === 'kho-chung' || !!sp.chi_la_kho_canh;
+  ['#spBan1', '#spBan2', '#spBan3'].forEach(i => $(i).classList.toggle('hidden', chung));
+  $('#spChungNote').classList.toggle('hidden', !chung); $('#spChungMd').classList.toggle('hidden', !chung); $('#spTron').checked = !!sp.tron_mac_dinh;
+  $('#qua').value = (sp.qua_tang || []).join('\n'); $('#cam').value = (sp.khong_duoc_noi || []).join('\n'); $('#suThat').value = (sp.su_that_duoc_noi || []).join('\n');
+}
+$('#spSua').onchange = taiSp;
+$('#btnSKho').onclick = () => moThuMuc($('#spKho').value, p => { $('#spKho').value = p; toast('Đã chọn — nhớ bấm 💾 Lưu nhé'); });
+async function datAnhSua(body, nut) {
+  const t = nut.textContent; nut.disabled = true; nut.textContent = '⏳ Đang làm…';
+  const r = await api('/api/anh-sp/' + $('#spSua').value, body); nut.disabled = false; nut.textContent = t;
+  if (!r.ok) return toast(r.loi);
+  hienAnhSua(r.url); toast('Đã đổi ảnh sản phẩm'); taiTongQuan(true); capNhat();
+}
+$('#btnSAnhFile').onclick = async () => { const d = await chonFileAnh(); if (d) datAnhSua({data: d}, $('#btnSAnhFile')); };
+$('#btnSAnhVid').onclick = () => datAnhSua({tu_video: true}, $('#btnSAnhVid'));
+let SUA_SHOP = null;                 // sản phẩm Shop hiện gắn với sản phẩm đang sửa
+luoiShop($('#sShopLuoi'), () => SUA_SHOP, x => { if (x && confirm('Đổi ảnh sản phẩm sang ảnh của "' + tenGon(x.tieu_de) + '"?')) { SUA_SHOP = x.id; datAnhSua({tu_shop: x.id}, $('#btnSAnhShop')); veShopTatCa(); } });
+$('#btnSAnhShop').onclick = () => $('#sShopBox').classList.toggle('hidden');
+$('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); };
+$('#btnLuuSp').onclick = async () => {
+  const L = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+  const chung = !$('#spChungNote').classList.contains('hidden');       // kho chung: chỉ lưu thư mục kho + cờ trộn mặc định, không đụng ô bán hàng
+  await api('/api/san-pham/' + $('#spSua').value, chung ? {kho: $('#spKho').value, tron_mac_dinh: $('#spTron').checked}
+    : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value});
+  toast('Đã lưu. Lô sau dùng thông tin mới.'); $('#spChon').innerHTML = ''; KT.ma = null; taiKho(); capNhat();
+};
+// ---------- GU
+async function taiGu() { const g = await api('/api/so-gu'); $('#soGu').value = g.so_gu; $('#baiHoc').textContent = g.bai_hoc || '(chưa có)'; }
+$('#btnLuuGu').onclick = async () => { await api('/api/so-gu', {so_gu: $('#soGu').value}); toast('Đã lưu sổ gu'); };
+// ---------- CÀI ĐẶT
+async function taiODia() {
+  const o = await api('/api/o-dia');
+  const canh = o.o_trong_gb < 30 ? '<span class="pill r">Ổ sắp đầy</span>' : '<span class="pill g">Ổ còn rộng</span>';
+  $('#oDia').innerHTML = `${canh} Ổ còn trống <b>${o.o_trong_gb} GB</b> / ${o.o_tong_gb} GB · Video hub đang chiếm <b>${o.ra_gb} GB</b>` +
+    '<table style="width:100%;margin-top:10px;border-collapse:collapse">' +
+    o.ngay.slice(0, 10).map(d => `<tr><td style="padding:4px 0">${d.ngay.split('-').reverse().join('/')}</td><td>${d.video} video</td><td>${d.gb} GB</td>` +
+      `<td><button class="btn ghost" style="padding:4px 10px;font-size:13px" onclick="api('/api/mo-thu-muc',{ngay:'${d.ngay}'})">📂 Mở</button></td></tr>`).join('') + '</table>';
+}
+let TP = {};
+async function taiTp() { TP = await api('/api/trypost'); $('#tpDiaChi').textContent = TP.bat ? TP.dia_chi : '(chưa bật)'; }
+async function taiCd() { taiNhac(); taiODia(); taiTp(); $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; taiTk(); }
+// ---------- NHẠC & ÂM THANH
+let NH_T = null;
+async function taiNhac() {
+  clearTimeout(NH_T);
+  let r; try { r = await api('/api/nhac'); } catch (e) { return; }
+  const m = r.mac_dinh, t = r.tai || {};
+  const ghi = t.loi ? `⚠️ ${esc(t.loi)}` : t.dang ? `⏳ ${esc(t.ghi)}${t.tong ? ' ' + (t.da / t.tong * 100).toFixed(0) + '%' : ''}` : t.xong ? '✅ Đã tải xong' : '';
+  $('#nhMacDinh').innerHTML = `<span>${m.cai ? '<span class="pill g">Đã cài</span>' : '<span class="pill y">Chưa cài</span>'}
+    <b>Kho mặc định</b> · ${m.n_nhac} bài nhạc · ${m.n_sfx} âm thanh · ${m.gb} GB</span>
+    <button class="btn soft" id="btnNhacTai" ${r.co_link && !t.dang ? '' : 'disabled'}>${r.co_link ? '⬇️ Tải thêm nhạc' : 'Chưa có link tải — sẽ có khi đưa lên GitHub'}</button>`;
+  $('#nhTai').classList.toggle('hidden', !ghi);
+  $('#nhTai').innerHTML = ghi + (t.dang && t.tong ? `<progress max="${t.tong}" value="${t.da}" style="width:100%;margin-top:6px"></progress>` : '');
+  const ve = loai => {
+    const ds = r.nguon.filter(n => n.loai === loai);
+    return ds.length ? ds.map(n => `<div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:nowrap">
+      <input type="checkbox" data-nbat="${n.i}" ${n.bat ? 'checked' : ''} style="width:20px;height:20px;flex:none" title="Bật / tắt">
+      <span style="flex:1;min-width:0;overflow-wrap:anywhere;${n.ton_tai ? '' : 'color:var(--red)'}">${esc(n.duong_dan)}</span>
+      <span class="pill ${n.ton_tai ? 'b' : 'r'}">${n.ton_tai ? n.so_file + ' file' : 'mất thư mục'}</span>
+      <button class="btn ghost" data-nxoa="${n.i}" style="padding:4px 10px;font-size:13px;color:var(--red)" title="Bỏ khỏi danh sách (không xoá file)">✖</button></div>`).join('')
+      : '<div class="note">Chưa thêm thư mục nào.</div>';
+  };
+  $('#nhDsNhac').innerHTML = ve('nhac'); $('#nhDsSfx').innerHTML = ve('sfx');
+  document.querySelectorAll('[data-nbat]').forEach(c => c.onchange = async () => { await api('/api/nhac-nguon', {bat: +c.dataset.nbat, gia_tri: c.checked}); taiNhac(); });
+  document.querySelectorAll('[data-nxoa]').forEach(b => b.onclick = async () => { await api('/api/nhac-nguon', {xoa: +b.dataset.nxoa}); taiNhac(); });
+  const tai = $('#btnNhacTai');
+  if (tai) tai.onclick = async () => { const x = await api('/api/nhac-tai', {}); if (!x.ok) toast(x.loi); taiNhac(); };
+  if (t.dang) NH_T = setTimeout(taiNhac, 1000);
+}
+async function nhacThem(loai) {
+  moThuMuc('', async p => { const r = await api('/api/nhac-nguon', {them: {duong_dan: p, loai}}); toast(r.ok ? 'Đã thêm thư mục' : r.loi); taiNhac(); }, true);
+}
+$('#btnNhacThem').onclick = () => nhacThem('nhac');
+$('#btnSfxThem').onclick = () => nhacThem('sfx');
+$('#btnLuuCd').onclick = async () => {
+  await api('/api/cai-dat', {model: $('#cdModel').value, effort: $('#cdEffort').value, video_moi_giong: +$('#cdPer').value});
+  toast('Đã lưu cài đặt'); capNhat();
+};
+$('#btnKiemTk').onclick = () => taiTk(true);
+
+async function taiLo() {
+  const ds = await api('/api/lo'); const k = n => (n || 0) >= 1e6 ? (n / 1e6).toFixed(2) + ' tr' : Math.round((n || 0) / 1000) + 'k';
+  const th = x => `<td style="padding:6px;font-weight:800;color:var(--mute);font-size:12px">${x}</td>`;
+  $('#loBang').innerHTML = !ds.length ? '<tr><td class="note">Chưa có lô nào được ghi (lô mới sẽ tự hiện ở đây).</td></tr>' :
+    '<tr>' + ['Lúc', 'Sản phẩm', 'Video', 'Thời gian', 'Phút/video', 'Lượt AI', 'Token (vào / ra)', 'Token/video', 'Ký tự giọng', 'Ký tự/video', '≈ USD', 'Tài khoản'].map(th).join('') + '</tr>' +
+    ds.map(l => `<tr style="border-top:1px solid var(--line)"><td style="padding:6px">${l.bat_dau.slice(5, 16).replace('T', ' ')}</td><td>${esc(l.san_pham)}</td>
+      <td><b>${l.video}</b></td><td>${l.phut} phút</td><td>${l.video ? (l.phut / l.video).toFixed(1) : '–'}</td><td>${l.luot_ai}</td>
+      <td>${k(l.token)} <span class="note">(${k(l.token_vao)} / ${k(l.token_ra)})</span></td><td><b>${l.video ? k(l.token / l.video) : '–'}</b></td>
+      <td>${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td>${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '–'}</td>
+      <td>${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => a + ': ' + n).join(', ')}</td></tr>`).join('');
+}
+async function taiTuDong() {
+  const t = await api('/api/tu-dong');
+  $('#tdBat').checked = t.bat; $('#tdPhut').value = t.kiem_moi_phut;
+  const tr = t.trang_thai || {};
+  $('#tdTrangThai').textContent = (tr.ghi || '') + (tr.lan_kiem_toi && t.bat ? ` · lần kiểm tới ${tr.lan_kiem_toi}` : '');
+  const th = x => `<td style="padding:8px 6px;font-weight:800;color:var(--mute);font-size:13px">${x}</td>`;
+  const ds = Object.entries(t.san_pham || {});
+  $('#tdBang').innerHTML = '<tr>' + ['Sản phẩm', 'Đã làm', 'Còn tồn', 'Hôm nay', 'Tự làm', 'Giữ tồn ít nhất', 'Tối đa / ngày', 'Mỗi lần làm', ''].map(th).join('') + '</tr>' +
+    ds.map(([ma, v]) => `<tr data-ma="${ma}" style="border-top:1px solid var(--line)">
+      <td style="padding:8px 6px;font-weight:800"><div class="sp-ten">${anhSp(urlAnh(ma))}<span>${esc(v.ten || ma)}</span></div></td>
+      <td>${v.da_lam}</td><td><b style="color:${v.ton < v.ton_toi_thieu ? 'var(--red)' : 'var(--green)'}">${v.ton}</b></td><td>${v.lam_hom_nay}</td>
+      <td><input type="checkbox" class="tdOn" ${v.bat ? 'checked' : ''} style="width:20px;height:20px"></td>
+      <td><input type="number" class="tdMin" min="0" value="${v.ton_toi_thieu}" style="width:80px"></td>
+      <td><input type="number" class="tdMax" min="0" value="${v.toi_da_ngay}" style="width:80px"></td>
+      <td><input type="number" class="tdLo" min="1" max="50" value="${v.lo}" style="width:80px"></td>
+      <td><button class="btn ghost" style="padding:6px 10px;font-size:14px;color:var(--red)" data-xoatd="${ma}" data-ten="${esc(v.ten || ma)}">🗑 Xoá</button></td></tr>`).join('');
+  document.querySelectorAll('[data-xoatd]').forEach(b => b.onclick = async () => {
+    if (!confirm(`Xoá hẳn sản phẩm "${b.dataset.ten}" khỏi app? (hồ sơ + kho cảnh vào Thùng rác; video gốc và video đã làm vẫn giữ)`)) return;
+    const r = await api('/api/xoa-san-pham/' + b.dataset.xoatd, {});
+    toast(r.ok ? 'Đã xoá sản phẩm' : r.loi); $('#spChon').innerHTML = ''; KT.ma = null; capNhat(); taiTuDong();
+  });
+}
+$('#btnLuuTd').onclick = async () => {
+  const sp = {}; document.querySelectorAll('#tdBang tr[data-ma]').forEach(r => sp[r.dataset.ma] = {bat: r.querySelector('.tdOn').checked,
+    ton_toi_thieu: +r.querySelector('.tdMin').value, toi_da_ngay: +r.querySelector('.tdMax').value, lo: +r.querySelector('.tdLo').value});
+  await api('/api/tu-dong', {bat: $('#tdBat').checked, kiem_moi_phut: +$('#tdPhut').value, san_pham: sp});
+  toast($('#tdBat').checked ? 'Đã bật tự động' : 'Đã lưu (tự động đang tắt)'); taiTuDong();
+};
+capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); setInterval(taiLo, 60000); setInterval(taiTuDong, 60000); setInterval(capNhat, 3000); setInterval(() => taiTk(), 90000);
+
+// mở thẳng tab: ?tab=kho  hoặc  #tab=kho  hoặc  #kho
+(() => {
+  const h = location.hash.replace(/^#(tab=)?/, '');
+  const t = new URLSearchParams(location.search).get('tab') || h;
+  if (t && (TAB_MA[t] || TAB_TEN[t])) moTab(t, false);
+})();
+window.addEventListener('hashchange', () => { const t = location.hash.replace(/^#(tab=)?/, ''); if (TAB_MA[t] || TAB_TEN[t]) moTab(t, false); });
+// trang cha (TikTok Auto Kid) điều khiển: {type:'xuong-video:set-tab', tab} | {type:'xuong-video:theme', theme:'dark'|'light'}
+window.addEventListener('message', e => {
+  if (!CHA.test(e.origin) || !e.data || typeof e.data !== 'object') return;
+  if (e.data.type === 'xuong-video:set-tab') moTab(String(e.data.tab), false);
+  if (e.data.type === 'xuong-video:theme' && /^(dark|light)$/.test(e.data.theme)) document.documentElement.dataset.theme = e.data.theme;
+});
+if (window.parent !== window) window.parent.postMessage({type: 'xuong-video:san-sang', tab: TAB_TEN[document.querySelector('nav button.on')?.dataset.tab] || 'san-xuat'}, '*');
+</script>
+</body>
+</html>

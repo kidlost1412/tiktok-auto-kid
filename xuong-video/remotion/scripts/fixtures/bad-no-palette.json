@@ -1,0 +1,78 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "graphics": [
+  {
+   "id": "k1",
+   "type": "keyword",
+   "f0": 0,
+   "f1": 30,
+   "text": "BỔ SUNG DINH DƯỠNG CHO CÂY",
+   "accent": "TRUNG VI LƯỢNG",
+   "y": 420
+  },
+  {
+   "id": "c1",
+   "type": "checklist",
+   "f0": 0,
+   "f1": 40,
+   "x": 90,
+   "y": 560,
+   "items": [
+    {
+     "text": "TRUNG VI LƯỢNG",
+     "f": 0
+    },
+    {
+     "text": "BỔ SUNG DINH DƯỠNG CHO CÂY",
+     "f": 10
+    },
+    {
+     "text": "RA HOA – ĐẬU QUẢ",
+     "f": 20
+    }
+   ]
+  },
+  {
+   "id": "t1",
+   "type": "cta",
+   "f0": 0,
+   "f1": 30,
+   "text": "NHẤN GIỎ HÀNG NGAY",
+   "y": 700
+  },
+  {
+   "id": "o1",
+   "type": "circle",
+   "f0": 0,
+   "f1": 20,
+   "label": null,
+   "keys": [
+    {
+     "f": 0,
+     "cx": 540,
+     "cy": 1000,
+     "rx": 200,
+     "ry": 80
+    },
+    {
+     "f": 19,
+     "cx": 560,
+     "cy": 1010,
+     "rx": 220,
+     "ry": 90
+    }
+   ]
+  }
+ ],
+ "style": {
+  "graphics_scale": 1.0
+ }
+}

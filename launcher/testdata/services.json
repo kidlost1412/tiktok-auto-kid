@@ -1,0 +1,48 @@
+{
+  "app_url": "http://localhost:18010",
+  "services": [
+    {
+      "name": "db",
+      "cmd": "bin/dummysvc.exe",
+      "args": ["-mode", "serve", "-port", "18433"],
+      "cwd": ".",
+      "health": { "type": "tcp", "port": 18433 },
+      "depends_on": [],
+      "restart": "always",
+      "stop": { "cmd": "bin/dummysvc.exe", "args": ["-mode", "stop", "-port", "18433"] }
+    },
+    {
+      "name": "web",
+      "cmd": "bin/dummysvc.exe",
+      "args": ["-mode", "serve", "-port", "18010", "-delay", "2s"],
+      "cwd": ".",
+      "env": { "APP_ENV": "test" },
+      "health": { "type": "http", "url": "http://127.0.0.1:18010/", "timeout_sec": 30 },
+      "depends_on": ["db"],
+      "restart": "always"
+    },
+    {
+      "name": "worker",
+      "cmd": "bin/dummysvc.exe",
+      "args": ["-mode", "idle", "-ignore-break"],
+      "health": null,
+      "depends_on": ["web"],
+      "restart": "always",
+      "stop_timeout_sec": 2
+    }
+  ],
+  "first_run": [
+    {
+      "name": "initdb",
+      "cmd": "bin/dummysvc.exe",
+      "args": ["-mode", "touch", "-file", "runtime/data/pg/PG_VERSION"],
+      "only_if_missing": "runtime/data/pg"
+    },
+    {
+      "name": "migrate",
+      "cmd": "bin/dummysvc.exe",
+      "args": ["-mode", "dump"]
+    }
+  ],
+  "backup": { "cmd": "bin/dummysvc.exe", "args": ["-mode", "dump"] }
+}

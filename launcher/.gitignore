@@ -1,0 +1,4 @@
+dist/
+testdata/bin/
+testdata/runtime/
+*.exe

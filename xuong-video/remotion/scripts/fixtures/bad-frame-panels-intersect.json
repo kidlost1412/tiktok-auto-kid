@@ -1,0 +1,86 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "graphics": [
+  {
+   "id": "bad_frame",
+   "type": "frame",
+   "f0": 0,
+   "f1": 40,
+   "panels": [
+    {
+     "box": [
+      120,
+      300,
+      520,
+      800
+     ],
+     "f_in": 0,
+     "enter": "pop",
+     "clips": [
+      {
+       "path": "D:/Video/f88e350a52553237a464079a2016bc5b.mp4",
+       "src_in_f": 89,
+       "f0": 0,
+       "f1": 40,
+       "label": "A"
+      }
+     ]
+    },
+    {
+     "box": [
+      530,
+      300,
+      930,
+      800
+     ],
+     "f_in": 0,
+     "enter": "pop",
+     "clips": [
+      {
+       "path": "D:/Video/f88e350a52553237a464079a2016bc5b.mp4",
+       "src_in_f": 89,
+       "f0": 0,
+       "f1": 40,
+       "label": "B"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "style": {
+  "graphics_scale": 0.62,
+  "scale_by_type": {
+   "frame": 1.0
+  },
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF",
+   "frame_border": "#FFFFFF",
+   "frame_label_bg": "#0B5D2E",
+   "frame_label_text": "#FFE14D",
+   "sub_text": "#FFFFFF",
+   "sub_active": "#FFE14D",
+   "sub_bg": "#000000",
+   "sub_bg_alpha": 0.55
+  }
+ }
+}

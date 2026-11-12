@@ -1,0 +1,546 @@
+// Independent QA: runs the REAL lib.js + hook-main.js + api-main.js in one simulated page (MAIN world) against a fake
+// TikTok (fetch + XHR stubs; nothing leaves the process). The fake "SDK" wraps XHR.send on top of our hook, as Studio does.
+// Oracle = the owner's requirements R1-R7, not the implementation.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const SRC = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const POST_RE = /\/tiktok\/web\/project\/post\/v1\//;
+const STS = { access_key_id: 'AKIDTESTKEY0001', secret_acess_key: 'SECRETvalueDoNotLog123', session_token: 'SESSIONtokenDoNotLog456' };
+const STORE_AUTH = 'STOREauthDoNotLog789';
+const ME = { username: 'me.user', user_id_str: '7000000000000000001' };
+
+// opts: identities: [passport json per call], auth: (n) => {ok, reason}, xhr: (xhr, body) => void (native send behaviour),
+//       sdk: 'wrap' | 'wrap-throw-after' | 'none'
+function page(opts = {}) {
+  const net = [];            // every request that reached the "network" (native fetch / native XHR send)
+  const msgs = [];           // every window.postMessage payload (what other page scripts can see)
+  const listeners = [];
+  const authReqs = [];
+  const shopRelays = [];
+  let passportCalls = 0;
+  let doneResolve; const done = new Promise((r) => { doneResolve = r; });
+  const video = new Blob([new Uint8Array(1000).fill(7)], { type: 'video/mp4' });
+
+  class XHR extends EventTarget {
+    constructor() { super(); this.readyState = 0; this.status = 0; this.responseText = ''; this.withCredentials = false; this.timeout = 0; }
+    open(m, u) { this.m = m; this.u = u; this.readyState = 1; }
+    setRequestHeader() {}
+    send(body) {             // the browser's native send
+      net.push({ via: 'xhr', method: this.m, url: String(this.u), body });
+      const x = this;
+      setTimeout(() => (opts.xhr || ((xx) => xx.reply(200, '{"status_code":0,"data":{"item_id":"7300000000000000001"}}')))(x, body), 5);
+    }
+    reply(status, text) { this.readyState = 4; this.status = status; this.responseText = text; for (const t of ['readystatechange', 'load', 'loadend']) this.dispatchEvent(new Event(t)); }
+    fail(type = 'error') { this.readyState = 4; this.status = 0; for (const t of ['readystatechange', type, 'loadend']) this.dispatchEvent(new Event(t)); }
+    dispatchEvent(e) { const h = this['on' + e.type]; if (typeof h === 'function') h.call(this, e); return super.dispatchEvent(e); }
+  }
+
+  const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
+  async function nativeFetch(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    net.push({ via: 'fetch', method: init.method || 'GET', url, body: init.body });
+    if (url.startsWith('blob:')) return new Response(video);
+    if (url.startsWith('/passport/web/account/info/')) {
+      const ids = opts.identities || [{ data: ME }];
+      const j = ids[Math.min(passportCalls++, ids.length - 1)];
+      return json(j);
+    }
+    if (url.startsWith('/api/v1/web/project/create/')) return json({ project: { id: 'p1' } });
+    if (url.startsWith('/api/v1/video/upload/auth/')) return json({ video_token_v5: STS });
+    if (url.startsWith('/top/v1?Action=ApplyUploadInner')) return json({ Result: { InnerUploadAddress: { UploadNodes: [{ Vid: 'v0123', SessionKey: 'sk-1', UploadHost: 'up.example', StoreInfos: [{ StoreUri: 'tos/abc', Auth: STORE_AUTH }] }] } } });
+    if (url.startsWith('https://up.example/')) return json({ ok: 1 });
+    if (url.startsWith('/top/v1?Action=CommitUploadInner')) return json({ Result: {} });
+    if (url.startsWith('/@')) return new Response('<html></html>');
+    if (url.startsWith('https://shop.tiktok.com/')) { if (!opts.shop) return new Response('not found', { status: 404 }); return opts.shop(url); }   // K4 shop API stub
+    return new Response('not found', { status: 404 });
+  }
+
+  const win = {
+    XMLHttpRequest: XHR, fetch: nativeFetch, location: { origin: 'https://www.tiktok.com', href: 'https://www.tiktok.com/tiktokstudio/upload' },
+    URL, Blob, Response, Event, ProgressEvent: Event, EventTarget, TextEncoder, crypto: globalThis.crypto, performance: { now: () => performance.now() },
+    setTimeout, clearTimeout, Intl, console,
+    document: { createElement: () => { const v = { removeAttribute() {}, load() {} }; Object.defineProperty(v, 'src', { set() { setTimeout(() => v.onerror && v.onerror(), 0); } }); return v; } },
+    addEventListener: (t, f) => { if (t === 'message') listeners.push(f); },
+    postMessage: (m) => { msgs.push(JSON.parse(JSON.stringify(m))); setTimeout(() => listeners.slice().forEach((f) => f({ source: inner, data: m })), 0); },
+  };
+  vm.createContext(win);
+  const inner = vm.runInContext('globalThis', win);          // what `window` means inside the page
+  win.window = inner;
+  for (const f of ['lib.js', 'hook-main.js', 'api-main.js']) vm.runInContext(SRC(f), win, { filename: f });
+
+  // The page's signing SDK wraps XHR.send AFTER our document_start hook.
+  const below = win.XMLHttpRequest.prototype.send;
+  if ((opts.sdk || 'wrap') === 'wrap') win.XMLHttpRequest.prototype.send = function (b) { return below.call(this, b); };
+  if (opts.sdk === 'wrap-throw-after') win.XMLHttpRequest.prototype.send = function (b) { below.call(this, b); throw new Error('sdk post-send bookkeeping failed'); };
+
+  // content.js stand-in (isolated world): answers auth-req via the "SW", records done.
+  listeners.push((e) => {
+    const d = e.data;
+    if (!d || d.__autotok !== 1 || d.from !== 'api') return;
+    if (d.kind === 'auth-req') {
+      authReqs.push(d);
+      const r = (opts.auth || (() => ({ ok: true })))(authReqs.length, d);
+      const answer = () => win.postMessage({ __autotok: 1, from: 'content', kind: 'auth-res', nonce: d.nonce, ok: !!r.ok, reason: r.reason });
+      answer();
+      if (opts.duplicateAuthRes) { answer(); setTimeout(answer, 50); }
+    } else if (d.kind === 'shop-req') {                       // K4: MAIN asks the "SW" (via content.js) to GET the shop API
+      shopRelays.push(d.url);
+      const r = opts.shopRelay ? opts.shopRelay(d.url) : { ok: false, error: 'no-relay' };
+      win.postMessage({ __autotok: 1, from: 'content', kind: 'shop-res', nonce: d.nonce, rid: d.rid, ok: !!r.ok, status: r.status, text: r.text, error: r.error });
+    } else if (d.kind === 'done') doneResolve(d.result);
+  });
+
+  const job = (over) => Object.assign({ id: 'job-1', nonce: 'N1', mode: 'post', visibility: 'private', schedule_time: null,
+    caption: 'Xin chào \u{1F338} #việt', expect_account: 'me.user', expect_user_id: ME.user_id_str, chunk_credentials: 'omit' }, over);
+  function run(over, nonce = 'N1') {
+    win.postMessage({ __autotok: 1, kind: 'arm', nonce, mode: 'block' });                       // content.js arms first
+    const j = job(over);
+    win.postMessage({ __autotok: 1, from: 'content', kind: 'run', nonce, job: j, blobUrl: 'blob:https://www.tiktok.com/x', size: video.size });
+    return j;
+  }
+  function runSync(nonce = 'S1') {                                       // K4 product sync, as content.js starts it
+    win.postMessage({ __autotok: 1, kind: 'arm', nonce, mode: 'block' });
+    win.postMessage({ __autotok: 1, from: 'content', kind: 'sync_products', nonce, request_id: 'req1' });
+  }
+  const posts = () => net.filter((r) => POST_RE.test(r.url));
+  const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('no done within ' + ms + ' ms')), ms));
+  return { win, net, msgs, authReqs, shopRelays, run, runSync, posts, done: (ms = 8000) => Promise.race([done, timeout(ms)]), XHR };
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------- R1 / R5: the happy path sends exactly one publish and maps status 0 -> posted ----------
+test('post: exactly one publish request, mapped to posted with item id', async () => {
+  const p = page();
+  p.run();
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.equal(r.item_id, '7300000000000000001');
+  assert.equal(p.posts().length, 1);
+  assert.equal(p.authReqs.length, 1);
+});
+
+// ---------- R7: the body that actually went out (hand-computed values) ----------
+test('post: body sent has private visibility, caption text and UTF-16 hashtag offsets', async () => {
+  const p = page();
+  p.run();
+  await p.done();
+  const sent = JSON.parse(p.posts()[0].body);
+  const f = sent.feature_common_info_list[0];
+  const info = sent.single_post_req_list[0].single_post_feature_info;
+  assert.equal(f.privacy_setting_info.visibility_type, 1);           // private
+  assert.equal('schedule_time' in f, false);                          // no schedule
+  assert.equal(info.text, 'Xin chào \u{1F338} #việt');
+  // "Xin chào " = 9 units, flower = 2 units, space = 1 -> hashtag at 12, "#việt" = 5 units -> end 17
+  assert.deepEqual(info.text_extra, [{ end: 17, hashtag_name: 'việt', start: 12, tag_id: '0', type: 1, user_id: '' }]);
+  assert.equal(info.markup_text, 'Xin chào \u{1F338} <h id="0">#việt</h>');
+  assert.equal(sent.single_post_req_list[0].video_id, 'v0123');
+  assert.equal(f.vedit_common_info.video_id, 'v0123');
+});
+
+// ---------- R1: duplicate run / duplicate auth answers ----------
+test('post: duplicate run messages and duplicate auth answers still send at most one publish', async () => {
+  const p = page({ duplicateAuthRes: true });
+  p.run(); p.run(); p.run({}, 'N2');
+  const r = await p.done();
+  await sleep(300);
+  assert.equal(p.posts().length, 1, JSON.stringify(r));
+  assert.equal(p.authReqs.length, 1);
+  assert.equal(p.net.filter((x) => x.url.startsWith('/api/v1/web/project/create/')).length, 1);   // one upload, too
+});
+
+// ---------- R1/R2: authorization denied -> nothing sent ----------
+test('post: authorization denied by server -> nothing sent, definite failure', async () => {
+  const p = page({ auth: () => ({ ok: false, reason: 'post-disabled' }) });
+  p.run();
+  const r = await p.done();
+  assert.deepEqual([r.outcome, r.definite, p.posts().length], ['failed', true, 0]);
+});
+
+// ---------- R2: public / scheduled / no expect_account are refused before any upload ----------
+const soon = new Date(Date.now() + 5 * 60000).toISOString();
+const inDays = (d) => new Date(Date.now() + d * 86400000).toISOString();
+for (const [name, over] of [['private scheduled', { schedule_time: inDays(2) }], ['public scheduled 5 min ahead (<15)', { visibility: 'public', schedule_time: soon }],
+  ['public scheduled 31 days ahead', { visibility: 'public', schedule_time: inDays(31) }],
+  ['no expect_account', { expect_account: null }], ['no expect_user_id', { expect_user_id: null }], ['friends', { visibility: 'friends' }], ['bad option value', { options: { allow_duet: 'x' } }]]) {
+  test(`post: ${name} job is refused before upload and never authorized`, async () => {
+    const p = page();
+    p.run(over);
+    const r = await p.done();
+    assert.deepEqual([r.outcome, r.definite], ['failed', true]);
+    assert.equal(p.posts().length, 0);
+    assert.equal(p.authReqs.length, 0);
+    assert.equal(p.net.filter((x) => x.url.startsWith('/api/v1/web/project/create/')).length, 0);
+  });
+}
+
+// ---------- R3: identity ----------
+test('identity: passport without user_id_str -> nothing uploaded, nothing sent', async () => {
+  const p = page({ identities: [{ data: { username: 'me.user' } }] });
+  p.run();
+  const r = await p.done();
+  assert.deepEqual([r.outcome, r.definite], ['failed', true]);
+  assert.equal(p.net.filter((x) => x.url.startsWith('/api/v1/web/project/create/')).length, 0);
+  assert.equal(p.posts().length, 0);
+});
+
+test('identity: account switched during upload -> second check refuses, nothing sent, never authorized', async () => {
+  const p = page({ identities: [{ data: ME }, { data: { username: 'other.acc', user_id_str: '7000000000000000002' } }] });
+  p.run();
+  const r = await p.done();
+  assert.deepEqual([r.outcome, r.definite], ['failed', true]);
+  assert.match(r.detail, /identity-mismatch/);
+  assert.equal(p.authReqs.length, 0);
+  assert.equal(p.posts().length, 0);
+});
+
+test('identity: expect_user_id conflicts with passport user_id_str -> refused before upload', async () => {
+  const p = page();
+  p.run({ expect_user_id: '7000000000000000999' });
+  const r = await p.done();
+  assert.deepEqual([r.outcome, r.definite], ['failed', true]);
+  assert.equal(p.net.filter((x) => x.url.startsWith('/api/v1/web/project/create/')).length, 0);
+});
+
+// ---------- R4: selftest / intercept never send, even if the page itself tries ----------
+for (const mode of ['selftest', 'intercept']) {
+  test(`${mode}: no publish request in any path; a page-initiated publish is blocked, not reported as success`, async () => {
+    const p = page();
+    p.run({ mode, expect_account: 'me.user' });
+    // Studio's own code tries to publish while we are armed
+    const x = new p.win.XMLHttpRequest(); let ok = false, err = false;
+    x.onload = () => { ok = true; }; x.onerror = () => { err = true; };
+    await sleep(20);
+    x.open('POST', '/tiktok/web/project/post/v1/?aid=1988'); x.send('{}');
+    await assert.rejects(p.win.fetch('/tiktok/web/project/post/v1/', { method: 'POST', body: '{}' }));
+    const r = await p.done();
+    await sleep(50);                                     // the blocked XHR's error event is dispatched asynchronously
+    assert.equal(r.outcome, mode === 'selftest' ? 'selftest_ok' : 'intercepted');
+    assert.equal(p.posts().length, 0);
+    assert.equal(p.authReqs.length, 0);
+    assert.deepEqual([ok, err], [false, true]);
+    if (mode === 'intercept') assert.equal(r.sent, false);
+  });
+}
+
+// ---------- R5: result mapping on the real send path ----------
+for (const [name, xhr, want] of [
+  ['HTTP 503', (x) => x.reply(503, ''), 'uncertain'],
+  ['HTTP 429', (x) => x.reply(429, ''), 'uncertain'],
+  ['HTTP 408', (x) => x.reply(408, ''), 'uncertain'],
+  ['non-JSON 200', (x) => x.reply(200, '<html>oops</html>'), 'uncertain'],
+  ['network error after send', (x) => x.fail('error'), 'uncertain'],
+  ['timeout after send', (x) => x.fail('timeout'), 'uncertain'],
+  ['status_code 5', (x) => x.reply(200, '{"status_code":5,"status_msg":"Invalid parameters"}'), 'rejected'],
+]) {
+  test(`publish result: ${name} -> ${want}`, async () => {
+    const p = page({ xhr });
+    p.run();
+    const r = await p.done();
+    assert.equal(r.outcome, want, JSON.stringify(r));
+    assert.equal(p.posts().length, 1);
+    if (want === 'rejected') assert.equal(r.definite, true);
+    else assert.notEqual(r.definite, true);
+  });
+}
+
+// R1 "a lost result means uncertain": the request reached the network, then the page's send wrapper threw.
+test('publish result: request handed to the network, then the SDK send wrapper throws -> must be uncertain, not definite', async () => {
+  const p = page({ sdk: 'wrap-throw-after' });
+  p.run();
+  const r = await p.done();
+  assert.equal(p.posts().length, 1);                    // it WAS sent
+  assert.equal(r.outcome, 'uncertain', JSON.stringify({ outcome: r.outcome, definite: r.definite, reason: r.reason, detail: r.detail }));
+});
+
+// Python parity (_publish_in_browser: status <= 0 -> PublishUncertainError): a response with status 0 is not a rejection.
+test('publish result: load event with HTTP status 0 -> uncertain (Python: status <= 0 is uncertain)', async () => {
+  const p = page({ xhr: (x) => x.reply(0, '') });
+  p.run();
+  const r = await p.done();
+  assert.equal(p.posts().length, 1);
+  assert.equal(r.outcome, 'uncertain', JSON.stringify(r));
+});
+
+// ---------- SDK readiness ----------
+test('SDK never wraps send -> nothing authorized, nothing sent (definite)', { timeout: 40000 }, async () => {
+  const p = page({ sdk: 'none' });
+  p.run();
+  const r = await p.done(36000);
+  assert.deepEqual([r.outcome, r.definite, p.authReqs.length, p.posts().length], ['failed', true, 0, 0]);
+  assert.match(r.reason, /sdk-not-ready/);
+});
+
+// ---------- R6: secrets never reach postMessage (page-visible, forwarded to the SW/dev server log) ----------
+test('no STS secret, session token or storage Auth in any message leaving the MAIN world', async () => {
+  const p = page();
+  p.run();
+  const r = await p.done();
+  const all = JSON.stringify(p.msgs) + JSON.stringify(r);
+  for (const s of [STS.secret_acess_key, STS.session_token, STORE_AUTH, STS.access_key_id]) assert.equal(all.includes(s), false, 'leaked ' + s.slice(0, 6));
+});
+
+// ---------- production validation + options (protocol v1 job shape) ----------
+test('public immediate post is allowed and every non-default option reaches the body', async () => {
+  const p = page();
+  p.run({ visibility: 'public', options: { allow_comment: 0, allow_duet: 1, allow_stitch: 1, ai_label: 1 } });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.equal(r.schedule_time, null);
+  const f = JSON.parse(p.posts()[0].body).feature_common_info_list[0];
+  assert.deepEqual([f.privacy_setting_info.visibility_type, f.privacy_setting_info.allow_comment, f.privacy_setting_info.allow_duet, f.privacy_setting_info.allow_stitch], [0, 0, 1, 1]);
+  assert.deepEqual(f.aigc_info, { aigc_label_type: 1 });
+  assert.equal('schedule_time' in f, false);
+  assert.equal(p.authReqs[0].visibility_type, 0);
+  assert.equal(p.authReqs[0].schedule_time, null);
+  assert.equal(JSON.stringify(p.authReqs[0].identity), JSON.stringify({ username: 'me.user', user_id: ME.user_id_str }));
+});
+
+test('missing options use the Python defaults (comment on, duet/stitch/ai off)', async () => {
+  const p = page();
+  p.run({ visibility: 'public' });
+  await p.done();
+  const f = JSON.parse(p.posts()[0].body).feature_common_info_list[0];
+  assert.deepEqual([f.privacy_setting_info.allow_comment, f.privacy_setting_info.allow_duet, f.privacy_setting_info.allow_stitch, 'aigc_info' in f], [1, 0, 0, false]);
+});
+
+test('public scheduled post: schedule_unix goes into the body, authorize and the result', async () => {
+  const unix = Math.floor(Date.now() / 1000) + 3 * 86400;
+  const p = page();
+  p.run({ visibility: 'public', schedule_time: new Date(unix * 1000).toISOString(), schedule_unix: unix });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.equal(JSON.parse(p.posts()[0].body).feature_common_info_list[0].schedule_time, unix);
+  assert.equal(p.authReqs[0].schedule_time, unix);
+  assert.equal(r.schedule_time, unix);
+  assert.equal(p.posts().length, 1);
+});
+
+test('result carries a sanitized response (secret keys dropped) and ids', async () => {
+  const p = page({ xhr: (x) => x.reply(200, '{"status_code":0,"status_msg":"","data":{"item_id":"7701245450858351893","session_token":"SECRET"},"msToken":"SECRET2"}') });
+  p.run({ visibility: 'public' });
+  const r = await p.done();
+  assert.equal(r.item_id, '7701245450858351893');
+  assert.equal(JSON.stringify(r.response).includes('SECRET'), false);
+  assert.equal(r.response.data.item_id, '7701245450858351893');
+  assert.equal(r.status_code, 0);
+});
+
+// ====================== K4 cart: product check + anchors in the body, product sync ======================
+const OLD_ID = '7512345678901234567', NEW_ID = '7598765432109876543', SELLER_ID = '7400000000000000001';
+const OLD_NAME = 'Áo thun cotton nam form rộng', NEW_NAME = 'Quần short kaki nam';
+const tpl = () => [{ type: 'product', id: OLD_ID, title: OLD_NAME, extra: JSON.stringify({ product_id: OLD_ID, seller_id: SELLER_ID, title: OLD_NAME }) }];
+const sp = (id, o = {}) => ({ product_id: id, title: 'SP ' + id, format_available_price: '99.000đ', cover: { thumb_url_list: ['https://img/' + id] }, stock_num: o.stock === undefined ? 5 : o.stock, stock_status: 1 });
+const shopRes = (products, total) => new Response(JSON.stringify({ code: 0, data: { products, total: total == null ? products.length : total } }), { status: 200 });
+const qs = (url) => Object.fromEntries(new URL(url).searchParams);
+// a shop that only knows `known` ({id: product}) by keyword, for search_type 3 (my shop) or 2 (showcase)
+const shopKnows = (known, types = ['3']) => (url) => { const q = qs(url); const p = known[q.keyword]; return shopRes(p && types.includes(q.search_type) ? [p] : []); };
+const product = (over) => ({ product_id: NEW_ID, product_name: NEW_NAME, template_product_id: OLD_ID, anchor_template: tpl(), ...over });
+const shopCalls = (p) => p.net.filter((x) => x.url.startsWith('https://shop.tiktok.com/'));
+const uploaded = (p) => p.net.some((x) => x.url.startsWith('/api/v1/web/project/create/'));
+
+test('product job: checked against the shop BEFORE upload, anchors rebuilt for the new id, exactly one publish carries them', async () => {
+  const p = page({ shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) });
+  p.run({ product: product() });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.equal(p.posts().length, 1);
+  const calls = shopCalls(p);
+  assert.deepEqual([qs(calls[0].url).search_type, qs(calls[0].url).keyword, qs(calls[0].url).origin, qs(calls[0].url).aid, qs(calls[0].url).count], ['3', NEW_ID, '2', '1180', '10']);
+  assert.equal(calls[0].url.startsWith('https://shop.tiktok.com/api/v1/streamer_desktop/selection/search?'), true);
+  assert.ok(p.net.indexOf(calls[0]) < p.net.findIndex((x) => x.url.startsWith('/api/v1/web/project/create/')), 'shop check must precede the upload');
+  const sent = JSON.parse(p.posts()[0].body);
+  const anchors = sent.feature_common_info_list[0].anchors;
+  const text = JSON.stringify(anchors);
+  assert.equal(text.includes(OLD_ID), false);
+  assert.equal(text.includes(OLD_NAME), false);
+  assert.equal(anchors[0].id, NEW_ID);
+  assert.deepEqual(JSON.parse(anchors[0].extra), { product_id: NEW_ID, seller_id: SELLER_ID, title: NEW_NAME });
+  assert.equal(p.authReqs.length, 1);
+});
+
+for (const [name, over] of [['no anchor template', { anchor_template: null }], ['empty anchor template', { anchor_template: [] }]]) {
+  test(`product job: ${name} -> the default real-shape cart is posted (type 33, add_from 2)`, async () => {
+    const p = page({ shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) });
+    p.run({ product: product(over) });
+    const r = await p.done();
+    assert.equal(r.outcome, 'posted', JSON.stringify(r));
+    assert.equal(JSON.stringify(JSON.parse(p.posts()[0].body).feature_common_info_list[0].anchors), JSON.stringify([{ type: 33, keyword: NEW_NAME, content: { product_id: NEW_ID, keyword: NEW_NAME, add_from: 2 } }]));
+  });
+}
+
+test('product job: found only in the showcase (search_type=2) is accepted', async () => {
+  const p = page({ shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }, ['2']) });
+  p.run({ product: product() });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.deepEqual(shopCalls(p).map((x) => qs(x.url).search_type), ['3', '2']);
+});
+
+// nothing may be uploaded, authorized or published for any of these
+for (const [name, opts, prod, reason] of [
+  ['not found in my shop nor showcase', { shop: shopKnows({}) }, product(), 'product-unavailable'],
+  ['stock_num 0', { shop: shopKnows({ [NEW_ID]: sp(NEW_ID, { stock: 0 }) }) }, product(), 'product-unavailable'],
+  ['search returns a different product only', { shop: shopKnows({ [NEW_ID]: sp('7598765432109876544') }) }, product(), 'product-unavailable'],
+  ['shop answers code != 0', { shop: () => new Response('{"code":10001,"message":"x"}') }, product(), 'product-check-failed'],
+  ['shop answers HTTP 500', { shop: () => new Response('boom', { status: 500 }) }, product(), 'product-check-failed'],
+  ['shop unreachable and no relay', { shop: () => { throw new TypeError('Failed to fetch'); } }, product(), 'product-check-failed'],
+  ['product_name longer than 30 chars', { shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) }, product({ product_name: 'x'.repeat(31) }), 'anchor-build-failed'],
+  ['empty product_name', { shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) }, product({ product_name: ' ' }), 'anchor-build-failed'],
+  ['template id not found in the template', { shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) }, product({ template_product_id: '7000000000000000999' }), 'anchor-build-failed'],
+  ['template_product_id missing', { shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) }, product({ template_product_id: undefined }), 'anchor-build-failed'],
+  ['product_id is a number', { shop: shopKnows({}) }, product({ product_id: 7598765432109876543 }), 'anchor-build-failed'],
+]) {
+  test(`product job: ${name} -> failed ${reason}, not sent, nothing uploaded`, async () => {
+    const p = page(opts);
+    p.run({ product: prod });
+    const r = await p.done();
+    assert.deepEqual([r.outcome, r.definite, r.notSent, r.reason], ['failed', true, true, reason], JSON.stringify(r));
+    assert.equal(p.posts().length, 0);
+    assert.equal(p.authReqs.length, 0);
+    assert.equal(uploaded(p), false);
+  });
+}
+
+test('product job: when the page cannot read the shop (CORS) the GET is relayed through content.js -> service worker', async () => {
+  const body = JSON.stringify({ code: 0, data: { products: [sp(NEW_ID)], total: 1 } });
+  const p = page({ shop: () => { throw new TypeError('Failed to fetch'); }, shopRelay: () => ({ ok: true, status: 200, text: body }) });
+  p.run({ product: product() });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.equal(p.shopRelays.length, 1);
+  assert.equal(qs(p.shopRelays[0]).keyword, NEW_ID);
+});
+
+test('product job in intercept mode builds the body with the cart and sends nothing; selftest does not touch the shop', async () => {
+  const p = page({ shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) });
+  p.run({ mode: 'intercept', product: product() });
+  const r = await p.done();
+  assert.equal(r.outcome, 'intercepted');
+  assert.equal(r.body.feature_common_info_list[0].anchors[0].id, NEW_ID);
+  assert.equal(p.posts().length, 0);
+  const q = page({ shop: shopKnows({}) });
+  q.run({ mode: 'selftest', product: product() });
+  assert.equal((await q.done()).outcome, 'selftest_ok');
+  assert.equal(shopCalls(q).length, 0);
+});
+
+test('job without a product keeps anchors [] and never calls the shop', async () => {
+  const p = page({ shop: shopKnows({}) });
+  p.run();
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted');
+  assert.deepEqual(JSON.parse(p.posts()[0].body).feature_common_info_list[0].anchors, []);
+  assert.equal(shopCalls(p).length, 0);
+});
+
+// ---- product sync ----
+// a shop with `n` products per source, paged by cursor/count like the real API
+const pagedShop = (counts, log) => (url) => {
+  const q = qs(url); log.push([q.search_type, q.cursor, q.count, q.keyword]);
+  const n = counts[q.search_type] == null ? 0 : counts[q.search_type];
+  const from = Number(q.cursor), to = Math.min(from + Number(q.count), n);
+  const items = []; for (let i = from; i < to; i++) items.push(sp(String(7600000000000000000n + BigInt(q.search_type) * 100000n + BigInt(i))));
+  return shopRes(items, n);
+};
+
+test('sync: pages my shop (3) then showcase (2) by cursor offset 50, stops on a short page, never touches /project/post/', async () => {
+  const log = [];
+  const p = page({ shop: pagedShop({ 3: 107, 2: 0 }, log) });
+  p.runSync();
+  const r = await p.done();
+  assert.equal(r.outcome, 'sync_ok', JSON.stringify(r).slice(0, 300));
+  assert.deepEqual(log, [['3', '0', '50', ''], ['3', '50', '50', ''], ['3', '100', '50', ''], ['2', '0', '50', '']]);
+  assert.equal(JSON.stringify(r.identity), JSON.stringify({ username: 'me.user', user_id: ME.user_id_str }));
+  assert.deepEqual([r.sources.my_shop.products.length, r.sources.my_shop.complete, r.sources.my_shop.total], [107, true, 107]);
+  assert.deepEqual([r.sources.showcase.products.length, r.sources.showcase.complete], [0, true]);
+  assert.deepEqual(Object.keys(r.sources.my_shop.products[0]).sort(), ['cover_url', 'price', 'product_id', 'stock_num', 'stock_status', 'title']);
+  assert.equal(typeof r.sources.my_shop.products[0].product_id, 'string');
+  assert.equal(new Set(r.sources.my_shop.products.map((x) => x.product_id)).size, 107);
+  assert.equal(p.posts().length, 0);
+  assert.equal(p.authReqs.length, 0);
+  assert.equal(uploaded(p), false);
+});
+
+test('sync: stops when total is reached on an exact page boundary (100 of 100: no third request)', async () => {
+  const log = [];
+  const p = page({ shop: pagedShop({ 3: 100, 2: 50 }, log) });
+  p.runSync();
+  const r = await p.done();
+  assert.equal(r.outcome, 'sync_ok');
+  assert.deepEqual(log.map((x) => x[0] + ':' + x[1]), ['3:0', '3:50', '2:0']);
+  assert.equal(r.sources.showcase.complete, true);
+});
+
+test('sync: a failing source is reported incomplete (never complete:true); the other source still goes through', async () => {
+  const log = [];
+  const inner = pagedShop({ 3: 10 }, log);
+  const p = page({ shop: (url) => (qs(url).search_type === '2' ? new Response('{"code":5}') : inner(url)) });
+  p.runSync();
+  const r = await p.done();
+  assert.equal(r.outcome, 'sync_ok');
+  assert.deepEqual([r.sources.my_shop.complete, r.sources.showcase.complete, r.sources.showcase.error], [true, false, 'code-5']);
+});
+
+test('sync: 40 page cap -> source marked incomplete; unknown identity -> failed', { timeout: 30000 }, async () => {
+  const log = [];
+  const p = page({ shop: (url) => { const q = qs(url); log.push(q.search_type + ':' + q.cursor); return q.search_type === '3' ? shopRes(Array.from({ length: 50 }, (_, i) => sp(String(7700000000000000000n + BigInt(q.cursor) + BigInt(i)))), 99999) : shopRes([]); } });
+  p.runSync();
+  const r = await p.done(25000);
+  assert.equal(r.outcome, 'sync_ok');
+  assert.deepEqual([r.sources.my_shop.complete, r.sources.my_shop.pages, r.sources.my_shop.products.length], [false, 40, 2000]);
+  assert.equal(log.filter((x) => x.startsWith('3:')).length, 40);
+  const q = page({ identities: [{ data: { username: 'me.user' } }], shop: shopKnows({}) });
+  q.runSync();
+  const f = await q.done();
+  assert.deepEqual([f.outcome, f.reason], ['failed', 'identity-unknown']);
+  assert.equal(shopCalls(q).length, 0);
+});
+
+test('sync_products from the page itself (not content.js) is ignored', async () => {
+  const p = page({ shop: shopKnows({}) });
+  p.win.postMessage({ __autotok: 1, kind: 'sync_products', nonce: 'X' });                // no from:'content'
+  await sleep(150);
+  assert.equal(p.net.length, 0);
+});
+
+// ---- hook: passive capture of the owner's own manual post ----
+test('hook: a manual post with anchors is observed AFTER the native send, unchanged; the extension\'s own publish is never captured', async () => {
+  const body = JSON.stringify({ feature_common_info_list: [{ anchors: tpl() }] });
+  const p = page();
+  const x = new p.win.XMLHttpRequest();
+  x.open('POST', '/tiktok/web/project/post/v1/?aid=1988');
+  x.send(body);                                           // unarmed: the owner's own request
+  assert.equal(p.net.filter((r) => POST_RE.test(r.url)).length, 1);   // already handed to the network synchronously
+  assert.equal(p.net.find((r) => POST_RE.test(r.url)).body, body);     // byte-identical
+  await sleep(30);
+  const caps = p.msgs.filter((m) => m.kind === 'anchor-capture');
+  assert.equal(caps.length, 1);
+  assert.deepEqual([caps[0].from, caps[0].anchors, caps[0].keyed], ['hook', tpl(), [OLD_ID]]);
+  assert.deepEqual(caps[0].candidates.sort(), [OLD_ID, SELLER_ID].sort());
+  // a post without anchors, and a GET, are not captured
+  const y = new p.win.XMLHttpRequest(); y.open('POST', '/tiktok/web/project/post/v1/'); y.send(JSON.stringify({ feature_common_info_list: [{ anchors: [] }] }));
+  await sleep(30);
+  assert.equal(p.msgs.filter((m) => m.kind === 'anchor-capture').length, 1);
+});
+
+test('hook: our own armed publish (with a cart) produces no capture message', async () => {
+  const p = page({ shop: shopKnows({ [NEW_ID]: sp(NEW_ID) }) });
+  p.run({ product: product() });
+  const r = await p.done();
+  await sleep(30);
+  assert.equal(r.outcome, 'posted');
+  assert.equal(p.msgs.filter((m) => m.kind === 'anchor-capture').length, 0);
+});
+
+test('hook: capture never throws into the page, whatever the body is', async () => {
+  const p = page();
+  const x = new p.win.XMLHttpRequest(); x.open('POST', '/tiktok/web/project/post/v1/'); assert.doesNotThrow(() => x.send('}{not json'));
+  await sleep(20);
+  const z = new p.win.XMLHttpRequest(); z.open('POST', '/tiktok/web/project/post/v1/'); assert.doesNotThrow(() => z.send(null));
+  assert.equal(p.msgs.filter((m) => m.kind === 'anchor-capture').length, 0);
+});

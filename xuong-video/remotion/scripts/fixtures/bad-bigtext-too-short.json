@@ -1,0 +1,39 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "style": {
+  "graphics_scale": 1.0,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF",
+   "title_fill": "#FFE14D"
+  }
+ },
+ "graphics": [
+  {
+   "id": "b1",
+   "type": "big_text",
+   "f0": 0,
+   "f1": 40,
+   "text": "5",
+   "cy": 700
+  }
+ ]
+}

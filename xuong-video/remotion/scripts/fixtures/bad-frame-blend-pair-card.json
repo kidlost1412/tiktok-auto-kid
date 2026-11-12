@@ -1,0 +1,205 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture-frame",
+ "draft_name": "V9 frame fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": "D:/video/mau/video-1.mp4",
+  "src_in_f": 0
+ },
+ "voice": {
+  "from": "main"
+ },
+ "music": {
+  "path": null,
+  "gain_rel_voice_db": -18
+ },
+ "mix": {
+  "target_lufs": -14.0,
+  "true_peak_max_dbtp": -1.0
+ },
+ "main_moves": [
+  {
+   "f0": 0,
+   "f1": 60,
+   "zoom_from": 1.0,
+   "zoom_to": 1.08,
+   "center": [
+    0.5,
+    0.5
+   ]
+  },
+  {
+   "f0": 60,
+   "f1": 200,
+   "zoom_from": 1.08,
+   "zoom_to": 1.0,
+   "center": [
+    0.5,
+    0.5
+   ],
+   "easing": "ease_in_out"
+  }
+ ],
+ "transitions": [
+  {
+   "at_f": 60,
+   "slug": "pull-in",
+   "dur_f": 6
+  }
+ ],
+ "sub_style": {
+  "font_px": 48,
+  "max_width_ratio": 0.8
+ },
+ "subs": [
+  {
+   "id": "s01",
+   "f0": 0,
+   "f1": 30,
+   "words": [
+    {
+     "text": "KÍCH",
+     "f0": 0,
+     "f1": 15
+    },
+    {
+     "text": "RỄ",
+     "f0": 15,
+     "f1": 30
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "f0": 30,
+   "f1": 60,
+   "words": [
+    {
+     "text": "CỰC",
+     "f0": 30,
+     "f1": 45
+    },
+    {
+     "text": "MẠNH",
+     "f0": 45,
+     "f1": 60
+    }
+   ]
+  }
+ ],
+ "broll": [
+  {
+   "id": "b01",
+   "f0": 180,
+   "f1": 210,
+   "path": "D:/Video/snaptik_7560683381579648276_v2.mp4",
+   "src_in_f": 3000,
+   "fit": "cover",
+   "zoom": {
+    "from": 1.0,
+    "to": 1.0
+   },
+   "center": [
+    0.5,
+    0.5
+   ]
+  }
+ ],
+ "graphics": [
+  {
+   "id": "g_pair",
+   "type": "frame",
+   "f0": 0,
+   "f1": 60,
+   "exit": "default",
+   "xfade_f": 0,
+   "panels": [
+    {
+     "box": [
+      0,
+      0,
+      548,
+      820
+     ],
+     "f_in": 0,
+     "enter": "fade",
+     "clips": [
+      {
+       "path": "D:/Video/f88e350a52553237a464079a2016bc5b.mp4",
+       "src_in_f": 100,
+       "f0": 0,
+       "f1": 60,
+       "center": [
+        0.5,
+        0.5
+       ]
+      }
+     ],
+     "feather": {
+      "bottom": 260,
+      "right": 16
+     }
+    },
+    {
+     "box": [
+      532,
+      0,
+      1080,
+      820
+     ],
+     "f_in": 0,
+     "enter": "fade",
+     "clips": [
+      {
+       "path": "D:/Video/f88e350a52553237a464079a2016bc5b.mp4",
+       "src_in_f": 140,
+       "f0": 0,
+       "f1": 60,
+       "center": [
+        0.5,
+        0.5
+       ]
+      }
+     ],
+     "feather": {
+      "bottom": 260,
+      "left": 16
+     }
+    }
+   ],
+   "behind_person": true,
+   "style": "card"
+  }
+ ],
+ "style": {
+  "graphics_scale": 0.62,
+  "scale_by_type": {
+   "frame": 1.0
+  },
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF",
+   "frame_border": "#FFFFFF",
+   "frame_label_bg": "#0B5D2E",
+   "frame_label_text": "#FFE14D",
+   "sub_text": "#FFFFFF",
+   "sub_active": "#FFE14D",
+   "sub_bg": "#000000",
+   "sub_bg_alpha": 0.55
+  }
+ }
+}

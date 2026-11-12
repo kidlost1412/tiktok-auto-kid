@@ -1,0 +1,75 @@
+{
+ "id": "g01",
+ "type": "keyword",
+ "f0": 1,
+ "f1": 58,
+ "frames": 57,
+ "layout": {
+  "box": [
+   238.0,
+   302.0,
+   842.0,
+   538.0
+  ],
+  "lines": [
+   {
+    "text": "KÍCH RỄ",
+    "size": 72,
+    "lh": 85,
+    "top": 20,
+    "color": "#FFFFFF",
+    "w": 312
+   },
+   {
+    "text": "CỰC MẠNH",
+    "size": 90,
+    "lh": 99,
+    "top": 111,
+    "color": "#FFE14D",
+    "w": 532
+   }
+  ],
+  "blocks": [
+   {
+    "name": "text",
+    "box": [
+     274.0,
+     322.0,
+     806.0,
+     407.0
+    ]
+   },
+   {
+    "name": "accent",
+    "box": [
+     274.0,
+     413.0,
+     806.0,
+     512.0
+    ]
+   }
+  ],
+  "pred_bbox": [
+   215.70977940709824,
+   283.4542338070004,
+   875.2536980243507,
+   566.7693742943555
+  ],
+  "font_size": 72,
+  "accent_size": 90,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF"
+  }
+ }
+}

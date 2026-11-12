@@ -1,0 +1,13 @@
+{
+  "duration_f": 30,
+  "audio": "hub-sample/audio.m4a",
+  "clips": [],
+  "transition": {"kind": "cut", "dur_f": 8},
+  "words": [],
+  "caption": {"style": "vien_den", "center_y": 1060, "upper": true, "group": 3},
+  "colors": {"accent": "#FFD400", "brand_red": "#D7262E", "brand_green": "#2E9E44", "text": "#FFFFFF"},
+  "open_card": {"kind": "khong", "text": "", "f1": 0},
+  "cta": {"kind": "hop_do", "line1": "", "line2": "", "f0": 9999},
+  "arrow": {"f0": 9999, "label": "GIỎ HÀNG"},
+  "progress_bar": false
+}

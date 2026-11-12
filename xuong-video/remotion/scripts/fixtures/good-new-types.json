@@ -1,0 +1,142 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "graphics": [
+  {
+   "id": "n_title",
+   "type": "title_behind",
+   "f0": 0,
+   "f1": 24,
+   "text": "KÍCH RỄ",
+   "y": 640
+  },
+  {
+   "id": "n_title2",
+   "type": "title_behind",
+   "f0": 30,
+   "f1": 60,
+   "text": "CỰC MẠNH",
+   "y": 700
+  },
+  {
+   "id": "n_cut",
+   "type": "cutout",
+   "f0": 0,
+   "f1": 60,
+   "image": "D:/remotion/scripts/fixtures/cutout-blob.png",
+   "label": "DINH DƯỠNG",
+   "cx": 820,
+   "cy": 430,
+   "h": 380
+  },
+  {
+   "id": "n_cut2",
+   "type": "cutout",
+   "f0": 60,
+   "f1": 100,
+   "image": "D:/remotion/scripts/fixtures/cutout-blob.png",
+   "label": "TC01",
+   "cx": 300,
+   "cy": 600,
+   "h": 360
+  },
+  {
+   "id": "n_flash",
+   "type": "flash",
+   "f0": 0,
+   "f1": 5
+  },
+  {
+   "id": "n_flash2",
+   "type": "flash",
+   "f0": 10,
+   "f1": 16
+  },
+  {
+   "id": "n_kw",
+   "type": "keyword",
+   "f0": 0,
+   "f1": 30,
+   "text": "BỔ SUNG DINH DƯỠNG CHO CÂY",
+   "accent": "TRUNG VI LƯỢNG",
+   "y": 420
+  },
+  {
+   "id": "n_cl",
+   "type": "checklist",
+   "f0": 0,
+   "f1": 40,
+   "x": 90,
+   "y": 900,
+   "items": [
+    {
+     "text": "TRUNG VI LƯỢNG",
+     "f": 0
+    },
+    {
+     "text": "BỔ SUNG DINH DƯỠNG CHO CÂY",
+     "f": 10
+    },
+    {
+     "text": "RA HOA – ĐẬU QUẢ",
+     "f": 20
+    }
+   ]
+  },
+  {
+   "id": "n_cta",
+   "type": "cta",
+   "f0": 0,
+   "f1": 30,
+   "text": "NHẤN GIỎ HÀNG NGAY",
+   "y": 700
+  },
+  {
+   "id": "n_circ",
+   "type": "circle",
+   "f0": 0,
+   "f1": 20,
+   "label": null,
+   "keys": [
+    {
+     "f": 0,
+     "cx": 540,
+     "cy": 1000,
+     "rx": 200,
+     "ry": 80
+    },
+    {
+     "f": 19,
+     "cx": 560,
+     "cy": 1010,
+     "rx": 220,
+     "ry": 90
+    }
+   ]
+  }
+ ],
+ "style": {
+  "graphics_scale": 0.62,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF"
+  }
+ }
+}

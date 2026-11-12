@@ -1,0 +1,53 @@
+{
+ "schema": "kich-ban/1",
+ "project_id": "fixture",
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "duration_f": 300,
+ "main": {
+  "path": null
+ },
+ "graphics": [
+  {
+   "id": "bad_circle",
+   "type": "circle",
+   "f0": 0,
+   "f1": 20,
+   "label": null,
+   "keys": [
+    {
+     "f": 0,
+     "cx": 800,
+     "cy": 1100,
+     "rx": 200,
+     "ry": 80
+    },
+    {
+     "f": 19,
+     "cx": 820,
+     "cy": 1200,
+     "rx": 200,
+     "ry": 80
+    }
+   ]
+  }
+ ],
+ "style": {
+  "graphics_scale": 1.0,
+  "palette": {
+   "card_bg": "#0B5D2E",
+   "card_border": "#FFE14D",
+   "card_shadow": "#E0262B",
+   "card_text": "#FFFFFF",
+   "card_accent": "#FFE14D",
+   "pill_bg": "#FFFFFF",
+   "pill_text": "#0B5D2E",
+   "tick": "#1FA64A",
+   "circle": "#FFE14D",
+   "circle_outline": "#0B5D2E",
+   "cta_bg": "#E0262B",
+   "cta_text": "#FFFFFF"
+  }
+ }
+}
