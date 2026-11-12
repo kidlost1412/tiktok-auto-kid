@@ -11,7 +11,7 @@ import {
 import { computed, reactive, ref } from 'vue';
 
 import type { AccountRow, LichChannel } from '@/components/fork/auto/types';
-import { fmtNum, toneClasses } from '@/components/fork/shared/status';
+import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,7 +110,8 @@ const recOpen = ref(false);
     <div
         :class="
             cn(
-                'flex flex-col gap-5 rounded-2xl border bg-card p-6 shadow-xs transition-colors',
+                cardCls,
+                'flex flex-col gap-5 p-6 transition-colors',
                 !account.enabled && 'bg-muted/30',
             )
         "
@@ -135,7 +136,7 @@ const recOpen = ref(false);
                 />
             </div>
             <div class="min-w-0 flex-1">
-                <div class="truncate text-xl font-semibold">{{ name }}</div>
+                <div class="truncate text-lg font-semibold tracking-tight">{{ name }}</div>
                 <div
                     v-if="account.display_name"
                     class="truncate text-sm text-muted-foreground"
@@ -145,9 +146,9 @@ const recOpen = ref(false);
                 <div
                     v-if="!avatarUrl"
                     class="truncate text-xs text-muted-foreground"
-                    title="Tiện ích TikTok Auto Kid bản 1.4.1 trở lên tự lấy ảnh đại diện từ tiktok.com và gửi về app"
+                    title="Tiện ích Chrome tự lấy ảnh đại diện khi mở tiktok.com trong Chrome đã ghép"
                 >
-                    Cập nhật tiện ích 1.4.1 để hiện ảnh đại diện
+                    Chưa có ảnh đại diện — sẽ tự hiện sau khi Chrome đã ghép mở tiktok.com
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
@@ -214,12 +215,12 @@ const recOpen = ref(false);
 
         <div class="flex flex-col gap-2">
             <div class="flex items-baseline justify-between">
-                <span class="text-base text-muted-foreground">Hôm nay</span>
-                <span class="font-heading text-3xl font-semibold tabular-nums">
+                <span class="text-sm font-medium text-muted-foreground">Hôm nay</span>
+                <span class="font-heading text-2xl font-[650] tracking-tight tabular-nums">
                     {{ planned }}/{{ cap }} bài
                 </span>
             </div>
-            <Progress :model-value="percent" class="h-3" />
+            <Progress :model-value="percent" class="h-2" />
             <div class="text-sm text-muted-foreground">
                 Đã đăng {{ today?.posted ?? 0 }}, còn
                 {{ Math.max(0, cap - planned) }} chỗ trong ngày.
@@ -335,7 +336,7 @@ const recOpen = ref(false);
             </Transition>
             <Link
                 :href="`/auto/gio-hang?kenh=${account.id}`"
-                class="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                class="ml-auto inline-flex items-center gap-1.5 text-sm text-primary-text hover:underline"
                 :data-testid="`fork-auto-cart-${account.id}`"
             >
                 <IconShoppingCart class="size-4" />
@@ -344,7 +345,7 @@ const recOpen = ref(false);
         </div>
 
         <div
-            class="rounded-xl bg-muted/40 text-base"
+            class="rounded-xl border bg-muted/50 text-sm"
             data-testid="fork-auto-recommend"
         >
             <button

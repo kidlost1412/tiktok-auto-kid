@@ -4,7 +4,7 @@ import { IconCalendarEvent, IconClockPlay, IconMovie, IconRobot } from '@tabler/
 import { computed } from 'vue';
 
 import type { AccountRow, Lich } from '@/components/fork/auto/types';
-import { toneClasses, type Tone } from '@/components/fork/shared/status';
+import { cardCls, toneClasses, type Tone } from '@/components/fork/shared/status';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -105,24 +105,24 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
 </script>
 
 <template>
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="fork-auto-kpi">
+    <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-testid="fork-auto-kpi">
         <div
             v-for="c in cards"
             :key="c.key"
-            class="flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-xs"
+            :class="cn(cardCls, 'relative flex flex-col gap-3 overflow-hidden p-5')"
             :data-testid="`fork-auto-kpi-${c.key}`"
         >
-            <span :class="cn('flex size-12 shrink-0 items-center justify-center rounded-xl', toneClasses[c.tone].chip)">
-                <component :is="c.icon" class="size-6" />
-            </span>
-            <div class="min-w-0">
+            <div class="flex items-center gap-3">
+                <span :class="cn('flex size-[34px] shrink-0 items-center justify-center rounded-[10px]', toneClasses[c.tone].chip)">
+                    <component :is="c.icon" class="size-[18px]" />
+                </span>
                 <div class="text-sm font-medium text-muted-foreground">{{ c.label }}</div>
-                <div class="mt-1 flex items-baseline gap-2">
-                    <span class="font-heading text-4xl leading-none font-semibold tracking-tight tabular-nums">{{ c.value }}</span>
-                    <span v-if="c.unit" class="text-sm text-muted-foreground">{{ c.unit }}</span>
-                </div>
-                <div class="mt-2 text-sm text-muted-foreground">{{ c.hint }}</div>
             </div>
+            <div class="flex items-baseline gap-2">
+                <span class="font-heading text-[32px] leading-none font-[650] tracking-[-0.025em] tabular-nums">{{ c.value }}</span>
+                <span v-if="c.unit" class="text-sm text-muted-foreground">{{ c.unit }}</span>
+            </div>
+            <div class="text-[13px] leading-snug text-muted-foreground">{{ c.hint }}</div>
         </div>
     </div>
 </template>

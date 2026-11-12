@@ -122,7 +122,7 @@ const tagDetail = computed(() => {
 
 <template>
     <article
-        class="group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-shadow hover:shadow-md"
+        class="group flex flex-col overflow-hidden rounded-[14px] border bg-card shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition-shadow hover:shadow-md"
         :data-testid="`fork-anh-bia-card-${product.code}`"
     >
         <!-- Đầu thẻ: sản phẩm -->

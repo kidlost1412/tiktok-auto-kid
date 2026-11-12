@@ -46,12 +46,12 @@ const scrollTo = (href: string) =>
 
 <template>
     <section
-        class="rounded-2xl border bg-card p-5 shadow-xs"
+        class="rounded-[14px] border bg-card p-5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
         data-testid="fork-auto-onboarding"
     >
         <div class="flex items-start gap-3">
             <div
-                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-text"
             >
                 <IconRocket class="size-5" />
             </div>

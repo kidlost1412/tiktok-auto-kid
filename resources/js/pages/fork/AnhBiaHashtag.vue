@@ -77,17 +77,16 @@ const customTags = computed(
         testid="fork-anh-bia-page"
     >
         <!-- Giải thích + hashtag mặc định chung -->
-        <section class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <section class="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <div
-                class="flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-xs"
+                class="flex flex-col gap-4 rounded-[14px] border bg-card p-5 sm:p-6 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
                 data-testid="fork-anh-bia-intro"
             >
-                <h2
-                    class="flex items-center gap-2 font-heading text-lg font-semibold"
-                >
-                    <IconInfoCircle class="size-5 text-muted-foreground" />
-                    Cách hoạt động
-                </h2>
+                <SectionHeading
+                    :icon="IconInfoCircle"
+                    tone="info"
+                    title="Cách hoạt động"
+                />
                 <ul class="flex flex-col gap-2.5 text-sm text-muted-foreground">
                     <li class="flex gap-2.5">
                         <IconPhoto
@@ -128,21 +127,16 @@ const customTags = computed(
             </div>
 
             <div
-                class="flex flex-col gap-3 rounded-2xl border bg-card p-5 shadow-xs"
+                class="flex flex-col gap-4 rounded-[14px] border bg-card p-5 sm:p-6 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
                 data-testid="fork-anh-bia-default"
             >
                 <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <h2
-                            class="flex items-center gap-2 font-heading text-lg font-semibold"
-                        >
-                            <IconHash class="size-5 text-muted-foreground" />
-                            Hashtag mặc định chung
-                        </h2>
-                        <p class="mt-0.5 text-sm text-muted-foreground">
-                            Dùng cho sản phẩm chưa có hashtag riêng.
-                        </p>
-                    </div>
+                    <SectionHeading
+                        :icon="IconHash"
+                        title="Hashtag mặc định chung"
+                        description="Dùng cho sản phẩm chưa có hashtag riêng."
+                        class="min-w-0"
+                    />
                     <Button
                         size="sm"
                         variant="outline"
@@ -158,7 +152,7 @@ const customTags = computed(
                     <span
                         v-for="t in defaults.tags"
                         :key="t"
-                        class="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                        class="rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-medium text-primary-text"
                         >{{ t }}</span
                     >
                 </div>
@@ -174,6 +168,7 @@ const customTags = computed(
             data-testid="fork-anh-bia-products"
         >
             <SectionHeading
+                :icon="IconPhoto"
                 title="Sản phẩm đang bật"
                 description="Bấm Chỉnh trên thẻ để tải ảnh bìa, chọn kiểu bìa và nhập hashtag; có xem trước caption."
             >
@@ -192,7 +187,7 @@ const customTags = computed(
 
             <div
                 v-if="products.length"
-                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+                class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
             >
                 <PersonaCard
                     v-for="p in products"

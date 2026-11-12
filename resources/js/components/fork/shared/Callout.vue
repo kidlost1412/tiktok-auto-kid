@@ -33,7 +33,7 @@ const icon = computed(
     <div
         :class="
             cn(
-                'flex items-start gap-3.5 rounded-xl border p-4 text-base',
+                'flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm font-medium',
                 toneClasses[tone].box,
                 props.class,
             )

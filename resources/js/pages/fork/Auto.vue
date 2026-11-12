@@ -2,7 +2,14 @@
 // Trang riêng của bản Việt hoá: "Tổng quan & Lịch" - theo dõi và điều khiển việc tự động đăng video từ hub sản xuất.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
 import { Link, router } from '@inertiajs/vue3';
-import { IconBolt, IconBrandTiktok } from '@tabler/icons-vue';
+import {
+    IconBolt,
+    IconBrandTiktok,
+    IconBuildingWarehouse,
+    IconChartBar,
+    IconChevronDown,
+    IconDeviceTv,
+} from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import ChannelCard from '@/components/fork/auto/ChannelCard.vue';
@@ -26,10 +33,18 @@ import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
-import { fmtNum } from '@/components/fork/shared/status';
+import {
+    cardCls,
+    fmtNum,
+    tableWrapCls,
+    tdCls,
+    thCls,
+    toneClasses,
+} from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
+import { cn } from '@/lib/utils';
 
 interface UpcomingRow {
     id: number;
@@ -235,12 +250,13 @@ const analyses = computed(() => [
         </div>
 
         <!-- Các kênh -->
-        <section id="kenh" class="flex scroll-mt-24 flex-col gap-4">
+        <section id="kenh" class="flex scroll-mt-24 flex-col gap-5">
             <SectionHeading
+                :icon="IconDeviceTv"
                 title="Kênh TikTok"
                 description="Bật kênh, chỉnh hạn mức, khung giờ và số ngày hẹn trước ngay trên thẻ."
             />
-            <div class="grid gap-6 lg:grid-cols-[repeat(auto-fit,minmax(34rem,1fr))] 2xl:grid-cols-[repeat(auto-fit,minmax(38rem,1fr))]">
+            <div class="grid gap-5 lg:grid-cols-[repeat(auto-fit,minmax(34rem,1fr))]">
                 <ChannelCard
                     v-for="a in accounts"
                     :key="a.id"
@@ -281,57 +297,71 @@ const analyses = computed(() => [
 
         <!-- Kho video theo sản phẩm -->
         <details
-            class="group rounded-2xl border bg-card p-5 shadow-xs"
+            :class="cn(cardCls, 'group p-5 sm:p-6')"
             data-testid="fork-auto-stock"
         >
             <summary
-                class="flex cursor-pointer flex-wrap items-baseline gap-x-3 text-lg font-semibold select-none"
+                class="flex cursor-pointer list-none flex-wrap items-center gap-3.5 select-none [&::-webkit-details-marker]:hidden"
             >
-                Kho video theo sản phẩm
-                <span class="text-sm font-normal text-muted-foreground"
-                    >cập nhật {{ fmtClock(stock.updated_at)
-                    }}<template v-if="stock.last_ingest_at"
-                        >, quét kho lần cuối
-                        {{ fmtClock(stock.last_ingest_at) }}</template
-                    ></span
+                <span
+                    :class="cn('flex size-[38px] shrink-0 items-center justify-center rounded-[11px]', toneClasses.info.chip)"
                 >
+                    <IconBuildingWarehouse class="size-[18px]" />
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span
+                        class="block font-heading text-lg leading-snug font-semibold tracking-[-0.015em]"
+                        >Kho video theo sản phẩm</span
+                    >
+                    <span class="block text-[13px] text-muted-foreground"
+                        >cập nhật {{ fmtClock(stock.updated_at)
+                        }}<template v-if="stock.last_ingest_at"
+                            >, quét kho lần cuối
+                            {{ fmtClock(stock.last_ingest_at) }}</template
+                        ></span
+                    >
+                </span>
+                <IconChevronDown
+                    class="size-5 text-muted-foreground transition-transform group-open:rotate-180"
+                />
             </summary>
-            <div class="mt-3 overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-muted-foreground">
+            <div :class="cn(tableWrapCls, 'mt-4')">
+                <table class="w-full border-separate border-spacing-0 text-sm">
+                    <thead>
                         <tr>
-                            <th class="p-3 font-medium">Sản phẩm</th>
-                            <th class="p-3 font-medium">Mới</th>
-                            <th class="p-3 font-medium">Đã xếp</th>
-                            <th class="p-3 font-medium">Đã đăng</th>
-                            <th class="p-3 font-medium">Bỏ qua</th>
-                            <th class="p-3 font-medium">Lỗi</th>
+                            <th :class="thCls">Sản phẩm</th>
+                            <th :class="cn(thCls, 'text-right')">Mới</th>
+                            <th :class="cn(thCls, 'text-right')">Đã xếp</th>
+                            <th :class="cn(thCls, 'text-right')">Đã đăng</th>
+                            <th :class="cn(thCls, 'text-right')">Bỏ qua</th>
+                            <th :class="cn(thCls, 'text-right')">Lỗi</th>
                         </tr>
                     </thead>
-                    <tbody class="tabular-nums">
+                    <tbody class="tabular-nums [&>tr:hover>td]:bg-accent/60 [&>tr:last-child>td]:border-b-0">
                         <tr
                             v-for="p in products"
                             :key="p.code"
-                            class="border-t"
                             :data-testid="`fork-auto-product-${p.code}`"
                         >
-                            <td class="flex items-center gap-2 p-2 font-medium">
-                                <ProductThumb :src="p.image" />
-                                {{ p.short_name }}
-                                <span
-                                    v-if="!p.enabled"
-                                    class="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground"
-                                    >tắt</span
-                                >
+                            <td :class="cn(tdCls, 'font-medium')">
+                                <span class="flex items-center gap-2.5">
+                                    <ProductThumb :src="p.image" />
+                                    {{ p.short_name }}
+                                    <span
+                                        v-if="!p.enabled"
+                                        class="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground"
+                                        >tắt</span
+                                    >
+                                </span>
                             </td>
-                            <td class="p-3">{{ p.counts.new }}</td>
-                            <td class="p-3">{{ p.counts.scheduled }}</td>
-                            <td class="p-3">{{ p.counts.posted }}</td>
-                            <td class="p-3">{{ p.counts.skipped }}</td>
-                            <td class="p-3">{{ p.counts.failed }}</td>
+                            <td :class="cn(tdCls, 'text-right')">{{ p.counts.new }}</td>
+                            <td :class="cn(tdCls, 'text-right')">{{ p.counts.scheduled }}</td>
+                            <td :class="cn(tdCls, 'text-right')">{{ p.counts.posted }}</td>
+                            <td :class="cn(tdCls, 'text-right')">{{ p.counts.skipped }}</td>
+                            <td :class="cn(tdCls, 'text-right')">{{ p.counts.failed }}</td>
                         </tr>
                         <tr v-if="!products.length">
-                            <td colspan="6" class="p-3 text-muted-foreground">
+                            <td colspan="6" class="p-6 text-center text-muted-foreground">
                                 Chưa có sản phẩm nào. Hệ thống sẽ đọc từ hub sau
                                 lần quét kế tiếp.
                             </td>
@@ -342,47 +372,59 @@ const analyses = computed(() => [
         </details>
 
         <!-- Phân tích -->
-        <details class="group rounded-2xl border bg-card p-5 shadow-xs">
+        <details :class="cn(cardCls, 'group p-5 sm:p-6')">
             <summary
-                class="flex cursor-pointer flex-wrap items-baseline gap-x-3 text-lg font-semibold select-none"
+                class="flex cursor-pointer list-none flex-wrap items-center gap-3.5 select-none [&::-webkit-details-marker]:hidden"
             >
-                Phân tích nhanh (lượt xem trung bình sau 24 giờ)
-                <Link
-                    href="/auto/so-lieu"
-                    class="text-sm font-normal text-primary hover:underline"
-                    @click.stop
-                    >Mở trang Số liệu để xem đầy đủ →</Link
+                <span
+                    :class="cn('flex size-[38px] shrink-0 items-center justify-center rounded-[11px]', toneClasses.violet.chip)"
                 >
+                    <IconChartBar class="size-[18px]" />
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span
+                        class="block font-heading text-lg leading-snug font-semibold tracking-[-0.015em]"
+                        >Phân tích nhanh (lượt xem trung bình sau 24 giờ)</span
+                    >
+                    <Link
+                        href="/auto/so-lieu"
+                        class="text-[13px] font-medium text-primary-text hover:underline"
+                        @click.stop
+                        >Mở trang Số liệu để xem đầy đủ →</Link
+                    >
+                </span>
+                <IconChevronDown
+                    class="size-5 text-muted-foreground transition-transform group-open:rotate-180"
+                />
             </summary>
-            <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 <div
                     v-for="g in analyses"
                     :key="g.key"
-                    class="overflow-hidden rounded-lg border"
+                    :class="cn(tableWrapCls, 'overflow-hidden')"
                     :data-testid="`fork-auto-insight-${g.key}`"
                 >
-                    <div class="border-b bg-muted/50 p-3 text-base font-medium">
+                    <div class="border-b bg-muted px-3.5 py-2.5 text-sm font-semibold">
                         {{ g.title }}
                     </div>
-                    <table class="w-full text-sm">
-                        <tbody>
+                    <table class="w-full border-separate border-spacing-0 text-sm">
+                        <tbody class="tabular-nums [&>tr:hover>td]:bg-accent/60 [&>tr:last-child>td]:border-b-0">
                             <tr
                                 v-for="row in insights[g.key] ?? []"
                                 :key="row.key"
-                                class="border-t first:border-t-0"
                             >
-                                <td class="p-3">{{ g.fmt(row.key) }}</td>
-                                <td class="p-3 text-right tabular-nums">
+                                <td :class="tdCls">{{ g.fmt(row.key) }}</td>
+                                <td :class="cn(tdCls, 'text-right font-medium')">
                                     {{ fmtNum(row.avg_views) }}
                                 </td>
                                 <td
-                                    class="p-3 text-right text-muted-foreground"
+                                    :class="cn(tdCls, 'text-right text-muted-foreground')"
                                 >
                                     {{ row.samples }} bài
                                 </td>
                             </tr>
                             <tr v-if="!(insights[g.key] ?? []).length">
-                                <td class="p-3 text-muted-foreground">
+                                <td :class="cn(tdCls, 'text-muted-foreground')">
                                     Chưa có số liệu.
                                 </td>
                             </tr>

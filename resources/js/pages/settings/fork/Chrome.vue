@@ -5,17 +5,22 @@
 import { Head, Link, router, usePoll } from '@inertiajs/vue3';
 import {
     IconBrandChrome,
+    IconBrandTelegram,
     IconCopy,
+    IconHistory,
     IconPlayerPlay,
+    IconPlugConnected,
     IconPlus,
     IconRefresh,
+    IconSend,
+    IconSettings,
     IconTrash,
+    IconUsers,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import PairProgress from '@/components/fork/chrome/PairProgress.vue';
 import SettingsSection from '@/components/settings/SettingsSection.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -410,6 +415,15 @@ const jobState: Record<
     failed: { label: 'Lỗi', variant: 'destructive-subtle' },
 };
 
+// Màu nhãn trạng thái (chấm + nền) theo biến thể cũ.
+const pillTone = (variant?: string): string =>
+    ({
+        success: 'is-green',
+        warning: 'is-amber',
+        'destructive-subtle': 'is-red',
+        info: 'is-blue',
+    })[variant ?? ''] ?? '';
+
 const fromNow = (value?: string | null): string =>
     value ? dayjs(value).locale('vi').fromNow() : 'chưa thấy';
 
@@ -420,6 +434,37 @@ const copy = async (text: string): Promise<void> => {
         // Trình duyệt chặn clipboard: người dùng tự chép tay.
     }
 };
+
+const stats = computed(() => [
+    {
+        icon: IconBrandChrome,
+        tone: 'green',
+        value: connectedClients.value.length,
+        label: 'Chrome đã kết nối',
+    },
+    {
+        icon: IconUsers,
+        tone: 'blue',
+        value: props.accounts.filter((a) => a.enabled).length,
+        label: 'Tài khoản đăng qua Chrome',
+    },
+    {
+        icon: IconSend,
+        tone: 'primary',
+        value: props.jobs.filter((j) =>
+            ['queued', 'claimed', 'uploading', 'ready', 'authorized'].includes(
+                j.state,
+            ),
+        ).length,
+        label: 'Bài đang xử lý',
+    },
+    {
+        icon: IconHistory,
+        tone: 'amber',
+        value: props.jobs.filter((j) => j.state === 'posted').length,
+        label: 'Bài đã đăng (30 gần nhất)',
+    },
+]);
 
 const clientsWithIdentity = computed(() =>
     props.clients.filter((c) => c.tiktok_user_id && c.tiktok_username),
@@ -440,543 +485,563 @@ const chromeOnlyCandidates = computed(() => {
 <template>
     <Head title="Kết nối Chrome" />
 
-    <SettingsLayout title="Kết nối Chrome">
-        <div class="flex flex-col gap-10" data-testid="fork-chrome-page">
-            <SettingsSection
-                title="Ghép nối tiện ích TikTok Auto Kid"
-                description="TikTok chỉ cho đăng công khai khi đăng qua Chrome đang đăng nhập sẵn tài khoản của bạn. Cài tiện ích, rồi nhập mã 6 số bên dưới vào tiện ích."
-            >
-                <template #actions>
-                    <Button :disabled="busy === 'pair'" @click="makeCode">
-                        <Spinner v-if="busy === 'pair'" class="size-4" />
-                        <IconPlus v-else class="size-4" />
-                        {{
-                            pairActive
-                                ? 'Tạo mã mới'
-                                : paired
-                                  ? 'Ghép thêm Chrome'
-                                  : 'Tạo mã ghép nối'
-                        }}
-                    </Button>
-                </template>
-
+    <SettingsLayout
+        title="Kết nối Chrome"
+        description="Ghép nối tiện ích Chrome để đăng TikTok bằng tài khoản của bạn, xem Chrome nào đang kết nối và bài nào vừa được giao."
+    >
+        <div class="flex flex-col gap-5" data-testid="fork-chrome-page">
+            <!-- Ô số liệu nhanh -->
+            <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
                 <div
-                    class="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2"
-                    data-testid="fork-chrome-connect-info"
+                    v-for="s in stats"
+                    :key="s.label"
+                    class="flex items-center gap-3.5 rounded-[14px] border border-border bg-card px-5 py-4 shadow-card"
                 >
-                    <div>
-                        <p class="text-sm text-muted-foreground">
-                            Địa chỉ máy chủ (nhập vào tiện ích)
-                        </p>
-                        <div class="mt-1 flex flex-wrap items-center gap-2">
-                            <code class="text-xl font-semibold break-all">{{
-                                serverUrl || 'http://localhost:8010'
-                            }}</code>
+                    <span class="fk-chip" :class="s.tone !== 'primary' && `is-${s.tone}`">
+                        <component :is="s.icon" />
+                    </span>
+                    <div class="min-w-0">
+                        <b
+                            class="block text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                            >{{ s.value }}</b
+                        >
+                        <span class="mt-1.5 block truncate text-[13px] text-muted-foreground">{{
+                            s.label
+                        }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid items-start gap-5 xl:grid-cols-2">
+                <div class="flex min-w-0 flex-col gap-5">
+                    <SettingsSection
+                        title="Ghép nối tiện ích TikTok Auto Kid"
+                        description="TikTok chỉ cho đăng công khai khi đăng qua Chrome đang đăng nhập sẵn tài khoản của bạn. Cài tiện ích, rồi nhập mã 6 số bên dưới vào tiện ích."
+                        :icon="IconPlugConnected"
+                    >
+                        <template #actions>
+                            <Button :disabled="busy === 'pair'" @click="makeCode">
+                                <Spinner v-if="busy === 'pair'" class="size-4" />
+                                <IconPlus v-else class="size-4" />
+                                {{
+                                    pairActive
+                                        ? 'Tạo mã mới'
+                                        : paired
+                                          ? 'Ghép thêm Chrome'
+                                          : 'Tạo mã ghép nối'
+                                }}
+                            </Button>
+                        </template>
+
+                        <div
+                            class="grid gap-4 rounded-xl border border-border bg-muted p-4 sm:grid-cols-2"
+                            data-testid="fork-chrome-connect-info"
+                        >
+                            <div class="min-w-0">
+                                <p class="text-[13px] font-medium text-muted-foreground">
+                                    Địa chỉ máy chủ (nhập vào tiện ích)
+                                </p>
+                                <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                                    <code
+                                        class="text-xl font-semibold tracking-tight break-all"
+                                        >{{ serverUrl || 'http://localhost:8010' }}</code
+                                    >
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        @click="copy(serverUrl || 'http://localhost:8010')"
+                                    >
+                                        <IconCopy class="size-4" />
+                                        Chép
+                                    </Button>
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[13px] font-medium text-muted-foreground">
+                                    Phiên bản tiện ích TikTok Auto Kid
+                                </p>
+                                <p
+                                    v-if="latestExtension"
+                                    class="mt-1.5 text-xl font-semibold tabular-nums"
+                                >
+                                    Mới nhất: v{{ latestExtension }}
+                                </p>
+                                <p
+                                    v-for="c in clients"
+                                    :key="c.id"
+                                    :class="
+                                        extensionOutdated(c.ext_version)
+                                            ? 'mt-0.5 text-sm text-amber-800 dark:text-amber-300'
+                                            : 'mt-0.5 text-sm text-success-text'
+                                    "
+                                >
+                                    {{ c.label }}: đang chạy v{{ c.ext_version
+                                    }}{{
+                                        extensionOutdated(c.ext_version)
+                                            ? ': hãy tải lại tiện ích ở chrome://extensions'
+                                            : ' (đã mới nhất)'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="paired && !pairActive"
+                            class="flex flex-wrap items-center gap-3 rounded-xl border border-success-text/30 bg-success-subtle p-4 text-sm text-foreground"
+                            data-testid="fork-chrome-paired"
+                        >
+                            <span class="fk-pill is-green">Đã ghép nối</span>
+                            <span class="min-w-0 flex-1">
+                                Tiện ích TikTok Auto Kid đã kết nối<template
+                                    v-if="connectedClients[0]?.tiktok_username"
+                                >
+                                    với tài khoản
+                                    <strong
+                                        >@{{
+                                            connectedClients[0].tiktok_username.replace(
+                                                /^@/,
+                                                '',
+                                            )
+                                        }}</strong
+                                    ></template
+                                >. Không cần tạo mã nữa; chỉ tạo mã khi muốn ghép thêm
+                                một Chrome khác.
+                            </span>
+                        </div>
+                        <div
+                            v-if="pairActive && pair"
+                            class="flex flex-wrap items-center gap-4 rounded-xl border border-primary-strong/30 bg-primary-subtle p-4"
+                        >
+                            <code
+                                class="text-3xl font-semibold tracking-[0.3em] text-primary-text tabular-nums"
+                                data-testid="fork-chrome-code"
+                                >{{ pair.code }}</code
+                            >
+                            <Button variant="outline" size="sm" @click="copy(pair.code)">
+                                <IconCopy class="size-4" />
+                                Chép mã
+                            </Button>
+                            <span class="text-sm text-muted-foreground">
+                                Còn hiệu lực {{ countdown }}. Tạo mã mới sẽ làm mã cũ
+                                mất hiệu lực.
+                            </span>
+                        </div>
+                        <div
+                            v-else-if="!paired"
+                            class="rounded-xl border border-dashed border-border-strong p-4 text-sm text-muted-foreground"
+                        >
+                            Bấm “Tạo mã ghép nối”. Mã chỉ dùng được trong 5 phút và tối
+                            đa 5 lần nhập.
+                        </div>
+
+                        <PairProgress ref="pairProgress" @changed="onPairChanged" />
+
+                        <details
+                            class="group rounded-xl border border-border bg-muted p-4 text-sm"
+                        >
+                            <summary class="cursor-pointer font-semibold">
+                                Cách cài tiện ích
+                            </summary>
+                            <ol
+                                class="mt-3 list-inside list-decimal space-y-2 text-muted-foreground"
+                            >
+                                <li>
+                                    Mở Chrome, vào
+                                    <code>chrome://extensions</code> (Edge:
+                                    <code>edge://extensions</code>) và bật “Chế độ cho
+                                    nhà phát triển”.
+                                </li>
+                                <li>
+                                    Bấm “Tải tiện ích đã giải nén” rồi chọn thư mục:
+                                    <span class="mt-1 flex flex-wrap items-center gap-2">
+                                        <code class="break-all">{{ extensionPath }}</code>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            @click="copy(extensionPath)"
+                                        >
+                                            <IconCopy class="size-4" />
+                                            Chép đường dẫn
+                                        </Button>
+                                    </span>
+                                </li>
+                                <li>
+                                    Đăng nhập TikTok trong chính Chrome (profile) đó.
+                                </li>
+                                <li>
+                                    Mở tiện ích, nhập máy chủ
+                                    <code>{{ serverUrl }}</code> và mã 6 số ở trên.
+                                </li>
+                                <li>
+                                    Vào <code>chrome://settings/system</code> và bật
+                                    “Tiếp tục chạy ứng dụng nền khi đóng Google Chrome”,
+                                    để tiện ích vẫn nhận việc khi bạn đã đóng cửa sổ
+                                    Chrome.
+                                </li>
+                                <li>
+                                    Sau mỗi lần cập nhật tiện ích, bấm nút tải lại (⟳) ở
+                                    <code>chrome://extensions</code>.
+                                </li>
+                            </ol>
+                        </details>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        v-if="clients.length && clientsNeedBackgroundHint"
+                        title="Cho Chrome chạy nền khi đóng cửa sổ"
+                        description="Làm một lần: để tiện ích không tắt theo khi bạn đóng cửa sổ Chrome cuối cùng."
+                        :icon="IconSettings"
+                        tone="amber"
+                    >
+                        <div
+                            class="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                            data-testid="fork-chrome-background-hint"
+                        >
+                            <p v-if="backgroundModeOff">
+                                Trợ lý đọc thấy cài đặt này đang <b>TẮT</b> trong trình
+                                duyệt của bạn.
+                            </p>
+                            <p v-else>
+                                Chưa xác định được cài đặt này trên máy (trợ lý chưa báo
+                                về). Hãy kiểm tra giúp.
+                            </p>
+                            <ol class="list-decimal space-y-1 pl-5">
+                                <li>
+                                    Mở một tab mới, dán địa chỉ
+                                    <code>{{ settingsUrl }}</code> rồi Enter (trang web
+                                    không mở được trang này giúp bạn).
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        class="ml-1"
+                                        @click="copy(settingsUrl)"
+                                    >
+                                        <IconCopy class="size-4" />
+                                        Chép địa chỉ
+                                    </Button>
+                                </li>
+                                <li>
+                                    Bật “Tiếp tục chạy ứng dụng nền khi đóng Google
+                                    Chrome” (Edge: “Tiếp tục chạy tiện ích và ứng dụng
+                                    nền khi Microsoft Edge đóng”).
+                                </li>
+                                <li>
+                                    Xong. App không tự sửa cấu hình này của Chrome vì
+                                    Chrome có thể ghi đè khi đang chạy.
+                                </li>
+                            </ol>
+                        </div>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title="Cảnh báo qua Telegram"
+                        description="Báo ngay khi bài lên, bài lỗi, Chrome hoặc hub mất kết nối, giỏ hàng tạm dừng, kho sắp hết, và tổng kết mỗi ngày."
+                        :icon="IconBrandTelegram"
+                        tone="blue"
+                    >
+                        <div
+                            class="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
+                            data-testid="fork-chrome-telegram"
+                        >
+                            <span
+                                class="fk-pill"
+                                :class="telegram?.configured ? 'is-green' : 'is-amber'"
+                            >
+                                {{ telegram?.configured ? 'Đã cấu hình' : 'Chưa cấu hình' }}
+                            </span>
+                            <span class="min-w-0 flex-1 text-muted-foreground">
+                                Nối bot, chọn loại tin và xem trước tin nhắn ở trang
+                                Telegram (không cần sửa file).
+                            </span>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                @click="
-                                    copy(serverUrl || 'http://localhost:8010')
-                                "
+                                :disabled="!telegram?.configured || busy === 'telegram'"
+                                @click="telegramTest"
                             >
-                                <IconCopy class="size-4" />
-                                Chép
+                                <Spinner v-if="busy === 'telegram'" class="size-4" />
+                                Gửi thử
+                            </Button>
+                            <Button as-child size="sm">
+                                <Link href="/settings/telegram">Cài đặt Telegram</Link>
                             </Button>
                         </div>
-                    </div>
-                    <div>
-                        <p class="text-sm text-muted-foreground">
-                            Phiên bản tiện ích TikTok Auto Kid
-                        </p>
-                        <p
-                            v-if="latestExtension"
-                            class="mt-1 text-xl font-semibold"
-                        >
-                            Mới nhất: v{{ latestExtension }}
-                        </p>
-                        <p
-                            v-for="c in clients"
-                            :key="c.id"
-                            :class="
-                                extensionOutdated(c.ext_version)
-                                    ? 'text-sm text-amber-700 dark:text-amber-400'
-                                    : 'text-sm text-success-text'
-                            "
-                        >
-                            {{ c.label }}: đang chạy v{{ c.ext_version
-                            }}{{
-                                extensionOutdated(c.ext_version)
-                                    ? ': hãy tải lại tiện ích ở chrome://extensions'
-                                    : ' (đã mới nhất)'
-                            }}
-                        </p>
-                    </div>
+                    </SettingsSection>
                 </div>
 
-                <div
-                    v-if="paired && !pairActive"
-                    class="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-4 text-sm"
-                    data-testid="fork-chrome-paired"
-                >
-                    <Badge variant="success">Đã ghép nối</Badge>
-                    <span>
-                        Tiện ích TikTok Auto Kid đã kết nối<template
-                            v-if="connectedClients[0]?.tiktok_username"
+                <div class="flex min-w-0 flex-col gap-5">
+                    <SettingsSection
+                        title="Chrome đã ghép nối"
+                        description="Mỗi Chrome (profile) đăng nhập một tài khoản TikTok, và mỗi kênh cần một profile riêng."
+                        :icon="IconBrandChrome"
+                        tone="green"
+                    >
+                        <div
+                            v-if="!clients.length"
+                            class="rounded-xl border border-dashed border-border-strong p-5 text-sm text-muted-foreground"
                         >
-                            với tài khoản
-                            <strong
-                                >@{{
-                                    connectedClients[0].tiktok_username.replace(
-                                        /^@/,
-                                        '',
-                                    )
-                                }}</strong
-                            ></template
-                        >. Không cần tạo mã nữa; chỉ tạo mã khi muốn ghép thêm
-                        một Chrome khác.
-                    </span>
-                </div>
-                <div
-                    v-if="pairActive && pair"
-                    class="flex flex-wrap items-center gap-4 rounded-lg border p-4"
-                >
-                    <code
-                        class="text-3xl font-emphasis tracking-[0.3em]"
-                        data-testid="fork-chrome-code"
-                        >{{ pair.code }}</code
-                    >
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        @click="copy(pair.code)"
-                    >
-                        <IconCopy class="size-4" />
-                        Chép mã
-                    </Button>
-                    <span class="text-sm text-muted-foreground">
-                        Còn hiệu lực {{ countdown }}. Tạo mã mới sẽ làm mã cũ
-                        mất hiệu lực.
-                    </span>
-                </div>
-                <div
-                    v-else-if="!paired"
-                    class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-                >
-                    Bấm “Tạo mã ghép nối”. Mã chỉ dùng được trong 5 phút và tối
-                    đa 5 lần nhập.
-                </div>
+                            Chưa có Chrome nào được ghép nối.
+                        </div>
 
-                <PairProgress ref="pairProgress" @changed="onPairChanged" />
-
-                <details class="rounded-lg border p-4 text-sm">
-                    <summary class="cursor-pointer font-emphasis">
-                        Cách cài tiện ích
-                    </summary>
-                    <ol
-                        class="mt-3 list-inside list-decimal space-y-2 text-muted-foreground"
-                    >
-                        <li>
-                            Mở Chrome, vào
-                            <code>chrome://extensions</code> (Edge:
-                            <code>edge://extensions</code>) và bật “Chế độ cho
-                            nhà phát triển”.
-                        </li>
-                        <li>
-                            Bấm “Tải tiện ích đã giải nén” rồi chọn thư mục:
-                            <span
-                                class="mt-1 flex flex-wrap items-center gap-2"
+                        <ul v-else class="flex flex-col gap-3">
+                            <li
+                                v-for="client in clients"
+                                :key="client.id"
+                                class="flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl border border-border bg-muted p-4 text-sm"
                             >
-                                <code class="break-all">{{
-                                    extensionPath
-                                }}</code>
+                                <span class="fk-chip is-neutral">
+                                    <IconBrandChrome />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-[15px] font-semibold">{{ client.label }}</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{
+                                            client.tiktok_username
+                                                ? `@${client.tiktok_username.replace(/^@/, '')}`
+                                                : 'Chưa biết tài khoản TikTok'
+                                        }}
+                                        · v{{ client.ext_version }} · thấy
+                                        {{ fromNow(client.last_seen_at) }}
+                                    </p>
+                                </div>
+                                <span
+                                    class="fk-pill"
+                                    :class="pillTone(clientStatus[client.status]?.variant)"
+                                >
+                                    {{ clientStatus[client.status]?.label ?? client.status }}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="text-destructive-text hover:bg-critical-subtle"
+                                    :disabled="busy === `revoke-${client.id}`"
+                                    @click="revoke(client)"
+                                >
+                                    <IconTrash class="size-4" />
+                                    Thu hồi
+                                </Button>
+
+                                <p
+                                    v-if="client.status === 'offline'"
+                                    class="w-full text-sm text-amber-800 dark:text-amber-300"
+                                    data-testid="fork-chrome-offline-hint"
+                                >
+                                    {{ offlineHint(client) }}
+                                </p>
+                                <p
+                                    v-if="
+                                        client.keepalive?.state === 'failed' &&
+                                        client.keepalive.message
+                                    "
+                                    class="w-full text-sm text-destructive-text"
+                                    data-testid="fork-chrome-keepalive-error"
+                                >
+                                    {{ client.keepalive.message }}
+                                </p>
+                                <div
+                                    v-if="
+                                        keepAliveChip(client) ||
+                                        client.profile_needs_choice ||
+                                        client.profile_conflict_with
+                                    "
+                                    class="flex w-full flex-wrap items-center gap-2"
+                                >
+                                    <span
+                                        v-if="keepAliveChip(client)"
+                                        class="fk-pill max-w-full !whitespace-normal"
+                                        :class="pillTone(keepAliveChip(client)!.variant)"
+                                        data-testid="fork-chrome-keepalive-chip"
+                                    >
+                                        {{ keepAliveChip(client)!.label }}
+                                    </span>
+                                    <span
+                                        v-if="client.profile_needs_choice"
+                                        class="fk-pill is-amber"
+                                        data-testid="fork-chrome-profile-warning"
+                                    >
+                                        Chưa chọn profile
+                                    </span>
+                                    <span
+                                        v-if="client.profile_conflict_with"
+                                        class="fk-pill is-red"
+                                        data-testid="fork-chrome-profile-conflict"
+                                    >
+                                        Trùng profile với “{{ client.profile_conflict_with }}”
+                                    </span>
+                                </div>
+
+                                <div class="w-full">
+                                    <NativeSelect
+                                        v-if="profiles.length"
+                                        :model-value="selectedProfile(client)"
+                                        :disabled="busy === `profile-${client.id}`"
+                                        @update:model-value="
+                                            saveFromSelect(client, String($event ?? ''))
+                                        "
+                                    >
+                                        <option value="">— Chọn profile —</option>
+                                        <option
+                                            v-for="profile in profiles"
+                                            :key="`${profile.browser}|${profile.dir}`"
+                                            :value="optionValue(profile.browser, profile.dir)"
+                                        >
+                                            {{ profileLabel(profile) }}
+                                        </option>
+                                    </NativeSelect>
+                                    <Input
+                                        v-else
+                                        class="w-full max-w-xs"
+                                        placeholder="Profile, vd: Default"
+                                        :model-value="profileOf(client)"
+                                        @update:model-value="
+                                            profileDraft[client.id] = String($event)
+                                        "
+                                        @change="saveProfile(client, profileOf(client))"
+                                    />
+                                </div>
+
+                                <div
+                                    v-if="client.chrome_profile_dir"
+                                    class="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3 text-sm"
+                                >
+                                    <label class="flex items-center gap-2.5 font-medium">
+                                        <Switch
+                                            :model-value="client.keep_alive ?? true"
+                                            :disabled="busy === `keepalive-${client.id}`"
+                                            aria-label="Giữ Chrome luôn chạy nền"
+                                            data-testid="fork-chrome-keepalive-toggle"
+                                            @update:model-value="
+                                                setKeepAlive(client, Boolean($event))
+                                            "
+                                        />
+                                        Giữ Chrome luôn chạy nền
+                                    </label>
+                                    <span class="text-muted-foreground">
+                                        <template v-if="client.keepalive?.last_start_at">
+                                            Tự mở lần cuối
+                                            {{ fromNow(client.keepalive.last_start_at) }}
+                                        </template>
+                                        <template v-else>Chưa tự mở lần nào</template>
+                                    </span>
+                                    <Button
+                                        v-if="client.keepalive?.state !== 'running'"
+                                        variant="outline"
+                                        size="sm"
+                                        class="ml-auto"
+                                        :disabled="busy === `open-${client.id}`"
+                                        data-testid="fork-chrome-open-now"
+                                        @click="openNow(client)"
+                                    >
+                                        <IconPlayerPlay class="size-4" />
+                                        Mở Chrome nền ngay
+                                    </Button>
+                                </div>
+                            </li>
+                        </ul>
+                        <p v-if="clients.length" class="text-sm text-muted-foreground">
+                            Profile Chrome để tự mở khi Chrome đang tắt: chọn profile mà
+                            bạn đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu chỉ
+                            có một lựa chọn, app tự chọn giúp.
+                        </p>
+                        <p
+                            v-if="!profiles.length && clients.length"
+                            class="text-sm text-muted-foreground"
+                        >
+                            Chưa có danh sách profile từ trợ lý mở Chrome. Bạn có thể gõ
+                            tên thư mục profile (Default, Profile 1, ...).
+                        </p>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        title="Tài khoản TikTok đăng qua Chrome"
+                        description="Bật công tắc để bài của tài khoản đó được đăng qua Chrome."
+                        :icon="IconUsers"
+                        tone="blue"
+                    >
+                        <div
+                            v-if="!accounts.length"
+                            class="rounded-xl border border-dashed border-border-strong p-5 text-sm text-muted-foreground"
+                        >
+                            Chưa có tài khoản TikTok nào. Bạn có thể thêm từ một Chrome
+                            đã đăng nhập ở phần bên dưới.
+                        </div>
+
+                        <ul
+                            v-else
+                            class="divide-y divide-border overflow-hidden rounded-xl border border-border"
+                        >
+                            <li
+                                v-for="account in accounts"
+                                :key="account.id"
+                                class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 text-sm transition-colors hover:bg-accent/60"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-[15px] font-semibold">
+                                        {{ account.display_name || account.username }}
+                                    </p>
+                                    <p class="text-sm text-muted-foreground">
+                                        @{{ account.username }}
+                                        <template v-if="account.chrome_only">
+                                            · chỉ đăng qua Chrome
+                                        </template>
+                                        <template v-if="account.enabled && account.readiness">
+                                            ·
+                                            {{ readiness[account.readiness] ?? account.readiness }}
+                                        </template>
+                                    </p>
+                                </div>
+                                <Switch
+                                    :model-value="account.enabled"
+                                    :disabled="busy === `toggle-${account.id}`"
+                                    :aria-label="`Đăng qua Chrome cho ${account.username}`"
+                                    @update:model-value="toggle(account)"
+                                />
+                            </li>
+                        </ul>
+
+                        <div
+                            v-if="chromeOnlyCandidates.length"
+                            class="flex flex-col gap-2 rounded-xl border border-border bg-muted p-4 text-sm"
+                        >
+                            <p class="font-semibold">Thêm tài khoản chỉ đăng qua Chrome</p>
+                            <p class="text-muted-foreground">
+                                Dành cho tài khoản TikTok chưa có trong app. App tạo tài
+                                khoản từ danh tính mà Chrome báo về.
+                            </p>
+                            <div
+                                v-for="client in chromeOnlyCandidates"
+                                :key="client.id"
+                                class="flex items-center gap-3"
+                            >
+                                <span class="flex-1">
+                                    @{{ (client.tiktok_username ?? '').replace(/^@/, '') }}
+                                    <span class="text-sm text-muted-foreground">
+                                        ({{ client.label }})
+                                    </span>
+                                </span>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    @click="copy(extensionPath)"
+                                    :disabled="!hasWorkspace || busy === `add-${client.id}`"
+                                    @click="addFromClient(client)"
                                 >
-                                    <IconCopy class="size-4" />
-                                    Chép đường dẫn
+                                    <IconPlus class="size-4" />
+                                    Thêm tài khoản
                                 </Button>
-                            </span>
-                        </li>
-                        <li>
-                            Đăng nhập TikTok trong chính Chrome (profile) đó.
-                        </li>
-                        <li>
-                            Mở tiện ích, nhập máy chủ
-                            <code>{{ serverUrl }}</code> và mã 6 số ở trên.
-                        </li>
-                        <li>
-                            Vào <code>chrome://settings/system</code> và bật
-                            “Tiếp tục chạy ứng dụng nền khi đóng Google Chrome”,
-                            để tiện ích vẫn nhận việc khi bạn đã đóng cửa sổ
-                            Chrome.
-                        </li>
-                        <li>
-                            Sau mỗi lần cập nhật tiện ích, bấm nút tải lại (⟳) ở
-                            <code>chrome://extensions</code>.
-                        </li>
-                    </ol>
-                </details>
-            </SettingsSection>
-
-            <SettingsSection
-                title="Chrome đã ghép nối"
-                description="Mỗi Chrome (profile) đăng nhập một tài khoản TikTok, và mỗi kênh cần một profile riêng."
-            >
-                <div
-                    v-if="!clients.length"
-                    class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-                >
-                    Chưa có Chrome nào được ghép nối.
-                </div>
-
-                <ul v-else class="divide-y rounded-lg border">
-                    <li
-                        v-for="client in clients"
-                        :key="client.id"
-                        class="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 text-sm"
-                    >
-                        <IconBrandChrome class="size-5 shrink-0" />
-                        <div class="min-w-0 flex-1">
-                            <p class="font-emphasis">{{ client.label }}</p>
-                            <p class="text-sm text-muted-foreground">
-                                {{
-                                    client.tiktok_username
-                                        ? `@${client.tiktok_username.replace(/^@/, '')}`
-                                        : 'Chưa biết tài khoản TikTok'
-                                }}
-                                · v{{ client.ext_version }} · thấy
-                                {{ fromNow(client.last_seen_at) }}
-                            </p>
+                            </div>
                         </div>
-                        <p
-                            v-if="client.status === 'offline'"
-                            class="w-full text-sm text-amber-700 dark:text-amber-400"
-                            data-testid="fork-chrome-offline-hint"
-                        >
-                            {{ offlineHint(client) }}
-                        </p>
-                        <p
-                            v-if="
-                                client.keepalive?.state === 'failed' &&
-                                client.keepalive.message
-                            "
-                            class="w-full text-sm text-destructive"
-                            data-testid="fork-chrome-keepalive-error"
-                        >
-                            {{ client.keepalive.message }}
-                        </p>
-                        <Badge
-                            :variant="
-                                clientStatus[client.status]?.variant ??
-                                'secondary'
-                            "
-                        >
-                            {{
-                                clientStatus[client.status]?.label ??
-                                client.status
-                            }}
-                        </Badge>
-                        <Badge
-                            v-if="keepAliveChip(client)"
-                            :variant="keepAliveChip(client)!.variant"
-                            data-testid="fork-chrome-keepalive-chip"
-                            class="max-w-full whitespace-normal"
-                        >
-                            {{ keepAliveChip(client)!.label }}
-                        </Badge>
-                        <Badge
-                            v-if="client.profile_needs_choice"
-                            variant="warning"
-                            data-testid="fork-chrome-profile-warning"
-                        >
-                            Chưa chọn profile
-                        </Badge>
-                        <Badge
-                            v-if="client.profile_conflict_with"
-                            variant="destructive-subtle"
-                            data-testid="fork-chrome-profile-conflict"
-                        >
-                            Trùng profile với “{{
-                                client.profile_conflict_with
-                            }}”
-                        </Badge>
-
-                        <NativeSelect
-                            v-if="profiles.length"
-                            :model-value="selectedProfile(client)"
-                            :disabled="busy === `profile-${client.id}`"
-                            @update:model-value="
-                                saveFromSelect(client, String($event ?? ''))
-                            "
-                        >
-                            <option value="">— Chọn profile —</option>
-                            <option
-                                v-for="profile in profiles"
-                                :key="`${profile.browser}|${profile.dir}`"
-                                :value="
-                                    optionValue(profile.browser, profile.dir)
-                                "
-                            >
-                                {{ profileLabel(profile) }}
-                            </option>
-                        </NativeSelect>
-                        <Input
-                            v-else
-                            class="w-44"
-                            placeholder="Profile, vd: Default"
-                            :model-value="profileOf(client)"
-                            @update:model-value="
-                                profileDraft[client.id] = String($event)
-                            "
-                            @change="saveProfile(client, profileOf(client))"
-                        />
-
-                        <div
-                            v-if="client.chrome_profile_dir"
-                            class="flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-sm"
-                        >
-                            <label class="flex items-center gap-2">
-                                <Switch
-                                    :model-value="client.keep_alive ?? true"
-                                    :disabled="
-                                        busy === `keepalive-${client.id}`
-                                    "
-                                    aria-label="Giữ Chrome luôn chạy nền"
-                                    data-testid="fork-chrome-keepalive-toggle"
-                                    @update:model-value="
-                                        setKeepAlive(client, Boolean($event))
-                                    "
-                                />
-                                Giữ Chrome luôn chạy nền
-                            </label>
-                            <span class="text-muted-foreground">
-                                <template
-                                    v-if="client.keepalive?.last_start_at"
-                                >
-                                    Tự mở lần cuối
-                                    {{
-                                        fromNow(client.keepalive.last_start_at)
-                                    }}
-                                </template>
-                                <template v-else>Chưa tự mở lần nào</template>
-                            </span>
-                            <Button
-                                v-if="client.keepalive?.state !== 'running'"
-                                variant="outline"
-                                size="sm"
-                                :disabled="busy === `open-${client.id}`"
-                                data-testid="fork-chrome-open-now"
-                                @click="openNow(client)"
-                            >
-                                <IconPlayerPlay class="size-4" />
-                                Mở Chrome nền ngay
-                            </Button>
-                        </div>
-
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            :disabled="busy === `revoke-${client.id}`"
-                            @click="revoke(client)"
-                        >
-                            <IconTrash class="size-4" />
-                            Thu hồi
-                        </Button>
-                    </li>
-                </ul>
-                <p v-if="clients.length" class="text-sm text-muted-foreground">
-                    Profile Chrome để tự mở khi Chrome đang tắt: chọn profile mà
-                    bạn đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu chỉ
-                    có một lựa chọn, app tự chọn giúp.
-                </p>
-                <p
-                    v-if="!profiles.length && clients.length"
-                    class="text-sm text-muted-foreground"
-                >
-                    Chưa có danh sách profile từ trợ lý mở Chrome. Bạn có thể gõ
-                    tên thư mục profile (Default, Profile 1, ...).
-                </p>
-            </SettingsSection>
-
-            <SettingsSection
-                v-if="clients.length && clientsNeedBackgroundHint"
-                title="Cho Chrome chạy nền khi đóng cửa sổ"
-                description="Làm một lần: để tiện ích không tắt theo khi bạn đóng cửa sổ Chrome cuối cùng."
-            >
-                <div
-                    class="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm"
-                    data-testid="fork-chrome-background-hint"
-                >
-                    <p v-if="backgroundModeOff">
-                        Trợ lý đọc thấy cài đặt này đang <b>TẮT</b> trong trình
-                        duyệt của bạn.
-                    </p>
-                    <p v-else>
-                        Chưa xác định được cài đặt này trên máy (trợ lý chưa báo
-                        về). Hãy kiểm tra giúp.
-                    </p>
-                    <ol class="list-decimal space-y-1 pl-5">
-                        <li>
-                            Mở một tab mới, dán địa chỉ
-                            <code>{{ settingsUrl }}</code> rồi Enter (trang web
-                            không mở được trang này giúp bạn).
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                class="ml-1"
-                                @click="copy(settingsUrl)"
-                            >
-                                <IconCopy class="size-4" />
-                                Chép địa chỉ
-                            </Button>
-                        </li>
-                        <li>
-                            Bật “Tiếp tục chạy ứng dụng nền khi đóng Google
-                            Chrome” (Edge: “Tiếp tục chạy tiện ích và ứng dụng
-                            nền khi Microsoft Edge đóng”).
-                        </li>
-                        <li>
-                            Xong. App không tự sửa cấu hình này của Chrome vì
-                            Chrome có thể ghi đè khi đang chạy.
-                        </li>
-                    </ol>
+                    </SettingsSection>
                 </div>
-            </SettingsSection>
-
-            <SettingsSection
-                title="Tài khoản TikTok đăng qua Chrome"
-                description="Bật công tắc để bài của tài khoản đó được đăng qua Chrome."
-            >
-                <div
-                    v-if="!accounts.length"
-                    class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-                >
-                    Chưa có tài khoản TikTok nào. Bạn có thể thêm từ một Chrome
-                    đã đăng nhập ở phần bên dưới.
-                </div>
-
-                <ul v-else class="divide-y rounded-lg border">
-                    <li
-                        v-for="account in accounts"
-                        :key="account.id"
-                        class="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 text-sm"
-                    >
-                        <div class="min-w-0 flex-1">
-                            <p class="font-emphasis">
-                                {{ account.display_name || account.username }}
-                            </p>
-                            <p class="text-sm text-muted-foreground">
-                                @{{ account.username }}
-                                <template v-if="account.chrome_only">
-                                    · chỉ đăng qua Chrome
-                                </template>
-                                <template
-                                    v-if="account.enabled && account.readiness"
-                                >
-                                    ·
-                                    {{
-                                        readiness[account.readiness] ??
-                                        account.readiness
-                                    }}
-                                </template>
-                            </p>
-                        </div>
-                        <Switch
-                            :model-value="account.enabled"
-                            :disabled="busy === `toggle-${account.id}`"
-                            :aria-label="`Đăng qua Chrome cho ${account.username}`"
-                            @update:model-value="toggle(account)"
-                        />
-                    </li>
-                </ul>
-
-                <div
-                    v-if="chromeOnlyCandidates.length"
-                    class="flex flex-col gap-2 rounded-lg border p-4 text-sm"
-                >
-                    <p class="font-emphasis">
-                        Thêm tài khoản chỉ đăng qua Chrome
-                    </p>
-                    <p class="text-muted-foreground">
-                        Dành cho tài khoản TikTok chưa có trong app. App tạo tài
-                        khoản từ danh tính mà Chrome báo về.
-                    </p>
-                    <div
-                        v-for="client in chromeOnlyCandidates"
-                        :key="client.id"
-                        class="flex items-center gap-3"
-                    >
-                        <span class="flex-1">
-                            @{{
-                                (client.tiktok_username ?? '').replace(/^@/, '')
-                            }}
-                            <span class="text-sm text-muted-foreground">
-                                ({{ client.label }})
-                            </span>
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            :disabled="
-                                !hasWorkspace || busy === `add-${client.id}`
-                            "
-                            @click="addFromClient(client)"
-                        >
-                            <IconPlus class="size-4" />
-                            Thêm tài khoản
-                        </Button>
-                    </div>
-                </div>
-            </SettingsSection>
-
-            <SettingsSection
-                title="Cảnh báo qua Telegram"
-                description="Báo ngay khi bài lên, bài lỗi, Chrome hoặc hub mất kết nối, giỏ hàng tạm dừng, kho sắp hết, và tổng kết mỗi ngày."
-            >
-                <div
-                    class="flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm"
-                    data-testid="fork-chrome-telegram"
-                >
-                    <Badge
-                        :variant="telegram?.configured ? 'success' : 'warning'"
-                    >
-                        {{
-                            telegram?.configured
-                                ? 'Đã cấu hình'
-                                : 'Chưa cấu hình'
-                        }}
-                    </Badge>
-                    <span class="min-w-0 flex-1 text-muted-foreground">
-                        Nối bot, chọn loại tin và xem trước tin nhắn ở trang
-                        Telegram (không cần sửa file).
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        :disabled="!telegram?.configured || busy === 'telegram'"
-                        @click="telegramTest"
-                    >
-                        <Spinner v-if="busy === 'telegram'" class="size-4" />
-                        Gửi thử
-                    </Button>
-                    <Button as-child size="sm">
-                        <Link href="/settings/telegram">Cài đặt Telegram</Link>
-                    </Button>
-                </div>
-            </SettingsSection>
+            </div>
 
             <SettingsSection
                 title="Bài gần đây giao cho Chrome"
                 description="30 lần giao gần nhất. Bài “Chưa rõ kết quả” không bao giờ tự đăng lại, hãy kiểm tra trên TikTok."
+                :icon="IconHistory"
+                tone="amber"
             >
                 <template #actions>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        @click="router.reload({ only })"
-                    >
+                    <Button variant="outline" size="sm" @click="router.reload({ only })">
                         <IconRefresh class="size-4" />
                         Làm mới
                     </Button>
@@ -984,57 +1049,82 @@ const chromeOnlyCandidates = computed(() => {
 
                 <div
                     v-if="!jobs.length"
-                    class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+                    class="rounded-xl border border-dashed border-border-strong p-5 text-sm text-muted-foreground"
                 >
                     Chưa có bài nào được giao cho Chrome.
                 </div>
 
-                <ul v-else class="divide-y rounded-lg border">
-                    <li
-                        v-for="job in jobs"
-                        :key="job.id"
-                        class="flex flex-col gap-1 p-4 text-sm"
-                    >
-                        <div class="flex flex-wrap items-center gap-2">
-                            <Badge
-                                :variant="
-                                    jobState[job.state]?.variant ?? 'secondary'
-                                "
+                <div
+                    v-else
+                    class="overflow-auto rounded-xl border border-border bg-card"
+                >
+                    <table class="w-full border-separate border-spacing-0 text-sm tabular-nums">
+                        <thead>
+                            <tr>
+                                <th
+                                    v-for="h in ['Trạng thái', 'Kiểu đăng', 'Tài khoản', 'Thời gian', 'Chú thích']"
+                                    :key="h"
+                                    class="sticky top-0 border-b border-border bg-muted px-4 py-2.5 text-left text-[13px] font-medium whitespace-nowrap text-muted-foreground"
+                                >
+                                    {{ h }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="job in jobs"
+                                :key="job.id"
+                                class="group align-top"
                             >
-                                {{ jobState[job.state]?.label ?? job.state }}
-                            </Badge>
-                            <Badge variant="outline">
-                                <IconPlayerPlay class="size-3" />
-                                {{
-                                    job.mode === 'now' ? 'Đăng ngay' : 'Hẹn giờ'
-                                }}
-                            </Badge>
-                            <span class="text-sm text-muted-foreground">
-                                @{{ job.username }} ·
-                                {{ fromNow(job.updated_at ?? job.created_at) }}
-                            </span>
-                        </div>
-                        <p class="truncate" :title="job.caption">
-                            {{ job.caption || '(không có chú thích)' }}
-                        </p>
-                        <p
-                            v-if="
-                                job.state === 'posted' &&
-                                job.mode === 'scheduled'
-                            "
-                            class="text-sm font-emphasis text-amber-700 dark:text-amber-400"
-                        >
-                            Đã hẹn trên TikTok — muốn đổi thì sửa/huỷ trong
-                            TikTok Studio.
-                        </p>
-                        <p
-                            v-if="job.note"
-                            class="text-sm text-muted-foreground"
-                        >
-                            {{ job.note }}
-                        </p>
-                    </li>
-                </ul>
+                                <td
+                                    class="border-b border-border px-4 py-3 whitespace-nowrap group-last:border-b-0 group-hover:bg-accent/60"
+                                >
+                                    <span
+                                        class="fk-pill"
+                                        :class="pillTone(jobState[job.state]?.variant)"
+                                    >
+                                        {{ jobState[job.state]?.label ?? job.state }}
+                                    </span>
+                                </td>
+                                <td
+                                    class="border-b border-border px-4 py-3 whitespace-nowrap group-last:border-b-0 group-hover:bg-accent/60"
+                                >
+                                    <span class="inline-flex items-center gap-1.5 text-muted-foreground">
+                                        <IconPlayerPlay class="size-3.5" />
+                                        {{ job.mode === 'now' ? 'Đăng ngay' : 'Hẹn giờ' }}
+                                    </span>
+                                </td>
+                                <td
+                                    class="border-b border-border px-4 py-3 font-medium whitespace-nowrap group-last:border-b-0 group-hover:bg-accent/60"
+                                >
+                                    @{{ job.username }}
+                                </td>
+                                <td
+                                    class="border-b border-border px-4 py-3 whitespace-nowrap text-muted-foreground group-last:border-b-0 group-hover:bg-accent/60"
+                                >
+                                    {{ fromNow(job.updated_at ?? job.created_at) }}
+                                </td>
+                                <td
+                                    class="w-full min-w-[260px] border-b border-border px-4 py-3 group-last:border-b-0 group-hover:bg-accent/60"
+                                >
+                                    <p class="line-clamp-2" :title="job.caption">
+                                        {{ job.caption || '(không có chú thích)' }}
+                                    </p>
+                                    <p
+                                        v-if="job.state === 'posted' && job.mode === 'scheduled'"
+                                        class="mt-1 text-sm font-semibold text-amber-800 dark:text-amber-300"
+                                    >
+                                        Đã hẹn trên TikTok — muốn đổi thì sửa/huỷ trong
+                                        TikTok Studio.
+                                    </p>
+                                    <p v-if="job.note" class="mt-1 text-sm text-muted-foreground">
+                                        {{ job.note }}
+                                    </p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </SettingsSection>
         </div>
     </SettingsLayout>

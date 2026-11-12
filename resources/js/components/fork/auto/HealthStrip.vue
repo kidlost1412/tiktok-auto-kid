@@ -15,7 +15,7 @@ import type {
     HubStatus,
 } from '@/components/fork/auto/types';
 import type { Tone } from '@/components/fork/shared/status';
-import { healthTone, toneClasses } from '@/components/fork/shared/status';
+import { cardCls, healthTone, toneClasses } from '@/components/fork/shared/status';
 import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -123,7 +123,7 @@ const tone = (l: Level): Tone => healthTone[l];
 
 <template>
     <div
-        class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
         data-testid="fork-auto-health"
     >
         <Link
@@ -132,20 +132,20 @@ const tone = (l: Level): Tone => healthTone[l];
             :href="c.href"
             :title="c.hint"
             :data-testid="`fork-health-chip-${c.key}`"
-            class="flex items-center gap-4 rounded-2xl border bg-card px-5 py-4 shadow-xs transition hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
+            :class="cn(cardCls, 'flex items-center gap-3.5 px-5 py-4 transition hover:border-border-strong hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none')"
         >
             <span
                 :class="
                     cn(
-                        'flex size-11 shrink-0 items-center justify-center rounded-xl',
+                        'flex size-[38px] shrink-0 items-center justify-center rounded-[11px]',
                         toneClasses[tone(c.level)].chip,
                     )
                 "
             >
-                <component :is="c.icon" class="size-6" />
+                <component :is="c.icon" class="size-[18px]" />
             </span>
             <div class="min-w-0 flex-1 leading-snug">
-                <div class="truncate text-base font-semibold">{{ c.title }}</div>
+                <div class="truncate text-sm font-semibold">{{ c.title }}</div>
                 <Skeleton v-if="c.loading" class="mt-2 h-4 w-28" />
                 <div v-else class="truncate text-sm text-muted-foreground">
                     {{ c.text }}
@@ -154,9 +154,9 @@ const tone = (l: Level): Tone => healthTone[l];
             <span
                 :class="
                     cn(
-                        'size-3 shrink-0 rounded-full',
+                        'size-2.5 shrink-0 rounded-full',
                         toneClasses[tone(c.level)].dot,
-                        c.level === 'ok' && 'ring-4 ring-emerald-500/20',
+                        c.level === 'ok' && 'ring-[3px] ring-emerald-500/20',
                         c.loading && 'animate-pulse',
                     )
                 "

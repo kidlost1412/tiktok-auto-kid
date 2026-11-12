@@ -59,16 +59,18 @@ const open = (id: number) =>
 </script>
 
 <template>
-    <section class="flex flex-col gap-3" data-testid="fork-auto-recent">
+    <section class="flex flex-col gap-4" data-testid="fork-auto-recent">
         <SectionHeading
+            :icon="IconSend"
+            tone="success"
             title="Vừa đăng gần đây"
             description="Những bài đã lên TikTok, mới nhất trước. Bài hẹn giờ chưa tới nằm trong lịch phía trên."
         >
             <Link
                 href="/auto/so-lieu"
-                class="inline-flex items-center gap-1.5 text-base font-medium text-primary hover:underline"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-text hover:underline"
             >
-                <IconChartBar class="size-5" />
+                <IconChartBar class="size-4" />
                 Xem số liệu chi tiết
             </Link>
         </SectionHeading>
@@ -142,18 +144,18 @@ const open = (id: number) =>
         >
             <Link
                 href="/auto/kho"
-                class="text-sm font-medium text-primary hover:underline"
+                class="text-sm font-medium text-primary-text hover:underline"
                 >Xem video đang chờ trong kho →</Link
             >
         </EmptyState>
 
-        <ul v-else class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        <ul v-else class="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
             <li
                 v-for="r in recent"
                 :key="r.id"
                 role="button"
                 tabindex="0"
-                class="flex cursor-pointer items-center gap-4 rounded-2xl border bg-card p-3.5 shadow-xs transition hover:-translate-y-px hover:border-foreground/25 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                class="flex cursor-pointer items-center gap-4 rounded-[14px] border bg-card p-3.5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition hover:-translate-y-px hover:border-foreground/25 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 :data-testid="`fork-auto-recent-${r.id}`"
                 @click="open(r.id)"
                 @keydown.enter.self.prevent="open(r.id)"
@@ -198,7 +200,7 @@ const open = (id: number) =>
                         <template v-else>Chưa có số liệu</template>
                     </div>
                     <div
-                        class="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
+                        class="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary-text"
                     >
                         <IconPlayerPlayFilled class="size-4" />
                         Bấm để xem video
@@ -211,7 +213,7 @@ const open = (id: number) =>
                         :href="r.link"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        class="inline-flex items-center gap-1 text-sm text-primary-text hover:underline"
                         @click.stop
                     >
                         TikTok

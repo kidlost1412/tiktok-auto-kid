@@ -66,7 +66,7 @@ const bestHours = computed(() =>
 
 <template>
     <div
-        class="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs"
+        class="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
         data-testid="fork-so-lieu-breakdown"
     >
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -82,9 +82,9 @@ const bestHours = computed(() =>
                     :aria-selected="dim === d.key"
                     :class="
                         cn(
-                            'shrink-0 rounded-full px-3 py-1 text-sm font-medium transition-colors',
+                            'shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
                             dim === d.key
-                                ? 'bg-primary text-primary-foreground'
+                                ? 'bg-primary-subtle font-semibold text-primary-text ring-1 ring-inset ring-primary-strong/20'
                                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                         )
                     "
@@ -93,7 +93,7 @@ const bestHours = computed(() =>
                     {{ d.label }}
                 </button>
             </div>
-            <div class="flex rounded-lg bg-muted p-0.5 text-xs">
+            <div class="flex gap-0.5 rounded-xl border bg-secondary/50 p-1 text-[13px] dark:bg-muted/60">
                 <button
                     v-for="m in [
                         { k: 'avg_views', t: 'View TB / bài' },
@@ -103,7 +103,7 @@ const bestHours = computed(() =>
                     type="button"
                     :class="
                         cn(
-                            'rounded-md px-2.5 py-1 font-medium transition',
+                            'rounded-[9px] px-3 py-1.5 font-medium transition',
                             metric === m.k
                                 ? 'bg-card text-foreground shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground',
@@ -165,7 +165,7 @@ const bestHours = computed(() =>
                         :class="
                             cn(
                                 'h-full rounded-full transition-[width] duration-500',
-                                i === 0 ? 'bg-primary' : 'bg-primary/50',
+                                i === 0 ? 'bg-primary-strong' : 'bg-primary-strong/50',
                             )
                         "
                         :style="{

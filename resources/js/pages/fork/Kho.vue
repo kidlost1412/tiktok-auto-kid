@@ -3,10 +3,13 @@
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
 import { Link, router } from '@inertiajs/vue3';
 import {
+    IconArchive,
     IconChevronDown,
+    IconFolder,
     IconLayoutList,
     IconRefresh,
     IconSearch,
+    IconTable,
     IconVideoOff,
     IconX,
 } from '@tabler/icons-vue';
@@ -20,7 +23,14 @@ import { openVideo as openViewer } from '@/components/fork/viewer';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
-import { toneClasses } from '@/components/fork/shared/status';
+import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
+import {
+    cardCls,
+    tableWrapCls,
+    tdCls,
+    thCls,
+    toneClasses,
+} from '@/components/fork/shared/status';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
 import { Button } from '@/components/ui/button';
 import {
@@ -355,7 +365,7 @@ const description = computed(
         <template #actions>
             <span
                 id="hub"
-                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-full border bg-card px-3 text-xs"
+                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-full border bg-card px-3 text-[12.5px] font-medium text-muted-foreground shadow-xs"
                 data-testid="fork-kho-hub-status"
             >
                 <span
@@ -424,7 +434,7 @@ const description = computed(
 
         <!-- Thanh lọc dính trên cùng khi cuộn -->
         <section
-            class="sticky top-0 z-20 -mx-4 flex flex-col gap-3 border-b bg-card/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/75 sm:-mx-6 sm:px-6"
+            :class="cn(cardCls, 'sticky top-2 z-20 flex flex-col gap-3.5 bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/85')"
             data-testid="fork-kho-filters"
         >
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -459,7 +469,7 @@ const description = computed(
                             v-model="search"
                             type="search"
                             placeholder="Tìm trong caption, tên file…"
-                            class="h-8 w-56 pl-8"
+                            class="h-10 w-64 pl-9"
                             aria-label="Tìm video theo caption hoặc tên file"
                             data-testid="fork-kho-search"
                         />
@@ -474,7 +484,6 @@ const description = computed(
                         <option value="sap-dang">Sắp đăng</option>
                     </NativeSelect>
                     <Button
-                        size="sm"
                         :variant="grouped ? 'secondary' : 'outline'"
                         :aria-pressed="grouped"
                         title="Gom video theo ngày"
@@ -493,7 +502,7 @@ const description = computed(
                 <Button
                     size="sm"
                     :variant="filters.product === '' ? 'default' : 'outline'"
-                    class="shrink-0 rounded-full"
+                    class="h-9 shrink-0 rounded-full"
                     @click="go({ product: '' })"
                 >
                     Mọi sản phẩm
@@ -510,7 +519,7 @@ const description = computed(
                     :variant="
                         filters.product === p.code ? 'default' : 'outline'
                     "
-                    class="shrink-0 rounded-full"
+                    class="h-9 shrink-0 rounded-full"
                     @click="
                         go({
                             product: filters.product === p.code ? '' : p.code,
@@ -541,10 +550,10 @@ const description = computed(
         </section>
 
         <!-- Lưới video -->
-        <section class="-mt-2" aria-live="polite">
+        <section aria-live="polite">
             <div
                 v-if="loading"
-                class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                class="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                 data-testid="fork-kho-skeleton"
             >
                 <div v-for="i in 10" :key="i" class="flex flex-col gap-2">
@@ -566,7 +575,7 @@ const description = computed(
                 >
                     <h3
                         v-if="grouped"
-                        class="flex items-baseline gap-2 text-sm font-semibold"
+                        class="flex items-baseline gap-2 text-[15px] font-semibold"
                     >
                         {{ g.label }}
                         <span class="text-xs font-normal text-muted-foreground"
@@ -574,7 +583,7 @@ const description = computed(
                         >
                     </h3>
                     <div
-                        class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                        class="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                     >
                         <VideoCard
                             v-for="v in g.items"
@@ -678,20 +687,22 @@ const description = computed(
                 <!-- Lưu giữ -->
                 <section
                     v-if="hub.enabled"
-                    class="flex flex-col gap-1"
+                    :class="cn(cardCls, 'p-5 sm:p-6')"
                     data-testid="fork-kho-hub-cleanup"
                 >
-                    <h2 class="text-base font-semibold">
-                        Lưu giữ video đã đăng
-                    </h2>
-                    <p class="text-sm text-muted-foreground">
-                        Hub tự dọn file sau 30 ngày.
-                    </p>
+                    <SectionHeading
+                        :icon="IconArchive"
+                        tone="neutral"
+                        title="Lưu giữ video đã đăng"
+                        description="Hub tự dọn file sau 30 ngày."
+                    />
                 </section>
-                <section v-else class="flex flex-col gap-3">
-                    <h2 class="text-base font-semibold">
-                        Lưu giữ video đã đăng
-                    </h2>
+                <section v-else :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')">
+                    <SectionHeading
+                        :icon="IconArchive"
+                        tone="neutral"
+                        title="Lưu giữ video đã đăng"
+                    />
                     <div class="flex flex-wrap items-center gap-3">
                         <NativeSelect
                             :model-value="retention.value"
@@ -716,49 +727,50 @@ const description = computed(
                 </section>
 
                 <!-- Số lượng -->
-                <section class="flex flex-col gap-3">
-                    <h2 class="text-base font-semibold">
-                        Số lượng theo sản phẩm và quy cách
-                    </h2>
-                    <div class="overflow-x-auto rounded-xl border bg-card">
+                <section :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')">
+                    <SectionHeading
+                        :icon="IconTable"
+                        tone="info"
+                        title="Số lượng theo sản phẩm và quy cách"
+                    />
+                    <div :class="tableWrapCls">
                         <table
-                            class="w-full text-sm"
+                            class="w-full border-separate border-spacing-0 text-sm"
                             data-testid="fork-kho-matrix"
                         >
-                            <thead class="bg-muted/50 text-left">
+                            <thead>
                                 <tr>
-                                    <th class="p-2 font-medium">Sản phẩm</th>
-                                    <th class="p-2 font-medium">Quy cách</th>
-                                    <th class="p-2 font-medium">Mới</th>
-                                    <th class="p-2 font-medium">Đã xếp</th>
-                                    <th class="p-2 font-medium">Đã đăng</th>
-                                    <th class="p-2 font-medium">Lỗi</th>
+                                    <th :class="thCls">Sản phẩm</th>
+                                    <th :class="thCls">Quy cách</th>
+                                    <th :class="cn(thCls, 'text-right')">Mới</th>
+                                    <th :class="cn(thCls, 'text-right')">Đã xếp</th>
+                                    <th :class="cn(thCls, 'text-right')">Đã đăng</th>
+                                    <th :class="cn(thCls, 'text-right')">Lỗi</th>
                                 </tr>
                             </thead>
-                            <tbody class="tabular-nums">
+                            <tbody class="tabular-nums [&>tr:hover>td]:bg-accent/60 [&>tr:last-child>td]:border-b-0">
                                 <tr
                                     v-for="r in matrix"
                                     :key="`${r.code}|${r.quy_cach}`"
-                                    class="border-t"
                                 >
-                                    <td class="p-2 font-medium">
-                                        <span class="flex items-center gap-2">
+                                    <td :class="cn(tdCls, 'font-medium')">
+                                        <span class="flex items-center gap-2.5">
                                             <ProductThumb :src="r.image" />
                                             {{ r.name }}
                                         </span>
                                     </td>
-                                    <td class="p-2">
+                                    <td :class="tdCls">
                                         {{ r.quy_cach_name ?? '—' }}
                                     </td>
-                                    <td class="p-2">{{ r.new }}</td>
-                                    <td class="p-2">{{ r.scheduled }}</td>
-                                    <td class="p-2">{{ r.posted }}</td>
-                                    <td class="p-2">{{ r.failed }}</td>
+                                    <td :class="cn(tdCls, 'text-right')">{{ r.new }}</td>
+                                    <td :class="cn(tdCls, 'text-right')">{{ r.scheduled }}</td>
+                                    <td :class="cn(tdCls, 'text-right')">{{ r.posted }}</td>
+                                    <td :class="cn(tdCls, 'text-right')">{{ r.failed }}</td>
                                 </tr>
                                 <tr v-if="!matrix.length">
                                     <td
                                         colspan="6"
-                                        class="p-3 text-muted-foreground"
+                                        class="p-6 text-center text-muted-foreground"
                                     >
                                         Chưa có video nào trong kho.
                                     </td>
@@ -771,12 +783,16 @@ const description = computed(
                 <!-- Chuẩn kho (chỉ khi dùng thư mục hub) -->
                 <section
                     v-if="!hub.enabled"
-                    class="flex flex-col gap-3"
+                    :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')"
                     data-testid="fork-kho-standard"
                 >
-                    <h2 class="text-base font-semibold">Chuẩn kho</h2>
+                    <SectionHeading
+                        :icon="IconFolder"
+                        tone="neutral"
+                        title="Chuẩn kho"
+                    />
                     <div
-                        class="rounded-xl border bg-card p-4 text-sm leading-relaxed"
+                        class="rounded-xl border bg-muted/50 p-4 text-sm leading-relaxed"
                     >
                         <p>
                             Hub bỏ video sẵn sàng đăng vào

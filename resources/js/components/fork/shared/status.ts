@@ -78,6 +78,16 @@ export const toneClasses: Record<Tone, ToneClasses> = {
     },
 };
 
+/** Thẻ chuẩn của khu Tự động đăng (cùng kiểu Xưởng Video): bo 14px, viền 1px, bóng nhẹ nhiều lớp (sáng) / bề mặt nổi (tối). */
+export const cardCls =
+    'rounded-[14px] border bg-card text-card-foreground shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]';
+
+/** Bảng dữ liệu chuẩn: khung bo, đầu bảng dính, hàng rê chuột, số căn phải. */
+export const tableWrapCls = 'overflow-auto rounded-xl border bg-card';
+export const thCls =
+    'sticky top-0 z-[1] whitespace-nowrap border-b bg-muted px-3.5 py-2.5 text-left text-xs font-medium tracking-[.01em] text-muted-foreground';
+export const tdCls = 'border-b px-3.5 py-2.5 align-middle';
+
 export interface StatusMeta {
     label: string;
     icon: Component;

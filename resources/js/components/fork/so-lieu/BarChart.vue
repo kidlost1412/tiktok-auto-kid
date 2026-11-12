@@ -64,8 +64,8 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                             cn(
                                 'w-full rounded-t-[3px] transition-[height,opacity] duration-500',
                                 hasHighlight && !highlight.includes(p.key)
-                                    ? 'bg-primary/30 group-hover:bg-primary/60'
-                                    : 'bg-primary/80 group-hover:bg-primary',
+                                    ? 'bg-primary-strong/30 group-hover:bg-primary-strong/60'
+                                    : 'bg-primary-strong/80 group-hover:bg-primary-strong',
                             )
                         "
                         :style="{

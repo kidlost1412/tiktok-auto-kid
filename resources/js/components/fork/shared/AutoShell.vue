@@ -56,22 +56,22 @@ const active = (i: (typeof items)[number]) =>
 
     <AppLayout title="Tự động đăng" :icon="IconRobot" full-width>
         <div
-            class="mx-auto flex w-full max-w-[1600px] flex-col px-4 pb-16 sm:px-8"
+            class="mx-auto flex w-full max-w-[1880px] flex-col px-4 pb-20 sm:px-8"
             :data-testid="testid"
         >
-            <header class="flex flex-col gap-4 pt-6">
+            <header class="flex flex-col gap-5 pt-6">
                 <div
-                    class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3"
+                    class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3"
                 >
                     <div class="min-w-0">
                         <h1
-                            class="font-heading text-3xl font-semibold tracking-tight"
+                            class="font-heading text-[22px] leading-tight font-[650] tracking-[-0.022em]"
                         >
                             {{ title }}
                         </h1>
                         <p
                             v-if="description"
-                            class="mt-1.5 max-w-3xl text-base text-muted-foreground"
+                            class="mt-1 max-w-3xl text-sm text-muted-foreground"
                         >
                             {{ description }}
                         </p>
@@ -85,7 +85,7 @@ const active = (i: (typeof items)[number]) =>
                 </div>
 
                 <nav
-                    class="-mx-4 flex gap-2 overflow-x-auto border-b px-4 sm:-mx-8 sm:px-8"
+                    class="flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border bg-secondary/50 p-1 dark:bg-muted/60"
                     aria-label="Khu Tự động đăng"
                     data-testid="fork-auto-subnav"
                 >
@@ -96,19 +96,28 @@ const active = (i: (typeof items)[number]) =>
                         :aria-current="active(i) ? 'page' : undefined"
                         :class="
                             cn(
-                                'relative inline-flex shrink-0 items-center gap-2.5 px-4 py-3.5 text-base font-medium whitespace-nowrap transition-colors',
-                                'after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary after:opacity-0 after:transition-opacity',
+                                'inline-flex h-9 shrink-0 items-center gap-2 rounded-[9px] px-3.5 text-sm font-medium whitespace-nowrap transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
                                 active(i)
-                                    ? 'text-foreground after:opacity-100'
+                                    ? 'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,25,23,.08),0_1px_1px_rgba(28,25,23,.04)] dark:bg-[#2a2e3a] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.06),0_1px_3px_rgba(0,0,0,.5)]'
                                     : 'text-muted-foreground hover:text-foreground',
                             )
                         "
                     >
-                        <component :is="i.icon" class="size-5" />
+                        <component
+                            :is="i.icon"
+                            :class="
+                                cn(
+                                    'size-[18px]',
+                                    active(i)
+                                        ? 'text-primary-text'
+                                        : 'opacity-80',
+                                )
+                            "
+                        />
                         {{ i.label }}
                         <span
                             v-if="i.href === '/auto/so-lieu' && buyBadge > 0"
-                            class="rounded-full bg-amber-500 px-2 text-xs leading-6 font-semibold text-white"
+                            class="rounded-full bg-amber-500 px-2 text-xs leading-5 font-semibold text-white"
                             title="Bình luận hỏi mua trong 24 giờ qua"
                             data-testid="fork-badge-buy-comments"
                             >{{ buyBadge }}</span
@@ -118,7 +127,7 @@ const active = (i: (typeof items)[number]) =>
             </header>
 
             <main
-                class="flex animate-in flex-col gap-10 pt-8 duration-300 fade-in slide-in-from-bottom-1"
+                class="flex animate-in flex-col gap-6 pt-6 duration-300 fade-in slide-in-from-bottom-1"
             >
                 <slot />
             </main>

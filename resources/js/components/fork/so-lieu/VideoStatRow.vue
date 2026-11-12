@@ -29,7 +29,7 @@ const open = () => openVideo(props.ids ?? [props.video.id], props.video.id);
 
 <template>
     <li
-        class="flex cursor-pointer flex-col gap-3 rounded-xl border bg-card p-3 shadow-xs transition hover:border-foreground/25 hover:shadow-sm sm:flex-row sm:items-center"
+        class="flex cursor-pointer flex-col gap-3 rounded-[14px] border bg-card p-3.5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition hover:border-foreground/25 hover:shadow-sm sm:flex-row sm:items-center"
         tabindex="0"
         role="button"
         @click="open"
@@ -151,7 +151,7 @@ const open = () => openVideo(props.ids ?? [props.video.id], props.video.id);
                 :href="video.link"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary hover:underline"
+                class="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary-text hover:underline"
                 @click.stop
             >
                 Mở trên TikTok

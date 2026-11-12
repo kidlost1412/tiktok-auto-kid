@@ -76,7 +76,7 @@ const retry = () => {
     <div
         role="button"
         tabindex="0"
-        class="group flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-card text-left shadow-xs transition duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        class="group flex cursor-pointer flex-col overflow-hidden rounded-[14px] border bg-card text-left shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         :data-testid="`fork-kho-card-${video.id}`"
         @click="$emit('open')"
         @keydown.enter.self.prevent="$emit('open')"

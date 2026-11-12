@@ -16,19 +16,19 @@ const props = defineProps<{
     <div
         :class="
             cn(
-                'flex flex-col items-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-14 text-center',
+                'flex flex-col items-center gap-3 rounded-[14px] border border-dashed bg-muted/30 px-6 py-12 text-center',
                 props.class,
             )
         "
     >
         <span
             v-if="icon"
-            class="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground"
+            class="flex size-12 items-center justify-center rounded-[14px] border bg-secondary/60 text-subtle-foreground"
         >
             <component :is="icon" class="size-6" stroke-width="1.5" />
         </span>
         <div class="flex max-w-md flex-col gap-1">
-            <p class="text-lg font-medium">{{ title }}</p>
+            <p class="text-[15px] font-semibold">{{ title }}</p>
             <p
                 v-if="description"
                 class="text-sm text-balance text-muted-foreground"

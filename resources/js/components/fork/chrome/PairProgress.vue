@@ -219,19 +219,19 @@ const done = computed(() => stage.value === 'account');
 <template>
     <div
         v-if="active"
-        class="flex flex-col gap-3 rounded-lg border p-4 text-sm"
+        class="flex flex-col gap-3 rounded-xl border p-4 text-sm shadow-raised"
         :class="
             done
-                ? 'border-emerald-500/40 bg-emerald-500/5'
+                ? 'border-success-text/30 bg-success-subtle'
                 : failed
-                  ? 'border-amber-500/40 bg-amber-500/5'
-                  : 'bg-card'
+                  ? 'border-amber-500/40 bg-amber-500/10'
+                  : 'border-primary-strong/25 bg-primary-subtle'
         "
         data-testid="fork-chrome-pair-progress"
         aria-live="polite"
     >
         <div class="flex items-start justify-between gap-3">
-            <p class="font-emphasis">
+            <p class="text-[15px] font-semibold">
                 {{
                     done
                         ? 'Kết nối xong'

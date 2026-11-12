@@ -5,12 +5,24 @@ import { Link, router } from '@inertiajs/vue3';
 import {
     IconArrowDownRight,
     IconArrowUpRight,
+    IconBookmark,
     IconChartBar,
+    IconChartLine,
+    IconClockPlay,
     IconFilterOff,
     IconExternalLink,
+    IconEye,
+    IconHeart,
     IconMessageCircle,
     IconMinus,
+    IconPercentage,
+    IconSend,
+    IconShare3,
+    IconTrophy,
+    IconUsers,
+    IconVideo,
 } from '@tabler/icons-vue';
+import type { Component } from 'vue';
 import { computed, ref } from 'vue';
 
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
@@ -18,7 +30,7 @@ import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
-import { fmtNum, toneClasses } from '@/components/fork/shared/status';
+import { cardCls, fmtNum, type Tone, toneClasses } from '@/components/fork/shared/status';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
 import BarChart from '@/components/fork/so-lieu/BarChart.vue';
 import BreakdownCard from '@/components/fork/so-lieu/BreakdownCard.vue';
@@ -180,6 +192,28 @@ const tiles: {
     },
 ];
 
+const tileMeta: Record<KpiKey, { icon: Component; tone: Tone }> = {
+    posts: { icon: IconSend, tone: 'violet' },
+    views: { icon: IconEye, tone: 'info' },
+    avg_views: { icon: IconChartLine, tone: 'info' },
+    likes: { icon: IconHeart, tone: 'danger' },
+    comments: { icon: IconMessageCircle, tone: 'warn' },
+    shares: { icon: IconShare3, tone: 'success' },
+    saves: { icon: IconBookmark, tone: 'violet' },
+    avg_watch_s: { icon: IconClockPlay, tone: 'neutral' },
+    finish_rate: { icon: IconPercentage, tone: 'success' },
+    engagement: { icon: IconPercentage, tone: 'violet' },
+};
+
+const segWrap = 'flex gap-0.5 rounded-xl border bg-secondary/50 p-1 dark:bg-muted/60';
+const segBtn = (on: boolean) =>
+    cn(
+        'inline-flex h-8 items-center gap-1.5 rounded-[9px] px-3.5 text-sm font-medium transition-[background-color,color,box-shadow]',
+        on
+            ? 'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,25,23,.08)] dark:bg-[#2a2e3a]'
+            : 'text-muted-foreground hover:text-foreground',
+    );
+
 const deltaTone = (k: Kpi) =>
     k.delta_pct === null || k.delta_pct === 0
         ? 'text-muted-foreground'
@@ -251,25 +285,18 @@ const sorts = [
 
         <!-- Thanh lọc -->
         <section
-            class="sticky top-0 z-20 -mx-4 flex flex-col gap-3 border-b bg-card/90 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/75 sm:-mx-6 sm:px-6"
+            :class="cn(cardCls, 'sticky top-2 z-20 flex flex-col gap-3 bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/85')"
             data-testid="fork-so-lieu-filters"
         >
             <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <div class="flex rounded-lg bg-muted p-0.5" role="tablist">
+                <div :class="segWrap" role="tablist">
                     <button
                         v-for="r in ranges"
                         :key="r.key"
                         type="button"
                         role="tab"
                         :aria-selected="filters.range === r.key"
-                        :class="
-                            cn(
-                                'rounded-md px-3 py-1 text-sm font-medium transition',
-                                filters.range === r.key
-                                    ? 'bg-card text-foreground shadow-xs'
-                                    : 'text-muted-foreground hover:text-foreground',
-                            )
-                        "
+                        :class="segBtn(filters.range === r.key)"
                         @click="pickRange(r.key)"
                     >
                         {{ r.label }}
@@ -283,17 +310,17 @@ const sorts = [
                     <Input
                         v-model="customFrom"
                         type="date"
-                        class="h-8 w-36"
+                        class="h-10 w-40"
                         aria-label="Từ ngày"
                     />
                     <span class="text-sm text-muted-foreground">đến</span>
                     <Input
                         v-model="customTo"
                         type="date"
-                        class="h-8 w-36"
+                        class="h-10 w-40"
                         aria-label="Đến ngày"
                     />
-                    <Button size="sm" @click="applyCustom">Áp dụng</Button>
+                    <Button @click="applyCustom">Áp dụng</Button>
                 </div>
 
                 <div class="ml-auto flex flex-wrap items-center gap-2">
@@ -349,7 +376,6 @@ const sorts = [
                     </NativeSelect>
                     <Button
                         v-if="hasFilter"
-                        size="sm"
                         variant="ghost"
                         @click="clearFilters"
                     >
@@ -409,24 +435,37 @@ const sorts = [
 
             <!-- KPI -->
             <section
-                class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5"
+                class="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5"
                 data-testid="fork-so-lieu-kpis"
             >
                 <template v-if="loading">
-                    <Skeleton v-for="i in 10" :key="i" class="h-24 rounded-xl" />
+                    <Skeleton v-for="i in 10" :key="i" class="h-32 rounded-[14px]" />
                 </template>
                 <template v-else>
                     <div
                         v-for="t in tiles"
                         :key="t.key"
-                        class="flex flex-col gap-1 rounded-xl border bg-card p-3.5 shadow-xs"
+                        :class="cn(cardCls, 'flex flex-col gap-2 p-4')"
                         :data-testid="`fork-so-lieu-kpi-${t.key}`"
                     >
-                        <span class="text-xs text-muted-foreground">{{
-                            t.label
-                        }}</span>
+                        <div class="flex items-center gap-2.5">
+                            <span
+                                :class="
+                                    cn(
+                                        'flex size-[30px] shrink-0 items-center justify-center rounded-[9px]',
+                                        toneClasses[tileMeta[t.key].tone].chip,
+                                    )
+                                "
+                                ><component
+                                    :is="tileMeta[t.key].icon"
+                                    class="size-4"
+                            /></span>
+                            <span class="text-[12.5px] leading-tight text-muted-foreground">{{
+                                t.label
+                            }}</span>
+                        </div>
                         <span
-                            class="text-2xl font-semibold tracking-tight tabular-nums"
+                            class="font-heading text-[26px] leading-none font-[650] tracking-[-0.025em] tabular-nums"
                             >{{ t.format(kpis[t.key].value) }}</span
                         >
                         <span
@@ -469,10 +508,12 @@ const sorts = [
             <!-- Người theo dõi -->
             <section
                 v-if="followers"
-                class="flex flex-col gap-3"
+                :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')"
                 data-testid="fork-so-lieu-followers"
             >
                 <SectionHeading
+                    :icon="IconUsers"
+                    tone="info"
                     title="Người theo dõi"
                     :description="
                         followers.change === null
@@ -480,11 +521,9 @@ const sorts = [
                             : 'Số người theo dõi mới mỗi ngày trong khoảng đã chọn.'
                     "
                 />
-                <div
-                    class="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-xs"
-                >
+                <div class="flex flex-col gap-4">
                     <div class="flex items-baseline gap-3">
-                        <span class="text-3xl font-semibold tabular-nums">{{
+                        <span class="font-heading text-[32px] leading-none font-[650] tracking-[-0.025em] tabular-nums">{{
                             fmtNum(followers.current)
                         }}</span>
                         <span
@@ -510,31 +549,34 @@ const sorts = [
             </section>
 
             <!-- Lượt xem theo ngày -->
-            <section class="flex flex-col gap-3">
+            <section :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')">
                 <SectionHeading
+                    :icon="IconEye"
+                    tone="info"
                     title="Lượt xem theo ngày"
                     description="Tổng lượt xem của các bài đăng trong ngày đó (số liệu mới nhất)."
                 />
-                <div class="rounded-xl border bg-card p-4 shadow-xs">
+                <div>
                     <Skeleton v-if="loading" class="h-44 w-full" />
                     <BarChart v-else :points="dailyPoints" unit="lượt xem" />
                 </div>
             </section>
 
             <!-- So sánh -->
-            <section class="flex flex-col gap-3">
+            <section class="flex flex-col gap-4">
                 <SectionHeading
+                    :icon="IconChartBar"
                     title="So sánh hiệu quả"
                     description="Chiều nào cho view TB mỗi bài cao hơn thì nên làm nhiều hơn."
                 />
-                <Skeleton v-if="loading" class="h-72 w-full rounded-xl" />
+                <Skeleton v-if="loading" class="h-72 w-full rounded-[14px]" />
                 <BreakdownCard v-else :breakdowns="breakdowns" />
             </section>
 
             <!-- Top / bottom -->
             <section
                 v-if="top.length"
-                class="grid gap-6 md:grid-cols-2"
+                class="grid gap-5 md:grid-cols-2"
                 data-testid="fork-so-lieu-ranking"
             >
                 <div
@@ -552,14 +594,18 @@ const sorts = [
                     ] as const"
                     v-show="block.list.length"
                     :key="block.title"
-                    class="flex flex-col gap-3"
+                    :class="cn(cardCls, 'flex flex-col gap-4 p-5')"
                 >
-                    <SectionHeading :title="block.title" />
+                    <SectionHeading
+                        :icon="IconTrophy"
+                        :tone="block.tone"
+                        :title="block.title"
+                    />
                     <ol class="flex flex-col gap-2">
                         <li
                             v-for="(v, i) in block.list"
                             :key="v.id"
-                            class="flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-2.5 shadow-xs transition hover:border-foreground/25"
+                            class="flex cursor-pointer items-center gap-3 rounded-xl border bg-muted/40 p-2.5 transition hover:border-border-strong hover:bg-accent/60"
                             tabindex="0"
                             @click="
                                 openVideo(
@@ -615,7 +661,7 @@ const sorts = [
                                     :href="v.link"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="text-xs text-primary hover:underline"
+                                    class="text-xs text-primary-text hover:underline"
                                     @click.stop
                                     >TikTok</a
                                 >
@@ -627,14 +673,16 @@ const sorts = [
 
             <!-- Bình luận -->
             <section
-                class="flex flex-col gap-3"
+                :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')"
                 data-testid="fork-so-lieu-comments"
             >
                 <SectionHeading
+                    :icon="IconMessageCircle"
+                    tone="warn"
                     title="Bình luận"
                     :description="`${comments.counts.total} bình luận đã thu, ${comments.counts.buy} hỏi mua / hỏi giá (${comments.counts.buy_24h} trong 24 giờ qua).`"
                 >
-                    <div class="flex rounded-lg bg-muted p-0.5">
+                    <div :class="segWrap">
                         <button
                             v-for="o in [
                                 { k: 'all', t: 'Tất cả' },
@@ -642,14 +690,7 @@ const sorts = [
                             ] as const"
                             :key="o.k"
                             type="button"
-                            :class="
-                                cn(
-                                    'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition',
-                                    filters.cm === o.k
-                                        ? 'bg-card text-foreground shadow-xs'
-                                        : 'text-muted-foreground hover:text-foreground',
-                                )
-                            "
+                            :class="segBtn(filters.cm === o.k)"
                             @click="setComments(o.k)"
                         >
                             {{ o.t }}
@@ -664,7 +705,7 @@ const sorts = [
 
                 <p
                     v-if="!comments.rows.length"
-                    class="rounded-xl border bg-card p-4 text-sm text-muted-foreground"
+                    class="rounded-xl border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground"
                 >
                     {{
                         filters.cm === 'mua'
@@ -672,13 +713,13 @@ const sorts = [
                             : 'Chưa thu được bình luận nào. Tiện ích thu bình luận mới mỗi giờ.'
                     }}
                 </p>
-                <ul v-else class="flex flex-col gap-2">
+                <ul v-else class="grid gap-3 xl:grid-cols-2">
                     <li
                         v-for="c in comments.rows"
                         :key="c.id"
                         :class="
                             cn(
-                                'flex flex-col gap-1 rounded-xl border bg-card p-3 text-sm shadow-xs',
+                                'flex flex-col gap-1.5 rounded-xl border bg-muted/30 p-3.5 text-sm',
                                 c.buy && 'border-amber-300 dark:border-amber-800',
                             )
                         "
@@ -718,7 +759,7 @@ const sorts = [
                             <button
                                 v-if="c.video_id"
                                 type="button"
-                                class="text-primary hover:underline"
+                                class="text-primary-text hover:underline"
                                 @click="openVideo([c.video_id], c.video_id)"
                             >
                                 Xem video
@@ -728,7 +769,7 @@ const sorts = [
                                 :href="c.link"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1 text-primary hover:underline"
+                                class="inline-flex items-center gap-1 text-primary-text hover:underline"
                                 >Mở trên TikTok
                                 <IconExternalLink class="size-3.5"
                             /></a>
@@ -742,10 +783,11 @@ const sorts = [
 
             <!-- Video vừa đăng -->
             <section
-                class="flex flex-col gap-3"
+                class="flex flex-col gap-4"
                 data-testid="fork-so-lieu-videos"
             >
                 <SectionHeading
+                    :icon="IconVideo"
                     title="Video đã đăng"
                     :description="
                         videos_total > videos.length
@@ -766,10 +808,10 @@ const sorts = [
                     </NativeSelect>
                 </SectionHeading>
 
-                <ul v-if="loading" class="flex flex-col gap-3">
-                    <Skeleton v-for="i in 4" :key="i" class="h-28 rounded-xl" />
+                <ul v-if="loading" class="flex flex-col gap-4">
+                    <Skeleton v-for="i in 4" :key="i" class="h-28 rounded-[14px]" />
                 </ul>
-                <ul v-else class="flex flex-col gap-3">
+                <ul v-else class="grid gap-4 2xl:grid-cols-2">
                     <VideoStatRow
                         v-for="v in videos"
                         :key="v.id"

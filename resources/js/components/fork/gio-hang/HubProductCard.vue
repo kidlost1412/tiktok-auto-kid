@@ -85,12 +85,12 @@ const personaSummary = computed(() => {
 
 <template>
     <div
-        :class="cn('flex flex-col gap-4 rounded-2xl border p-5', frame[tone])"
+        :class="cn('flex flex-col gap-4 rounded-[14px] border p-5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]', frame[tone])"
         :data-testid="`fork-gio-hang-row-${row.code}-${row.quy_cach ?? ''}`"
     >
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-                <div class="flex items-center gap-2 text-lg font-semibold">
+                <div class="flex items-center gap-2 text-base font-semibold">
                     <IconPackage
                         class="size-5 shrink-0 text-muted-foreground"
                     />
@@ -202,7 +202,7 @@ const personaSummary = computed(() => {
                 >
             </span>
             <Input
-                class="h-11"
+                class="h-10"
                 :maxlength="nameMax"
                 placeholder="VD: MUA 5 TẶNG 3 MÓN"
                 :model-value="name"

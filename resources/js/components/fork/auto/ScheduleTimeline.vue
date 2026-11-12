@@ -2,6 +2,7 @@
 // Lịch hẹn các ngày tới dạng "nhật ký ngày": chọn ngày, xem từng giờ với ảnh bìa video, sản phẩm, caption và trạng thái.
 // Màn rộng chia 2 cột để không bị trống bên phải. Bài thật nét liền; giờ dự kiến (chạy thử bộ xếp lịch) nét đứt.
 import {
+    IconCalendarEvent,
     IconCalendarOff,
     IconExternalLink,
     IconPlayerPlayFilled,
@@ -156,6 +157,8 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
 <template>
     <section class="flex flex-col gap-4" data-testid="fork-auto-lich">
         <SectionHeading
+            :icon="IconCalendarEvent"
+            tone="info"
             :title="`Lịch ${lich.days.length} ngày tới`"
             description="Mỗi thẻ là một giờ đăng: bài đã hẹn thật nét liền, giờ dự kiến nét đứt. Bấm vào thẻ để xem video."
         >
@@ -228,10 +231,10 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                     :aria-selected="current?.key === d.key"
                     :class="
                         cn(
-                            'flex min-w-[12rem] shrink-0 flex-col gap-2.5 rounded-2xl border bg-card p-4 text-left transition',
+                            'flex min-w-[12rem] shrink-0 flex-col gap-2.5 rounded-[14px] border bg-card p-4 text-left transition',
                             'hover:border-foreground/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                             current?.key === d.key &&
-                                'border-primary ring-1 ring-primary',
+                                'border-primary-strong ring-1 ring-primary-strong',
                         )
                     "
                     :data-testid="`fork-auto-day-tab-${d.key}`"
@@ -298,14 +301,14 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                     <!-- Mốc "bây giờ" -->
                     <template v-if="r.kind === 'now'">
                         <div
-                            class="flex w-16 shrink-0 items-center justify-end text-sm font-semibold text-primary tabular-nums"
+                            class="flex w-16 shrink-0 items-center justify-end text-sm font-semibold text-primary-text tabular-nums"
                         >
                             {{ r.at }}
                         </div>
                         <div class="flex flex-1 items-center gap-2 pb-3">
-                            <span class="size-2.5 rounded-full bg-primary" />
-                            <span class="h-px flex-1 bg-primary/40" />
-                            <span class="text-sm font-medium text-primary"
+                            <span class="size-2.5 rounded-full bg-primary-strong" />
+                            <span class="h-px flex-1 bg-primary-strong/40" />
+                            <span class="text-sm font-medium text-primary-text"
                                 >Bây giờ</span
                             >
                         </div>
@@ -343,7 +346,7 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                             :tabindex="isEmptySlot(r.e) ? undefined : 0"
                             :class="
                                 cn(
-                                    'group mb-4 flex min-w-0 flex-1 gap-4 rounded-2xl border bg-card p-3.5 text-left shadow-xs transition',
+                                    'group mb-4 flex min-w-0 flex-1 gap-4 rounded-[14px] border bg-card p-3.5 text-left shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition',
                                     !isEmptySlot(r.e) &&
                                         'cursor-pointer hover:-translate-y-px hover:border-foreground/25 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                                     r.e.state === 'projected' &&
@@ -428,7 +431,7 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                                 </div>
                                 <div
                                     v-if="!isEmptySlot(r.e)"
-                                    class="mt-auto inline-flex items-center gap-1.5 pt-1 text-sm font-medium text-primary"
+                                    class="mt-auto inline-flex items-center gap-1.5 pt-1 text-sm font-medium text-primary-text"
                                 >
                                     <IconPlayerPlayFilled class="size-4" />
                                     Bấm để xem video
@@ -444,7 +447,7 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                                     :href="r.e.link"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                    class="inline-flex items-center gap-1 text-sm text-primary-text hover:underline"
                                     @click.stop
                                 >
                                     TikTok

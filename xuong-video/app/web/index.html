@@ -84,7 +84,7 @@ svg.i.f{fill:currentColor;stroke:none}
 
 /* ---------- đầu trang + thanh tab */
 header{position:sticky;top:0;z-index:15;background:color-mix(in srgb,var(--bg) 84%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
-.hdr{max-width:1520px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:12px 28px}
+.hdr{max-width:1880px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:12px 32px}
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 6px 14px -4px rgba(109,40,217,.5),inset 0 1px 0 rgba(255,255,255,.25)}
 .logo svg.i{width:20px;height:20px}
 .brand h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.015em;line-height:1.2}
@@ -101,7 +101,9 @@ nav button.on svg.i{color:var(--pri-ink);opacity:1}
 .hdr-chip .dot{width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px color-mix(in srgb,#22C55E 22%,transparent)}
 :root[data-nhung] .logo, :root[data-nhung] .brand{display:none}
 :root[data-nhung] .hdr{padding:12px 24px}
-main{max-width:1520px;margin:0 auto;padding:26px 28px 80px}
+main{max-width:1880px;margin:0 auto;padding:26px 32px 80px}
+@media (min-width:1700px){body{zoom:1.06}}
+@media (min-width:2100px){body{zoom:1.14}}
 :root[data-nhung] main{padding:22px 24px 64px}
 
 /* ---------- tiêu đề trang, thẻ, lưới */
@@ -1156,7 +1158,7 @@ async function taiTongQuan(moi) {
         <div><div class="pc-name">${esc(p.ten)}</div><div class="pc-code">${esc(p.ma)}</div></div>
         <div class="pc-m">
           <div><b>${p.video_kho}</b><span>Video gốc</span></div>
-          <div><b>${p.so_dung_duoc ?? p.so_canh}</b><span>Cảnh dùng</span></div>
+          <div><b>${p.so_dung_duoc ?? p.so_canh}</b><span title="Cảnh dùng được">Cảnh</span></div>
           <div><b>${p.da_lam}</b><span>Đã làm</span></div>
           <div><b>${p.loai === 'kho-chung' ? '–' : p.ton}</b><span>Còn tồn</span></div>
         </div>

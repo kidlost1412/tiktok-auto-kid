@@ -2,7 +2,13 @@
 // Trang riêng của bản Việt hoá: chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
 import { router } from '@inertiajs/vue3';
-import { IconHash, IconPlugConnectedX, IconRefresh } from '@tabler/icons-vue';
+import {
+    IconBrandTiktok,
+    IconHash,
+    IconPlugConnectedX,
+    IconRefresh,
+    IconShoppingCart,
+} from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import HubProductCard from '@/components/fork/gio-hang/HubProductCard.vue';
@@ -22,10 +28,12 @@ import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
+import { cardCls } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
+import { cn } from '@/lib/utils';
 
 const props = defineProps<{
     channels: {
@@ -263,7 +271,7 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
         description="Chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh. Thẻ chưa chọn giỏ thì video được giữ trong kho."
         testid="fork-gio-hang-page"
     >
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-5">
             <EmptyState
                 v-if="!channels.length"
                 :icon="IconPlugConnectedX"
@@ -278,11 +286,13 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
 
             <template v-else>
                 <!-- Chọn kênh + lấy sản phẩm -->
-                <section
-                    class="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs"
-                >
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="text-sm font-medium">Kênh</span>
+                <section :class="cn(cardCls, 'flex flex-col gap-4 p-5')">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span
+                            class="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
+                            ><IconBrandTiktok class="size-[18px]"
+                        /></span>
+                        <span class="text-sm font-semibold">Kênh</span>
                         <div
                             class="flex flex-wrap gap-1.5"
                             data-testid="fork-gio-hang-channel"
@@ -290,7 +300,7 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             <Button
                                 v-for="c in channels"
                                 :key="c.id"
-                                size="sm"
+                                class="rounded-full"
                                 :variant="
                                     c.id === selected ? 'default' : 'outline'
                                 "
@@ -388,12 +398,15 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
 
                 <!-- Lưới thẻ sản phẩm hub -->
                 <section
-                    class="flex flex-col gap-3"
+                    class="flex flex-col gap-5"
                     data-testid="fork-gio-hang-rows"
                 >
-                    <div class="flex justify-end">
+                    <SectionHeading
+                        :icon="IconShoppingCart"
+                        title="Video nào gắn sản phẩm nào"
+                        description="Mỗi thẻ là một sản phẩm của hub theo từng quy cách. Phải chọn đúng một sản phẩm shop cho mỗi thẻ."
+                    >
                         <Button
-                            size="sm"
                             variant="outline"
                             data-testid="fork-personalise-default"
                             @click="openDefault"
@@ -405,25 +418,21 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                                     : ''
                             }}
                         </Button>
-                    </div>
-                    <SectionHeading
-                        title="Video nào gắn sản phẩm nào"
-                        description="Mỗi thẻ là một sản phẩm của hub theo từng quy cách. Phải chọn đúng một sản phẩm shop cho mỗi thẻ."
-                    />
+                    </SectionHeading>
 
                     <div
                         v-if="loading"
-                        class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                        class="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
                     >
                         <Skeleton
                             v-for="i in 6"
                             :key="i"
-                            class="h-56 rounded-xl"
+                            class="h-56 rounded-[14px]"
                         />
                     </div>
                     <div
                         v-else
-                        class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                        class="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
                     >
                         <HubProductCard
                             v-for="r in sortedRows"
