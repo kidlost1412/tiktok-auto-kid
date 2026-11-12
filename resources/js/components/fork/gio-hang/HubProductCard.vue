@@ -4,7 +4,7 @@ import {
     IconAlertTriangle,
     IconCheck,
     IconPackage,
-    IconPalette,
+    IconPhoto,
     IconShoppingCartPlus,
 } from '@tabler/icons-vue';
 import { computed } from 'vue';
@@ -212,18 +212,21 @@ const personaSummary = computed(() => {
             />
         </label>
 
-        <button
-            type="button"
-            class="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/50"
-            :data-testid="`fork-personalise-open-${row.code}-${row.quy_cach ?? ''}`"
-            @click="emit('personalise')"
-        >
-            <IconPalette class="size-4 shrink-0" />
-            <span class="font-medium text-foreground">Cá nhân hoá</span>
-            <span class="truncate">{{
-                personaSummary || 'ảnh bìa, hashtag riêng'
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <Button
+                size="sm"
+                variant="secondary"
+                class="shrink-0"
+                :data-testid="`fork-personalise-open-${row.code}-${row.quy_cach ?? ''}`"
+                @click="emit('personalise')"
+            >
+                <IconPhoto class="size-4" />
+                Ảnh bìa &amp; hashtag
+            </Button>
+            <span class="min-w-0 truncate text-sm text-muted-foreground">{{
+                personaSummary || 'chưa đặt riêng — dùng mặc định'
             }}</span>
-        </button>
+        </div>
 
         <div v-if="card" class="flex flex-wrap items-center gap-2">
             <Button

@@ -25,359 +25,545 @@
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ===== Xưởng Video — một giao diện cho cả chạy riêng lẫn nhúng trong TikTok Auto Kid (màu tím như app chính, sáng + tối) ===== */
 :root{
-  --bg:#F4FBF5; --card:#FFFFFF; --ink:#1F2D24; --mute:#6B7C70; --line:#DCEBDF;
-  --green:#23873A; --green-soft:#E2F5E6; --on-g:#fff; --on-r:#fff; --red:#D7262E; --red-soft:#FDE7E8; --yellow:#FFD400; --yellow-soft:#FFF6CC;
-  --blue:#2B7BD8; --blue-soft:#E4F0FD; --shadow:0 6px 22px rgba(46,158,68,.10); --r:20px;
-  --panel:#F4FBF5; --input:#FFFFFF; --y-ink:#8a6d00; --w-ink:#6b5500; color-scheme:light;
+  --font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --bg:#F8F7F5; --card:#FFFFFF; --raised:#FFFFFF; --ink:#1F1E1D; --ink2:#3A3937; --mute:#5A5A59; --subtle:#6F6E6C;
+  --line:#EAE8E5; --line2:#DEDCD9; --panel:#F9F8F6; --sec:#F1EFEC; --input:#FFFFFF; --hover:#F6F5F2; --tab-on:#FFFFFF;
+  --pri:#6D28D9; --pri-h:#5B21B6; --on-pri:#FFFFFF; --pri-soft:#F1ECFE; --pri-ink:#6D28D9; --ring:rgba(124,58,237,.24);
+  --pri-grad:linear-gradient(180deg,#7C3AED,#6D28D9); --bar-grad:linear-gradient(90deg,#A78BFA,#6D28D9);
+  --green:#2F7A47; --green-soft:#E6F4E1; --on-g:#FFFFFF; --red:#B42318; --red-soft:#FDECEA; --on-r:#FFFFFF; --danger:#C02E1C;
+  --blue:#1D5FA8; --blue-soft:#E6F1FE; --amber:#A15C07; --amber-soft:#FEF3C7; --yellow-soft:#FEF3C7; --y-ink:#8A4B08; --w-ink:#8A4B08; --yellow:#E8A300;
+  --sh-xs:0 1px 2px rgba(28,25,23,.05);
+  --sh-sm:0 1px 2px rgba(28,25,23,.04),0 2px 6px -1px rgba(28,25,23,.06);
+  --sh-md:0 1px 2px rgba(28,25,23,.05),0 10px 24px -6px rgba(28,25,23,.12);
+  --sh-lg:0 0 0 1px rgba(0,0,0,.04),0 24px 48px -12px rgba(28,25,23,.28),0 6px 12px -6px rgba(28,25,23,.1);
+  --shadow:var(--sh-sm); --r:14px;
+  --sk1:#EFEDEA; --sk2:#F8F7F5;
+  --log-bg:#111218; --log-line:#1F212A; --log-ink:#D6D8E0; --log-ok:#86EFAC; --log-bad:#FCA5A5; --log-warn:#FCD34D;
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2375736F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  color-scheme:light;
 }
 :root[data-theme="dark"]{
-  --bg:#0F1612; --card:#18221C; --ink:#E3F0E7; --mute:#93A89A; --line:#2A3A30;
-  --green:#43C25E; --green-soft:#1B3624; --on-g:#06210F; --on-r:#2B0508; --red:#FF6B71; --red-soft:#3B1C1F; --yellow-soft:#3A3314;
-  --blue:#6EA9F0; --blue-soft:#172739; --shadow:0 6px 22px rgba(0,0,0,.35);
-  --panel:#0F1612; --input:#111A15; --y-ink:#F0D06A; --w-ink:#F0D06A; color-scheme:dark;
+  --bg:#0D0E12; --card:#15171D; --raised:#1C1F27; --ink:#F1F1F4; --ink2:#DADBE2; --mute:#B4B7C3; --subtle:#959AAB;
+  --line:#262A35; --line2:#363A48; --panel:#191B22; --sec:#20232C; --input:#101217; --hover:#1D2029; --tab-on:#2A2E3A;
+  --pri:#A78BFA; --pri-h:#B9A3FB; --on-pri:#14102A; --pri-soft:#241A4A; --pri-ink:#C4B5FD; --ring:rgba(167,139,250,.38);
+  --pri-grad:linear-gradient(180deg,#B9A3FB,#9D7BF5); --bar-grad:linear-gradient(90deg,#7C3AED,#C4B5FD);
+  --green:#86EFAC; --green-soft:#12301F; --on-g:#052E16; --red:#FCA5A5; --red-soft:#3A1717; --on-r:#2B0508; --danger:#DC2626;
+  --blue:#93C5FD; --blue-soft:#0F2A4D; --amber:#FCD34D; --amber-soft:#33290B; --yellow-soft:#33290B; --y-ink:#FCD34D; --w-ink:#FCD34D;
+  --sh-xs:none;
+  --sh-sm:inset 0 1px 0 rgba(255,255,255,.03),0 1px 2px rgba(0,0,0,.35);
+  --sh-md:inset 0 1px 0 rgba(255,255,255,.04),0 12px 28px -8px rgba(0,0,0,.6);
+  --sh-lg:0 0 0 1px rgba(255,255,255,.06),0 28px 56px -12px rgba(0,0,0,.75);
+  --sk1:#1E2129; --sk2:#2A2E39;
+  --log-bg:#0A0B0F; --log-line:#20232C;
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23959AAB' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
-input[type=checkbox],input[type=radio]{accent-color:var(--green)}
-select option{background:var(--input);color:var(--ink)}
-::placeholder{color:var(--mute);opacity:.8}
-:root[data-theme="dark"] *{scrollbar-color:#3a4f42 transparent}
-a{color:var(--green)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 14.5px/1.55 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:"cv11","ss01"}
+a{color:var(--pri-ink);text-underline-offset:2px}
+b,strong{font-weight:600}
 table{color:var(--ink)}
-summary{color:var(--mute)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif;font-size:16px}
-header{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--card);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:5}
-.logo{width:44px;height:44px;border-radius:14px;background:var(--green);color:var(--on-g);display:grid;place-items:center;font-weight:900;font-size:22px}
-header h1{font-size:22px;margin:0;font-weight:900}
-header .sub{color:var(--mute);font-size:13px;font-weight:700}
-nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-nav button{border:0;background:transparent;padding:10px 16px;border-radius:14px;font:800 15px Nunito;color:var(--mute);cursor:pointer}
-nav button.on{background:var(--green-soft);color:var(--green)}
-main{max-width:1760px;margin:0 auto;padding:24px 32px 80px}
-.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:22px;border:1px solid var(--line)}
-.grid{display:grid;gap:18px}
-.g2{grid-template-columns:1.25fr 1fr}
-.g3{grid-template-columns:repeat(3,1fr)}
-h2{font-size:20px;margin:0 0 14px;font-weight:900}
-h3{font-size:16px;margin:0 0 10px;font-weight:800}
-label{font-weight:800;font-size:14px;color:var(--mute);display:block;margin:0 0 6px}
-select,input[type=number],textarea,input[type=text],input[type=password]{width:100%;padding:12px 14px;border:2px solid var(--line);border-radius:14px;font:700 16px Nunito;color:var(--ink);background:var(--input)}
-textarea{min-height:120px;resize:vertical;line-height:1.5}
-.btn{border:0;border-radius:16px;padding:14px 22px;font:900 17px Nunito;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
-.btn.big{padding:18px 30px;font-size:20px}
-.btn.go{background:var(--green);color:var(--on-g);box-shadow:0 6px 0 #1f7a31}
-.btn.go:active{transform:translateY(3px);box-shadow:0 3px 0 #1f7a31}
-.btn.stop{background:var(--red);color:var(--on-r);box-shadow:0 6px 0 #9b161c}
-.btn.soft{background:var(--green-soft);color:var(--green)}
-.btn.ghost{background:var(--card);border:2px solid var(--line);color:var(--ink)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-weight:800;font-size:13px}
-.pill.g{background:var(--green-soft);color:var(--green)} .pill.r{background:var(--red-soft);color:var(--red)}
-.pill.y{background:var(--yellow-soft);color:var(--y-ink)} .pill.b{background:var(--blue-soft);color:var(--blue)}
-.bar{height:16px;background:var(--green-soft);border-radius:999px;overflow:hidden}
-.bar>i{display:block;height:100%;background:linear-gradient(90deg,#3fc25a,var(--green));width:0;transition:width .6s}
-.log{background:#13201A;color:#CFEBD6;border-radius:16px;padding:14px;height:330px;overflow:auto;font:600 13px/1.55 Consolas,monospace;white-space:pre-wrap}
-.log .ok{color:#7CE38F} .log .bad{color:#FF8D8D} .log .warn{color:#FFD86B}
-.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat div{background:var(--panel);border-radius:16px;padding:14px;text-align:center}
-.stat b{display:block;font-size:26px;font-weight:900}
-.stat span{color:var(--mute);font-weight:800;font-size:13px}
-.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
-.vid{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;border:2px solid var(--line);display:flex;flex-direction:column}
-.vid.dat{border-color:var(--green)} .vid.bo{border-color:var(--red);opacity:.75}
-.thumb{position:relative;aspect-ratio:9/16;background:#000;cursor:pointer}
-.thumb video{width:100%;height:100%;object-fit:cover;display:block}
-.thumb .play{position:absolute;inset:0;display:grid;place-items:center;font-size:54px;color:#fff;text-shadow:0 2px 12px #000a}
-.thumb .score{position:absolute;top:10px;left:10px}
-.vid .info{padding:12px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
-.vid .t{font-weight:900;font-size:15px}
-.vid .m{color:var(--mute);font-weight:700;font-size:13px}
-.vid .act{display:flex;gap:8px;margin-top:auto}
-.vid .act button{flex:1;padding:10px 6px;border-radius:12px;border:0;font:900 15px Nunito;cursor:pointer}
-.b-ok{background:var(--green-soft);color:var(--green)} .b-no{background:var(--red-soft);color:var(--red)} .b-cp{background:var(--blue-soft);color:var(--blue)}
-.modal{position:fixed;inset:0;background:rgba(15,30,20,.72);display:none;z-index:20;align-items:center;justify-content:center;padding:20px}
-.modal.on{display:flex}
-.mbox{background:var(--card);border-radius:24px;display:grid;grid-template-columns:auto minmax(420px,560px);max-height:94vh;overflow:hidden;max-width:96vw}
-.mbox video{height:min(92vh,960px);aspect-ratio:9/16;background:#000;display:block}
-.mside{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-.mside .x{align-self:flex-end;border:0;background:var(--panel);border-radius:12px;padding:8px 14px;font:900 16px Nunito;cursor:pointer}
-.cap{background:var(--panel);border-radius:14px;padding:12px;font-weight:700;white-space:pre-wrap;font-size:14px}
-.note{color:var(--mute);font-weight:700;font-size:14px;line-height:1.5}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--card);padding:12px 22px;border-radius:14px;font-weight:800;display:none;z-index:30}
-.list li{margin:4px 0;font-weight:700}
-.warnbox{background:var(--yellow-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--w-ink)}
-.errbox{background:var(--red-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--red)}
+summary{color:var(--mute);cursor:pointer}
+::placeholder{color:var(--subtle);opacity:.85}
+::selection{background:var(--pri-soft)}
+select option{background:var(--input);color:var(--ink)}
+input[type=checkbox],input[type=radio]{accent-color:var(--pri);width:16px;height:16px}
+:root[data-theme="dark"] *{scrollbar-color:#363A48 transparent}
+:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 .hidden{display:none!important}
-.khothem{margin-top:12px;background:var(--panel);border-radius:16px;padding:12px 14px}
-.khothem .ds{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.khothem label.kt{display:flex;align-items:center;gap:10px;margin:0;padding:8px 12px 8px 8px;border-radius:14px;background:var(--card);border:2px solid var(--line);cursor:pointer;color:var(--ink);font-size:14px}
-.khothem label.kt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
-.khothem label.kt input{width:18px;height:18px;flex:none}
-.khothem label.kt small{display:block;color:var(--mute);font-weight:700;font-size:12px}
-.khothem details summary{cursor:pointer;font-weight:800;color:var(--mute);font-size:13px;margin-top:10px}
-.sp-anh{width:44px;height:44px;border-radius:12px;object-fit:cover;background:var(--green-soft);border:1px solid var(--line);flex:none;display:block}
-.sp-anh.lg{width:96px;height:96px;border-radius:18px}
-.shop-tim{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.shop-tim input{padding:8px 12px;font-size:14px;border-radius:12px}
-.shop-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px;max-height:258px;overflow:auto;padding:2px}
-.shop-it{display:flex;flex-direction:column;gap:5px;padding:5px;border:2px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;font:700 12px/1.3 Nunito;position:relative}
-.shop-it:hover{border-color:var(--green)}
-.shop-it.chon{border-color:var(--green);background:var(--green-soft)}
-.shop-it img,.shop-it .rong{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--green-soft);display:grid;place-items:center;font-size:24px}
-.shop-it span.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
-.shop-it .gan{position:absolute;top:8px;left:8px;background:var(--green);color:var(--on-g);border-radius:8px;padding:1px 6px;font:800 10px Nunito;font-style:normal}
-.shop-chon{display:flex;gap:10px;align-items:center;margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--green-soft)}
-.shop-chon .sp-anh{width:44px;height:44px}
-.sp-anh.rong{display:grid;place-items:center;font-size:20px}
-.sp-anh.lg.rong{font-size:40px}
-.sp-ten{display:flex;align-items:center;gap:10px}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+svg.i.f{fill:currentColor;stroke:none}
+.num,.tnum{font-variant-numeric:tabular-nums}
+
+/* ---------- đầu trang + thanh tab */
+header{position:sticky;top:0;z-index:15;background:color-mix(in srgb,var(--bg) 84%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+.hdr{max-width:1520px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:12px 28px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 6px 14px -4px rgba(109,40,217,.5),inset 0 1px 0 rgba(255,255,255,.25)}
+.logo svg.i{width:20px;height:20px}
+.brand h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.015em;line-height:1.2}
+.brand .sub{color:var(--mute);font-size:12.5px}
+nav{display:flex;gap:2px;padding:4px;background:var(--sec);border:1px solid var(--line);border-radius:12px;overflow-x:auto;scrollbar-width:none;max-width:100%}
+nav::-webkit-scrollbar{display:none}
+nav button{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--mute);font:500 14px var(--font);cursor:pointer;white-space:nowrap;transition:background-color .15s,color .15s,box-shadow .15s}
+nav button svg.i{opacity:.8}
+nav button:hover{color:var(--ink)}
+nav button.on{background:var(--tab-on);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(28,25,23,.08),0 1px 1px rgba(28,25,23,.04)}
+nav button.on svg.i{color:var(--pri-ink);opacity:1}
+:root[data-theme="dark"] nav button.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 3px rgba(0,0,0,.5)}
+.hdr-chip{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--mute);font-size:12.5px;font-weight:500;white-space:nowrap;box-shadow:var(--sh-xs)}
+.hdr-chip .dot{width:7px;height:7px;border-radius:50%;background:#22C55E;box-shadow:0 0 0 3px color-mix(in srgb,#22C55E 22%,transparent)}
+:root[data-nhung] .logo, :root[data-nhung] .brand{display:none}
+:root[data-nhung] .hdr{padding:12px 24px}
+main{max-width:1520px;margin:0 auto;padding:26px 28px 80px}
+:root[data-nhung] main{padding:22px 24px 64px}
+
+/* ---------- tiêu đề trang, thẻ, lưới */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 20px}
+.ph h1{font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.022em;margin:0}
+.ph p{margin:4px 0 0;color:var(--mute);font-size:14px}
+.ph .act{display:flex;gap:8px;flex-wrap:wrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-sm);padding:22px 24px;min-width:0}
+.mt{margin-top:20px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+.g2e{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ch{display:flex;align-items:flex-start;gap:14px;margin:0 0 18px}
+.ch>.t{flex:1;min-width:0}
+.ch h2{margin:0}
+.ch .sub{margin:3px 0 0;color:var(--mute);font-size:13px;line-height:1.5}
+.ch .sub:empty{display:none}
+.ch>.act{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.chip{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--pri-soft);color:var(--pri-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pri) 16%,transparent)}
+.chip svg.i{width:18px;height:18px}
+.chip.g{background:var(--green-soft);color:var(--green);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 18%,transparent)}
+.chip.b{background:var(--blue-soft);color:var(--blue);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 18%,transparent)}
+.chip.a{background:var(--amber-soft);color:var(--amber);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 20%,transparent)}
+.chip.r{background:var(--red-soft);color:var(--red);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 18%,transparent)}
+.chip.n{background:var(--sec);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line)}
+h2{font-size:18px;line-height:1.3;margin:0 0 14px;font-weight:600;letter-spacing:-.015em}
+h3{font-size:15px;line-height:1.35;margin:0 0 10px;font-weight:600;letter-spacing:-.008em}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:22px 0 12px}
+.sec-h h3{margin:0}
+.note{color:var(--mute);font-size:13px;line-height:1.55;font-weight:400}
+.help{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--mute);font-size:13px;line-height:1.65;margin:0}
+.help b{color:var(--ink2)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .nowrap{flex-wrap:nowrap}
-.tmbox{background:var(--card);border:1px solid var(--line);border-radius:24px;width:min(640px,96vw);max-height:90vh;display:flex;flex-direction:column;padding:20px;gap:12px}
-.tmbox h2{margin:0}
-.tmcrumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.tmcrumb button{border:0;background:var(--green-soft);color:var(--green);border-radius:10px;padding:5px 10px;font:800 14px Nunito;cursor:pointer}
-.tmds{overflow:auto;min-height:240px;flex:1;border:2px solid var(--line);border-radius:16px;background:var(--input)}
-.tmit{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 14px;font:800 15px Nunito;text-align:left;cursor:pointer}
-.tmit:hover{background:var(--green-soft)}
-.tmit .ten{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sep{height:1px;background:var(--line);margin:18px 0;border:0}
+
+/* ---------- ô nhập, nút, công tắc */
+label{display:block;font-size:13px;font-weight:500;color:var(--ink2);margin:0 0 6px}
+select,input[type=number],input[type=text],input[type=password],textarea{width:100%;height:40px;padding:0 12px;border:1px solid var(--line2);border-radius:10px;background:var(--input);color:var(--ink);font:400 14px var(--font);box-shadow:var(--sh-xs);transition:border-color .15s,box-shadow .15s;font-variant-numeric:tabular-nums}
+select{-webkit-appearance:none;appearance:none;padding-right:34px;background-image:var(--chev);background-repeat:no-repeat;background-position:right 10px center;background-size:16px;cursor:pointer;text-overflow:ellipsis}
+textarea{height:auto;min-height:120px;padding:10px 12px;line-height:1.6;resize:vertical}
+:is(select,input[type=number],input[type=text],input[type=password],textarea):hover{border-color:color-mix(in srgb,var(--line2) 55%,var(--subtle))}
+:is(select,input[type=number],input[type=text],input[type=password],textarea):focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--ring)}
 input.pick{background:var(--panel);cursor:default}
-/* tab Sản phẩm: danh sách · thêm mới · chi tiết */
-.lui{border:0;background:transparent;color:var(--mute);font:800 14px Nunito;cursor:pointer;padding:4px 0;margin:0 0 12px;display:inline-flex;align-items:center;gap:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:10px;border:1px solid transparent;font:500 14px/1 var(--font);cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--ink);transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,transform .06s}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn.big{height:48px;padding:0 24px;font-size:15px;font-weight:600;border-radius:12px}
+.btn.big svg.i{width:18px;height:18px}
+.btn.sm{height:32px;padding:0 11px;font-size:13px;border-radius:8px;gap:6px}
+.btn.sm svg.i{width:14px;height:14px}
+.btn.go{background:var(--pri);color:var(--on-pri);box-shadow:0 1px 2px rgba(76,29,149,.22),inset 0 1px 0 rgba(255,255,255,.14)}
+.btn.go:hover:not(:disabled){background:var(--pri-h)}
+.btn.go.big{background:var(--pri-grad);box-shadow:0 10px 22px -8px rgba(109,40,217,.6),inset 0 1px 0 rgba(255,255,255,.22)}
+.btn.go.big:hover:not(:disabled){filter:brightness(1.06)}
+:root[data-theme="dark"] .btn.go.big{box-shadow:0 10px 26px -10px rgba(167,139,250,.6),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn.stop{background:var(--danger);color:#fff;box-shadow:0 1px 2px rgba(127,15,0,.25)}
+.btn.stop:hover:not(:disabled){filter:brightness(1.08)}
+.btn.soft{background:var(--sec);color:var(--ink);border-color:var(--line)}
+.btn.soft:hover:not(:disabled){background:var(--line);border-color:var(--line2)}
+.btn.ghost{background:var(--card);border-color:var(--line2);color:var(--ink);box-shadow:var(--sh-xs)}
+.btn.ghost:hover:not(:disabled){background:var(--hover)}
+.btn.dz{color:var(--red)}
+.btn.dz:hover:not(:disabled){background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 30%,var(--line2))}
+.btn.ic-only{width:32px;padding:0}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.tg{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;user-select:none}
+input.sw{-webkit-appearance:none;appearance:none;width:36px;height:20px;margin:0;border:0;border-radius:999px;background:var(--line2);position:relative;cursor:pointer;flex:none;transition:background-color .2s}
+input.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .2s}
+input.sw:checked{background:var(--pri)}
+input.sw:checked::after{transform:translateX(16px)}
+.inl{display:inline-flex;align-items:center;gap:8px;color:var(--mute);font-size:13px;white-space:nowrap}
+.inl input{width:76px;height:34px}
+
+/* ---------- nhãn, thông báo, tiến độ, nhật ký */
+.pill{display:inline-flex;align-items:center;gap:5px;min-height:22px;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.4;white-space:nowrap;background:var(--sec);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line)}
+.pill svg.i{width:12px;height:12px;vertical-align:0}
+.pill.g{background:var(--green-soft);color:var(--green);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 22%,transparent)}
+.pill.r{background:var(--red-soft);color:var(--red);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 22%,transparent)}
+.pill.y{background:var(--amber-soft);color:var(--y-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--amber) 24%,transparent)}
+.pill.b{background:var(--blue-soft);color:var(--blue);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 22%,transparent)}
+.pill.p{background:var(--pri-soft);color:var(--pri-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pri) 22%,transparent)}
+.pill.dot::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.warnbox,.errbox{border-radius:12px;padding:12px 14px;font-size:14px;font-weight:500;line-height:1.5}
+.warnbox{background:var(--amber-soft);color:var(--w-ink);border:1px solid color-mix(in srgb,var(--amber) 26%,transparent)}
+.errbox{background:var(--red-soft);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 26%,transparent)}
+.bar{height:8px;background:var(--sec);border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--line2) 50%,transparent)}
+.bar>i{display:block;height:100%;width:0;border-radius:inherit;background:var(--bar-grad);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.bar.sm{height:6px}
+.log{background:var(--log-bg);color:var(--log-ink);border:1px solid var(--log-line);border-radius:12px;padding:14px 16px;height:330px;overflow:auto;font:400 12.5px/1.7 var(--mono);white-space:pre-wrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.log .ok{color:var(--log-ok)} .log .bad{color:var(--log-bad)} .log .warn{color:var(--log-warn)}
+.log{scrollbar-color:#3A3E4C transparent}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:none;z-index:60;max-width:min(560px,92vw);padding:12px 18px;border-radius:12px;background:#18181B;color:#FAFAFA;font-size:14px;font-weight:500;box-shadow:0 16px 36px -10px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06);animation:tin .22s ease}
+:root[data-theme="dark"] .toast{background:var(--raised);color:var(--ink);border:1px solid var(--line2);box-shadow:0 16px 40px -10px rgba(0,0,0,.8)}
+@keyframes tin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+.skel{background:linear-gradient(90deg,var(--sk1) 25%,var(--sk2) 37%,var(--sk1) 63%);background-size:400% 100%;animation:sk 1.3s ease infinite;border-radius:8px}
+@keyframes sk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:40px 20px;color:var(--mute);font-size:13.5px;grid-column:1/-1}
+.empty .ei{width:48px;height:48px;border-radius:14px;background:var(--sec);border:1px solid var(--line);display:grid;place-items:center;color:var(--subtle);margin-bottom:6px}
+.empty .ei svg.i{width:22px;height:22px}
+.empty b{color:var(--ink);font-size:15px}
+
+/* ---------- Sản xuất */
+.hero{position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(520px 220px at 100% 0%,color-mix(in srgb,var(--pri) 11%,transparent),transparent 70%)}
+.hero>*{position:relative}
+.fgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px 16px;align-items:end}
+.f-tg{height:40px;display:flex;align-items:center}
+.cta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:22px}
+.cta-row .note{flex:1;min-width:220px;margin:0}
+.runbox{margin-top:20px;padding:14px 16px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.run-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;font-size:13px}
+.run-h .run-l{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink2)}
+.run-h .note{text-align:right}
+#trangThai:not(:empty){margin-top:14px}
+.stat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1360px) and (min-width:1101px){.stat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.stat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat>div{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:12px;padding:14px 16px 14px;background:radial-gradient(160px 80px at 100% 0%,color-mix(in srgb,var(--acc,var(--pri)) 13%,transparent),transparent 70%),var(--panel)}
+.stat .si{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;margin-bottom:14px;color:var(--acc,var(--pri));background:color-mix(in srgb,var(--acc,var(--pri)) 14%,transparent)}
+.stat b{display:block;font-size:26px;line-height:1.1;font-weight:650;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:5px;color:var(--mute);font-size:12.5px;line-height:1.35}
+.tkm{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.tkm>div{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.tkm .hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.tkm .hd b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tkm .lr{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);margin:8px 0 5px}
+.tkm .lr b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- bảng */
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tbl-wrap.tall{max-height:460px}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;font-variant-numeric:tabular-nums}
+.tbl th{position:sticky;top:0;z-index:1;background:var(--panel);text-align:left;font-weight:500;font-size:12px;letter-spacing:.01em;color:var(--mute);padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr{transition:background-color .12s}
+.tbl tbody tr:hover td{background:var(--hover)}
+.tbl .num{text-align:right}
+.tbl td.wrap{white-space:normal}
+.tbl td.empty-td{padding:0}
+.tbl input[type=number]{height:34px;width:84px}
+.tbl.lo{min-width:1120px}
+.tbl.td{min-width:880px}
+.sp-ten{display:flex;align-items:center;gap:10px;font-weight:500}
+.foot-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+
+/* ---------- ảnh sản phẩm, kho phụ, TikTok Shop */
+.sp-anh{width:40px;height:40px;border-radius:10px;object-fit:cover;background:var(--panel);border:1px solid var(--line);flex:none;display:block}
+.sp-anh.lg{width:88px;height:88px;border-radius:16px}
+.sp-anh.rong{display:grid;place-items:center;color:var(--subtle)}
+.sp-anh.rong svg.i{width:46%;height:46%;stroke-width:1.6}
+.khothem{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px}
+.khothem .ds{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.khothem label.kt{display:flex;align-items:center;gap:10px;margin:0;padding:7px 12px 7px 7px;border-radius:10px;background:var(--card);border:1px solid var(--line2);cursor:pointer;color:var(--ink);font-size:13.5px;font-weight:500;transition:border-color .15s,background-color .15s}
+.khothem label.kt:hover{border-color:color-mix(in srgb,var(--pri) 40%,var(--line2))}
+.khothem label.kt:has(input:checked){border-color:var(--pri);background:var(--pri-soft);box-shadow:0 0 0 1px var(--pri)}
+.khothem label.kt input{flex:none}
+.khothem label.kt .sp-anh{width:34px;height:34px;border-radius:8px}
+.khothem label.kt small{display:block;color:var(--mute);font-weight:400;font-size:12px}
+.khothem details summary{font-weight:500;font-size:13px;margin-top:12px}
+.shop-tim{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.shop-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;max-height:300px;overflow:auto;padding:2px}
+.shop-it{display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;font:500 12px/1.35 var(--font);position:relative;transition:border-color .15s,box-shadow .15s}
+.shop-it:hover{border-color:var(--line2);box-shadow:var(--sh-sm)}
+.shop-it.chon{border-color:var(--pri);background:var(--pri-soft);box-shadow:0 0 0 1px var(--pri)}
+.shop-it img,.shop-it .rong{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--panel);display:grid;place-items:center;color:var(--subtle)}
+.shop-it span.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em}
+.shop-it .gan{position:absolute;top:10px;left:10px;background:var(--pri);color:var(--on-pri);border-radius:6px;padding:1px 6px;font:500 10.5px var(--font);font-style:normal}
+.shop-chon{display:flex;gap:12px;align-items:center;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--pri-soft);border:1px solid color-mix(in srgb,var(--pri) 30%,transparent)}
+
+/* ---------- Kho video */
+.toolbar .tb{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.toolbar .tb .fld{width:210px}
+.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-top:20px}
+.vid{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s,border-color .2s}
+.vid:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
+.vid.dat{border-color:color-mix(in srgb,var(--green) 60%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--green) 45%,transparent),var(--sh-sm)}
+.vid.bo{opacity:.6}
+.vid.bo:hover{opacity:.9}
+.thumb{position:relative;aspect-ratio:9/16;background:#0B0B0E;cursor:pointer;overflow:hidden}
+.thumb img,.thumb video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.vid:hover .thumb img,.vid:hover .thumb video{transform:scale(1.035)}
+.thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:30%;background:linear-gradient(transparent,rgba(0,0,0,.45));pointer-events:none}
+.thumb .play{position:absolute;inset:0;display:grid;place-items:center;z-index:1}
+.thumb .play span{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 0 0 1px rgba(255,255,255,.3),0 8px 20px rgba(0,0,0,.35);transition:transform .2s,background-color .2s}
+.thumb .play svg.i{width:20px;height:20px;margin-left:3px}
+.thumb:hover .play span{transform:scale(1.08);background:rgba(255,255,255,.28)}
+.thumb .score{position:absolute;top:10px;left:10px;z-index:2;background:rgba(12,12,16,.62)!important;color:#fff!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.thumb .score svg.i{color:#FCD34D}
+.vid .info{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.vid .info .pill{align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.vid .t{font-weight:600;font-size:14px;line-height:1.35}
+.vid .m{color:var(--mute);font-size:12.5px}
+.vid .act{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:auto;padding-top:4px}
+.vid .act button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 10px;border-radius:8px;border:1px solid transparent;font:500 13px var(--font);cursor:pointer;transition:filter .15s,background-color .15s}
+.vid .act button:hover{filter:brightness(.97)}
+:root[data-theme="dark"] .vid .act button:hover{filter:brightness(1.2)}
+.b-ok{background:var(--green-soft);color:var(--green);border-color:color-mix(in srgb,var(--green) 20%,transparent)!important}
+.b-no{background:var(--red-soft);color:var(--red);border-color:color-mix(in srgb,var(--red) 20%,transparent)!important}
+.b-cp{background:var(--sec);color:var(--ink);border-color:var(--line)!important}
+.vskel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.vskel .skel:first-child{aspect-ratio:9/16;border-radius:0}
+
+/* ---------- hộp thoại */
+.modal{position:fixed;inset:0;background:rgba(9,9,12,.62);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;z-index:40;align-items:center;justify-content:center;padding:24px}
+.modal.on{display:flex}
+.mbox{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-lg);display:grid;grid-template-columns:auto minmax(380px,520px);max-height:94vh;overflow:hidden;max-width:96vw}
+.mbox video{height:min(92vh,960px);aspect-ratio:9/16;background:#000;display:block}
+.mside{padding:22px 24px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+.mside .x{align-self:flex-end}
+.mside h3{font-size:13px;color:var(--mute);font-weight:500;margin:0 0 8px}
+.cap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:14px;line-height:1.6}
+.tmbox{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-lg);width:min(640px,96vw);max-height:90vh;display:flex;flex-direction:column;padding:22px;gap:14px}
+.tmbox .ch{margin:0}
+.tmcrumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tmcrumb button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--sec);color:var(--ink);border-radius:8px;height:28px;padding:0 10px;font:500 13px var(--font);cursor:pointer}
+.tmcrumb button:hover{background:var(--line)}
+.tmds{overflow:auto;min-height:240px;flex:1;border:1px solid var(--line);border-radius:12px;background:var(--input)}
+.tmit{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 14px;font:400 14px var(--font);text-align:left;cursor:pointer}
+.tmit:hover{background:var(--hover)}
+.tmit>svg.i{color:var(--subtle)}
+.tmit .ten{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Sản phẩm: lưới thẻ · thêm mới · chi tiết */
+.lui{border:0;background:transparent;color:var(--mute);font:500 13.5px var(--font);cursor:pointer;padding:4px 0;margin:0 0 14px;display:inline-flex;align-items:center;gap:6px}
 .lui:hover{color:var(--ink)}
-.dau{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.tbl-wrap{overflow-x:auto;margin-top:14px}
-.tbl{width:100%;border-collapse:collapse}
-.tbl td{padding:8px 6px;vertical-align:middle}
-#tqBang tr[data-ma]{cursor:pointer;transition:background-color .12s}
-#tqBang tr[data-ma]:hover{background:var(--panel)}
-.ct-dau{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
-.ct-dau .sp-anh.lg{width:64px;height:64px;border-radius:14px}
-.ct-dau .sp-anh.lg.rong{font-size:28px}
-.subtabs{display:flex;gap:4px;margin:18px 0 14px;border-bottom:2px solid var(--line);flex-wrap:wrap}
-.subtabs button{border:0;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;padding:10px 14px;font:800 15px Nunito;color:var(--mute);cursor:pointer}
+.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.pc{position:relative;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);cursor:pointer;transition:box-shadow .2s,transform .2s,border-color .2s}
+.pc:hover{box-shadow:var(--sh-md);transform:translateY(-2px);border-color:var(--line2)}
+.pc-media{position:relative;aspect-ratio:16/10;background:var(--panel);border-bottom:1px solid var(--line);overflow:hidden}
+.pc-media .sp-anh{width:100%;height:100%;border:0;border-radius:0;background:var(--panel);transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.pc:hover .pc-media img.sp-anh{transform:scale(1.04)}
+.pc-media .sp-anh.rong svg.i{width:40px;height:40px}
+.pc-st{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap}
+.pc-st .pill{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14),inset 0 0 0 1px var(--line);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+:root[data-theme="dark"] .pc-st .pill{background:var(--raised)}
+.pc-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;flex:1}
+.pc-name{font-weight:600;font-size:15px;line-height:1.35;letter-spacing:-.008em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pc-code{font:500 11.5px var(--mono);color:var(--subtle);margin-top:3px}
+.pc-m{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.pc-m>div{padding:8px 4px 7px;text-align:center;min-width:0}
+.pc-m>div+div{border-left:1px solid var(--line)}
+.pc-m b{display:block;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.3}
+.pc-m b.lo{color:var(--red)}
+.pc-m span{display:block;font-size:11px;color:var(--mute);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-pr .lr{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);margin-bottom:6px}
+.pc-pr .lr b{color:var(--ink2);font-weight:500;font-variant-numeric:tabular-nums}
+.pc-pr .bar.thieu>i{background:linear-gradient(90deg,#F59E0B,#D97706)}
+.pc-foot{display:flex;gap:8px;margin-top:auto}
+.pc-foot .btn.soft{flex:1}
+.pc-skel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.ct-dau{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.ct-dau .sp-anh.lg{width:72px;height:72px;border-radius:14px;box-shadow:var(--sh-sm)}
+.ct-dau h2{font-size:20px;letter-spacing:-.02em}
+.ct-dau .note{font-variant-numeric:tabular-nums}
+.subtabs{display:flex;gap:4px;margin:20px 0 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.subtabs button{display:inline-flex;align-items:center;gap:8px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;height:42px;padding:0 14px;font:500 14px var(--font);color:var(--mute);cursor:pointer;transition:color .15s,border-color .15s}
 .subtabs button:hover{color:var(--ink)}
-.subtabs button.on{color:var(--green);border-bottom-color:var(--green)}
-.khung{border:2px solid var(--line);border-radius:16px;padding:12px 14px}
-.khung-hep{max-width:960px}
-.buoc-ds{margin:14px 0 0;padding-left:20px}
-.buoc-ds li{margin:4px 0}
-@media (max-width:900px){.g2{grid-template-columns:1fr}.mbox{grid-template-columns:1fr}.mbox video{height:60vh}header{flex-wrap:wrap}}
-/* ===== chế độ nhúng (?nhung=1) trong TikTok Auto Kid: giống app chính — font hệ thống, màu trung tính, viền 1px, bo 8–12px, nút phẳng, ít emoji (cả sáng lẫn tối).
-   Đặt cuối <style> để thắng luật gốc; --bg thật do __xvApplyTheme gán inline (nền trùng trang cha). ===== */
-:root[data-nhung] header{position:static;padding:14px 24px 0;background:transparent;border-bottom:0}
-:root[data-nhung] header .logo, :root[data-nhung] header .brand{display:none}
-:root[data-nhung] nav{margin-left:0}
-:root[data-nhung] main{padding:16px 24px 64px}
-:root[data-nhung]{
-  --r:12px; --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
-  --bg:#FFFFFF; --card:#FFFFFF; --ink:#292928; --mute:#5A5A59; --line:#EAE8E5; --line2:#DEDCD9; --panel:#F7F6F3; --input:#FFFFFF; --sec:#EFEDEA; --tab-on:#FFFFFF;
-  --pri:#6D28D9; --pri-h:#5B21B6; --on-pri:#FFFFFF; --pri-soft:#EDE9FE; --pri-ink:#6D28D9; --ring:rgba(124,58,237,.22);
-  --green:#337046; --green-soft:#E3F3DD; --on-g:#FFFFFF; --red:#B42318; --red-soft:#FDE8E5; --on-r:#FFFFFF; --danger:#C02E1C;
-  --blue:#004781; --blue-soft:#E3F1FF; --yellow-soft:#FEF3C7; --y-ink:#8A4B08; --w-ink:#8A4B08; --shadow:0 1px 2px rgba(16,16,16,.04);
-  --log-bg:#F7F6F3; --log-ink:#3A3A39; --log-ok:#337046; --log-bad:#B42318; --log-warn:#8A4B08;
-}
-:root[data-nhung][data-theme="dark"]{
-  --bg:#0D0E12; --card:#15171D; --ink:#F1F1F4; --mute:#B4B7C3; --line:#2A2D38; --line2:#3A3E4C; --panel:#1A1D25; --input:#111318; --sec:#262A35; --tab-on:#2C303C;
-  --pri:#A78BFA; --pri-h:#B9A3FB; --on-pri:#14102A; --pri-soft:#241A4A; --pri-ink:#C4B5FD; --ring:rgba(167,139,250,.35);
-  --green:#86EFAC; --green-soft:#12301F; --on-g:#052E16; --red:#FCA5A5; --red-soft:#3A1717; --on-r:#2B0508; --danger:#DC2626;
-  --blue:#93C5FD; --blue-soft:#0F2A4D; --yellow-soft:#33290B; --y-ink:#FCD34D; --w-ink:#FCD34D; --shadow:none;
-  --log-bg:#0B0C10; --log-ink:#D4D6DE; --log-ok:#86EFAC; --log-bad:#FCA5A5; --log-warn:#FCD34D;
-}
-:root[data-nhung] *{font-family:var(--font)!important}
-:root[data-nhung] .log, :root[data-nhung] .log *{font-family:var(--mono)!important}
-:root[data-nhung] body{font-size:14px;-webkit-font-smoothing:antialiased}
-:root[data-nhung] a{color:var(--pri-ink)}
-:root[data-nhung] input[type=checkbox], :root[data-nhung] input[type=radio]{accent-color:var(--pri)}
-:root[data-nhung][data-theme="dark"] *{scrollbar-color:#3A3E4C transparent}
-:root[data-nhung] .ic{display:none}
-:root[data-nhung] b, :root[data-nhung] strong{font-weight:600}
-/* thanh tab chính: kiểu segmented như app */
-:root[data-nhung] nav{display:inline-flex;gap:2px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-:root[data-nhung] nav button{padding:7px 14px;border-radius:7px;font-size:14px;font-weight:500;color:var(--mute);transition:background-color .15s,color .15s}
-:root[data-nhung] nav button:hover{color:var(--ink)}
-:root[data-nhung] nav button.on{background:var(--tab-on);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-/* chữ */
-:root[data-nhung] h2{font-size:17px;font-weight:600;letter-spacing:-.01em}
-:root[data-nhung] h3{font-size:14.5px;font-weight:600}
-:root[data-nhung] label{font-size:13px;font-weight:500;color:var(--ink)}
-:root[data-nhung] .note{font-weight:400;font-size:13px}
-:root[data-nhung] summary{font-weight:500}
-/* thẻ */
-:root[data-nhung] .card{border-radius:12px;padding:20px;box-shadow:var(--shadow)}
-:root[data-nhung] .stat div{border:1px solid var(--line);border-radius:10px;padding:12px}
-:root[data-nhung] .stat b{font-size:22px;font-weight:600}
-:root[data-nhung] .stat span{font-weight:400;font-size:12.5px}
-/* nút */
-:root[data-nhung] .btn{border-radius:8px;padding:9px 16px;font-size:14px;font-weight:500;line-height:1.3;transition:background-color .15s,border-color .15s,color .15s}
-:root[data-nhung] .btn.big{padding:12px 22px;font-size:15px}
-:root[data-nhung] .btn.go{background:var(--pri);color:var(--on-pri);box-shadow:none}
-:root[data-nhung] .btn.go:hover:not(:disabled){background:var(--pri-h)}
-:root[data-nhung] .btn.go:active, :root[data-nhung] .btn.stop:active{transform:translateY(1px);box-shadow:none;filter:none}
-:root[data-nhung] .btn.stop{background:var(--danger);color:#fff;box-shadow:none}
-:root[data-nhung] .btn.soft{background:var(--sec);color:var(--ink)}
-:root[data-nhung] .btn.soft:hover:not(:disabled){background:var(--line2)}
-:root[data-nhung] .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
-:root[data-nhung] .btn.ghost:hover:not(:disabled){background:var(--panel)}
-:root[data-nhung] .btn:disabled{opacity:.5}
-:root[data-nhung] :focus-visible{outline:2px solid var(--pri);outline-offset:1px}
-/* ô nhập */
-:root[data-nhung] select, :root[data-nhung] input[type=number], :root[data-nhung] input[type=text], :root[data-nhung] input[type=password], :root[data-nhung] textarea{border:1px solid var(--line2);border-radius:8px;padding:9px 12px;font-size:14px;font-weight:400}
-:root[data-nhung] :is(select,input[type=number],input[type=text],input[type=password],textarea):focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--ring)}
-/* nhãn trạng thái */
-:root[data-nhung] .pill{padding:2px 8px;border-radius:6px;font-weight:500;font-size:12px;line-height:1.55}
-/* bảng: hàng đầu là tiêu đề cột */
-:root[data-nhung] .tbl td{padding:10px!important;font-size:13.5px}
-:root[data-nhung] .tbl td[style*="font-weight:800"]{font-weight:500!important}
-:root[data-nhung] .tbl tr:first-child td{font-weight:500!important;font-size:12px!important;color:var(--mute)!important;padding-top:4px!important;padding-bottom:8px!important}
-/* hộp thông báo, nhật ký, thanh tiến độ */
-:root[data-nhung] .warnbox, :root[data-nhung] .errbox{border-radius:10px;font-weight:500;font-size:14px;padding:12px 14px}
-:root[data-nhung] .cap{border-radius:10px;font-weight:400;border:1px solid var(--line)}
-:root[data-nhung] .khung{border-width:1px;border-radius:10px}
-:root[data-nhung] .bar{background:var(--sec)}
-:root[data-nhung] .bar>i{background:var(--pri)}
-:root[data-nhung] .log{background:var(--log-bg);color:var(--log-ink);border:1px solid var(--line);border-radius:10px;font-weight:400;font-size:12.5px}
-:root[data-nhung] .log .ok{color:var(--log-ok)} :root[data-nhung] .log .bad{color:var(--log-bad)} :root[data-nhung] .log .warn{color:var(--log-warn)}
-/* thẻ video */
-:root[data-nhung] .vids{gap:16px}
-:root[data-nhung] .vid{border-width:1px;border-radius:12px}
-:root[data-nhung] .vid.dat, :root[data-nhung] .vid.bo{border-width:2px}
-:root[data-nhung] .vid .t{font-weight:600;font-size:14px}
-:root[data-nhung] .vid .m{font-weight:400;font-size:12.5px}
-:root[data-nhung] .vid .act button{border-radius:8px;font-weight:500;font-size:14px;padding:8px 6px}
-/* hộp thoại + thông báo nổi */
-:root[data-nhung] .modal{background:rgba(0,0,0,.5)}
-:root[data-nhung] .mbox{border-radius:12px;border:1px solid var(--line);box-shadow:0 16px 48px rgba(0,0,0,.25)}
-:root[data-nhung] .mside .x{background:transparent;border:1px solid var(--line2);border-radius:8px;font-size:14px;font-weight:500;color:var(--ink);padding:6px 12px}
-:root[data-nhung] .tmbox{border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.25)}
-:root[data-nhung] .tmds{border-width:1px;border-radius:10px}
-:root[data-nhung] .tmit{font-size:14px;font-weight:400;padding:9px 14px}
-:root[data-nhung] .tmit:hover{background:var(--panel)}
-:root[data-nhung] .tmcrumb button{background:var(--sec);color:var(--ink);border-radius:6px;font-size:13px;font-weight:500}
-:root[data-nhung] .toast{background:var(--card);color:var(--ink);border:1px solid var(--line2);border-radius:10px;font-weight:500;font-size:14px;padding:11px 18px;box-shadow:0 8px 28px rgba(0,0,0,.14)}
-:root[data-nhung][data-theme="dark"] .toast{box-shadow:0 8px 28px rgba(0,0,0,.55)}
-/* kho phụ, lưới TikTok Shop, ảnh sản phẩm */
-:root[data-nhung] .khothem{border:1px solid var(--line);border-radius:10px}
-:root[data-nhung] .khothem label.kt{border-width:1px;border-radius:10px;font-weight:500}
-:root[data-nhung] .khothem label.kt:has(input:checked){border-color:var(--pri);background:var(--pri-soft)}
-:root[data-nhung] .khothem label.kt small{font-weight:400}
-:root[data-nhung] .shop-it{border-width:1px;border-radius:10px;font-weight:500}
-:root[data-nhung] .shop-it:hover{border-color:var(--line2);background:var(--panel)}
-:root[data-nhung] .shop-it.chon{border-color:var(--pri);background:var(--pri-soft);box-shadow:0 0 0 1px var(--pri)}
-:root[data-nhung] .shop-it img, :root[data-nhung] .shop-it .rong{border-radius:6px;background:var(--panel)}
-:root[data-nhung] .shop-it .gan{font-weight:500;border-radius:5px}
-:root[data-nhung] .shop-chon{background:var(--pri-soft);border-radius:10px}
-:root[data-nhung] .sp-anh{border-radius:8px;background:var(--panel)}
-:root[data-nhung] .sp-anh.lg{border-radius:12px}
-/* tab con + nút quay lại ở trang sản phẩm */
-:root[data-nhung] .subtabs{border-bottom-width:1px}
-:root[data-nhung] .subtabs button{font-size:14px;font-weight:500;margin-bottom:-1px}
-:root[data-nhung] .subtabs button.on{color:var(--ink);border-bottom-color:var(--pri)}
-:root[data-nhung] .lui{font-size:13.5px;font-weight:500}
+.subtabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--pri)}
+.subtabs button.on svg.i{color:var(--pri-ink)}
+.khung{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel)}
+.khung-hep{max-width:980px}
+.buoc-ds{list-style:none;counter-reset:b;margin:20px 0 0;padding:0;display:grid;gap:10px}
+.buoc-ds li{counter-increment:b;position:relative;padding:0 0 0 38px;margin:0;line-height:1.6}
+.buoc-ds li::before{content:counter(b);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:var(--pri-soft);color:var(--pri-ink);font:600 12px var(--font)}
+.kinfo{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.kinfo .k{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:9px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.kinfo .k b{font-variant-numeric:tabular-nums}
+.kinfo .k svg.i{color:var(--subtle);width:14px;height:14px}
+.kpath{display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:13.5px;font-weight:500;word-break:break-all}
+/* tài khoản Claude ở Cài đặt */
+.acc{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel)}
+.acc .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.acc .hd .who{display:flex;align-items:center;gap:10px;min-width:0}
+.acc .av{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--pri-soft);color:var(--pri-ink);font-weight:600;font-size:14px;flex:none}
+.acc .lr{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mute);margin:10px 0 5px}
+.acc .lr b{color:var(--ink);font-variant-numeric:tabular-nums}
+.acc .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.odia td{padding:8px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:13.5px}
+.odia tr:last-child td{border-bottom:0}
+.nguon{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;font-size:13.5px}
+
+svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.warnbox svg.i,.errbox svg.i{vertical-align:-3px;margin-right:4px}
+.tbl .sp-anh{width:32px;height:32px;border-radius:8px}
+#tmInfo svg.i{width:14px;height:14px;color:var(--subtle)}
+@media (max-width:1180px){.hdr-chip{display:none}}
+@media (max-width:1100px){.g2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.g2e,.g3{grid-template-columns:minmax(0,1fr)}.mbox{grid-template-columns:1fr}.mbox video{height:60vh;width:100%}.hdr{flex-wrap:wrap;padding:10px 16px}main{padding:20px 16px 64px}.fgrid{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">X</div>
-  <div class="brand"><h1>Xưởng Video</h1><div class="sub" id="hdrSub">ê-kíp AI</div></div>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-clap" viewBox="0 0 24 24"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></symbol>
+  <symbol id="i-pkg" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="m7.5 4.27 9 5.15"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0l1.58 6.14a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96l-6.14 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><path d="m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.87a.5.5 0 0 0-.75-.43L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-fopen" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+  <symbol id="i-checkc" viewBox="0 0 24 24"><path d="M21.8 10A10 10 0 1 1 17 3.34"/><path d="m9 11 3 3L22 4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-drive" viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01"/><path d="M10 16h.01"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-login" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M11.53 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.13a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .29-.9l5.17-.76a2.12 2.12 0 0 0 1.6-1.16z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+</svg>
+<header><div class="hdr">
+  <div class="logo"><svg class="i"><use href="#i-clap"/></svg></div>
+  <div class="brand"><h1>Xưởng Video</h1><div class="sub">Sản xuất video tự động</div></div>
   <nav>
-    <button data-tab="sx" class="on"><span class="ic">🎬</span> Sản xuất</button>
-    <button data-tab="kho"><span class="ic">📺</span> Kho video</button>
-    <button data-tab="sp"><span class="ic">🎁</span> Sản phẩm &amp; quà</button>
-    <button data-tab="gu"><span class="ic">💬</span> Gu &amp; bài học</button>
-    <button data-tab="cd"><span class="ic">⚙️</span> Cài đặt</button>
+    <button data-tab="sx" class="on"><svg class="i"><use href="#i-clap"/></svg>Sản xuất</button>
+    <button data-tab="kho"><svg class="i"><use href="#i-film"/></svg>Kho video</button>
+    <button data-tab="sp"><svg class="i"><use href="#i-gift"/></svg>Sản phẩm &amp; quà</button>
+    <button data-tab="gu"><svg class="i"><use href="#i-spark"/></svg>Gu &amp; bài học</button>
+    <button data-tab="cd"><svg class="i"><use href="#i-cog"/></svg>Cài đặt</button>
   </nav>
-</header>
+  <div class="hdr-chip"><span class="dot"></span><span id="hdrSub">Ê-kíp AI</span></div>
+</div></header>
 
 <main>
 <!-- SẢN XUẤT -->
 <section id="sx">
+  <div class="ph"><div><h1>Sản xuất</h1><p>Chọn sản phẩm và số video — ê-kíp AI tự viết, đọc, dựng và chấm điểm.</p></div></div>
   <div class="grid g2">
-    <div class="card">
-      <h2>Làm video mới</h2>
-      <div class="grid" style="grid-template-columns:1.4fr 1fr;gap:14px">
-        <div><label>Sản phẩm</label><div class="row nowrap" style="gap:10px"><span id="chonAnh"></span><select id="spChon" style="flex:1;min-width:0"></select></div></div>
-        <div><label>Số video</label><input id="soVideo" type="number" min="1" max="200" value="10"></div>
-      </div>
-      <div class="grid" style="grid-template-columns:1.4fr 1fr;gap:14px;margin-top:12px">
-        <div><label>Chạy bằng tài khoản Claude</label><select id="tkDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
-        <div><label>&nbsp;</label><label class="row" style="gap:8px;margin:10px 0 0;color:var(--ink);font-size:15px">
-          <input type="checkbox" id="tkChuyen" style="width:20px;height:20px"> Hết thì tự chuyển tài khoản khác</label></div>
+    <div class="card hero">
+      <div class="ch"><span class="chip"><svg class="i"><use href="#i-clap"/></svg></span>
+        <div class="t"><h2>Làm video mới</h2><p class="sub">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</p></div></div>
+      <div class="fgrid">
+        <div><label for="spChon">Sản phẩm</label><div class="row nowrap" style="gap:10px"><span id="chonAnh"></span><select id="spChon" style="flex:1;min-width:0"></select></div></div>
+        <div><label for="soVideo">Số video</label><input id="soVideo" type="number" min="1" max="200" value="10"></div>
+        <div><label for="tkDung">Chạy bằng tài khoản Claude</label><select id="tkDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
+        <div class="f-tg"><label class="tg"><input type="checkbox" id="tkChuyen" class="sw"> Hết thì tự chuyển tài khoản khác</label></div>
       </div>
       <div class="khothem hidden" id="khoThem"></div>
-      <p class="note" id="uocTinh"></p>
-      <div class="row" style="margin-top:6px">
-        <button class="btn go big" id="btnChay">▶ Bắt đầu làm</button>
-        <button class="btn stop hidden" id="btnDung">■ Dừng</button>
+      <div class="cta-row">
+        <button class="btn go big" id="btnChay"><svg class="i f"><use href="#i-play"/></svg>Bắt đầu làm</button>
+        <button class="btn stop big hidden" id="btnDung"><svg class="i f"><use href="#i-stop"/></svg>Dừng</button>
+        <p class="note" id="uocTinh"></p>
       </div>
-      <div id="trangThai" style="margin-top:18px"></div>
-      <div style="margin-top:16px"><div class="bar"><i id="barFill"></i></div>
-        <p class="note" id="barText" style="margin:8px 0 0">Chưa chạy.</p></div>
+      <div class="runbox">
+        <div class="run-h"><span class="run-l"><svg class="i"><use href="#i-clock"/></svg>Tiến độ lô</span><span class="note" id="barText">Chưa chạy.</span></div>
+        <div class="bar"><i id="barFill"></i></div>
+      </div>
+      <div id="trangThai"></div>
     </div>
     <div class="card">
-      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Hôm nay <span class="note" id="stMoc"></span></h2>
-        <button class="btn ghost" id="btnDemLai" style="padding:8px 14px;font-size:14px">↺ Đếm lại từ bây giờ</button></div>
-      <div class="note" id="stUsd" style="margin:6px 0 10px"></div>
+      <div class="ch"><span class="chip b"><svg class="i"><use href="#i-chart"/></svg></span>
+        <div class="t"><h2>Hôm nay <span class="note" id="stMoc"></span></h2><p class="sub" id="stUsd"></p></div>
+        <div class="act"><button class="btn ghost sm" id="btnDemLai"><svg class="i"><use href="#i-undo"/></svg>Đếm lại từ bây giờ</button></div></div>
       <div class="stat">
-        <div><b id="stVideo">–</b><span>video đã làm</span></div>
-        <div><b id="stLuot">–</b><span>lượt gọi AI</span></div>
-        <div><b id="stToken">–</b><span>token đã dùng</span></div>
-        <div><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+        <div style="--acc:#8B5CF6"><i class="si"><svg class="i"><use href="#i-video"/></svg></i><b id="stVideo">–</b><span>video đã làm</span></div>
+        <div style="--acc:#3B82F6"><i class="si"><svg class="i"><use href="#i-zap"/></svg></i><b id="stLuot">–</b><span>lượt gọi AI</span></div>
+        <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-coins"/></svg></i><b id="stToken">–</b><span>token đã dùng</span></div>
+        <div style="--acc:#10B981"><i class="si"><svg class="i"><use href="#i-mic"/></svg></i><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
       </div>
-      <div style="margin-top:16px" id="tkBox"></div>
+      <div id="tkBox"></div>
     </div>
   </div>
-  <div class="card" style="margin-top:18px">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0"><span class="ic">📊</span> Chi phí từng lô</h2>
-      <span class="note">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</span></div>
-    <div style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px" id="loBang"></table></div>
+  <div class="card mt">
+    <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
+      <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div></div>
+    <div class="tbl-wrap tall"><table class="tbl lo" id="loBang"></table></div>
   </div>
-  <div class="card" style="margin-top:18px">
-    <div class="row" style="justify-content:space-between">
-      <h2 style="margin:0"><span class="ic">🤖</span> Tự động giữ kho video</h2>
-      <label class="row" style="gap:8px;margin:0;font-size:16px;color:var(--ink)"><input type="checkbox" id="tdBat" style="width:22px;height:22px"> Bật tự động</label>
-    </div>
-    <p class="note">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
+  <div class="card mt">
+    <div class="ch"><span class="chip g"><svg class="i"><use href="#i-bot"/></svg></span>
+      <div class="t"><h2>Tự động giữ kho video</h2><p class="sub">Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.</p></div>
+      <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw"> Bật tự động</label></div></div>
+    <p class="help">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
       App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
       <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã ✅ và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự ✅) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
       <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
-    <div style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;margin-top:8px" id="tdBang"></table></div>
-    <div class="row" style="margin-top:12px;justify-content:space-between">
+    <div class="tbl-wrap" style="margin-top:16px"><table class="tbl td" id="tdBang"></table></div>
+    <div class="foot-row">
       <span class="note" id="tdTrangThai"></span>
-      <div class="row"><span class="note">Kiểm mỗi</span><input type="number" id="tdPhut" min="5" value="15" style="width:90px"><span class="note">phút</span>
-        <button class="btn go" id="btnLuuTd">💾 Lưu tự động</button></div>
+      <div class="row" style="gap:10px"><span class="inl">Kiểm mỗi <input type="number" id="tdPhut" min="5" value="15"> phút</span>
+        <button class="btn go" id="btnLuuTd"><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
     </div>
   </div>
-  <div class="card" style="margin-top:18px">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Nhật ký đang làm gì</h2>
-      <span class="note">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</span></div>
-    <div class="log" id="log" style="margin-top:12px">…</div>
+  <div class="card mt">
+    <div class="ch"><span class="chip n"><svg class="i"><use href="#i-term"/></svg></span>
+      <div class="t"><h2>Nhật ký đang làm gì</h2><p class="sub">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</p></div></div>
+    <div class="log" id="log">…</div>
   </div>
 </section>
 
 <!-- KHO VIDEO -->
 <section id="kho" class="hidden">
-  <div class="card" style="margin-bottom:18px">
-    <div class="row">
-      <div style="width:220px"><label>Ngày</label><select id="ngayChon"></select></div>
-      <div style="width:220px"><label>Lọc</label><select id="locChon">
-        <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng ✅</option><option value="bo">Anh bỏ ❌</option></select></div>
+  <div class="ph"><div><h1>Kho video</h1><p>Bấm vào video để xem to. Ưng / Bỏ kèm một dòng góp ý → ê-kíp AI đọc sổ gu này ở mọi lần làm sau.</p></div></div>
+  <div class="card toolbar">
+    <div class="tb">
+      <div class="fld"><label for="ngayChon">Ngày</label><select id="ngayChon"></select></div>
+      <div class="fld"><label for="locChon">Lọc</label><select id="locChon">
+        <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng</option><option value="bo">Anh bỏ</option></select></div>
       <div style="margin-left:auto" class="row">
-        <button class="btn soft" id="btnMoThuMuc">📂 Mở thư mục</button>
-        <button class="btn ghost" id="btnTaiLai">↻ Tải lại</button>
+        <button class="btn ghost" id="btnMoThuMuc"><svg class="i"><use href="#i-fopen"/></svg>Mở thư mục</button>
+        <button class="btn ghost" id="btnTaiLai"><svg class="i"><use href="#i-refresh"/></svg>Tải lại</button>
       </div>
     </div>
-    <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);gap:10px">
-      <label class="row" style="gap:8px;margin:0;color:var(--ink);font-size:15px"><input type="checkbox" id="tdyBat" style="width:20px;height:20px"> 🤖 Tự duyệt theo điểm giám khảo</label>
-      <span class="note">Đạt (✅) khi điểm ≥</span><input type="number" id="tdyDat" min="0" max="10" step="0.5" value="7" style="width:80px">
-      <span class="note">· Tự bỏ (❌) khi điểm &lt;</span><input type="number" id="tdyBo" min="0" max="10" step="0.5" value="0" style="width:80px"><span class="note">(0 = không tự bỏ)</span>
-      <button class="btn go" id="btnTdy" style="padding:10px 16px;font-size:15px">💾 Lưu &amp; áp dụng</button>
-      <button class="btn soft" id="btnLamLaiAll" style="padding:10px 16px;font-size:15px">🔁 Làm lại các video ❌ (theo góp ý)</button>
+    <hr class="sep">
+    <div class="row" style="gap:12px 18px">
+      <label class="tg"><input type="checkbox" id="tdyBat" class="sw"> Tự duyệt theo điểm giám khảo</label>
+      <span class="inl">Đạt khi điểm ≥ <input type="number" id="tdyDat" min="0" max="10" step="0.5" value="7"></span>
+      <span class="inl">Tự bỏ khi điểm &lt; <input type="number" id="tdyBo" min="0" max="10" step="0.5" value="0"> <span>(0 = không tự bỏ)</span></span>
+      <div class="row" style="gap:8px;margin-left:auto">
+        <button class="btn go" id="btnTdy"><svg class="i"><use href="#i-save"/></svg>Lưu &amp; áp dụng</button>
+        <button class="btn soft" id="btnLamLaiAll"><svg class="i"><use href="#i-repeat"/></svg>Làm lại các video đã bỏ (theo góp ý)</button>
+      </div>
     </div>
-    <p class="note" style="margin:8px 0 0">Tự duyệt chỉ áp cho video anh CHƯA đánh giá, không đè đánh giá tay. Làm lại: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý anh ghi; bản cũ cất vào _ban-chua-dat.</p>
-    <p class="note" style="margin:12px 0 0">Bấm vào video để xem to. ✅ Ưng / ❌ Bỏ kèm một dòng góp ý → ê-kíp AI đọc sổ gu này ở mọi lần làm sau.</p>
+    <p class="note" style="margin:12px 0 0">Tự duyệt chỉ áp cho video anh CHƯA đánh giá, không đè đánh giá tay. Làm lại: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý anh ghi; bản cũ cất vào _ban-chua-dat.</p>
   </div>
   <div class="vids" id="vids"></div>
 </section>
@@ -386,193 +572,199 @@ input.pick{background:var(--panel);cursor:default}
 <section id="sp" class="hidden">
   <!-- 3 màn: danh sách (mặc định) · thêm sản phẩm mới · chi tiết 1 sản phẩm (JS: spXem / moChiTiet / ctMo) -->
   <div id="spDs">
-    <div class="card">
-      <div class="dau">
-        <div><h2 style="margin:0"><span class="ic">📦</span> Sản phẩm</h2><div class="note" id="tqTom" style="margin-top:4px"></div></div>
-        <div class="row" style="gap:8px"><button class="btn ghost" id="btnTqMoi">↻ Đếm lại</button>
-          <button class="btn go" id="btnMoThem">＋ Thêm sản phẩm mới</button></div>
-      </div>
-      <div class="tbl-wrap"><table class="tbl" id="tqBang"></table></div>
-      <p class="note" style="margin:12px 0 0">Bấm vào một sản phẩm để sửa quà tặng, sự thật, kho cảnh và ảnh. Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được) — video gốc và video đã làm KHÔNG bị xoá.</p>
+    <div class="ph">
+      <div><h1>Sản phẩm &amp; quà</h1><p id="tqTom">Đang tải…</p></div>
+      <div class="act"><button class="btn ghost" id="btnTqMoi"><svg class="i"><use href="#i-refresh"/></svg>Đếm lại</button>
+        <button class="btn go" id="btnMoThem"><svg class="i"><use href="#i-plus"/></svg>Thêm sản phẩm mới</button></div>
     </div>
+    <div class="sp-grid" id="tqBang"></div>
+    <p class="note" style="margin:18px 0 0;display:flex;gap:8px;align-items:flex-start"><svg class="i" style="margin-top:2px"><use href="#i-info"/></svg><span>Bấm vào một sản phẩm để sửa quà tặng, sự thật, kho cảnh và ảnh. Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được) — video gốc và video đã làm KHÔNG bị xoá.</span></p>
   </div>
 
   <div id="spThem" class="hidden">
-    <button type="button" class="lui" data-ve="ds">← Danh sách sản phẩm</button>
-    <div class="card khung-hep"><h2><span class="ic">➕</span> Thêm sản phẩm mới</h2>
-      <p class="note" style="margin:-6px 0 16px">Điền từ trên xuống. Tạo xong, app mở trang của sản phẩm để anh điền quà tặng, sự thật rồi học cảnh.</p>
-      <div style="margin-bottom:12px"><label>Loại</label>
+    <button type="button" class="lui" data-ve="ds"><svg class="i"><use href="#i-left"/></svg>Danh sách sản phẩm</button>
+    <div class="card khung-hep">
+      <div class="ch"><span class="chip"><svg class="i"><use href="#i-plus"/></svg></span>
+        <div class="t"><h2>Thêm sản phẩm mới</h2><p class="sub">Điền từ trên xuống. Tạo xong, app mở trang của sản phẩm để anh điền quà tặng, sự thật rồi học cảnh.</p></div></div>
+      <div style="margin-bottom:16px"><label for="mLoai">Loại</label>
         <select id="mLoai"><option value="ban">Sản phẩm bán (làm video bán hàng)</option><option value="kho-chung">Kho cảnh chung (chỉ cho sản phẩm khác mượn cảnh)</option></select></div>
-      <div id="mShopBox" style="margin-bottom:12px"><label>① Chọn sản phẩm từ TikTok Shop</label>
+      <div id="mShopBox" style="margin-bottom:16px"><label>① Chọn sản phẩm từ TikTok Shop</label>
         <div id="mShopLuoi"></div>
         <div class="shop-chon hidden" id="mShopChon"></div>
-        <div class="note" style="margin-top:6px"><a href="#" id="mTay">Không có trên Shop? Thêm tay</a></div></div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
-        <div><label id="mTenNhan">Tên gọi trong video</label><input type="text" id="mTenSp" placeholder="vd. Đạm cá Toàn Cầu"></div>
-        <div id="mDocWrap"><label>Cách đọc tên (nếu có chữ/số khó đọc)</label><input type="text" id="mDoc" placeholder="vd. TC01=Tê Xê Không Một"></div>
+        <div class="note" style="margin-top:8px"><a href="#" id="mTay">Không có trên Shop? Thêm tay</a></div></div>
+      <div class="grid g2e" style="gap:16px">
+        <div><label id="mTenNhan" for="mTenSp">Tên gọi trong video</label><input type="text" id="mTenSp" placeholder="vd. Đạm cá Toàn Cầu"></div>
+        <div id="mDocWrap"><label for="mDoc">Cách đọc tên (nếu có chữ/số khó đọc)</label><input type="text" id="mDoc" placeholder="vd. TC01=Tê Xê Không Một"></div>
       </div>
-      <div style="margin-top:12px"><label id="mKhoNhan">② Thư mục kho video</label>
+      <div style="margin-top:16px"><label id="mKhoNhan" for="mKho">② Thư mục kho video</label>
         <div class="row nowrap" style="gap:10px"><input type="text" id="mKho" class="pick" placeholder="Bấm &quot;Chọn thư mục&quot; bên cạnh" style="flex:1;min-width:0">
-          <button class="btn soft" id="btnMKho" style="white-space:nowrap">📁 Chọn thư mục</button></div></div>
-      <div style="margin-top:12px" id="mAnhTay" class="hidden"><label>Ảnh sản phẩm (để dễ nhận ra)</label>
-        <div class="row nowrap" style="gap:14px"><span id="mAnhXem"><span class="sp-anh lg rong">📦</span></span>
-          <div><div class="row" style="gap:8px"><button class="btn soft" id="btnMAnhFile" style="padding:10px 14px;font-size:15px">🖼 Chọn ảnh</button>
-            <button class="btn soft" id="btnMAnhVid" style="padding:10px 14px;font-size:15px">🎞 Lấy ảnh từ video</button></div>
-            <div class="note" style="margin-top:6px">Không chọn cũng được — hub tự lấy 1 khung hình từ video. <a href="#" id="mShopLai">← Chọn từ TikTok Shop</a></div></div></div></div>
-      <div class="row" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><button class="btn go" id="btnTaoSp">➕ Tạo sản phẩm</button>
+          <button class="btn ghost" id="btnMKho"><svg class="i"><use href="#i-folder"/></svg>Chọn thư mục</button></div></div>
+      <div style="margin-top:16px" id="mAnhTay" class="hidden"><label>Ảnh sản phẩm (để dễ nhận ra)</label>
+        <div class="row nowrap" style="gap:16px"><span id="mAnhXem"><span class="sp-anh lg rong"><svg class="i"><use href="#i-pkg"/></svg></span></span>
+          <div><div class="row" style="gap:8px"><button class="btn ghost" id="btnMAnhFile"><svg class="i"><use href="#i-image"/></svg>Chọn ảnh</button>
+            <button class="btn ghost" id="btnMAnhVid"><svg class="i"><use href="#i-film"/></svg>Lấy ảnh từ video</button></div>
+            <div class="note" style="margin-top:8px">Không chọn cũng được — hub tự lấy 1 khung hình từ video. <a href="#" id="mShopLai">← Chọn từ TikTok Shop</a></div></div></div></div>
+      <div class="row" style="margin-top:22px;padding-top:18px;border-top:1px solid var(--line)"><button class="btn go" id="btnTaoSp"><svg class="i"><use href="#i-plus"/></svg>Tạo sản phẩm</button>
         <button type="button" class="btn ghost" data-ve="ds">Huỷ</button>
         <span class="note" id="mGhiChu">Tạo xong: điền sự thật + quà tặng → bấm "Chuẩn bị kho".</span></div>
     </div>
   </div>
 
   <div id="spCt" class="hidden">
-    <button type="button" class="lui" data-ve="ds">← Danh sách sản phẩm</button>
+    <button type="button" class="lui" data-ve="ds"><svg class="i"><use href="#i-left"/></svg>Danh sách sản phẩm</button>
     <div class="card ct-dau">
-      <div class="row nowrap" style="gap:14px;min-width:0;flex:1 1 320px"><span id="spAnh"></span>
-        <div style="min-width:0"><h2 id="spTenCt" style="margin:0">…</h2><div class="row" id="spTtCt" style="gap:6px;margin-top:6px"></div></div></div>
+      <div class="row nowrap" style="gap:16px;min-width:0;flex:1 1 360px"><span id="spAnh"></span>
+        <div style="min-width:0"><h2 id="spTenCt" style="margin:0">…</h2><div class="row" id="spTtCt" style="gap:8px;margin-top:8px"></div></div></div>
       <div class="row" style="gap:8px">
         <span class="note">Chuyển sang</span><select id="spSua" title="Chuyển sang sản phẩm khác" style="width:220px"></select>
-        <button class="btn go" id="btnLuuSp">💾 Lưu thay đổi</button></div>
+        <button class="btn go" id="btnLuuSp"><svg class="i"><use href="#i-save"/></svg>Lưu thay đổi</button></div>
     </div>
     <div class="subtabs" id="spTabs" role="tablist">
-      <button type="button" data-ct="tt" class="on">Thông tin &amp; quà</button>
-      <button type="button" data-ct="kc">Kho cảnh</button>
-      <button type="button" data-ct="shop">Ảnh &amp; sản phẩm Shop</button>
-      <button type="button" data-ct="hq">Hiệu quả</button>
+      <button type="button" data-ct="tt" class="on"><svg class="i"><use href="#i-gift"/></svg>Thông tin &amp; quà</button>
+      <button type="button" data-ct="kc"><svg class="i"><use href="#i-layers"/></svg>Kho cảnh</button>
+      <button type="button" data-ct="shop"><svg class="i"><use href="#i-bag"/></svg>Ảnh &amp; sản phẩm Shop</button>
+      <button type="button" data-ct="hq"><svg class="i"><use href="#i-trend"/></svg>Hiệu quả</button>
     </div>
 
     <!-- THÔNG TIN & QUÀ -->
     <div class="card" id="ctTt">
-      <div class="warnbox hidden" id="spChungNote" style="background:var(--green-soft);color:var(--green)">Kho cảnh chung: chỉ để sản phẩm khác mượn cảnh khi làm video. Không bán, không quà tặng, không có lời nói. Thư mục kho nằm ở mục "Kho cảnh".</div>
-      <label class="row hidden" id="spChungMd" style="gap:8px;margin:12px 0 0;color:var(--ink);font-size:15px"><input type="checkbox" id="spTron" style="width:20px;height:20px"> Tự trộn vào video của mọi sản phẩm (khi anh chưa chọn kho phụ)</label>
-      <div class="grid g2" id="spBan1">
-        <div><h3><span class="ic">🎁</span> Quà tặng chương trình <span class="note">(mỗi dòng 1 mức)</span></h3>
+      <div class="warnbox hidden" id="spChungNote" style="background:var(--green-soft);color:var(--green);border-color:color-mix(in srgb,var(--green) 25%,transparent)">Kho cảnh chung: chỉ để sản phẩm khác mượn cảnh khi làm video. Không bán, không quà tặng, không có lời nói. Thư mục kho nằm ở mục "Kho cảnh".</div>
+      <label class="tg hidden" id="spChungMd" style="margin-top:14px"><input type="checkbox" id="spTron" class="sw"> Tự trộn vào video của mọi sản phẩm (khi anh chưa chọn kho phụ)</label>
+      <div class="grid g2e" id="spBan1">
+        <div><div class="ch" style="margin-bottom:12px"><span class="chip"><svg class="i"><use href="#i-gift"/></svg></span><div class="t"><h3 style="margin:0">Quà tặng chương trình</h3><p class="sub">Mỗi dòng 1 mức</p></div></div>
           <textarea id="qua" style="min-height:190px" placeholder="Mua 1 chai: tặng 1 gói siêu kali bo"></textarea>
           <p class="note">Biên kịch chỉ được nói đúng các mức quà ở đây. Đổi quà (vd. Nano Lân) thì sửa rồi bấm Lưu. Không ghi giá.</p></div>
-        <div><h3><span class="ic">🚫</span> Không được nói</h3><textarea id="cam" style="min-height:190px"></textarea></div>
+        <div><div class="ch" style="margin-bottom:12px"><span class="chip r"><svg class="i"><use href="#i-ban"/></svg></span><div class="t"><h3 style="margin:0">Không được nói</h3><p class="sub">AI tuyệt đối tránh các ý này</p></div></div>
+          <textarea id="cam" style="min-height:190px"></textarea></div>
       </div>
-      <div id="spBan3"><div class="row" style="margin-top:14px;justify-content:space-between"><h3 style="margin:0"><span class="ic">✔</span> Sự thật được nói về sản phẩm <span class="note">(anh đã xác nhận)</span></h3>
-        <button class="btn soft" id="btnDocNhan">🔍 AI đọc nhãn, điền gợi ý</button></div>
-      <p class="note">AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới. Anh kiểm, xoá dòng sai, rồi bấm Lưu.</p>
-      <textarea id="suThat" style="min-height:170px"></textarea></div>
-      <div id="spBan2" style="max-width:420px;margin-top:14px"><label>Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
+      <div id="spBan3"><hr class="sep">
+        <div class="ch" style="margin-bottom:12px"><span class="chip g"><svg class="i"><use href="#i-checkc"/></svg></span>
+          <div class="t"><h3 style="margin:0">Sự thật được nói về sản phẩm</h3><p class="sub">Anh đã xác nhận. AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới — anh kiểm, xoá dòng sai, rồi bấm Lưu.</p></div>
+          <div class="act"><button class="btn ghost" id="btnDocNhan"><svg class="i"><use href="#i-scan"/></svg>AI đọc nhãn, điền gợi ý</button></div></div>
+        <textarea id="suThat" style="min-height:170px"></textarea></div>
+      <div id="spBan2" style="max-width:440px;margin-top:18px"><label for="spGio">Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
     </div>
 
     <!-- KHO CẢNH -->
     <div id="ctKc" class="hidden">
       <div class="card">
-        <h3>Thư mục kho video</h3>
-        <div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn soft" id="btnSKho" style="white-space:nowrap">📁 Chọn thư mục</button></div>
-        <p class="note" style="margin:8px 0 0">Đổi thư mục xong nhớ bấm <b>💾 Lưu thay đổi</b> ở trên.</p>
+        <div class="ch"><span class="chip"><svg class="i"><use href="#i-folder"/></svg></span><div class="t"><h3 style="margin:0">Thư mục kho video</h3><p class="sub">Đổi thư mục xong nhớ bấm <b>Lưu thay đổi</b> ở trên.</p></div></div>
+        <div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn ghost" id="btnSKho"><svg class="i"><use href="#i-folder"/></svg>Chọn thư mục</button></div>
       </div>
-      <div class="card" style="margin-top:14px">
-        <h3>Cảnh trong kho</h3>
-        <div class="row nowrap" style="gap:14px;align-items:flex-start"><span id="khoAnh" class="hidden"></span><div id="khoInfo" class="note" style="min-width:0">Đang tải…</div></div>
-        <div class="row" style="margin-top:14px"><button class="btn go" id="btnHoc">🧠 Học cảnh</button>
-          <button class="btn soft" id="btnKho">🧩 Chuẩn bị kho (nạp cảnh + AI soát)</button>
-          <button class="btn soft" id="btnKiem">🩺 Kiểm định dạng</button>
-          <button class="btn ghost" id="btnAgy2" title="Trạng thái Antigravity / model" style="padding:8px 12px;font-size:14px">⚙ Antigravity</button></div>
-        <div id="hocBox" class="hidden" style="margin-top:12px"><div class="bar"><i id="hocFill"></i></div>
+      <div class="card mt">
+        <div class="ch"><span class="chip b"><svg class="i"><use href="#i-layers"/></svg></span><div class="t"><h3 style="margin:0">Cảnh trong kho</h3><p class="sub">Học cảnh → Chuẩn bị kho → sẵn sàng làm video</p></div></div>
+        <div class="row nowrap" style="gap:16px;align-items:flex-start"><span id="khoAnh" class="hidden"></span><div id="khoInfo" class="note" style="min-width:0;flex:1">Đang tải…</div></div>
+        <div class="row" style="margin-top:18px;gap:8px"><button class="btn go" id="btnHoc"><svg class="i"><use href="#i-cap"/></svg>Học cảnh</button>
+          <button class="btn ghost" id="btnKho"><svg class="i"><use href="#i-layers"/></svg>Chuẩn bị kho (nạp cảnh + AI soát)</button>
+          <button class="btn ghost" id="btnKiem"><svg class="i"><use href="#i-shield"/></svg>Kiểm định dạng</button>
+          <button class="btn ghost sm" id="btnAgy2" title="Trạng thái Antigravity / model"><svg class="i"><use href="#i-cog"/></svg>Antigravity</button></div>
+        <div id="hocBox" class="hidden" style="margin-top:14px"><div class="bar"><i id="hocFill"></i></div>
           <p class="note" id="hocText" style="margin:8px 0 0"></p></div>
-        <div id="hocSetup" class="hidden khung" style="margin-top:12px">
+        <div id="hocSetup" class="hidden khung" style="margin-top:14px">
           <div class="row nowrap" style="gap:10px"><b id="agyTt" style="flex:1">Antigravity: …</b>
-            <button class="btn soft hidden" id="btnAgyMo" style="padding:8px 14px;font-size:14px">Mở Antigravity</button>
-            <select id="hsModel" title="Model học cảnh" style="max-width:170px"></select>
-            <button class="btn ghost" id="btnHsDong" title="Thu gọn" style="padding:4px 10px;font-size:14px">✕</button></div>
+            <button class="btn ghost sm hidden" id="btnAgyMo">Mở Antigravity</button>
+            <select id="hsModel" title="Model học cảnh" style="max-width:190px;height:32px"></select>
+            <button class="btn ghost sm ic-only" id="btnHsDong" title="Thu gọn"><svg class="i"><use href="#i-x"/></svg></button></div>
         </div>
         <div id="hocLoi" class="note" style="margin-top:6px"></div>
-        <div id="kdBox" class="hidden khung" style="margin-top:12px"></div>
+        <div id="kdBox" class="hidden khung" style="margin-top:14px"></div>
         <ol class="note buoc-ds">
           <li><b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
             <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</li>
           <li><b>Chuẩn bị kho</b>: nạp cảnh đã mô tả vào kho và cho AI soát lại. Học cảnh xong hub tự chạy bước này; bấm tay khi anh làm tay bằng Antigravity hoặc tự sửa mô tả.</li>
           <li><b>Kiểm định dạng</b>: soát các bản mô tả, báo file hỏng / video thiếu mô tả và đề nghị sửa (giữ bản gốc). Dùng khi chuẩn bị kho báo lỗi.</li>
         </ol>
-        <div class="note" id="khoBuoc" style="margin-top:12px"></div>
-        <div class="log" id="khoLog" style="height:140px;margin-top:8px"></div>
+        <div class="note" id="khoBuoc" style="margin-top:14px"></div>
+        <div class="log" id="khoLog" style="height:160px;margin-top:8px"></div>
       </div>
     </div>
 
     <!-- ẢNH & SẢN PHẨM SHOP -->
     <div class="card hidden" id="ctShop">
-      <h3>Ảnh sản phẩm</h3>
-      <p class="note" style="margin-top:0">Ảnh chỉ để anh dễ nhận ra sản phẩm trong app. Đổi ảnh có hiệu lực ngay, không cần bấm Lưu.</p>
-      <div class="row" style="gap:8px"><button class="btn soft" id="btnSAnhFile">🖼 Chọn ảnh từ máy</button>
-        <button class="btn soft" id="btnSAnhVid">🎞 Lấy ảnh từ video</button>
-        <button class="btn soft" id="btnSAnhShop">🛍 Lấy ảnh từ TikTok Shop</button></div>
-      <div class="note" id="spShopGan" style="margin-top:14px"></div>
-      <div id="sShopBox" class="hidden" style="margin-top:12px"><div id="sShopLuoi"></div></div>
+      <div class="ch"><span class="chip"><svg class="i"><use href="#i-image"/></svg></span><div class="t"><h3 style="margin:0">Ảnh sản phẩm</h3><p class="sub">Ảnh chỉ để anh dễ nhận ra sản phẩm trong app. Đổi ảnh có hiệu lực ngay, không cần bấm Lưu.</p></div></div>
+      <div class="row" style="gap:8px"><button class="btn ghost" id="btnSAnhFile"><svg class="i"><use href="#i-image"/></svg>Chọn ảnh từ máy</button>
+        <button class="btn ghost" id="btnSAnhVid"><svg class="i"><use href="#i-film"/></svg>Lấy ảnh từ video</button>
+        <button class="btn ghost" id="btnSAnhShop"><svg class="i"><use href="#i-bag"/></svg>Lấy ảnh từ TikTok Shop</button></div>
+      <div class="note" id="spShopGan" style="margin-top:16px"></div>
+      <div id="sShopBox" class="hidden" style="margin-top:14px"><div id="sShopLuoi"></div></div>
     </div>
     <!-- HIỆU QUẢ: số liệu thật TikTok nuôi biên kịch & đạo diễn -->
     <div class="card hidden" id="ctHq">
-      <h3>Video nào ăn khách</h3>
-      <p class="note" style="margin-top:0">App tự lấy lượt xem 24 giờ của video đã đăng, so theo góc bán, dạng bài, gu đạo diễn và câu mở. Khi đủ số liệu, biên kịch và đạo diễn AI đọc phần tóm tắt dưới đây để làm video sau tốt hơn (chỉ là gợi ý, vẫn giữ đa dạng).</p>
+      <div class="ch"><span class="chip g"><svg class="i"><use href="#i-trend"/></svg></span><div class="t"><h3 style="margin:0">Video nào ăn khách</h3><p class="sub">App tự lấy lượt xem 24 giờ của video đã đăng, so theo góc bán, dạng bài, gu đạo diễn và câu mở. Khi đủ số liệu, biên kịch và đạo diễn AI đọc phần tóm tắt dưới đây để làm video sau tốt hơn (chỉ là gợi ý, vẫn giữ đa dạng).</p></div></div>
       <div id="hqTrang" class="note">Đang tải…</div>
-      <div id="hqTop" style="margin-top:12px"></div>
-      <h3 style="margin-top:16px">Đang gửi cho AI</h3>
-      <pre id="hqTxt" class="note" style="white-space:pre-wrap;margin:0;font-family:inherit"></pre>
+      <div id="hqTop" style="margin-top:14px"></div>
+      <h3 style="margin-top:20px">Đang gửi cho AI</h3>
+      <pre id="hqTxt" class="cap note" style="margin:0;font-family:inherit"></pre>
     </div>
   </div>
 </section>
 
 <!-- GU -->
 <section id="gu" class="hidden">
-  <div class="grid g2">
-    <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Sổ gu của anh</h2>
-      <button class="btn go" id="btnLuuGu">💾 Lưu</button></div>
-      <p class="note">Ghi điều anh thích / không thích. Biên kịch, đạo diễn và giám khảo đều đọc trước khi làm.</p>
-      <textarea id="soGu" style="min-height:420px" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
-    <div class="card"><h2>Bài học giám khảo tự ghi</h2>
-      <p class="note">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn tránh lặp lại.</p>
-      <div class="cap" id="baiHoc" style="min-height:420px"></div></div>
+  <div class="ph"><div><h1>Gu &amp; bài học</h1><p>Điều anh thích / không thích và lỗi giám khảo đã bắt — ê-kíp AI đọc trước mỗi lần làm.</p></div></div>
+  <div class="grid g2e">
+    <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-heart"/></svg></span>
+      <div class="t"><h2>Sổ gu của anh</h2><p class="sub">Biên kịch, đạo diễn và giám khảo đều đọc trước khi làm.</p></div>
+      <div class="act"><button class="btn go" id="btnLuuGu"><svg class="i"><use href="#i-save"/></svg>Lưu</button></div></div>
+      <textarea id="soGu" style="min-height:440px" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
+    <div class="card"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-book"/></svg></span>
+      <div class="t"><h2>Bài học giám khảo tự ghi</h2><p class="sub">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn tránh lặp lại.</p></div></div>
+      <div class="cap" id="baiHoc" style="min-height:440px;max-height:640px;overflow:auto"></div></div>
   </div>
 </section>
 
 <!-- CÀI ĐẶT -->
 <section id="cd" class="hidden">
-  <div class="grid g2">
-    <div class="card" style="grid-column:1/-1"><div class="row" style="justify-content:space-between">
-      <h2 style="margin:0"><span class="ic">🔑</span> Tài khoản Claude (hub tự chuyển tài khoản còn dư)</h2>
-      <div class="row"><button class="btn ghost" id="btnKiemTk">↻ Làm mới</button><button class="btn soft" id="btnThemTk">➕ Thêm tài khoản</button></div></div>
-      <div id="tkChiTiet" style="margin-top:12px" class="note">Đang kiểm…</div>
-      <p class="note">Mỗi tài khoản đăng nhập riêng: bấm 🔑 Đăng nhập → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
+  <div class="ph"><div><h1>Cài đặt</h1><p>Tài khoản AI, khoá giọng đọc, nhạc và ổ đĩa của xưởng.</p></div></div>
+  <div class="grid g2e">
+    <div class="card" style="grid-column:1/-1">
+      <div class="ch"><span class="chip"><svg class="i"><use href="#i-key"/></svg></span>
+        <div class="t"><h2>Tài khoản Claude</h2><p class="sub">Hub tự chuyển sang tài khoản còn dư hạn mức.</p></div>
+        <div class="act"><button class="btn ghost" id="btnKiemTk"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnThemTk"><svg class="i"><use href="#i-plus"/></svg>Thêm tài khoản</button></div></div>
+      <div id="tkChiTiet" class="note">Đang kiểm…</div>
+      <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
         Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
         tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi cả 3 đều hết.</p>
     </div>
-    <div class="card"><h2><span class="ic">🔗</span> Kết nối app TikTok Auto Kid</h2>
-      <div class="note">Kết nối tự động, không cần nhập gì. Cổng nội bộ: <b id="tpDiaChi">…</b></div>
+    <div class="card"><div class="ch"><span class="chip b"><svg class="i"><use href="#i-link"/></svg></span>
+      <div class="t"><h2>Kết nối app TikTok Auto Kid</h2><p class="sub">Kết nối tự động, không cần nhập gì.</p></div></div>
+      <div class="kpath"><svg class="i"><use href="#i-pin"/></svg>Cổng nội bộ: <b id="tpDiaChi">…</b></div>
       <p class="note">App chỉ lấy video anh đã bấm ✅ Ưng và chưa đăng. Đăng xong / lỗi đăng sẽ hiện ngay trong Kho video.</p>
     </div>
-    <div class="card"><h2><span class="ic">💾</span> Ổ đĩa</h2>
+    <div class="card"><div class="ch"><span class="chip n"><svg class="i"><use href="#i-drive"/></svg></span>
+      <div class="t"><h2>Ổ đĩa</h2><p class="sub">Dung lượng video thành phẩm theo ngày</p></div></div>
       <div id="oDia" class="note">Đang tính…</div>
       <p class="note">Hub tự dọn file tạm (bản dựng dở, giọng cũ hơn 7 ngày, bản giám khảo chưa đạt cũ hơn 5 ngày) sau mỗi lô và mỗi lần mở app.
         Video thành phẩm KHÔNG bao giờ tự xoá — ngày nào đã đăng xong anh tự chép ra ổ khác hoặc xoá.</p>
     </div>
-    <div class="card" style="grid-column:1/-1"><h2><span class="ic">🎵</span> Nhạc &amp; âm thanh</h2>
-      <div id="nhMacDinh" class="row" style="justify-content:space-between;gap:12px"><span class="note">Đang kiểm…</span></div>
+    <div class="card" style="grid-column:1/-1"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-music"/></svg></span>
+      <div class="t"><h2>Nhạc &amp; âm thanh</h2><p class="sub">Kho mặc định + thư mục nhạc / SFX của anh</p></div></div>
+      <div id="nhMacDinh" class="row khung" style="justify-content:space-between;gap:12px"><span class="note">Đang kiểm…</span></div>
       <div id="nhTai" class="note hidden" style="margin-top:8px"></div>
-      <div class="grid g2" style="margin-top:14px;gap:18px">
+      <div class="grid g2e" style="margin-top:18px;gap:20px">
         <div><label>Thư mục nhạc của tôi</label><div id="nhDsNhac"></div>
-          <button class="btn soft" id="btnNhacThem" style="margin-top:8px">📁 Chọn thư mục</button></div>
+          <button class="btn ghost" id="btnNhacThem" style="margin-top:4px"><svg class="i"><use href="#i-folder"/></svg>Chọn thư mục</button></div>
         <div><label>Thư mục âm thanh (SFX) của tôi</label><div id="nhDsSfx"></div>
-          <button class="btn soft" id="btnSfxThem" style="margin-top:8px">📁 Chọn thư mục</button></div>
+          <button class="btn ghost" id="btnSfxThem" style="margin-top:4px"><svg class="i"><use href="#i-folder"/></svg>Chọn thư mục</button></div>
       </div>
       <p class="note">Hub chọn nhạc/âm thanh từ kho mặc định + mọi thư mục đang bật. Nhạc của anh không có nhãn nên coi là "chung" (hợp mọi kiểu video), chỉ dùng bài dài từ 40 giây.
         SFX được xếp nhóm theo tên thư mục con hoặc tên file (whoosh, impact, click, ding, coin…); file không đoán được thì bỏ qua. Hỗ trợ mp3, wav, m4a, ogg, flac.</p>
     </div>
-    <div class="card"><h2><span class="ic">🎙</span> Khoá ElevenLabs (giọng đọc)</h2>
+    <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
+      <div class="t"><h2>Khoá ElevenLabs (giọng đọc)</h2><p class="sub">Bắt buộc để làm video</p></div></div>
       <div class="note" id="kgTrangThai">Đang kiểm…</div>
-      <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input type="password" id="kgKhoa" placeholder="Dán khoá API ElevenLabs vào đây" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
-        <button class="btn go" id="btnLuuKg">💾 Lưu khoá</button></div>
-      <p class="note">Bắt buộc để làm video (giọng đọc). Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
+      <div class="row nowrap" style="margin-top:12px;gap:8px"><input type="password" id="kgKhoa" placeholder="Dán khoá API ElevenLabs vào đây" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
+        <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
+      <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
     </div>
-    <div class="card"><h2>Chất lượng AI</h2>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px">
-        <div><label>Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
-        <div><label>Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
-        <div><label>Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
+    <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
+      <div class="t"><h2>Chất lượng AI</h2><p class="sub">Model, mức suy nghĩ và số đạo diễn mỗi lời đọc</p></div></div>
+      <div class="grid g2e" style="gap:16px">
+        <div><label for="cdModel">Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
+        <div><label for="cdEffort">Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
+        <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
       </div>
-      <div class="row" style="margin-top:14px"><button class="btn go" id="btnLuuCd">💾 Lưu cài đặt</button></div>
+      <div class="row" style="margin-top:18px"><button class="btn go" id="btnLuuCd"><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
     </div>
   </div>
 </section>
@@ -581,38 +773,39 @@ input.pick{background:var(--panel);cursor:default}
 <div class="modal" id="modal"><div class="mbox">
   <video id="mVideo" controls playsinline></video>
   <div class="mside">
-    <button class="x" id="mDong">✕ Đóng</button>
-    <div class="t" id="mTen" style="font-weight:900;font-size:17px"></div>
-    <div id="mPills" class="row"></div>
+    <button class="btn ghost sm x" id="mDong"><svg class="i"><use href="#i-x"/></svg>Đóng</button>
+    <div class="t" id="mTen" style="font-weight:600;font-size:16px;letter-spacing:-.01em;word-break:break-all"></div>
+    <div id="mPills" class="row" style="gap:6px"></div>
     <div><h3>Caption để đăng</h3><div class="cap" id="mCap"></div>
-      <div class="row" style="margin-top:8px"><button class="btn soft" id="mCopy">📋 Chép caption</button>
-        <a class="btn ghost" id="mBia" download>🖼 Tải ảnh bìa</a></div></div>
+      <div class="row" style="margin-top:10px;gap:8px"><button class="btn ghost sm" id="mCopy"><svg class="i"><use href="#i-copy"/></svg>Chép caption</button>
+        <a class="btn ghost sm" id="mBia" download><svg class="i"><use href="#i-dl"/></svg>Tải ảnh bìa</a></div></div>
     <div id="mGk"></div>
     <div><h3>Đánh giá của anh</h3>
       <textarea id="mGop" style="min-height:80px" placeholder="Góp ý 1 dòng (không bắt buộc): vd. mở đầu chậm, cảnh rễ đẹp…"></textarea>
-      <div class="row" style="margin-top:8px"><button class="btn go" id="mOk">✅ Ưng</button><button class="btn stop" id="mNo">❌ Bỏ</button>
-        <button class="btn soft" id="mLamLai">🔁 Làm lại theo góp ý</button></div></div>
-    <details><summary class="note">Lời đọc</summary><div class="note" id="mLoi"></div></details>
+      <div class="row" style="margin-top:10px;gap:8px"><button class="btn go" id="mOk"><svg class="i"><use href="#i-up"/></svg>Ưng</button><button class="btn stop" id="mNo"><svg class="i"><use href="#i-down"/></svg>Bỏ</button>
+        <button class="btn ghost" id="mLamLai"><svg class="i"><use href="#i-repeat"/></svg>Làm lại theo góp ý</button></div></div>
+    <details><summary class="note">Lời đọc</summary><div class="note" id="mLoi" style="margin-top:8px"></div></details>
   </div>
 </div></div>
 <div class="modal" id="tmModal"><div class="tmbox">
-  <h2 id="tmTieuDe"><span class="ic">📁</span> Chọn thư mục kho video</h2>
+  <div class="ch"><span class="chip"><svg class="i"><use href="#i-folder"/></svg></span><div class="t"><h2 id="tmTieuDe">Chọn thư mục kho video</h2></div></div>
   <div class="tmcrumb" id="tmCrumb"></div>
   <div class="tmds" id="tmDs"></div>
   <div class="note" id="tmInfo"></div>
-  <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="tmDong">Đóng</button>
-    <button class="btn go" id="tmChon" disabled>✔ Chọn thư mục này</button></div>
+  <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="tmDong">Đóng</button>
+    <button class="btn go" id="tmChon" disabled><svg class="i"><use href="#i-check"/></svg>Chọn thư mục này</button></div>
 </div></div>
 <div class="toast" id="toast"></div>
-
 <script>
 const $ = s => document.querySelector(s);
 const api = (u, b) => fetch(u, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}).then(r => r.json());
 const toast = t => { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 2600); };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 // ---------- ẢNH SẢN PHẨM
-const anhSp = (u, c = '') => u ? `<img class="sp-anh ${c}" src="${esc(u)}" alt="" loading="lazy" onerror="anhLoi(this)">` : `<span class="sp-anh rong ${c}">📦</span>`;
-function anhLoi(i) { const s = document.createElement('span'); s.className = i.className + ' rong'; s.textContent = '📦'; i.replaceWith(s); }
+const ic = (n, c = '') => `<svg class="i${c ? ' ' + c : ''}"><use href="#i-${n}"/></svg>`;   // biểu tượng SVG (sprite đầu <body>)
+const rong = (icon, tieu, mo) => `<div class="empty"><div class="ei">${ic(icon)}</div><b>${tieu}</b>${mo ? `<span>${mo}</span>` : ''}</div>`;
+const anhSp = (u, c = '') => u ? `<img class="sp-anh ${c}" src="${esc(u)}" alt="" loading="lazy" onerror="anhLoi(this)">` : `<span class="sp-anh rong ${c}">${ic('pkg')}</span>`;
+function anhLoi(i) { const s = document.createElement('span'); s.className = i.className + ' rong'; s.innerHTML = ic('pkg'); i.replaceWith(s); }
 const urlAnh = ma => ma ? ((((typeof ST !== 'undefined' && ST.san_pham) || []).find(p => p.ma === ma) || {}).anh || '/api/anh-sp/' + ma) : '';
 // ---------- DÙNG THÊM CẢNH TỪ KHO KHÁC (kho phụ)
 const KT = {ma: null};
@@ -666,26 +859,26 @@ function chonFileAnh() {
 }
 // ---------- TRÌNH CHỌN THƯ MỤC
 const TM = {cb: null, cur: '', am: false};
-function moThuMuc(giaTri, cb, am) { TM.cb = cb; TM.am = !!am; $('#tmTieuDe').textContent = am ? '📁 Chọn thư mục nhạc / âm thanh' : '📁 Chọn thư mục kho video'; $('#tmModal').classList.add('on'); tmTai((giaTri || '').trim() || undefined); }
+function moThuMuc(giaTri, cb, am) { TM.cb = cb; TM.am = !!am; $('#tmTieuDe').textContent = am ? 'Chọn thư mục nhạc / âm thanh' : 'Chọn thư mục kho video'; $('#tmModal').classList.add('on'); tmTai((giaTri || '').trim() || undefined); }
 async function tmTai(p) {
-  $('#tmDs').innerHTML = '<div class="note" style="padding:14px">⏳ Đang mở…</div>'; $('#tmChon').disabled = true;
+  $('#tmDs').innerHTML = '<div style="padding:12px;display:grid;gap:8px">' + '<div class="skel" style="height:22px"></div>'.repeat(6) + '</div>'; $('#tmChon').disabled = true;
   let r;
   try { r = await api('/api/thu-muc' + (p === undefined ? '' : '?p=' + encodeURIComponent(p))); } catch (e) { r = {ok: false, loi: 'Không kết nối được app.'}; }
   TM.cur = r.ok && !r.la_o_dia ? r.duong_dan : '';
   const nut = (t, d) => `<button data-p="${esc(d)}">${esc(t)}</button>`;
-  $('#tmCrumb').innerHTML = nut('💽 Các ổ đĩa', '@') + (r.duong || []).map(x => '<span class="note">›</span>' + nut(x.ten, x.duong_dan)).join('');
+  $('#tmCrumb').innerHTML = `<button data-p="@">${ic('drive')}Các ổ đĩa</button>` + (r.duong || []).map(x => '<span class="note">›</span>' + nut(x.ten, x.duong_dan)).join('');
   let h = '';
-  if (r.cha) h += `<button class="tmit" data-p="${esc(r.cha)}"><span>⬆️</span><span class="ten">Lên thư mục trên</span></button>`;
+  if (r.cha) h += `<button class="tmit" data-p="${esc(r.cha)}">${ic('left')}<span class="ten">Lên thư mục trên</span></button>`;
   if (!r.ok) h += `<div class="errbox" style="margin:12px">${esc(r.loi || 'Không mở được.')}</div>`;
   else {
-    h += (r.muc || []).map(m => `<button class="tmit" data-p="${esc(m.duong_dan)}"><span>${r.la_o_dia ? '💽' : '📁'}</span>
+    h += (r.muc || []).map(m => `<button class="tmit" data-p="${esc(m.duong_dan)}">${ic(r.la_o_dia ? 'drive' : 'folder')}
       <span class="ten">${esc(m.ten)}${m.mo_ta ? ` <span class="note">${esc(m.mo_ta)}</span>` : ''}</span>` +
-      (m.so_video && !TM.am ? `<span class="pill g">🎥 ${m.so_video} video</span>` : '') + '</button>').join('');
-    if (!(r.muc || []).length) h += '<div class="note" style="padding:14px">Thư mục này không có thư mục con.</div>';
+      (m.so_video && !TM.am ? `<span class="pill g">${ic('video')} ${m.so_video} video</span>` : '') + '</button>').join('');
+    if (!(r.muc || []).length) h += rong('folder', 'Không có thư mục con', 'Thư mục này không có thư mục con.');
     if (r.cat_bot) h += '<div class="note" style="padding:10px 14px">Chỉ hiện 500 thư mục đầu.</div>';
   }
   $('#tmDs').innerHTML = h; $('#tmDs').scrollTop = 0;
-  $('#tmInfo').innerHTML = r.ok && !r.la_o_dia ? (TM.am ? `📍 ${esc(r.duong_dan)}` : `📍 ${esc(r.duong_dan)} — có <b>${r.so_video || 0}</b> video ngay trong thư mục này`) : (r.ok ? 'Chọn ổ đĩa rồi mở dần vào thư mục anh cần.' : '');
+  $('#tmInfo').innerHTML = r.ok && !r.la_o_dia ? (TM.am ? `${ic('pin')} ${esc(r.duong_dan)}` : `${ic('pin')} ${esc(r.duong_dan)} — có <b>${r.so_video || 0}</b> video ngay trong thư mục này`) : (r.ok ? 'Chọn ổ đĩa rồi mở dần vào thư mục anh cần.' : '');
   $('#tmChon').disabled = !TM.cur;
   document.querySelectorAll('#tmCrumb [data-p], #tmDs [data-p]').forEach(b => b.onclick = () => tmTai(b.dataset.p));
 }
@@ -736,7 +929,7 @@ async function capNhat() {
   $('#barText').textContent = chay ? `Đang làm: ${td.xong}/${td.tong} video xong${ST.chay_ngoai_app ? ' (đang chạy từ cửa sổ lệnh)' : ''}…`
     : td.da_xong ? `Lô gần nhất xong: ${td.xong}/${td.tong} video.` : (td.tong ? `Lô gần nhất dừng ở ${td.xong}/${td.tong}.` : 'Chưa chạy.');
   $('#trangThai').innerHTML = td.het_han_muc && !chay
-    ? `<div class="errbox">⛔ Hết hạn mức Claude. Vào ⚙️ Cài đặt → Đăng nhập / Đổi tài khoản, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '';
+    ? `<div class="errbox">${ic('alert')} Hết hạn mức Claude. Vào ⚙️ Cài đặt → Đăng nhập / Đổi tài khoản, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '';
   const lg = $('#log'), dinh = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
   lg.innerHTML = (ST.nhat_ky.length ? ST.nhat_ky : ['(chưa có nhật ký)']).map(l => `<div class="${mau(l)}">${esc(l)}</div>`).join('');
   if (dinh) lg.scrollTop = lg.scrollHeight;
@@ -759,24 +952,24 @@ function vach(o, nhan) {
   const qua = o.reset && o.reset * 1000 < Date.now(); const p = qua ? 0 : Math.round((o.pct || 0) * 100);
   const mau = p >= 90 ? 'var(--red)' : p >= 70 ? '#e0a100' : 'var(--green)';
   const gio = o.reset ? new Date(o.reset * 1000).toLocaleString('vi-VN', {hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'}) : '';
-  return `<div class="note" style="margin:2px 0">${nhan}: <b style="color:${mau}">${p}%</b>${gio && !qua ? ` · reset ${gio}` : ''}</div>
-    <div class="bar" style="height:8px"><i style="width:${p}%;background:${mau}"></i></div>`;
+  return `<div class="lr"><span>${nhan}${gio && !qua ? ` · reset ${gio}` : ''}</span><b style="color:${p >= 70 ? mau : ''}">${p}%</b></div>
+    <div class="bar sm"><i style="width:${p}%;${p >= 70 ? 'background:' + mau : ''}"></i></div>`;
 }
 async function taiTk(moi) {
   const ds = await api('/api/tai-khoan-ds' + (moi ? '?moi=1' : ''));
   const the = t => {
     const het = t.het_den && t.het_den * 1000 > Date.now();
-    const tt = !t.dang_nhap ? '<span class="pill r">Chưa đăng nhập</span>' : het ? `<span class="pill r">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g">Sẵn sàng</span>';
-    return `<div class="khung">
-      <div class="row" style="justify-content:space-between"><b>${esc(t.ten)}</b>${tt}</div>
-      <div class="note" style="margin:4px 0 8px">${esc(t.email || '—')} ${t.goi ? '· gói ' + esc(t.goi) : ''}</div>
+    const tt = !t.dang_nhap ? '<span class="pill r dot">Chưa đăng nhập</span>' : het ? `<span class="pill r dot">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g dot">Sẵn sàng</span>';
+    return `<div class="acc">
+      <div class="hd"><div class="who"><span class="av">${esc(String(t.ten || '?').trim().slice(-1).toUpperCase())}</span><div style="min-width:0"><b>${esc(t.ten)}</b>
+        <div class="note" style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.email || '—')} ${t.goi ? '· gói ' + esc(t.goi) : ''}</div></div></div>${tt}</div>
       ${vach(t.five_hour, 'Phiên 5 giờ')}${vach(t.seven_day, 'Cả tuần')}
-      <div class="note" style="margin:6px 0 0;font-size:12px">${t.cap_nhat ? 'cập nhật lúc ' + new Date(t.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'chưa cập nhật'}</div>
-      <div class="row" style="margin-top:10px;gap:6px">
-        <button class="btn go" style="padding:6px 10px;font-size:14px" data-dung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>▶ Dùng TK này</button>
-        <button class="btn soft" style="padding:6px 10px;font-size:14px" data-dn="${t.ma}">🔑 Đăng nhập</button>
-        <button class="btn ghost" style="padding:6px 10px;font-size:14px" data-kiem="${t.ma}">📊 Kiểm hạn mức</button>
-        <button class="btn ghost" style="padding:6px 10px;font-size:14px;color:var(--red)" data-bo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
+      <div class="note" style="margin:8px 0 0;font-size:12px">${t.cap_nhat ? 'Cập nhật lúc ' + new Date(t.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'Chưa cập nhật'}</div>
+      <div class="btns">
+        <button class="btn go sm" data-dung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${ic('play', 'f')}Dùng TK này</button>
+        <button class="btn ghost sm" data-dn="${t.ma}">${ic('login')}Đăng nhập</button>
+        <button class="btn ghost sm" data-kiem="${t.ma}">${ic('gauge')}Kiểm hạn mức</button>
+        <button class="btn ghost sm dz" style="margin-left:auto" data-bo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
   };
   const sel = $('#tkDung'), giu = ST.tai_khoan_dung || sel.value;
   sel.innerHTML = '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => {
@@ -786,9 +979,15 @@ async function taiTk(moi) {
     return `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : het ? 'HẾT hạn mức' : `5 giờ ${p ?? '?'}% · tuần ${w ?? '?'}%`}</option>`; }).join('');
   sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
   $('#tkChuyen').checked = ST.tu_chuyen !== false;
-  $('#tkChiTiet').innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${ds.map(the).join('')}</div>`;
-  $('#tkBox').innerHTML = '<h3>Tài khoản Claude</h3>' + ds.map(t => { const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
-    return `<div class="note">${esc(t.ten)}: ${t.dang_nhap ? (p === null ? 'chưa có số' : `5 giờ ${p}%` + (t.seven_day ? ` · tuần ${Math.round(t.seven_day.pct * 100)}%` : '')) : '<b style="color:var(--red)">chưa đăng nhập</b>'}</div>`; }).join('');
+  $('#tkChiTiet').innerHTML = ds.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.');
+  const mini = (p, nhan) => { const c = p === null ? '' : p >= 90 ? 'var(--red)' : p >= 70 ? '#e0a100' : '';
+    return `<div class="lr"><span>${nhan}</span><b style="color:${c}">${p === null ? '—' : p + '%'}</b></div><div class="bar sm"><i style="width:${p || 0}%;${c ? 'background:' + c : ''}"></i></div>`; };
+  $('#tkBox').innerHTML = '<div class="sec-h"><h3>Tài khoản Claude</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm">' + ds.map(t => {
+    const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
+    const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
+    const het = t.het_den && t.het_den * 1000 > Date.now();
+    return `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
+      ${t.dang_nhap ? mini(p, 'Phiên 5 giờ') + mini(w, 'Cả tuần') : '<div class="note" style="font-size:12px">Vào Cài đặt → Đăng nhập</div>'}</div>`; }).join('') + '</div>';
   document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => { await api('/api/cai-dat', {tai_khoan_dung: b.dataset.dung});
     ST.tai_khoan_dung = b.dataset.dung; toast('Hub sẽ chạy bằng tài khoản này'); taiTk(); });
   document.querySelectorAll('[data-dn]').forEach(b => b.onclick = async () => { await api('/api/tai-khoan-dang-nhap/' + b.dataset.dn, {}); toast('Đã mở cửa sổ đăng nhập'); });
@@ -817,21 +1016,24 @@ async function taiNgay() {
   const ds = await api('/api/ngay'); const s = $('#ngayChon'); const cu = s.value; s.innerHTML = '';
   ds.forEach(d => s.add(new Option(d.split('-').reverse().join('/'), d))); if (cu) s.value = cu; taiVideo();
 }
-async function taiVideo() { VIDS = await api('/api/video?ngay=' + $('#ngayChon').value); veVideo(); }
+async function taiVideo() {
+  if (!VIDS.length) $('#vids').innerHTML = '<div class="vskel"><div class="skel"></div><div style="padding:14px;display:grid;gap:8px"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:12px;width:45%"></div></div></div>'.repeat(5);
+  VIDS = await api('/api/video?ngay=' + $('#ngayChon').value); veVideo();
+}
 function veVideo() {
   const loc = $('#locChon').value;
   const ds = VIDS.filter(v => !loc || (loc === 'chua' ? !v.danh_gia.ket_qua : v.danh_gia.ket_qua === loc));
   $('#vids').innerHTML = ds.length ? ds.map((v, i) => {
-    const dg = v.danh_gia.ket_qua; const diem = v.diem ? `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'} score">⭐ ${v.diem}/10</span>` : '';
+    const dg = v.danh_gia.ket_qua; const diem = v.diem ? `<span class="pill score">${ic('star', 'f')} ${v.diem}/10</span>` : '';
     return `<div class="vid ${dg || ''}" data-f="${esc(v.file)}">
-      <div class="thumb" data-i="${VIDS.indexOf(v)}">${v.bia ? `<img src="${v.bia}" style="width:100%;height:100%;object-fit:cover;display:block">` : `<video src="${v.url}#t=1.2" preload="metadata" muted></video>`}<div class="play">▶</div>${diem}</div>
+      <div class="thumb" data-i="${VIDS.indexOf(v)}">${v.bia ? `<img src="${v.bia}" alt="" loading="lazy">` : `<video src="${v.url}#t=1.2" preload="metadata" muted></video>`}<div class="play"><span>${ic('play', 'f')}</span></div>${diem}</div>
       <div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
         <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + v.luc : ''}</div>
-        ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : 'r'}">${v.danh_gia.tu_dong ? '🤖 ' : ''}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt ✅' : '✅ Anh ưng') : (v.danh_gia.tu_dong ? 'Tự bỏ ❌' : '❌ Anh bỏ')}</span>` : ''}
-        ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">📤 Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
-        ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">⚠ Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}
-        <div class="act"><button class="b-ok" data-dg="dat">✅</button><button class="b-no" data-dg="bo">❌</button><button class="b-cp">📋 Caption</button></div></div></div>`;
-  }).join('') : '<div class="card note">Chưa có video ngày này.</div>';
+        ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : 'r'}">${v.danh_gia.tu_dong ? ic('bot') : ic(dg === 'dat' ? 'check' : 'x')}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt' : 'Anh ưng') : (v.danh_gia.tu_dong ? 'Tự bỏ' : 'Anh bỏ')}</span>` : ''}
+        ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">${ic('send')} Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
+        ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">${ic('alert')} Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}
+        <div class="act"><button class="b-ok" data-dg="dat" title="Anh ưng">${ic('up')}Ưng</button><button class="b-no" data-dg="bo" title="Anh bỏ">${ic('down')}Bỏ</button><button class="b-cp" title="Chép caption">${ic('copy')}</button></div></div></div>`;
+  }).join('') : rong('film', 'Chưa có video ngày này', 'Video làm xong sẽ hiện ở đây để anh duyệt.');
   document.querySelectorAll('.thumb').forEach(t => t.onclick = () => moVideo(VIDS[+t.dataset.i]));
   document.querySelectorAll('.vid').forEach(c => {
     const v = VIDS.find(x => x.file === c.dataset.f);
@@ -848,15 +1050,15 @@ async function danhGia(v, kq, gy) {
 function moVideo(v) {
   CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
   $('#mLoi').textContent = v.loi || ''; $('#mGop').value = v.danh_gia.gop_y || '';
-  $('#mPills').innerHTML = [v.diem && `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'}">⭐ Giám khảo ${v.diem}/10</span>`,
-    v.gu && `<span class="pill b">🎬 ${esc(v.gu.replaceAll('_', ' '))}</span>`, v.cong_thuc && `<span class="pill g">${esc(v.cong_thuc)}</span>`,
-    v.nhac && `<span class="pill y">🎵 ${esc(v.nhac)}</span>`,
-    v.token && `<span class="pill b">🧠 ${Math.round(v.token / 1000)}k token</span>`,
-    v.ky_tu_giong && `<span class="pill b">🎙 ${v.ky_tu_giong} ký tự${v.dung_chung_giong > 1 ? ' (chung ' + v.dung_chung_giong + ' video)' : ''}</span>`,
-    v.thoi_luong && `<span class="pill g">⏱ ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
-    v.dang_bai && `<span class="pill y">📝 ${esc(v.dang_bai)}</span>`,
-    v.lam_lai_tu && `<span class="pill r">🔁 làm lại</span>`].filter(Boolean).join('');
-  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `<div class="note">${v.y_tuong ? '💡 ' + esc(v.y_tuong) : ''}</div>${v.loi_gk ? `<details class="note"><summary>Giám khảo góp ý</summary>${esc(v.loi_gk)}</details>` : ''}` : '';
+  $('#mPills').innerHTML = [v.diem && `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'}">${ic('star')} Giám khảo ${v.diem}/10</span>`,
+    v.gu && `<span class="pill p">${ic('clap')} ${esc(v.gu.replaceAll('_', ' '))}</span>`, v.cong_thuc && `<span class="pill g">${esc(v.cong_thuc)}</span>`,
+    v.nhac && `<span class="pill y">${ic('music')} ${esc(v.nhac)}</span>`,
+    v.token && `<span class="pill b">${ic('coins')} ${Math.round(v.token / 1000)}k token</span>`,
+    v.ky_tu_giong && `<span class="pill b">${ic('mic')} ${v.ky_tu_giong} ký tự${v.dung_chung_giong > 1 ? ' (chung ' + v.dung_chung_giong + ' video)' : ''}</span>`,
+    v.thoi_luong && `<span class="pill">${ic('clock')} ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
+    v.dang_bai && `<span class="pill y">${ic('file')} ${esc(v.dang_bai)}</span>`,
+    v.lam_lai_tu && `<span class="pill r">${ic('repeat')} làm lại</span>`].filter(Boolean).join('');
+  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<details class="note" style="margin-top:10px"><summary>Giám khảo góp ý</summary>${esc(v.loi_gk)}</details>` : ''}` : '';
   $('#modal').classList.add('on'); $('#mVideo').play().catch(() => {});
 }
 $('#mDong').onclick = () => { $('#mVideo').pause(); $('#modal').classList.remove('on'); };
@@ -885,9 +1087,9 @@ $('#mNo').onclick = () => { danhGia(CUR, 'bo', $('#mGop').value); $('#mDong').on
 
 // ---------- SẢN PHẨM
 $('#btnDocNhan').onclick = async () => {
-  const b = $('#btnDocNhan'); b.disabled = true; b.textContent = '⏳ AI đang đọc nhãn (~1 phút)…';
+  const b = $('#btnDocNhan'); b.disabled = true; b.innerHTML = ic('loader') + 'AI đang đọc nhãn (~1 phút)…';
   const r = await api('/api/doc-nhan/' + $('#spSua').value, {});
-  b.disabled = false; b.textContent = '🔍 AI đọc nhãn, điền gợi ý';
+  b.disabled = false; b.innerHTML = ic('scan') + 'AI đọc nhãn, điền gợi ý';
   if (r.loi) return toast(r.loi);
   const cu = $('#suThat').value.trim(); const nl = String.fromCharCode(10);
   const moi = (r.su_that || []).concat((r.chua_ro || []).map(x => '(CHƯA RÕ — anh kiểm) ' + x));
@@ -912,8 +1114,8 @@ async function taiHq() {
     ? `Mới có ${r.n_tat_ca} video có số liệu (cần ít nhất ${r.can}). Cứ đăng tiếp, app tự học dần.`
     : `Sản phẩm này: ${r.n} video có số liệu · tất cả sản phẩm: ${r.n_tat_ca}.` + (r.n < r.can ? ' Sản phẩm này chưa đủ video nên AI đang học từ mọi sản phẩm.' : '');
   const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  if (r.top && r.top.length) $('#hqTop').innerHTML = '<table class="tbl" style="width:100%"><thead><tr><th>Câu mở</th><th>Góc</th><th>Dạng</th><th style="text-align:right">View 24h</th></tr></thead><tbody>'
-    + r.top.map(x => `<tr><td>${esc(x.cau_mo)}</td><td>${esc(x.goc)}</td><td>${esc(x.dang)}</td><td style="text-align:right">${esc(x.xem)}</td></tr>`).join('') + '</tbody></table>';
+  if (r.top && r.top.length) $('#hqTop').innerHTML = '<div class="tbl-wrap"><table class="tbl" style="width:100%"><thead><tr><th>Câu mở</th><th>Góc</th><th>Dạng</th><th class="num">View 24h</th></tr></thead><tbody>'
+    + r.top.map(x => `<tr><td class="wrap">${esc(x.cau_mo)}</td><td>${esc(x.goc)}</td><td>${esc(x.dang)}</td><td class="num"><b>${esc(x.xem)}</b></td></tr>`).join('') + '</tbody></table></div>';
   $('#hqTxt').textContent = [r.bien_kich && ('Biên kịch:\n' + r.bien_kich), r.dao_dien && ('Đạo diễn:\n' + r.dao_dien)].filter(Boolean).join('\n\n') || '(chưa đủ số liệu — AI làm như bình thường)';
 }
 function ctMo(k) {
@@ -930,29 +1132,44 @@ function moChiTiet(ma, k, ten) {
 function veDauCt() {
   const ma = $('#spSua').value, p = TQ.find(x => x.ma === ma), o = $('#spSua').selectedOptions[0];
   $('#spTenCt').textContent = (p && p.ten) || (o && o.text) || ma || '';
-  $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g">Sẵn sàng làm video</span>' : `<span class="pill y">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`) +
-    `<span class="note">${p.video_kho} video gốc · ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được · ${p.da_lam} video đã làm</span>`;
+  $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng làm video</span>' : `<span class="pill y dot">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`) +
+    `<span class="pill">${ic('film')} ${p.video_kho} video gốc</span><span class="pill">${ic('layers')} ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được</span><span class="pill">${ic('video')} ${p.da_lam} video đã làm</span>` +
+    (p.ma ? `<span class="pc-code" style="margin:0">${esc(p.ma)}</span>` : '');
 }
 document.querySelectorAll('#sp [data-ve]').forEach(b => b.onclick = () => { spXem(b.dataset.ve); if (b.dataset.ve === 'ds') taiTongQuan(); });
 document.querySelectorAll('#spTabs [data-ct]').forEach(b => b.onclick = () => ctMo(b.dataset.ct));
 $('#btnMoThem').onclick = () => spXem('them');
 async function taiTongQuan(moi) {
+  if (!TQ.length && !$('#tqBang').children.length)
+    $('#tqBang').innerHTML = '<div class="pc-skel"><div class="skel" style="aspect-ratio:16/10;border-radius:0"></div><div style="padding:16px;display:grid;gap:10px"><div class="skel" style="height:16px;width:70%"></div><div class="skel" style="height:12px;width:30%"></div><div class="skel" style="height:48px"></div></div></div>'.repeat(4);
   const ds = await api('/api/tong-quan' + (moi ? '?moi=1' : ''));
   TQ = ds; if (SPV.xem === 'ct') veDauCt();
   const sx = ds.filter(p => p.loai !== 'kho-chung');
   $('#tqTom').textContent = `${sx.length} sản phẩm · ${sx.filter(p => p.san_sang).length} sẵn sàng làm video · ${ds.reduce((a, p) => a + p.da_lam, 0)} video đã làm`;
-  const th = s => `<td style="padding:8px 6px;font-weight:800;color:var(--mute);font-size:13px">${s}</td>`;
-  $('#tqBang').innerHTML = !ds.length ? '<tr><td class="note" style="padding:18px 6px">Chưa có sản phẩm nào — bấm "＋ Thêm sản phẩm mới".</td></tr>' :
-    '<tr>' + ['Sản phẩm', 'Video gốc', 'Đã mô tả', 'Cảnh dùng được', 'Video đã làm', 'Còn tồn', 'Trạng thái', ''].map(th).join('') + '</tr>' +
-    ds.map(p => `<tr data-ma="${esc(p.ma)}" data-ten="${esc(p.ten)}" style="border-top:1px solid var(--line)" title="Mở ${esc(p.ten)}">
-      <td style="padding:8px 6px;font-weight:800"><div class="sp-ten">${anhSp(p.anh)}<div>${esc(p.ten)}<div class="note" style="font-size:12px">${esc(p.ma)}</div></div></div></td>
-      <td>${p.video_kho}</td><td>${p.mo_ta}${p.video_kho > p.mo_ta ? ` <span class="pill y">thiếu ${p.video_kho - p.mo_ta}</span>` : ''}</td>
-      <td>${p.so_canh}</td><td><b>${p.da_lam}</b></td><td>${p.ton}</td>
-      <td>${p.loai === 'kho-chung' ? `<span class="pill b">Kho cảnh chung · ${p.so_dung_duoc ?? p.so_canh} cảnh</span>` : p.san_sang ? '<span class="pill g">Sẵn sàng</span>' : `<span class="pill y">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`}</td>
-      <td style="white-space:nowrap;text-align:right"><button class="btn soft" style="padding:6px 12px;font-size:14px" data-sua="${esc(p.ma)}">Mở →</button>
-        <button class="btn ghost" style="padding:6px 12px;font-size:14px;color:var(--red)" data-xoa="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Xoá sản phẩm">🗑 Xoá</button></td></tr>`).join('');
-  document.querySelectorAll('#tqBang tr[data-ma]').forEach(r => r.onclick = e => { if (!e.target.closest('button')) moChiTiet(r.dataset.ma, '', r.dataset.ten); });
-  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => moChiTiet(b.dataset.sua, '', b.closest('tr').dataset.ten));
+  const tt = p => p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng</span>'
+    : `<span class="pill y dot" title="Thiếu: ${esc((p.thieu || []).join(', '))}">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`;
+  $('#tqBang').innerHTML = !ds.length ? rong('pkg', 'Chưa có sản phẩm nào', 'Bấm "Thêm sản phẩm mới" để bắt đầu.') :
+    ds.map(p => { const pm = p.video_kho ? Math.min(100, Math.round(100 * p.mo_ta / p.video_kho)) : 0, thieu = p.video_kho > p.mo_ta;
+      return `<div class="pc" data-ma="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Mở ${esc(p.ten)}" role="button" tabindex="0">
+      <div class="pc-media">${anhSp(p.anh)}<div class="pc-st">${tt(p)}</div></div>
+      <div class="pc-body">
+        <div><div class="pc-name">${esc(p.ten)}</div><div class="pc-code">${esc(p.ma)}</div></div>
+        <div class="pc-m">
+          <div><b>${p.video_kho}</b><span>Video gốc</span></div>
+          <div><b>${p.so_dung_duoc ?? p.so_canh}</b><span>Cảnh dùng</span></div>
+          <div><b>${p.da_lam}</b><span>Đã làm</span></div>
+          <div><b>${p.loai === 'kho-chung' ? '–' : p.ton}</b><span>Còn tồn</span></div>
+        </div>
+        <div class="pc-pr"><div class="lr"><span>Đã mô tả cảnh${thieu ? ` · <span style="color:var(--y-ink)">thiếu ${p.video_kho - p.mo_ta}</span>` : ''}</span><b>${p.mo_ta}/${p.video_kho}</b></div>
+          <div class="bar sm${thieu ? ' thieu' : ''}"><i style="width:${pm}%"></i></div></div>
+        <div class="pc-foot"><button class="btn soft sm" data-sua="${esc(p.ma)}">Mở${ic('right')}</button>
+          <button class="btn ghost sm dz" data-xoa="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Xoá sản phẩm">${ic('trash')}Xoá</button></div>
+      </div></div>`; }).join('');
+  document.querySelectorAll('#tqBang [data-ma]').forEach(r => {
+    r.onclick = e => { if (!e.target.closest('button')) moChiTiet(r.dataset.ma, '', r.dataset.ten); };
+    r.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === r) { e.preventDefault(); moChiTiet(r.dataset.ma, '', r.dataset.ten); } };
+  });
+  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => moChiTiet(b.dataset.sua, '', b.closest('[data-ma]').dataset.ten));
   document.querySelectorAll('[data-xoa]').forEach(b => b.onclick = async () => {
     if (!confirm(`Xoá sản phẩm "${b.dataset.ten}" khỏi app?
 Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm vẫn giữ.`)) return;
@@ -967,16 +1184,18 @@ $('#btnTqMoi').onclick = () => taiTongQuan(true);
 const spCtHien = () => SPV.xem === 'ct' && !$('#sp').classList.contains('hidden');
 async function taiKho() {
   const k = await api('/api/kho/' + $('#spSua').value);
-  $('#khoInfo').innerHTML = !k.kho ? '⚠ Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.'
-    : !k.kho_ton_tai ? '⚠ Không tìm thấy thư mục: ' + esc(k.kho)
-    : `📁 ${esc(k.kho)}<br>🎥 ${k.so_video} video · 📝 ${k.so_mo_ta} bản mô tả · 🎞 ${k.so_canh} cảnh · 👁 AI đã soát ${k.so_soat}` +
-      (k.so_video > k.so_mo_ta ? `<br><b style="color:var(--red)">${k.so_video - k.so_mo_ta} video chưa có mô tả cảnh → bấm "🧠 Học cảnh" (Antigravity tự xem, xong hub tự chuẩn bị kho).</b>` : '');
-  $('#btnKho').disabled = k.dang_chay || !k.kho_ton_tai || !k.so_mo_ta; $('#btnKho').textContent = k.dang_chay ? '⏳ Đang chuẩn bị kho…' : '🧩 Chuẩn bị kho (nạp cảnh + AI soát)';
+  $('#khoInfo').innerHTML = !k.kho ? `<div class="warnbox">${ic('alert')} Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.</div>`
+    : !k.kho_ton_tai ? `<div class="errbox">${ic('alert')} Không tìm thấy thư mục: ${esc(k.kho)}</div>`
+    : `<div class="kpath">${ic('folder')}${esc(k.kho)}</div><div class="kinfo">
+        <span class="k">${ic('video')}<b>${k.so_video}</b> video</span><span class="k">${ic('file')}<b>${k.so_mo_ta}</b> bản mô tả</span>
+        <span class="k">${ic('layers')}<b>${k.so_canh}</b> cảnh</span><span class="k">${ic('eye')}AI đã soát <b>${k.so_soat}</b></span></div>` +
+      (k.so_video > k.so_mo_ta ? `<div class="warnbox" style="margin-top:12px">${k.so_video - k.so_mo_ta} video chưa có mô tả cảnh → bấm "Học cảnh" (Antigravity tự xem, xong hub tự chuẩn bị kho).</div>` : '');
+  $('#btnKho').disabled = k.dang_chay || !k.kho_ton_tai || !k.so_mo_ta; $('#btnKho').innerHTML = k.dang_chay ? ic('loader') + 'Đang chuẩn bị kho…' : ic('layers') + 'Chuẩn bị kho (nạp cảnh + AI soát)';
   const BUOC = ['', 'Bước 1/3: kiểm định dạng mô tả', 'Bước 2/3: nạp cảnh vào kho', 'Bước 3/3: AI soát cảnh'];
   $('#khoBuoc').innerHTML = k.dang_chay && k.buoc >= 1 && k.buoc <= 3
-      ? `⏳ ${BUOC[k.buoc]}<div class="bar" style="margin-top:6px;height:10px"><i style="width:${Math.round((k.buoc - 1) / 3 * 100 + 8)}%"></i></div>`
-    : !k.dang_chay && k.buoc === 4 ? '✅ Chuẩn bị kho xong (3/3)'
-    : !k.dang_chay && k.buoc >= 1 && k.buoc <= 3 ? `<span style="color:var(--red)">⚠ Dừng ở ${BUOC[k.buoc]} — xem nhật ký bên dưới</span>` : '';
+      ? `${ic('loader')} ${BUOC[k.buoc]}<div class="bar" style="margin-top:8px"><i style="width:${Math.round((k.buoc - 1) / 3 * 100 + 8)}%"></i></div>`
+    : !k.dang_chay && k.buoc === 4 ? `<span class="pill g">${ic('check')} Chuẩn bị kho xong (3/3)</span>`
+    : !k.dang_chay && k.buoc >= 1 && k.buoc <= 3 ? `<span class="pill r">${ic('alert')} Dừng ở ${BUOC[k.buoc]} — xem nhật ký bên dưới</span>` : '';
   $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)'; taiHoc();
   if (k.dang_chay && spCtHien()) setTimeout(taiKho, 4000);           // chỉ tự làm mới khi đang mở trang chi tiết
 }
@@ -1009,7 +1228,7 @@ async function taiHoc() {
     if (j.trang_thai === 'xong' && HOC.xongBao !== j.bat_dau) { HOC.xongBao = j.bat_dau; taiKho(); }
   }
   $('#hocBox').classList.toggle('hidden', !hien);
-  const hb = $('#btnHoc'); hb.textContent = chay ? '⏹ Dừng học' : '🧠 Học cảnh'; hb.disabled = !!h.job_khac || (!chay && h.dang_chay_lo);
+  const hb = $('#btnHoc'); hb.innerHTML = chay ? ic('stop', 'f') + 'Dừng học' : ic('cap') + 'Học cảnh'; hb.disabled = !!h.job_khac || (!chay && h.dang_chay_lo);
   hb.title = h.dang_chay_lo ? 'Đang làm video — đợi xong' : '';
   if (!spCtHien()) return;                                          // rời trang chi tiết: ngừng hỏi, mở lại sẽ tự tải tiếp
   if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
@@ -1029,12 +1248,12 @@ $('#hsModel').onchange = async () => { const r = await api('/api/hoc-canh-model'
 const KD_T = {t: null};
 function kdVe(b, dangChay, tien) {
   const box = $('#kdBox'); box.classList.remove('hidden');
-  if (dangChay || !b) { box.innerHTML = '⏳ Đang kiểm các bản mô tả… ' + (tien || ''); return; }
+  if (dangChay || !b) { box.innerHTML = ic('loader') + ' Đang kiểm các bản mô tả… ' + (tien || ''); return; }
   if (b.loi) { box.innerHTML = `<b style="color:var(--red)">Lỗi: ${esc(b.loi)}</b>`; return; }
   const thu = b.che_do !== 'that';
   const ds = (arr, f) => arr.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + arr.map(f).join('') + '</ul>' : '';
   const ten = x => esc(String(x).split(/[\\/]/).pop().slice(0, 60));
-  box.innerHTML = `<div class="row" style="gap:8px;margin-bottom:8px"><b>🩺 Kết quả kiểm</b>
+  box.innerHTML = `<div class="row" style="gap:8px;margin-bottom:8px"><b style="display:inline-flex;gap:6px;align-items:center">${ic('shield')} Kết quả kiểm</b>
       <span class="pill g">✓ đúng sẵn ${b.da_dung}</span><span class="pill ${b.so_da_sua ? 'y' : 'g'}">${thu ? 'cần sửa' : 'đã sửa'} ${b.so_da_sua}</span>
       <span class="pill ${b.so_hong ? 'r' : 'g'}">hỏng ${b.so_hong}</span><span class="pill ${b.so_thieu_mo_ta ? 'y' : 'g'}">thiếu mô tả ${b.so_thieu_mo_ta}</span></div>
     <div class="note">${esc(b.tom_tat || '')}${b.bo_canh ? `<br><b>${thu ? 'Sẽ bỏ' : 'Đã bỏ'} ${b.bo_canh} cảnh sai giờ.</b>` : ''}</div>
@@ -1044,7 +1263,7 @@ function kdVe(b, dangChay, tien) {
     ${b.so_mo_coi ? `<details style="margin-top:8px"><summary>Mô tả không còn video: ${b.so_mo_coi}</summary>` + ds(b.mo_coi, x => `<li>${ten(x)}</li>`) + '</details>' : ''}
     ${b.so_trung ? `<details style="margin-top:8px"><summary>Video có 2 bản mô tả: ${b.so_trung} (hub chỉ lấy 1, không xoá)</summary>` + ds(b.trung, x => `<li>${ten(x.video)}</li>`) + '</details>' : ''}
     ${b.so_canh_bao ? `<details style="margin-top:8px"><summary>Lưu ý: ${b.so_canh_bao}</summary>` + ds(b.canh_bao, x => `<li>${ten(x.file)}: ${esc(x.ghi_chu)}</li>`) + '</details>' : ''}
-    ${thu && b.so_da_sua ? '<div class="row" style="margin-top:12px"><button class="btn go" id="btnKiemSua">✅ Sửa luôn (giữ bản gốc trong _goc-kiem)</button></div>' : ''}`;
+    ${thu && b.so_da_sua ? `<div class="row" style="margin-top:12px"><button class="btn go" id="btnKiemSua">${ic('check')}Sửa luôn (giữ bản gốc trong _goc-kiem)</button></div>` : ''}`;
   const bs = $('#btnKiemSua'); if (bs) bs.onclick = () => kdChay(true);
 }
 async function kdTai() {
@@ -1071,12 +1290,12 @@ function tenGon(t) {          // tên ngắn gọn từ tiêu đề dài trên S
   return x || String(t || '').slice(0, 38);
 }
 function luoiShop(host, getChon, onPick) {
-  host.innerHTML = '<div class="shop-tim"><input type="text" class="shq" placeholder="🔎 Tìm sản phẩm trên Shop…"><button type="button" class="btn ghost shlai" style="padding:7px 12px;font-size:14px" title="Tải lại từ TikTok Auto Kid">↻</button></div><div class="shop-luoi"></div><div class="note shgc"></div>';
+  host.innerHTML = `<div class="shop-tim"><input type="text" class="shq" placeholder="Tìm sản phẩm trên Shop…"><button type="button" class="btn ghost shlai" style="width:40px;padding:0" title="Tải lại từ TikTok Auto Kid">${ic('refresh')}</button></div><div class="shop-luoi"></div><div class="note shgc"></div>`;
   const q = host.querySelector('.shq'), L = host.querySelector('.shop-luoi'), G = host.querySelector('.shgc');
   const ve = () => {
     const k = q.value.trim().toLowerCase(), ds = (SHOP.ds || []).filter(x => !k || (x.tieu_de + ' ' + x.ma.join(' ')).toLowerCase().includes(k)), chon = getChon();
-    L.innerHTML = ds.map(x => `<button type="button" class="shop-it${x.id === chon ? ' chon' : ''}" data-id="${esc(x.id)}" title="${esc(x.tieu_de)}">${x.anh ? `<img src="${esc(x.anh)}" alt="" loading="lazy" onerror="anhLoi(this)">` : '<span class="rong">📦</span>'}${x.ma.length ? `<i class="gan">đã gắn ${esc(x.ma[0])}</i>` : ''}<span class="t">${esc(x.tieu_de)}</span></button>`).join('');
-    G.textContent = SHOP.dang ? '⏳ Đang tải sản phẩm từ TikTok Auto Kid…' : SHOP.loi ? SHOP.loi : !(SHOP.ds || []).length ? 'Chưa có sản phẩm nào từ Shop. Vào TikTok Auto Kid → Giỏ hàng → "Lấy sản phẩm từ shop".' : ds.length ? '' : 'Không thấy sản phẩm nào khớp.';
+    L.innerHTML = ds.map(x => `<button type="button" class="shop-it${x.id === chon ? ' chon' : ''}" data-id="${esc(x.id)}" title="${esc(x.tieu_de)}">${x.anh ? `<img src="${esc(x.anh)}" alt="" loading="lazy" onerror="anhLoi(this)">` : `<span class="rong">${ic('pkg')}</span>`}${x.ma.length ? `<i class="gan">đã gắn ${esc(x.ma[0])}</i>` : ''}<span class="t">${esc(x.tieu_de)}</span></button>`).join('');
+    G.textContent = SHOP.dang ? 'Đang tải sản phẩm từ TikTok Auto Kid…' : SHOP.loi ? SHOP.loi : !(SHOP.ds || []).length ? 'Chưa có sản phẩm nào từ Shop. Vào TikTok Auto Kid → Giỏ hàng → "Lấy sản phẩm từ shop".' : ds.length ? '' : 'Không thấy sản phẩm nào khớp.';
   };
   q.oninput = ve; host.querySelector('.shlai').onclick = () => taiShop(true);
   L.onclick = e => { const b = e.target.closest('.shop-it'); if (b) onPick((SHOP.ds || []).find(x => x.id === b.dataset.id)); };
@@ -1104,8 +1323,8 @@ $('#btnMKho').onclick = () => moThuMuc($('#mKho').value, p => { $('#mKho').value
 $('#btnMAnhFile').onclick = async () => { const d = await chonFileAnh(); if (d) { MA.data = d; $('#mAnhXem').innerHTML = anhSp(d, 'lg'); } };
 $('#btnMAnhVid').onclick = async () => {
   const b = $('#btnMAnhVid'); if (!$('#mKho').value.trim()) return toast('Chọn thư mục kho video trước nhé');
-  b.disabled = true; const t = b.textContent; b.textContent = '⏳ Đang lấy…';
-  const r = await api('/api/anh-khung', {kho: $('#mKho').value}); b.disabled = false; b.textContent = t;
+  b.disabled = true; const t = b.innerHTML; b.innerHTML = ic('loader') + 'Đang lấy…';
+  const r = await api('/api/anh-khung', {kho: $('#mKho').value}); b.disabled = false; b.innerHTML = t;
   if (!r.ok) return toast(r.loi); MA.data = r.data; $('#mAnhXem').innerHTML = anhSp(r.data, 'lg');
 };
 $('#btnTaoSp').onclick = async () => {
@@ -1133,8 +1352,8 @@ async function taiSp() {
 $('#spSua').onchange = taiSp;
 $('#btnSKho').onclick = () => moThuMuc($('#spKho').value, p => { $('#spKho').value = p; toast('Đã chọn — nhớ bấm 💾 Lưu nhé'); });
 async function datAnhSua(body, nut) {
-  const t = nut.textContent; nut.disabled = true; nut.textContent = '⏳ Đang làm…';
-  const r = await api('/api/anh-sp/' + $('#spSua').value, body); nut.disabled = false; nut.textContent = t;
+  const t = nut.innerHTML; nut.disabled = true; nut.innerHTML = ic('loader') + 'Đang làm…';
+  const r = await api('/api/anh-sp/' + $('#spSua').value, body); nut.disabled = false; nut.innerHTML = t;
   if (!r.ok) return toast(r.loi);
   hienAnhSua(r.url); toast('Đã đổi ảnh sản phẩm'); taiTongQuan(true); capNhat();
 }
@@ -1143,7 +1362,7 @@ $('#btnSAnhVid').onclick = () => datAnhSua({tu_video: true}, $('#btnSAnhVid'));
 let SUA_SHOP = null;                 // sản phẩm Shop hiện gắn với sản phẩm đang sửa
 VE_SHOP.push(() => {                 // dòng "đang gắn với sản phẩm Shop nào" ở mục Ảnh & sản phẩm Shop
   const x = SUA_SHOP && (SHOP.ds || []).find(s => s.id === SUA_SHOP);
-  $('#spShopGan').innerHTML = x ? `<div class="sp-ten">${anhSp(x.anh)}<span>Đang gắn với sản phẩm Shop: <b>${esc(x.tieu_de)}</b></span></div>` : SUA_SHOP ? 'Đã gắn 1 sản phẩm TikTok Shop.' : 'Chưa gắn sản phẩm TikTok Shop nào — bấm "🛍 Lấy ảnh từ TikTok Shop" để chọn.';
+  $('#spShopGan').innerHTML = x ? `<div class="sp-ten">${anhSp(x.anh)}<span>Đang gắn với sản phẩm Shop: <b>${esc(x.tieu_de)}</b></span></div>` : SUA_SHOP ? 'Đã gắn 1 sản phẩm TikTok Shop.' : 'Chưa gắn sản phẩm TikTok Shop nào — bấm "Lấy ảnh từ TikTok Shop" để chọn.';
 });
 luoiShop($('#sShopLuoi'), () => SUA_SHOP, x => { if (x && confirm('Đổi ảnh sản phẩm sang ảnh của "' + tenGon(x.tieu_de) + '"?')) { SUA_SHOP = x.id; datAnhSua({tu_shop: x.id}, $('#btnSAnhShop')); veShopTatCa(); } });
 $('#btnSAnhShop').onclick = () => $('#sShopBox').classList.toggle('hidden');
@@ -1161,17 +1380,20 @@ $('#btnLuuGu').onclick = async () => { await api('/api/so-gu', {so_gu: $('#soGu'
 // ---------- CÀI ĐẶT
 async function taiODia() {
   const o = await api('/api/o-dia');
-  const canh = o.o_trong_gb < 30 ? '<span class="pill r">Ổ sắp đầy</span>' : '<span class="pill g">Ổ còn rộng</span>';
-  $('#oDia').innerHTML = `${canh} Ổ còn trống <b>${o.o_trong_gb} GB</b> / ${o.o_tong_gb} GB · Video hub đang chiếm <b>${o.ra_gb} GB</b>` +
-    '<table style="width:100%;margin-top:10px;border-collapse:collapse">' +
-    o.ngay.slice(0, 10).map(d => `<tr><td style="padding:4px 0">${d.ngay.split('-').reverse().join('/')}</td><td>${d.video} video</td><td>${d.gb} GB</td>` +
-      `<td><button class="btn ghost" style="padding:4px 10px;font-size:13px" onclick="api('/api/mo-thu-muc',{ngay:'${d.ngay}'})">📂 Mở</button></td></tr>`).join('') + '</table>';
+  const canh = o.o_trong_gb < 30 ? '<span class="pill r dot">Ổ sắp đầy</span>' : '<span class="pill g dot">Ổ còn rộng</span>';
+  const dung = o.o_tong_gb ? Math.round(100 * (o.o_tong_gb - o.o_trong_gb) / o.o_tong_gb) : 0;
+  $('#oDia').innerHTML = `<div class="row" style="justify-content:space-between;gap:8px"><span style="color:var(--ink)">Còn trống <b>${o.o_trong_gb} GB</b> / ${o.o_tong_gb} GB</span>${canh}</div>
+    <div class="bar" style="margin:10px 0 8px"><i style="width:${dung}%;${o.o_trong_gb < 30 ? 'background:var(--danger)' : ''}"></i></div>
+    <div>Video hub đang chiếm <b style="color:var(--ink)">${o.ra_gb} GB</b></div>` +
+    '<table class="odia" style="width:100%;margin-top:12px;border-collapse:collapse">' +
+    o.ngay.slice(0, 10).map(d => `<tr><td style="color:var(--ink)">${d.ngay.split('-').reverse().join('/')}</td><td>${d.video} video</td><td>${d.gb} GB</td>` +
+      `<td style="text-align:right"><button class="btn ghost sm" onclick="api('/api/mo-thu-muc',{ngay:'${d.ngay}'})">${ic('fopen')}Mở</button></td></tr>`).join('') + '</table>';
 }
 let TP = {};
 async function taiTp() { TP = await api('/api/trypost'); $('#tpDiaChi').textContent = TP.bat ? TP.dia_chi : '(chưa bật)'; }
 async function taiKg() {
   let r; try { r = await api('/api/khoa-giong'); } catch (e) { return; }
-  $('#kgTrangThai').innerHTML = r.co ? `<span class="pill g">Đã có khoá</span> ${r.cuoi ? 'đuôi …' + esc(r.cuoi) : ''}` : '<span class="pill r">Chưa có khoá</span> Chưa làm video được cho tới khi dán khoá.';
+  $('#kgTrangThai').innerHTML = r.co ? `<span class="pill g dot">Đã có khoá</span> ${r.cuoi ? '<span class="pc-code" style="display:inline">đuôi …' + esc(r.cuoi) + '</span>' : ''}` : '<span class="pill r dot">Chưa có khoá</span> Chưa làm video được cho tới khi dán khoá.';
 }
 $('#btnLuuKg').onclick = async () => {
   const k = $('#kgKhoa').value.trim(); if (!k) return toast('Dán khoá vào ô trước đã');
@@ -1186,21 +1408,21 @@ async function taiNhac() {
   clearTimeout(NH_T);
   let r; try { r = await api('/api/nhac'); } catch (e) { return; }
   const m = r.mac_dinh, t = r.tai || {};
-  const ghi = t.loi ? `⚠️ ${esc(t.loi)}` : t.dang ? `⏳ ${esc(t.ghi)}${t.tong ? ' ' + (t.da / t.tong * 100).toFixed(0) + '%' : ''}` : t.xong ? '✅ Đã tải xong' : '';
-  $('#nhMacDinh').innerHTML = `<span>${m.cai ? '<span class="pill g">Đã cài</span>' : '<span class="pill y">Chưa cài</span>'}
-    <b>Kho mặc định</b> · ${m.n_nhac} bài nhạc · ${m.n_sfx} âm thanh · ${m.gb} GB</span>
-    ${r.co_link ? `<button class="btn soft" id="btnNhacTai" ${t.dang ? 'disabled' : ''}>⬇️ Tải thêm nhạc</button>`
-      : '<span class="note">Muốn thêm nhạc của anh: bấm "📁 Chọn thư mục" ở mục bên dưới.</span>'}`;
+  const ghi = t.loi ? `${ic('alert')} ${esc(t.loi)}` : t.dang ? `${ic('loader')} ${esc(t.ghi)}${t.tong ? ' ' + (t.da / t.tong * 100).toFixed(0) + '%' : ''}` : t.xong ? `${ic('check')} Đã tải xong` : '';
+  $('#nhMacDinh').innerHTML = `<span class="row" style="gap:10px"><b style="color:var(--ink)">Kho mặc định</b>${m.cai ? '<span class="pill g dot">Đã cài</span>' : '<span class="pill y dot">Chưa cài</span>'}
+    <span class="note">${m.n_nhac} bài nhạc · ${m.n_sfx} âm thanh · ${m.gb} GB</span></span>
+    ${r.co_link ? `<button class="btn ghost" id="btnNhacTai" ${t.dang ? 'disabled' : ''}>${ic('dl')}Tải thêm nhạc</button>`
+      : '<span class="note">Muốn thêm nhạc của anh: bấm "Chọn thư mục" ở mục bên dưới.</span>'}`;
   $('#nhTai').classList.toggle('hidden', !ghi);
   $('#nhTai').innerHTML = ghi + (t.dang && t.tong ? `<progress max="${t.tong}" value="${t.da}" style="width:100%;margin-top:6px"></progress>` : '');
   const ve = loai => {
     const ds = r.nguon.filter(n => n.loai === loai);
-    return ds.length ? ds.map(n => `<div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:nowrap">
-      <input type="checkbox" data-nbat="${n.i}" ${n.bat ? 'checked' : ''} style="width:20px;height:20px;flex:none" title="Bật / tắt">
+    return ds.length ? ds.map(n => `<div class="nguon">
+      <input type="checkbox" class="sw" data-nbat="${n.i}" ${n.bat ? 'checked' : ''} title="Bật / tắt">
       <span style="flex:1;min-width:0;overflow-wrap:anywhere;${n.ton_tai ? '' : 'color:var(--red)'}">${esc(n.duong_dan)}</span>
       <span class="pill ${n.ton_tai ? 'b' : 'r'}">${n.ton_tai ? n.so_file + ' file' : 'mất thư mục'}</span>
-      <button class="btn ghost" data-nxoa="${n.i}" style="padding:4px 10px;font-size:13px;color:var(--red)" title="Bỏ khỏi danh sách (không xoá file)">✖</button></div>`).join('')
-      : '<div class="note">Chưa thêm thư mục nào.</div>';
+      <button class="btn ghost sm dz ic-only" data-nxoa="${n.i}" title="Bỏ khỏi danh sách (không xoá file)">${ic('x')}</button></div>`).join('')
+      : '<div class="note" style="padding:10px 12px;border:1px dashed var(--line2);border-radius:10px;margin-bottom:8px">Chưa thêm thư mục nào.</div>';
   };
   $('#nhDsNhac').innerHTML = ve('nhac'); $('#nhDsSfx').innerHTML = ve('sfx');
   document.querySelectorAll('[data-nbat]').forEach(c => c.onchange = async () => { await api('/api/nhac-nguon', {bat: +c.dataset.nbat, gia_tri: c.checked}); taiNhac(); });
@@ -1222,31 +1444,31 @@ $('#btnKiemTk').onclick = () => taiTk(true);
 
 async function taiLo() {
   const ds = await api('/api/lo'); const k = n => (n || 0) >= 1e6 ? (n / 1e6).toFixed(2) + ' tr' : Math.round((n || 0) / 1000) + 'k';
-  const th = x => `<td style="padding:6px;font-weight:800;color:var(--mute);font-size:12px">${x}</td>`;
-  $('#loBang').innerHTML = !ds.length ? '<tr><td class="note">Chưa có lô nào được ghi (lô mới sẽ tự hiện ở đây).</td></tr>' :
-    '<tr>' + ['Lúc', 'Sản phẩm', 'Video', 'Thời gian', 'Phút/video', 'Lượt AI', 'Token (vào / ra)', 'Token/video', 'Ký tự giọng', 'Ký tự/video', '≈ USD', 'Tài khoản'].map(th).join('') + '</tr>' +
-    ds.map(l => `<tr style="border-top:1px solid var(--line)"><td style="padding:6px">${l.bat_dau.slice(5, 16).replace('T', ' ')}</td><td>${esc(l.san_pham)}</td>
-      <td><b>${l.video}</b></td><td>${l.phut} phút</td><td>${l.video ? (l.phut / l.video).toFixed(1) : '–'}</td><td>${l.luot_ai}</td>
-      <td>${k(l.token)} <span class="note">(${k(l.token_vao)} / ${k(l.token_ra)})</span></td><td><b>${l.video ? k(l.token / l.video) : '–'}</b></td>
-      <td>${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td>${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '–'}</td>
-      <td>${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => a + ': ' + n).join(', ')}</td></tr>`).join('');
+  const cot = [['Lúc'], ['Sản phẩm'], ['Video', 1], ['Thời gian', 1], ['Phút/video', 1], ['Lượt AI', 1], ['Token (vào / ra)', 1], ['Token/video', 1], ['Ký tự giọng', 1], ['Ký tự/video', 1], ['≈ USD', 1], ['Tài khoản']];
+  $('#loBang').innerHTML = !ds.length ? `<tbody><tr><td class="empty-td">${rong('coins', 'Chưa có lô nào được ghi', 'Lô mới sẽ tự hiện ở đây.')}</td></tr></tbody>` :
+    '<thead><tr>' + cot.map(([t, n]) => `<th${n ? ' class="num"' : ''}>${t}</th>`).join('') + '</tr></thead><tbody>' +
+    ds.map(l => `<tr><td class="note" style="color:var(--ink2)">${l.bat_dau.slice(5, 16).replace('T', ' ')}</td><td><b>${esc(l.san_pham)}</b></td>
+      <td class="num"><b>${l.video}</b></td><td class="num">${l.phut} phút</td><td class="num">${l.video ? (l.phut / l.video).toFixed(1) : '–'}</td><td class="num">${l.luot_ai}</td>
+      <td class="num">${k(l.token)} <span class="note">(${k(l.token_vao)} / ${k(l.token_ra)})</span></td><td class="num"><b>${l.video ? k(l.token / l.video) : '–'}</b></td>
+      <td class="num">${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td class="num">${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '–'}</td>
+      <td class="num">${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => esc(a) + ': ' + n).join(', ')}</td></tr>`).join('') + '</tbody>';
 }
 async function taiTuDong() {
   const t = await api('/api/tu-dong');
   $('#tdBat').checked = t.bat; $('#tdPhut').value = t.kiem_moi_phut;
   const tr = t.trang_thai || {};
   $('#tdTrangThai').textContent = (tr.ghi || '') + (tr.lan_kiem_toi && t.bat ? ` · lần kiểm tới ${tr.lan_kiem_toi}` : '');
-  const th = x => `<td style="padding:8px 6px;font-weight:800;color:var(--mute);font-size:13px">${x}</td>`;
   const ds = Object.entries(t.san_pham || {});
-  $('#tdBang').innerHTML = '<tr>' + ['Sản phẩm', 'Đã làm', 'Còn tồn', 'Hôm nay', 'Tự làm', 'Giữ tồn ít nhất', 'Tối đa / ngày', 'Mỗi lần làm', ''].map(th).join('') + '</tr>' +
-    ds.map(([ma, v]) => `<tr data-ma="${ma}" style="border-top:1px solid var(--line)">
-      <td style="padding:8px 6px;font-weight:800"><div class="sp-ten">${anhSp(urlAnh(ma))}<span>${esc(v.ten || ma)}</span></div></td>
-      <td>${v.da_lam}</td><td><b style="color:${v.ton < v.ton_toi_thieu ? 'var(--red)' : 'var(--green)'}">${v.ton}</b></td><td>${v.lam_hom_nay}</td>
-      <td><input type="checkbox" class="tdOn" ${v.bat ? 'checked' : ''} style="width:20px;height:20px"></td>
-      <td><input type="number" class="tdMin" min="0" value="${v.ton_toi_thieu}" style="width:80px"></td>
-      <td><input type="number" class="tdMax" min="0" value="${v.toi_da_ngay}" style="width:80px"></td>
-      <td><input type="number" class="tdLo" min="1" max="50" value="${v.lo}" style="width:80px"></td>
-      <td><button class="btn ghost" style="padding:6px 10px;font-size:14px;color:var(--red)" data-xoatd="${ma}" data-ten="${esc(v.ten || ma)}">🗑 Xoá</button></td></tr>`).join('');
+  $('#tdBang').innerHTML = '<thead><tr>' + [['Sản phẩm'], ['Đã làm', 1], ['Còn tồn', 1], ['Hôm nay', 1], ['Tự làm'], ['Giữ tồn ít nhất'], ['Tối đa / ngày'], ['Mỗi lần làm'], ['']].map(([x, n]) => `<th${n ? ' class="num"' : ''}>${x}</th>`).join('') + '</tr></thead><tbody>' +
+    (ds.length ? '' : `<tr><td colspan="9" class="empty-td">${rong('bot', 'Chưa có sản phẩm nào', 'Thêm sản phẩm ở tab Sản phẩm & quà.')}</td></tr>`) +
+    ds.map(([ma, v]) => `<tr data-ma="${ma}">
+      <td><div class="sp-ten">${anhSp(urlAnh(ma))}<span>${esc(v.ten || ma)}</span></div></td>
+      <td class="num">${v.da_lam}</td><td class="num"><span class="pill ${v.ton < v.ton_toi_thieu ? 'r' : 'g'}">${v.ton}</span></td><td class="num">${v.lam_hom_nay}</td>
+      <td><input type="checkbox" class="tdOn sw" ${v.bat ? 'checked' : ''}></td>
+      <td><input type="number" class="tdMin" min="0" value="${v.ton_toi_thieu}"></td>
+      <td><input type="number" class="tdMax" min="0" value="${v.toi_da_ngay}"></td>
+      <td><input type="number" class="tdLo" min="1" max="50" value="${v.lo}"></td>
+      <td style="text-align:right"><button class="btn ghost sm dz" data-xoatd="${ma}" data-ten="${esc(v.ten || ma)}">${ic('trash')}Xoá</button></td></tr>`).join('') + '</tbody>';
   document.querySelectorAll('[data-xoatd]').forEach(b => b.onclick = async () => {
     if (!confirm(`Xoá hẳn sản phẩm "${b.dataset.ten}" khỏi app? (hồ sơ + kho cảnh vào Thùng rác; video gốc và video đã làm vẫn giữ)`)) return;
     const r = await api('/api/xoa-san-pham/' + b.dataset.xoatd, {});

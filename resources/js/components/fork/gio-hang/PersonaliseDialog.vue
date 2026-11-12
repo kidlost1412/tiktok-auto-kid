@@ -249,7 +249,7 @@ const modes = [
                 <DialogTitle>
                     {{
                         isProduct
-                            ? `Cá nhân hoá — ${label}`
+                            ? `Ảnh bìa & hashtag — ${label}`
                             : 'Hashtag mặc định chung'
                     }}
                 </DialogTitle>

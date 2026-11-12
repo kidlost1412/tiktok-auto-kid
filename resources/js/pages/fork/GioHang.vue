@@ -16,6 +16,7 @@ import type {
     ShopProduct,
     Sync,
 } from '@/components/fork/gio-hang/types';
+import { usePersonalise } from '@/components/fork/gio-hang/usePersonalise';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
@@ -222,44 +223,8 @@ const clearRow = (r: Row) => {
 };
 
 // ---- Cá nhân hoá (ảnh bìa, hashtag) theo sản phẩm hub; 'default' = hashtag mặc định chung ----
-const emptyPersona: Persona = {
-    cover_mode: 'default',
-    cover_fixed: null,
-    covers: [],
-    hashtags: [],
-    hashtag_mode: 'append',
-    hashtag_pick: 0,
-};
-const personaOf = (code: string): Persona =>
-    props.personalise?.[code] ?? emptyPersona;
-const personalising = ref<{ code: string; label: string } | null>(null);
-const editingDefault = ref(false);
-
-const dialogState = computed<Persona>(() => {
-    if (editingDefault.value) {
-        const d = props.personalise_default;
-
-        return {
-            ...emptyPersona,
-            hashtags: d?.tags ?? [],
-            hashtag_mode: d?.mode ?? 'append',
-            hashtag_pick: d?.pick ?? 0,
-        };
-    }
-
-    return personalising.value
-        ? personaOf(personalising.value.code)
-        : emptyPersona;
-});
-const dialogOpen = computed(
-    () => editingDefault.value || personalising.value !== null,
-);
-const closePersonalise = (v: boolean) => {
-    if (!v) {
-        editingDefault.value = false;
-        personalising.value = null;
-    }
-};
+const { personaOf, dialogProps, openProduct, openDefault, closePersonalise } =
+    usePersonalise(() => props);
 
 // ---- Sắp xếp: thẻ có video chờ mà chưa có giỏ lên đầu ----
 // Một thẻ đã chọn sản phẩm trong nháp (chưa lưu) vẫn tính là chưa có giỏ cho tới khi lưu.
@@ -431,7 +396,7 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             size="sm"
                             variant="outline"
                             data-testid="fork-personalise-default"
-                            @click="editingDefault = true"
+                            @click="openDefault"
                         >
                             <IconHash class="size-4" />
                             Hashtag mặc định chung{{
@@ -471,12 +436,7 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             :has-draft="!!draft[r.key]"
                             :busy="busy === `row-${r.key}`"
                             :persona="personaOf(r.code)"
-                            @personalise="
-                                personalising = {
-                                    code: r.code,
-                                    label: r.hub_name,
-                                }
-                            "
+                            @personalise="openProduct(r.code, r.hub_name)"
                             @pick="picking = r.key"
                             @update:name="(v: string) => editName(r, v)"
                             @save="saveRow(r)"
@@ -498,11 +458,7 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
         </div>
 
         <PersonaliseDialog
-            :open="dialogOpen"
-            :scope="editingDefault ? 'default' : 'product'"
-            :code="personalising?.code ?? ''"
-            :label="personalising?.label ?? ''"
-            :state="dialogState"
+            v-bind="dialogProps"
             @update:open="closePersonalise"
         />
 

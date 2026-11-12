@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// Khung chung của khu "Tự động đăng": đầu trang thống nhất + thanh điều hướng 4 mục + hiệu ứng vào trang.
+// Khung chung của khu "Tự động đăng": đầu trang thống nhất + thanh điều hướng 5 mục + hiệu ứng vào trang.
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     IconBuildingWarehouse,
     IconCalendarEvent,
     IconChartBar,
+    IconPhotoEdit,
     IconRobot,
     IconShoppingCart,
 } from '@tabler/icons-vue';
@@ -21,7 +22,12 @@ defineProps<{
 }>();
 
 const page = usePage();
-const buyBadge = computed(() => Number((page.props as { fork_badges?: { buy_comments?: number } | null }).fork_badges?.buy_comments ?? 0));
+const buyBadge = computed(() =>
+    Number(
+        (page.props as { fork_badges?: { buy_comments?: number } | null })
+            .fork_badges?.buy_comments ?? 0,
+    ),
+);
 const path = computed(() => page.url.split('?')[0].replace(/\/+$/, '') || '/');
 
 const items = [
@@ -33,6 +39,11 @@ const items = [
     },
     { href: '/auto/kho', label: 'Kho video', icon: IconBuildingWarehouse },
     { href: '/auto/gio-hang', label: 'Giỏ hàng', icon: IconShoppingCart },
+    {
+        href: '/auto/anh-bia-hashtag',
+        label: 'Ảnh bìa & hashtag',
+        icon: IconPhotoEdit,
+    },
     { href: '/auto/so-lieu', label: 'Số liệu', icon: IconChartBar },
 ];
 
@@ -53,7 +64,9 @@ const active = (i: (typeof items)[number]) =>
                     class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3"
                 >
                     <div class="min-w-0">
-                        <h1 class="font-heading text-3xl font-semibold tracking-tight">
+                        <h1
+                            class="font-heading text-3xl font-semibold tracking-tight"
+                        >
                             {{ title }}
                         </h1>
                         <p

@@ -30,7 +30,8 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::patch('accounts/{socialAccount}/shop-products/{productId}', [GioHangController::class, 'setHidden'])
         ->where('productId', '[0-9]{6,25}')->name('accounts.shop-products.hide');
     Route::patch('products/{code}', [AutoController::class, 'updateProduct'])->name('products.update');
-    // Cá nhân hoá theo sản phẩm hub: ảnh bìa riêng và hashtag riêng.
+    // Cá nhân hoá theo sản phẩm hub: ảnh bìa riêng và hashtag riêng (trang tổng hợp + các thao tác).
+    Route::get('anh-bia-hashtag', [PersonaliseController::class, 'index'])->name('anh-bia-hashtag');
     Route::put('products/{code}/personalise', [PersonaliseController::class, 'update'])->name('products.personalise');
     Route::post('products/{code}/personalise/preview', [PersonaliseController::class, 'preview'])->middleware('throttle:60,1')->name('products.personalise.preview');
     Route::post('products/{code}/covers', [PersonaliseController::class, 'upload'])->middleware('throttle:30,1')->name('products.covers.upload');
