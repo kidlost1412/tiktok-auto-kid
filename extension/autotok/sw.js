@@ -16,6 +16,7 @@ const EXT_VERSION = (typeof chrome.runtime.getManifest === 'function' && chrome.
 const DEFAULTS = { server: 'http://localhost:8010', token: '', clientId: null, windowStrategy: 'minimized', keepOpen: false, polling: true };
 const HELLO_EVERY_MS = 55 * 1000;
 const HEARTBEAT_EVERY_MS = 40 * 1000;
+const IDLE_POLL_MS = 3000;                 // pause after an empty /api/ext/next (204) before asking again
 const NEED_RELOAD_TEXT = 'Cần tải lại tiện ích (chrome://extensions → ⟳)';
 const JOB_DEADLINE_MS = 40 * 60 * 1000;   // whole job
 const STALL_MS = 5 * 60 * 1000;           // no progress message from the tab (minimized tabs are throttled)
@@ -704,8 +705,10 @@ async function pollLoop() {
         if (await pollTasks()) continue;                          // a product sync was started: let it run first
         if (await collectIfDue('timer')) continue;                // v1.4: hourly stats + comments (read only)
         await setPoll('đang chờ job');
-        const job = await api('/api/ext/next?wait=20', { timeoutMs: 30000 });
+        // v1.4.4: short poll (wait=0) + client-side idle wait, so a held request never ties up one of the app's few php-cgi workers
+        const job = await api('/api/ext/next?wait=0', { timeoutMs: 15000 });
         if (job) await startJob(job, false);
+        else await wait(IDLE_POLL_MS);
       } catch (e) {
         // includes "No SW" when Chrome tears the worker down mid-await: log, back off, alarm restarts us
         console.warn('[autotok] pollLoop', e);

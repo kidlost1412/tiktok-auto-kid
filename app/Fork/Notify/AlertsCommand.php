@@ -326,8 +326,7 @@ final class AlertsCommand extends Command
 
         // Cùng điều kiện với VideoLibrary::reserveNext.
         $available = AutoVideo::query()
-            ->where('status', AutoVideo::NEW)
-            ->where('file_name', 'like', '%\_MIXKIT\_%')
+            ->eligibleNew()
             ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
             ->count();
 

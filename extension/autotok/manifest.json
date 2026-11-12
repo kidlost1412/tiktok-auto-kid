@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TikTok Auto Kid – tiện ích",
   "description": "Cau noi giua ung dung TikTok Auto Kid va Chrome: dang TikTok tu profile da dang nhap.",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu+MbSg6I2GzXIexOG6RtanOY1QRTbJPXOodt74c8mTqzqvu0djLI6X5BPCJAF3LkvA6b7A66nnWOUB2dm15CHKQqE+ISZOgy/vKeNrHFSbJ+mGXqY/X0jahv9ZzkobwtF4WuDTn1JU+DcaK8aPVW9SeZHdVu11xRuXkmLXvWcNFuF0g9essrV/rrKfmne5aKfjy87LwSvA30ECbvXfehUy2HqIZT26G3j32XNivz1kZ5F5q3cTib8ZYml+/YF0t1KPIG0/qJ8p2Yof3C0QBOPLhWx7hPLeranbGOeLKCpRWvY36EJ2LUS9bK1ElKyxOkeTsQpswuBCNQmjRbrOoixQIDAQAB",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "alarms", "tabs", "background"],

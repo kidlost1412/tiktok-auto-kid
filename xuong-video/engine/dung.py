@@ -53,13 +53,13 @@ def split_sentences(text_no_tag):
 
 
 def sentence_times(text, words):
-    """Ghép từ có mốc thời gian vào từng câu theo số từ."""
+    """Ghép từ có mốc thời gian vào từng câu theo số từ (lệch số từ → dóng theo nội dung từ)."""
     plain = re.sub(r"\[[^\]]*\]", "", text)
     sents = split_sentences(plain)
-    out, i = [], 0
-    for s in sents:
-        n = len([w for w in s.split() if re.search(r"\w", w)])   # bỏ dấu đứng riêng (– …) — khớp cách gộp từ của giọng
-        ws = words[i:i + n]; i += n
+    from phu_de import chia_tu, _tu_dem       # đếm từ như giọng; lệch số từ → dóng theo từ, không trôi câu sau
+    out = []
+    for s, (a, b) in zip(sents, chia_tu([_tu_dem(s) for s in sents], words)):
+        ws = words[a:b]
         if ws:
             out.append({"text": s, "s": ws[0]["s"], "e": ws[-1]["e"], "words": ws})
     return out

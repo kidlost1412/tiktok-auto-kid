@@ -95,7 +95,11 @@ final class AutoController extends Controller
         $dailyCap = collect($rows)->where('enabled', true)->sum('daily_cap');
         $images = ProductImages::lookup($accounts->pluck('id')->map(fn ($id): string => (string) $id)->all());
         $products = $this->productRows($images->byCode());
-        $newTotal = (int) collect($products)->where('enabled', true)->sum('counts.new');
+        // Chỉ đếm video thật sự giữ chỗ được (cùng bộ lọc với reserveNext và cảnh báo sắp hết kho).
+        $newTotal = AutoVideo::query()
+            ->eligibleNew()
+            ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+            ->count();
 
         return Inertia::render('fork/Auto', [
             'products' => $products,
@@ -368,8 +372,13 @@ final class AutoController extends Controller
 
             usort($items, fn (array $x, array $y): int => strcmp((string) $x['at'], (string) $y['at']));
 
-            $counted = $videos->filter(fn (AutoVideo $v): bool => in_array($v->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED, AutoVideo::POSTED], true)
-                && $v->scheduled_for !== null && $v->scheduled_for >= $start->utc() && $v->scheduled_for < $start->addDay()->utc());
+            // Cùng mốc thời gian với trần bài/ngày của VideoLibrary (COALESCE(scheduled_for, posted_at, updated_at)):
+            // bài đăng "ngay" không có scheduled_for vẫn được tính vào hôm nay.
+            $counted = AutoVideo::query()
+                ->where('social_account_id', $a->id)
+                ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED, AutoVideo::POSTED])
+                ->whereRaw('COALESCE(scheduled_for, posted_at, updated_at) >= ? AND COALESCE(scheduled_for, posted_at, updated_at) < ?', [$start->utc(), $start->addDay()->utc()])
+                ->get(['id', 'status', 'posted_at']);
 
             $channels[$a->id] = [
                 'items' => $items,

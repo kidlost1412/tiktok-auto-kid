@@ -222,7 +222,7 @@ const modes = [
 <template>
     <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
         <DialogContent
-            class="max-h-[90vh] max-w-2xl overflow-y-auto"
+            class="flex max-h-[88dvh] max-w-2xl flex-col overflow-hidden"
             data-testid="fork-personalise-dialog"
         >
             <DialogHeader>
@@ -242,7 +242,10 @@ const modes = [
                 </DialogDescription>
             </DialogHeader>
 
-            <div class="flex flex-col gap-6">
+            <!-- Chỉ phần giữa cuộn: nút Đóng/Lưu luôn thấy trên màn hình thấp. -->
+            <div
+                class="-mx-6 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6"
+            >
                 <!-- Ảnh bìa -->
                 <section v-if="isProduct" class="flex flex-col gap-3">
                     <h3 class="text-base font-semibold">Ảnh bìa</h3>
@@ -483,7 +486,7 @@ const modes = [
                 </section>
             </div>
 
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="flex shrink-0 justify-end gap-2 border-t pt-3">
                 <Button variant="ghost" @click="emit('update:open', false)"
                     >Đóng</Button
                 >

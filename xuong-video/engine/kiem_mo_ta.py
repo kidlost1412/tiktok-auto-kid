@@ -5,6 +5,7 @@ van_de[].loai/tu_s/den_s, cay_trong; cờ is_duplicate / ban_trung_cua do ngư�
 
 Dùng:
   python kiem_mo_ta.py <ma-san-pham> [--sua]       (mặc định chạy THỬ: không ghi gì)
+  thêm --ffprobe: đo lại độ dài MỌI video (mặc định chỉ đo khi file thiếu thoi_luong_s hoặc có cảnh vượt quá)
   from kiem_mo_ta import kiem_kho, chuan_hoa_noi_dung, KHUNG_JSON_GEMINI
 
 Quy tắc an toàn: file gốc luôn được giữ ở _mo-ta/<thư mục con>/_goc-kiem/ TRƯỚC khi ghi lại (kho_canh.py bỏ qua mọi thư mục
@@ -691,10 +692,37 @@ def ghi_mo_ta(mt, obj, goc_bytes=None):
     tmp.replace(mt)
 
 
-def kiem_kho(ma_hoac_kho, sua=False, tien_do=None, do_dai=do_dai_video, chi_ffprobe_khi_can=False):
+def _can_ffprobe(d):
+    """File mô tả đã có thoi_luong_s > 0 và mọi cảnh kết thúc ≤ thoi_luong_s + 1 → tin số trong file, khỏi chạy ffprobe."""
+    try:
+        if not isinstance(d, dict):
+            return True
+        c, v, _k = _lay(d, "thoi_luong_s", BI_DANH_GOC["thoi_luong_s"])
+        dai = _so(v) if c else None
+        if not dai or dai <= 0:
+            return True
+        c, cq, _k = _lay(d, "canh_quay", BI_DANH_GOC["canh_quay"])
+        if c and isinstance(cq, dict):
+            cq = [cq]
+        if not c or not isinstance(cq, list):
+            return True
+        for sc in cq:
+            if not isinstance(sc, dict):
+                continue
+            c2, v2, _k2 = _lay(sc, "den_s", BI_DANH_CANH["den_s"])
+            b = _so(v2) if c2 else None
+            if b is not None and b > dai + 1.0:
+                return True
+        return False
+    except Exception:
+        return True
+
+
+def kiem_kho(ma_hoac_kho, sua=False, tien_do=None, do_dai=do_dai_video, chi_ffprobe_khi_can=True):
     """Kiểm định kho. sua=False → CHẠY THỬ (không ghi gì). Trả báo cáo:
     {da_dung: số file đúng sẵn, da_sua: [{file, sua:[..]}], hong: [{file, loi}], thieu_mo_ta: [video...], mo_coi: [file mô tả không còn video],
-     trung: [{video, files}], canh_bao: [...], tong_video, tong_mo_ta, che_do}"""
+     trung: [{video, files}], canh_bao: [...], tong_video, tong_mo_ta, che_do}
+    chi_ffprobe_khi_can=True: chỉ đo độ dài video (ffprobe) khi file mô tả thiếu thoi_luong_s hoặc có cảnh vượt quá nó."""
     kho = Path(ma_hoac_kho) if (isinstance(ma_hoac_kho, Path) or Path(str(ma_hoac_kho)).is_absolute()) else _kho_cua(ma_hoac_kho)
     rep = {"che_do": "that" if sua else "thu", "kho": str(kho), "da_dung": 0, "da_sua": [], "hong": [], "thieu_mo_ta": [], "mo_coi": [],
            "trung": [], "canh_bao": [], "tong_video": 0, "tong_mo_ta": 0, "bo_canh": 0, "da_ghi": 0}
@@ -723,10 +751,10 @@ def kiem_kho(ma_hoac_kho, sua=False, tien_do=None, do_dai=do_dai_video, chi_ffpr
         if rel is None:
             rep["mo_coi"].append(rel_mt); continue
         cua_video.setdefault(rel, []).append(rel_mt)
-        xu_ly.append((mt, rel, theo_truong, goc, rel_mt))
-    for mt, rel, theo_truong, goc, rel_mt in xu_ly:
+        xu_ly.append((mt, rel, theo_truong, goc, rel_mt, d_tho))
+    for mt, rel, theo_truong, goc, rel_mt, d_tho in xu_ly:
         vp = videos[rel]
-        dai = do_dai(vp)
+        dai = do_dai(vp) if (not chi_ffprobe_khi_can or _can_ffprobe(d_tho)) else None
         try:
             obj, ghi, cb = chuan_hoa_noi_dung(goc, dai, rel if not theo_truong else None)
         except Hong as e:
@@ -806,7 +834,7 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         print(__doc__); sys.exit(1)
-    r = kiem_kho(args[0], sua="--sua" in sys.argv)
+    r = kiem_kho(args[0], sua="--sua" in sys.argv, chi_ffprobe_khi_can="--ffprobe" not in sys.argv)
     print(tom_tat(r))
     if "--chi-tiet" in sys.argv:
         print(json.dumps(r, ensure_ascii=False, indent=1))

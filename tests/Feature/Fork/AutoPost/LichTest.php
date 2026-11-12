@@ -131,6 +131,24 @@ test('auto page exposes health, the 3-day schedule and the plan-ahead hint', fun
         ->where('plan_ahead_hours', 6));
 });
 
+test('today counts include posts made with mode now (no scheduled_for)', function (): void {
+    $this->travelTo(CarbonImmutable::now('Asia/Ho_Chi_Minh')->setTime(12, 0)->utc());
+    $id = $this->a['social']->id;
+
+    // Đăng "ngay": không có scheduled_for, chỉ có posted_at.
+    lichVideo('nano-dong', ['status' => AutoVideo::POSTED, 'social_account_id' => $id, 'posted_at' => now()->subHour()]);
+    // Vừa giữ chỗ cho bài đăng ngay: chưa có scheduled_for lẫn posted_at (mốc là updated_at, như trần bài/ngày).
+    lichVideo('nano-dong', ['status' => AutoVideo::RESERVED, 'social_account_id' => $id]);
+    // Hẹn giờ hôm nay.
+    lichVideo('nano-dong', ['status' => AutoVideo::SCHEDULED, 'social_account_id' => $id, 'scheduled_for' => now()->addHours(2)]);
+    // Hẹn ngày mai: không tính vào hôm nay.
+    lichVideo('nano-dong', ['status' => AutoVideo::SCHEDULED, 'social_account_id' => $id, 'scheduled_for' => now()->addDay()]);
+
+    $this->actingAs($this->a['owner'])->get('/auto')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
+        ->where("lich.channels.{$id}.today.planned", 3)
+        ->where("lich.channels.{$id}.today.posted", 1));
+});
+
 test('plan-now only plans the channels of the signed-in owner', function (): void {
     $b = lichOwner('kenh_b');
     lichCart($this->a['social']);

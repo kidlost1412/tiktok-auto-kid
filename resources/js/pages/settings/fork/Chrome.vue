@@ -87,9 +87,6 @@ interface ChromeProfile {
     bundle_extension?: boolean;
 }
 
-/** Bản tiện ích mới nhất đi kèm app. */
-const LATEST_EXTENSION = '1.4.1';
-
 const props = defineProps<{
     pair: Pair | null;
     clients: ChromeClient[];
@@ -98,10 +95,37 @@ const props = defineProps<{
     profiles: ChromeProfile[];
     telegram?: { configured: boolean };
     extensionPath: string;
+    /** Bản tiện ích đi kèm app (đọc từ extension/autotok/manifest.json). */
+    latestExtension?: string | null;
     serverUrl: string;
     hasWorkspace: boolean;
     backgroundMode?: { chrome: boolean | null; edge: boolean | null };
 }>();
+
+/** So sánh phiên bản dạng số (1.4.10 > 1.4.9): âm nếu a < b. */
+function compareVersions(a: string, b: string): number {
+    const pa = a.split('.').map((x) => parseInt(x, 10) || 0);
+    const pb = b.split('.').map((x) => parseInt(x, 10) || 0);
+
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+
+        if (d !== 0) {
+            return d;
+        }
+    }
+
+    return 0;
+}
+
+/** Tiện ích đang chạy cũ hơn bản đi kèm app (chỉ khi cả hai đều biết). */
+function extensionOutdated(version: string | null | undefined): boolean {
+    return (
+        !!props.latestExtension &&
+        !!version &&
+        compareVersions(version, props.latestExtension) < 0
+    );
+}
 
 const only = [
     'pair',
@@ -440,7 +464,9 @@ const chromeOnlyCandidates = computed(() => {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                @click="copy(serverUrl || 'http://localhost:8010')"
+                                @click="
+                                    copy(serverUrl || 'http://localhost:8010')
+                                "
                             >
                                 <IconCopy class="size-4" />
                                 Chép
@@ -451,22 +477,26 @@ const chromeOnlyCandidates = computed(() => {
                         <p class="text-sm text-muted-foreground">
                             Phiên bản tiện ích TikTok Auto Kid
                         </p>
-                        <p class="mt-1 text-xl font-semibold">
-                            Mới nhất: v{{ LATEST_EXTENSION }}
+                        <p
+                            v-if="latestExtension"
+                            class="mt-1 text-xl font-semibold"
+                        >
+                            Mới nhất: v{{ latestExtension }}
                         </p>
                         <p
                             v-for="c in clients"
                             :key="c.id"
                             :class="
-                                c.ext_version === LATEST_EXTENSION
-                                    ? 'text-sm text-success-text'
-                                    : 'text-sm text-amber-700 dark:text-amber-400'
+                                extensionOutdated(c.ext_version)
+                                    ? 'text-sm text-amber-700 dark:text-amber-400'
+                                    : 'text-sm text-success-text'
                             "
                         >
-                            {{ c.label }}: đang chạy v{{ c.ext_version }}{{
-                                c.ext_version === LATEST_EXTENSION
-                                    ? ' (đã mới nhất)'
-                                    : ': hãy tải lại tiện ích ở chrome://extensions'
+                            {{ c.label }}: đang chạy v{{ c.ext_version
+                            }}{{
+                                extensionOutdated(c.ext_version)
+                                    ? ': hãy tải lại tiện ích ở chrome://extensions'
+                                    : ' (đã mới nhất)'
                             }}
                         </p>
                     </div>
@@ -513,8 +543,8 @@ const chromeOnlyCandidates = computed(() => {
                         Chép mã
                     </Button>
                     <span class="text-sm text-muted-foreground">
-                        Còn hiệu lực {{ countdown }}. Tạo mã mới sẽ làm mã cũ mất
-                        hiệu lực.
+                        Còn hiệu lực {{ countdown }}. Tạo mã mới sẽ làm mã cũ
+                        mất hiệu lực.
                     </span>
                 </div>
                 <div
@@ -533,14 +563,19 @@ const chromeOnlyCandidates = computed(() => {
                         class="mt-3 list-inside list-decimal space-y-2 text-muted-foreground"
                     >
                         <li>
-                            Mở Chrome, vào <code>chrome://extensions</code> (Edge:
+                            Mở Chrome, vào
+                            <code>chrome://extensions</code> (Edge:
                             <code>edge://extensions</code>) và bật “Chế độ cho
                             nhà phát triển”.
                         </li>
                         <li>
                             Bấm “Tải tiện ích đã giải nén” rồi chọn thư mục:
-                            <span class="mt-1 flex flex-wrap items-center gap-2">
-                                <code class="break-all">{{ extensionPath }}</code>
+                            <span
+                                class="mt-1 flex flex-wrap items-center gap-2"
+                            >
+                                <code class="break-all">{{
+                                    extensionPath
+                                }}</code>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -560,13 +595,13 @@ const chromeOnlyCandidates = computed(() => {
                         </li>
                         <li>
                             Vào <code>chrome://settings/system</code> và bật
-                            “Tiếp tục chạy ứng dụng nền khi đóng Google
-                            Chrome”, để tiện ích vẫn nhận việc khi bạn đã đóng
-                            cửa sổ Chrome.
+                            “Tiếp tục chạy ứng dụng nền khi đóng Google Chrome”,
+                            để tiện ích vẫn nhận việc khi bạn đã đóng cửa sổ
+                            Chrome.
                         </li>
                         <li>
-                            Sau mỗi lần cập nhật tiện ích, bấm nút tải lại (⟳)
-                            ở <code>chrome://extensions</code>.
+                            Sau mỗi lần cập nhật tiện ích, bấm nút tải lại (⟳) ở
+                            <code>chrome://extensions</code>.
                         </li>
                     </ol>
                 </details>
@@ -625,7 +660,10 @@ const chromeOnlyCandidates = computed(() => {
                                 'secondary'
                             "
                         >
-                            {{ clientStatus[client.status]?.label ?? client.status }}
+                            {{
+                                clientStatus[client.status]?.label ??
+                                client.status
+                            }}
                         </Badge>
                         <Badge
                             v-if="keepAliveChip(client)"
@@ -647,7 +685,9 @@ const chromeOnlyCandidates = computed(() => {
                             variant="destructive-subtle"
                             data-testid="fork-chrome-profile-conflict"
                         >
-                            Trùng profile với “{{ client.profile_conflict_with }}”
+                            Trùng profile với “{{
+                                client.profile_conflict_with
+                            }}”
                         </Badge>
 
                         <NativeSelect
@@ -662,7 +702,9 @@ const chromeOnlyCandidates = computed(() => {
                             <option
                                 v-for="profile in profiles"
                                 :key="`${profile.browser}|${profile.dir}`"
-                                :value="optionValue(profile.browser, profile.dir)"
+                                :value="
+                                    optionValue(profile.browser, profile.dir)
+                                "
                             >
                                 {{ profileLabel(profile) }}
                             </option>
@@ -685,7 +727,9 @@ const chromeOnlyCandidates = computed(() => {
                             <label class="flex items-center gap-2">
                                 <Switch
                                     :model-value="client.keep_alive ?? true"
-                                    :disabled="busy === `keepalive-${client.id}`"
+                                    :disabled="
+                                        busy === `keepalive-${client.id}`
+                                    "
                                     aria-label="Giữ Chrome luôn chạy nền"
                                     data-testid="fork-chrome-keepalive-toggle"
                                     @update:model-value="
@@ -695,9 +739,13 @@ const chromeOnlyCandidates = computed(() => {
                                 Giữ Chrome luôn chạy nền
                             </label>
                             <span class="text-muted-foreground">
-                                <template v-if="client.keepalive?.last_start_at">
+                                <template
+                                    v-if="client.keepalive?.last_start_at"
+                                >
                                     Tự mở lần cuối
-                                    {{ fromNow(client.keepalive.last_start_at) }}
+                                    {{
+                                        fromNow(client.keepalive.last_start_at)
+                                    }}
                                 </template>
                                 <template v-else>Chưa tự mở lần nào</template>
                             </span>
@@ -726,16 +774,16 @@ const chromeOnlyCandidates = computed(() => {
                     </li>
                 </ul>
                 <p v-if="clients.length" class="text-sm text-muted-foreground">
-                    Profile Chrome để tự mở khi Chrome đang tắt: chọn profile
-                    mà bạn đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu
-                    chỉ có một lựa chọn, app tự chọn giúp.
+                    Profile Chrome để tự mở khi Chrome đang tắt: chọn profile mà
+                    bạn đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu chỉ
+                    có một lựa chọn, app tự chọn giúp.
                 </p>
                 <p
                     v-if="!profiles.length && clients.length"
                     class="text-sm text-muted-foreground"
                 >
-                    Chưa có danh sách profile từ trợ lý mở Chrome. Bạn có thể
-                    gõ tên thư mục profile (Default, Profile 1, ...).
+                    Chưa có danh sách profile từ trợ lý mở Chrome. Bạn có thể gõ
+                    tên thư mục profile (Default, Profile 1, ...).
                 </p>
             </SettingsSection>
 
@@ -848,7 +896,9 @@ const chromeOnlyCandidates = computed(() => {
                         class="flex items-center gap-3"
                     >
                         <span class="flex-1">
-                            @{{ (client.tiktok_username ?? '').replace(/^@/, '') }}
+                            @{{
+                                (client.tiktok_username ?? '').replace(/^@/, '')
+                            }}
                             <span class="text-sm text-muted-foreground">
                                 ({{ client.label }})
                             </span>
@@ -942,7 +992,9 @@ const chromeOnlyCandidates = computed(() => {
                             </Badge>
                             <Badge variant="outline">
                                 <IconPlayerPlay class="size-3" />
-                                {{ job.mode === 'now' ? 'Đăng ngay' : 'Hẹn giờ' }}
+                                {{
+                                    job.mode === 'now' ? 'Đăng ngay' : 'Hẹn giờ'
+                                }}
                             </Badge>
                             <span class="text-sm text-muted-foreground">
                                 @{{ job.username }} ·
@@ -953,7 +1005,10 @@ const chromeOnlyCandidates = computed(() => {
                             {{ job.caption || '(không có chú thích)' }}
                         </p>
                         <p
-                            v-if="job.state === 'posted' && job.mode === 'scheduled'"
+                            v-if="
+                                job.state === 'posted' &&
+                                job.mode === 'scheduled'
+                            "
                             class="text-sm font-emphasis text-amber-700 dark:text-amber-400"
                         >
                             Đã hẹn trên TikTok — muốn đổi thì sửa/huỷ trong

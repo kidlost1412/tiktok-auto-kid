@@ -393,8 +393,14 @@ def _bu_bo_cuc(segs, shots, used):
 
 # ---------------------------------------------------------------- GIÁM KHẢO
 def to_ban_dung(video, sents, out, blocks=None):
-    """Ảnh soát bản dựng: 1 khung giữa mỗi câu (+ đầu/cuối), có ghi số câu."""
-    ts = [0.5] + [round((s["s"] + s["e"]) / 2, 2) for s in sents] + [round(sents[-1]["e"] - 0.2, 2)]
+    """Ảnh soát bản dựng: 1 khung ở ~65% mỗi câu (khối chữ có hiệu ứng đã hiện đủ) (+ đầu/cuối), có ghi số câu."""
+    def moc(s):                       # 65% câu, kẹp trong câu (cách mép 0,05 s nếu câu đủ dài)
+        a, b = s["s"], s["e"]
+        t = a + 0.65 * (b - a)
+        if b - a > 0.1:
+            t = min(max(t, a + 0.05), b - 0.05)
+        return round(t, 2)
+    ts = [0.5] + [moc(s) for s in sents] + [round(sents[-1]["e"] - 0.2, 2)]
     tmp = Path(out).with_suffix(""); tmp.mkdir(exist_ok=True)
     ims = []
     for i, t in enumerate(ts):

@@ -7,10 +7,10 @@ use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
+use App\Fork\AutoPost\Models\VideoStat;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
-use App\Fork\AutoPost\Models\VideoStat;
 use App\Fork\Notify\Telegram;
 use App\Fork\Notify\TelegramSettings;
 use App\Models\Account;
@@ -142,6 +142,7 @@ test('failed auto videos and paused cart links are reported', function () {
 });
 
 test('low stock is reported when new videos are fewer than the daily cap', function () {
+    config()->set('fork.auto.hub_api.key', '');
     // Tránh 21:00 (giờ gửi tổng kết ngày) để chỉ có đúng 1 tin cảnh báo.
     $this->travelTo(now('Asia/Ho_Chi_Minh')->setTime(15, 0)->utc());
     AutoAccount::query()->create(['social_account_id' => $this->social->id, 'enabled' => true, 'daily_cap' => 5]);
@@ -150,7 +151,7 @@ test('low stock is reported when new videos are fewer than the daily cap', funct
     foreach (range(1, 3) as $i) {
         AutoVideo::query()->create([
             'hash' => "s{$i}", 'path' => '/x.mp4', 'batch_date' => now()->toDateString(), 'file_name' => "v{$i}_MIXKIT_1.mp4",
-            'product_code' => 'SP1', 'status' => AutoVideo::NEW,
+            'product_code' => 'SP1', 'status' => AutoVideo::NEW, 'caption' => "Caption {$i}",
         ]);
     }
 
@@ -162,6 +163,37 @@ test('low stock is reported when new videos are fewer than the daily cap', funct
     fakeTelegram();
     $this->artisan('fork:alerts')->assertSuccessful();
     expect(sentTexts())->toBe([]);
+});
+
+test('low stock counts the same eligible videos as reserveNext', function () {
+    config()->set('fork.auto.hub_api.key', '');
+    $this->travelTo(now('Asia/Ho_Chi_Minh')->setTime(15, 0)->utc());
+    AutoAccount::query()->create(['social_account_id' => $this->social->id, 'enabled' => true, 'daily_cap' => 10]);
+    AutoProduct::query()->create(['code' => 'SP1', 'name' => 'SP1', 'short_name' => 'SP1', 'enabled' => true]);
+    AutoProduct::query()->create(['code' => 'OFF', 'name' => 'OFF', 'short_name' => 'OFF', 'enabled' => false]);
+
+    $make = function (string $hash, array $o = []): void {
+        AutoVideo::query()->create(array_merge([
+            'hash' => $hash, 'path' => "/{$hash}.mp4", 'batch_date' => now()->toDateString(), 'file_name' => "{$hash}.mp4",
+            'product_code' => 'SP1', 'status' => AutoVideo::NEW, 'source' => 'hub', 'caption' => 'Caption',
+        ], $o));
+    };
+
+    // Đủ điều kiện: video hub/kho (không cần tên MIXKIT) và bản MIXKIT kiểu cũ.
+    $make('e1');
+    $make('e2', ['source' => 'kho']);
+    $make('e3', ['source' => 'ra', 'file_name' => 'e3_MIXKIT_1.mp4']);
+    // Không đủ điều kiện: thiếu caption, file đã xoá, kiểu cũ không MIXKIT, sản phẩm tắt, không còn new.
+    $make('x1', ['caption' => null]);
+    $make('x2', ['files_deleted_at' => now()]);
+    $make('x3', ['source' => 'ra']);
+    $make('x4', ['product_code' => 'OFF']);
+    $make('x5', ['status' => AutoVideo::POSTED]);
+
+    expect(AutoVideo::query()->eligibleNew()->whereIn('product_code', ['SP1'])->count())->toBe(3);
+
+    $this->artisan('fork:alerts')->assertSuccessful();
+    expect(sentTexts())->toHaveCount(1)->and(sentTexts()[0])->toContain('Kho sắp hết video')->toContain('<code>3</code> video');
 });
 
 test('the daily summary does not count imported posts still scheduled in the future', function () {

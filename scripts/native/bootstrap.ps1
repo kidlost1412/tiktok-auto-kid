@@ -23,6 +23,27 @@ function Run([string]$exe, [string[]]$a) {
     if ($LASTEXITCODE -ne 0) { throw "Lenh that bai ($LASTEXITCODE): $exe $($a -join ' ')" }
 }
 
+# Caddy: snippet hub_ra_root (<FORK_HUB_PATH>/ra cho /media/ra), sinh lai tu .env moi lan khoi dong
+# de doi thu muc du lieu co hieu luc (cung logic voi setup.ps1). Loi o day khong chan khoi dong.
+try {
+    $envPath = Join-Path $Root '.env'
+    $envLines = if (Test-Path $envPath) { [IO.File]::ReadAllLines($envPath, [Text.Encoding]::UTF8) } else { @() }
+    $envVal = { param($k) (($envLines | Where-Object { $_ -match "^$k=" } | Select-Object -First 1) -replace "^$k=", '').Trim().Trim('"') }
+    $hubEnv = & $envVal 'FORK_HUB_PATH'
+    if (-not $hubEnv) { $hubEnv = & $envVal 'XUONG_DATA' }
+    if (-not $hubEnv) { $hubEnv = Join-Path $Root 'du-lieu\xuong-video' }
+    $hubRa = ($hubEnv.Replace('\', '/').TrimEnd('/') + '/ra').Replace('"', '')
+    $snippet = "(hub_ra_root) {`n`troot * `"$hubRa`"`n}`n"
+    $snipPath = Join-Path $rt 'hub-root.caddy'
+    $old = if (Test-Path $snipPath) { [IO.File]::ReadAllText($snipPath) } else { $null }
+    if ($old -cne $snippet) {
+        [IO.File]::WriteAllText($snipPath, $snippet, (New-Object Text.UTF8Encoding($false)))
+        Write-Host '[bootstrap] cap nhat runtime/hub-root.caddy'
+    }
+} catch {
+    Write-Host "[bootstrap] khong ghi duoc runtime/hub-root.caddy: $($_.Exception.Message)"
+}
+
 if (-not (Test-Path (Join-Path $data 'PG_VERSION'))) {
     Write-Host '[bootstrap] initdb'
     New-Item -ItemType Directory -Force (Split-Path $data) | Out-Null

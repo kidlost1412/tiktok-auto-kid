@@ -109,7 +109,11 @@ const statLine = computed(() => {
     return s
         ? [
               { icon: IconHeart, label: 'Thích', value: s.likes },
-              { icon: IconMessageCircle, label: 'Bình luận', value: s.comments },
+              {
+                  icon: IconMessageCircle,
+                  label: 'Bình luận',
+                  value: s.comments,
+              },
               { icon: IconShare3, label: 'Chia sẻ', value: s.shares },
               { icon: IconBookmark, label: 'Lưu', value: s.saves ?? null },
               { icon: IconEye, label: '72h', value: s.views_72h ?? null },
@@ -152,7 +156,9 @@ const statLine = computed(() => {
                         v-if="viewer.open && video.can_preview"
                         :key="video.id"
                         :src="videoUrl(video.id)"
-                        :poster="video.has_cover ? coverUrl(video.id) : undefined"
+                        :poster="
+                            video.has_cover ? coverUrl(video.id) : undefined
+                        "
                         controls
                         autoplay
                         playsinline
@@ -272,7 +278,9 @@ const statLine = computed(() => {
                             cn(
                                 'rounded-lg border p-3 text-sm',
                                 toneClasses[
-                                    video.status === 'failed' ? 'danger' : 'warn'
+                                    video.status === 'failed'
+                                        ? 'danger'
+                                        : 'warn'
                                 ].box,
                             )
                         "
@@ -284,7 +292,9 @@ const statLine = computed(() => {
                         class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm"
                     >
                         <dt class="text-muted-foreground">Giỏ hàng</dt>
-                        <dd class="flex min-w-0 items-center gap-1.5 font-medium">
+                        <dd
+                            class="flex min-w-0 items-center gap-1.5 font-medium"
+                        >
                             <IconShoppingCart
                                 class="size-4 shrink-0 text-muted-foreground"
                             />
@@ -293,10 +303,12 @@ const statLine = computed(() => {
                             }}</span>
                         </dd>
                         <dt class="text-muted-foreground">Kênh</dt>
-                        <dd class="flex min-w-0 items-center gap-1.5 font-medium">
+                        <dd
+                            class="flex min-w-0 items-center gap-1.5 font-medium"
+                        >
                             <Avatar
                                 :src="video.channel_avatar ?? null"
-                                :name="video.channel ?? '?'"
+                                :name="video.channel?.replace(/^@+/, '') || '?'"
                                 class="size-5 rounded-full"
                                 fallback-class="bg-secondary text-[0.65rem] font-bold"
                             />
@@ -396,7 +408,8 @@ const statLine = computed(() => {
                             >
                         </div>
                         <span v-if="video.stats.collected_at"
-                            >Cập nhật lúc {{ fmtTime(video.stats.collected_at) }}</span
+                            >Cập nhật lúc
+                            {{ fmtTime(video.stats.collected_at) }}</span
                         >
                     </div>
 
@@ -406,25 +419,35 @@ const statLine = computed(() => {
                         data-testid="fork-viewer-comments"
                     >
                         <span class="text-sm font-semibold"
-                            >Bình luận ({{ video.comments.total }}<template
-                                v-if="video.comments.buy"
+                            >Bình luận ({{ video.comments.total
+                            }}<template v-if="video.comments.buy"
                                 >, {{ video.comments.buy }} hỏi mua</template
                             >)</span
                         >
-                        <ul class="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+                        <ul
+                            class="flex max-h-48 flex-col gap-1.5 overflow-y-auto"
+                        >
                             <li
                                 v-for="c in video.comments.rows"
                                 :key="c.id"
                                 class="rounded-lg bg-muted p-2 text-sm"
                             >
-                                <span class="font-medium">{{ c.author || 'Ẩn danh' }}</span>
-                                <Badge v-if="c.buy" variant="outline" class="ml-1.5"
+                                <span class="font-medium">{{
+                                    c.author || 'Ẩn danh'
+                                }}</span>
+                                <Badge
+                                    v-if="c.buy"
+                                    variant="outline"
+                                    class="ml-1.5"
                                     >Hỏi mua</Badge
                                 >
-                                <span class="ml-1.5 text-xs text-muted-foreground">{{
-                                    fmtTime(c.at)
-                                }}</span>
-                                <p class="break-words whitespace-pre-line">{{ c.text }}</p>
+                                <span
+                                    class="ml-1.5 text-xs text-muted-foreground"
+                                    >{{ fmtTime(c.at) }}</span
+                                >
+                                <p class="break-words whitespace-pre-line">
+                                    {{ c.text }}
+                                </p>
                             </li>
                         </ul>
                     </div>

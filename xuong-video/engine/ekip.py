@@ -214,7 +214,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 list(ex.map(lambda t: len_bang(t, (gop or {}).get(id(t), "")), nhom))
         with ThreadPoolExecutor(2) as ex:      # 2 luồng FFmpeg: máy 16 GB
             ds = [x for x in ex.map(dung_nen, ds) if x]
-        moi = [t for t in ds if Path(t["job"]["base"]).exists()]       # bản dựng lại hỏng: giữ nguyên bản cũ, không dựng chữ lại
+        moi = [t for t in ds if Path(t["job"]["base"]).exists()       # bản dựng lại hỏng: giữ nguyên bản cũ, không dựng chữ lại
+               and not (t.get("_cu") and t["job"]["out"] == t["_cu"]["job"]["out"])]   # (không ghi đè file cũ)
         done = set(dung_lo([t["job"] for t in moi], tam / "_public", log)) if moi else set()
         return [t for t in moi if t["job"]["out"] in done]
 
@@ -249,7 +250,25 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                     t["_cu"] = {"job": dict(t["job"]), "info": t["info"], "fname": t["fname"], "gk": t["gk"], "edl": t["edl"],
                                 "plan": t["plan"], "music": t.get("music")}
                 gop = {id(t): f"{t['gk'].get('sua')} | Lỗi: {'; '.join(t['gk'].get('loi', []))}" for t in sua}
-                lai = mot_vong(sua, gop)
+                try:
+                    lai = mot_vong(sua, gop)
+                except BaseException:            # hết hạn mức / lỗi giữa chừng → mọi bản về nguyên trạng cũ
+                    lai = []
+                    for t in sua:
+                        for k in ("job", "info", "fname", "gk", "edl", "plan", "music"):
+                            t[k] = t["_cu"][k]
+                        t["lan"] = 1
+                    raise
+                # Chỉ tính là "dựng lại xong" khi có file MỚI khác bản cũ. Bản nào dựng nền/lớp chữ hỏng → trả lại
+                # nguyên trạng bản cũ (job/info/fname/...) để vòng dưới không cất nhầm video cũ vào _ban-chua-dat.
+                lai = [t for t in lai if t["job"]["out"] != t["_cu"]["job"]["out"] and Path(t["job"]["out"]).exists()]
+                id_lai = {id(t) for t in lai}
+                for t in sua:
+                    if id(t) not in id_lai:
+                        log(f"  dựng lại hỏng {t['_cu']['fname']} → giữ bản cũ")
+                        for k in ("job", "info", "fname", "gk", "edl", "plan", "music"):
+                            t[k] = t["_cu"][k]
+                        t["lan"] = 1
                 with ThreadPoolExecutor(3) as ex:
                     kq2 = list(ex.map(lambda t: (t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"])), lai))
                 for t, r in kq2:

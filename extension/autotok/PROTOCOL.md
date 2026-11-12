@@ -66,11 +66,14 @@ With an unsupported protocol the answer is still 200 with `need_reload: true` an
 `message`; the backend records the version so the GUI can show the reminder.
 
 ### 3.3 `GET /api/ext/next?wait=<0..25>`
-Long poll (seconds, capped at 25). Every call counts as "seen" for readiness. Returns the oldest
+Long poll (seconds, capped server-side by `fork.chrome.next_max_wait`, 10). Every call counts as "seen" for readiness. Returns the oldest
 `queued` job for the account bound to this client's last reported `user_id`.
 - 200: the job (below). The job is now `claimed` by this client; it is never served again (no
   re-issue). The extension must keep it in durable storage and resume it after a restart.
 - 204: nothing to do.
+- Extension >= 1.4.4 sends `wait=0` (answered at once) and waits ~3 s itself after a 204 before
+  asking again: a held request would occupy one of the app's two php-cgi workers. Older
+  extensions still send `wait=20` and are still served the hold (no protocol change).
 - 409 `need_reload` / `identity_conflict` / `no_identity`.
 
 Job object:

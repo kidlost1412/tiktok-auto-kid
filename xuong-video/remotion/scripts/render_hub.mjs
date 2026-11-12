@@ -13,7 +13,7 @@ const jobs = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
 const t0 = Date.now();
 const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'hub', 'entry.ts'), publicDir, onProgress: () => {}});
 console.log(JSON.stringify({bundled: (Date.now() - t0) / 1000}));
-const conc = Number(process.env.HUB_CONC || 6);
+const conc = Number(process.env.HUB_CONC || 3);   // 3: máy 16 GB RAM (6 từng làm hết RAM)
 async function one(j, inputProps, c) {
   const composition = await selectComposition({serveUrl, id: 'HubOverlay', inputProps, chromiumOptions: {gl: 'angle'}, timeoutInMilliseconds: 180000});
   fs.mkdirSync(j.frames, {recursive: true});

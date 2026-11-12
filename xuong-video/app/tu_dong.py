@@ -22,19 +22,24 @@ def _doc(f, md):
 
 
 def dem(ma):
-    """(tồn: video chưa đăng & chưa ❌, làm hôm nay)."""
+    """(tồn: video app TikTok Auto lấy đăng được, làm hôm nay).
+    Tồn = ĐÚNG bộ lọc của cổng cong_trypost.ds_video(status="ung"): đã ✅ (ket_qua "dat") và chưa đăng (trang_thai != "da_dang").
+    Bật "Tự duyệt theo điểm": chỉ tính video ✅. Tắt: tính thêm video chờ duyệt tay (chưa ✅/❌) để không làm thừa."""
     ra = Path(cfg()["duong_dan"]["ra"])
     dg = _doc(LS / "danh-gia.json", {}); tt = _doc(LS / "trypost.json", {})
     hom_nay = datetime.date.today().isoformat()
     ton = nay = 0
+    tu_duyet_bat = bool((cfg().get("tu_duyet") or {}).get("bat"))
     for v in ra.glob(f"*/{ma}_*.mp4"):
         if v.parent.name.startswith("_"):
             continue
         if v.parent.name == hom_nay:
             nay += 1
-        if (tt.get(v.stem) or {}).get("trang_thai") == "da_dang" or (dg.get(v.name) or {}).get("ket_qua") == "bo":
+        kq = (dg.get(v.name) or {}).get("ket_qua")
+        if (tt.get(v.stem) or {}).get("trang_thai") == "da_dang" or kq == "bo":
             continue
-        ton += 1
+        if kq == "dat" or (not tu_duyet_bat and not kq):   # tắt tự duyệt: video chờ anh duyệt tay vẫn tính tồn (khỏi làm thừa, tốn hạn mức)
+            ton += 1
     return ton, nay
 
 

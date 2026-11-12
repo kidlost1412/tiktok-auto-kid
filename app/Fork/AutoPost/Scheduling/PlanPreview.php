@@ -131,11 +131,7 @@ final class PlanPreview
         $enabled = AutoProduct::query()->where('enabled', true)->pluck('code')->all();
 
         return AutoVideo::query()
-            ->where('status', AutoVideo::NEW)
-            ->whereNull('files_deleted_at')
-            ->whereNotNull('caption')->where('caption', '!=', '')
-            ->where(fn ($q) => $q->whereIn('source', ['kho', 'hub'])->orWhere('file_name', 'like', '%\_MIXKIT\_%'))
-            ->when(filled(config('fork.auto.hub_api.key')), fn ($q) => $q->whereNotNull('hub_id'))
+            ->eligibleNew()
             ->whereIn('product_code', $enabled)
             ->whereIn('product_code', array_keys($allowed))
             ->orderBy('batch_date')

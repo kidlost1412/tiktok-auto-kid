@@ -66,7 +66,7 @@ def nhac_tai_bat_dau():
     if NHAC_TAI["dang"]:
         return {"ok": False, "loi": "Đang tải rồi."}
     if not ((cfg().get("nhac") or {}).get("goi_mac_dinh_url") or "").strip():
-        return {"ok": False, "loi": "Chưa có link tải — sẽ có khi đưa lên GitHub."}
+        return {"ok": False, "loi": "Chưa có gói nhạc tải sẵn. Thêm thư mục nhạc của anh ở mục bên dưới."}
     NHAC_TAI.update(dang=True, ghi="Bắt đầu…", da=0, tong=0, loi=None, xong=False)
 
     def cb(d):
@@ -88,6 +88,66 @@ def nhac_tai_bat_dau():
 
 def ra_dir():
     return Path(cfg()["duong_dan"]["ra"])
+
+
+# ---- Khoá ElevenLabs (giọng đọc): kiểm trước khi chạy lô, nhập/lưu ở tab Cài đặt (không bao giờ trả nguyên khoá ra giao diện) ----
+KHOA_GIONG = "ELEVENLABS_API_KEY"
+
+
+def _env_hub():
+    return Path(cfg()["duong_dan"].get("env_file") or (HUB / ".env"))
+
+
+def _doc_khoa(f):
+    try:
+        for l in Path(f).read_text(encoding="utf-8-sig").splitlines():
+            k, _, v = l.partition("=")
+            if k.strip() == KHOA_GIONG:
+                return v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def _khoa_hien_tai():
+    return _doc_khoa(_env_hub()) or _doc_khoa(CODE.parent / ".env")
+
+
+def co_khoa_giong():
+    try:
+        sys.path.insert(0, str(CODE / "engine"))
+        from giong import co_khoa_giong as _ck      # engine (agent khác thêm); chưa có / thiếu thư viện → kiểm tại chỗ
+        return bool(_ck())
+    except Exception:
+        return bool(_khoa_hien_tai())
+
+
+def khoa_giong_trang_thai():
+    k = _khoa_hien_tai()
+    return {"ok": True, "co": bool(k), "cuoi": k[-4:] if len(k) >= 8 else ""}
+
+
+def khoa_giong_luu(k):
+    k = str(k or "").strip().strip('"').strip("'")
+    if not re.fullmatch(r"[A-Za-z0-9_\-]{16,200}", k):
+        return {"ok": False, "loi": "Khoá không hợp lệ (dán đúng khoá API ElevenLabs, không có dấu cách)."}
+    f = _env_hub(); f.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        dong = f.read_text(encoding="utf-8-sig").splitlines() if f.exists() else []
+    except OSError:
+        dong = []
+    moi, da = [], False
+    for l in dong:
+        if l.partition("=")[0].strip() == KHOA_GIONG:
+            if not da:
+                moi.append(f"{KHOA_GIONG}={k}"); da = True
+            continue
+        moi.append(l)
+    if not da:
+        moi.append(f"{KHOA_GIONG}={k}")
+    f.write_bytes(("\n".join(moi) + "\n").encode("utf-8"))      # UTF-8 không BOM, giữ các dòng khác
+    os.environ.pop(KHOA_GIONG, None)                                # lần chạy sau đọc lại từ file
+    return khoa_giong_trang_thai()
 
 
 NHUNG_MAC_DINH = ["http://localhost:8010", "http://127.0.0.1:8010"]     # TikTok Auto nhúng app này (iframe)
@@ -301,9 +361,12 @@ def kho_trang_thai(ma):
     so_mo_ta = len({x.name.replace(".mo-ta.json", "").lower().removesuffix(".mp4") for x in (kho / "_mo-ta").rglob("*.mo-ta.json") if not any(q.startswith("_") for q in x.relative_to(kho / "_mo-ta").parts[:-1])})         if kho and (kho / "_mo-ta").exists() else 0          # đếm theo tên video (bỏ bản trùng ở thư mục con / sao lưu)
     j = KHO_JOB.get(ma)
     log = (LS / f"kho-{ma}.log")
-    return {"kho": sp.get("kho_video", ""), "kho_ton_tai": bool(kho and kho.exists()), "so_video": so_video, "so_mo_ta": so_mo_ta,
+    dong = log.read_text(encoding="utf-8", errors="replace").splitlines() if log.exists() else []
+    moc = [l.strip() for l in dong if l.startswith("##")]
+    buoc = 4 if moc and moc[-1] == "##XONG" else (int(moc[-1][7]) if moc and re.fullmatch(r"##BUOC [1-3]/3", moc[-1]) else 0)
+    return {"buoc": buoc, "kho": sp.get("kho_video", ""), "kho_ton_tai": bool(kho and kho.exists()), "so_video": so_video, "so_mo_ta": so_mo_ta,
             "so_canh": len(canh), "so_soat": sum(1 for x in canh if x.get("soat")), "dang_chay": bool(j and j.poll() is None),
-            "log": log.read_text(encoding="utf-8", errors="replace").splitlines()[-8:] if log.exists() else []}
+            "log": [l for l in dong if not l.startswith("##")][-8:]}
 
 
 PROMPT_GEMINI = CODE / "luat" / "MO-TA-VIDEO-GEMINI.md"   # mẫu Gemini mô tả từng cảnh (hub đọc đúng mẫu này)
@@ -325,8 +388,8 @@ def chuan_bi_kho(ma):
         return {"ok": False, "loi": "Đang chuẩn bị kho rồi."}
     c = cfg(); py = c["duong_dan"]["python"]; eng = CODE / "engine"
     log = LS / f"kho-{ma}.log"
-    cmd = (f'"{py}" -X utf8 "{eng / "kiem_mo_ta.py"}" {ma} --sua && "{py}" -X utf8 "{eng / "kho_canh.py"}" {ma} && '
-           f'"{py}" -X utf8 "{eng / "soat_kho.py"}" {ma}')          # kiểm định dạng mô tả → nạp cảnh → AI soát
+    cmd = (f'echo ##BUOC 1/3&& "{py}" -X utf8 "{eng / "kiem_mo_ta.py"}" {ma} --sua && echo ##BUOC 2/3&& "{py}" -X utf8 "{eng / "kho_canh.py"}" {ma} && '
+           f'echo ##BUOC 3/3&& "{py}" -X utf8 "{eng / "soat_kho.py"}" {ma} && echo ##XONG')   # kiểm định dạng mô tả → nạp cảnh → AI soát (##: mốc tiến độ cho giao diện)
     KHO_JOB[ma] = _popen(cmd, shell=True, cwd=str(eng), stdout=open(log, "w", encoding="utf-8"), stderr=subprocess.STDOUT,
                          env=dict(os.environ, PYTHONIOENCODING="utf-8"))
     return {"ok": True}
@@ -582,6 +645,8 @@ def chay(sp, so, kho_them=None):
             return {"ok": False, "loi": "Đang học cảnh cho kho, đợi học xong (hoặc bấm Dừng học) rồi làm video."}
     except ImportError:
         pass
+    if not co_khoa_giong():                  # kiểm TRƯỚC khi chạy: thiếu khoá giọng thì lô hỏng giữa chừng, phí hạn mức Claude
+        return {"ok": False, "loi": "Chưa có khoá ElevenLabs (giọng đọc). Vào tab Cài đặt → mục \"Khoá ElevenLabs\" dán khoá rồi Lưu, sau đó chạy lại."}
     from tu_dong import san_sang
     if not san_sang(sp):
         return {"ok": False, "loi": "Sản phẩm chưa đủ hồ sơ (sự thật / quà tặng / kho cảnh) — vào tab Sản phẩm để bổ sung."}
@@ -759,6 +824,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(anh_sp.liet_ke_thu_muc(q["p"][0] if "p" in q else None))
         if u.path == "/api/nhac":
             return self._json(nhac_trang_thai())
+        if u.path == "/api/khoa-giong":
+            return self._json(khoa_giong_trang_thai())
         if u.path == "/api/shop-sp":          # sản phẩm TikTok Shop (từ app TikTok Auto) để chọn khi thêm sản phẩm
             ds = anh_sp.ds_shop("moi" in q)
             return self._json({"ok": ds is not None, "ds": [{"id": x["id"], "tieu_de": x["tieu_de"], "ten_ngan": x["ten_ngan"], "gia": x["gia"], "ma": x["ma"],
@@ -908,6 +975,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(mo_dang_nhap())
         if u.path == "/api/nhac-nguon":
             return self._json(nhac_nguon_sua(b))
+        if u.path == "/api/khoa-giong":
+            return self._json(khoa_giong_luu(b.get("khoa")))
         if u.path == "/api/nhac-tai":
             return self._json(nhac_tai_bat_dau())
         if u.path == "/api/mo-thu-muc":
@@ -964,6 +1033,16 @@ KIEM_HAN_MUC_GIAY = 7 * 60
 _KIEM_LOCK = threading.Lock()
 
 
+def _cua_so_dang_mo(x):
+    """Tài khoản có cửa sổ 5 giờ ĐANG chạy (reset ở tương lai và đã dùng > 0) → đáng tự kiểm.
+    Chưa biết / đã quá giờ reset / dùng 0% → bỏ qua (nút "Kiểm hạn mức" vẫn kiểm tay được)."""
+    fh = x.get("five_hour") or {}
+    try:
+        return float(fh.get("reset") or 0) > time.time() and float(fh.get("pct") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def _vong_kiem_han_muc():
     """Nền: mỗi ~7 phút kiểm hạn mức từng tài khoản (tuần tự, mỗi lần 1 câu rất ngắn). Lô đang chạy → bỏ qua (lô tự cập nhật hạn mức)."""
     time.sleep(45)                                   # chờ app lên xong rồi mới kiểm lần đầu
@@ -973,9 +1052,12 @@ def _vong_kiem_han_muc():
                 try:
                     sys.path.insert(0, str(CODE / "engine"))
                     import ai
+                    st = ai.doc_trang_thai()
                     for tk in list(ai.ds_tai_khoan()):
                         if dang_chay():
                             break
+                        if not _cua_so_dang_mo(st.get(tk["ma"]) or {}):
+                            continue                 # cửa sổ 5 giờ đã reset / chưa dùng: gọi lúc này = mở cửa sổ mới vô ích
                         try:
                             ai.kiem_han_muc(tk["ma"])
                         except Exception as e:

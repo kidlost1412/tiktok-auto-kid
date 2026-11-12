@@ -6,8 +6,11 @@ namespace App\Fork\AutoPost\Console;
 
 use App\Fork\AutoPost\Hub\HubApi;
 use App\Fork\AutoPost\Hub\HubReporter;
+use App\Fork\AutoPost\Shop\HubCartAttach;
 use App\Fork\AutoPost\VideoLibrary;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class AutoIngestCommand extends Command
 {
@@ -24,6 +27,17 @@ final class AutoIngestCommand extends Command
         }
 
         $products = $library->syncProducts();
+
+        try {
+            // Sản phẩm Shop chọn trong hub -> tự gắn giỏ hàng cho ô còn trống (không bao giờ ghi đè).
+            $carts = app(HubCartAttach::class)->run();
+            if ($carts > 0) {
+                $this->line("Giỏ hàng: tự gắn {$carts} sản phẩm theo lựa chọn trong hub.");
+            }
+        } catch (Throwable $e) {
+            Log::warning('Giỏ hàng: tự gắn theo hub lỗi.', ['error' => $e->getMessage()]);
+        }
+
         $result = $library->ingest();
 
         $this->info("Sản phẩm: {$products}. Video mới: {$result['new']}, bỏ qua: {$result['skipped']}, đã biết: {$result['known']}.");

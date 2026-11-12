@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Fork\Chrome\Http\Extension;
 
 use App\Fork\AutoPost\Shop\ShopSync;
+use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Stats\CommentIngest;
 use App\Fork\AutoPost\Stats\StatsIngest;
 use App\Fork\Chrome\ChromeJobs;
@@ -282,6 +283,11 @@ final class ExtensionController
     {
         $job = $this->videoJob($request);
         $path = $this->videoPath($job);
+
+        if (($accel = $this->accelVideo($path)) !== null) {
+            return $accel;
+        }
+
         $size = (int) filesize($path);
         $type = $this->libraryType((string) $job->video_name);
         $contentRange = 'Content-'.'Range';
@@ -551,6 +557,36 @@ final class ExtensionController
         }
 
         return $path;
+    }
+
+    /**
+     * FORK_ACCEL: the job was checked above, so hand the bytes to Caddy, which already serves storage/app/public
+     * at /storage/* (Range/206 ok) without holding a php-cgi worker. fetch() follows the same-origin 302 keeping
+     * the Range header. Anything outside that folder (another disk) keeps the PHP stream below.
+     */
+    private function accelVideo(string $path): ?Response
+    {
+        if (! config('fork.auto.accel') || str_contains($path, "\0")) {
+            return null;
+        }
+
+        $real = realpath($path);
+        $root = realpath(storage_path('app/public'));
+
+        if ($real === false || $root === false || ! Paths::isUnder($real, $root)) {
+            return null;
+        }
+
+        $rel = substr(Paths::slash($real), strlen(rtrim(Paths::slash($root), '/')) + 1);
+
+        if ($rel === '' || preg_match('#(^|/)\.#', $rel)) {
+            return null;   // Caddy answers 404 for hidden paths (/.*)
+        }
+
+        return response('', 302, [
+            'Location' => '/storage/'.implode('/', array_map('rawurlencode', explode('/', $rel))),
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     private function libraryType(string $name): string

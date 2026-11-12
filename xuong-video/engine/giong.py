@@ -1,27 +1,52 @@
 """Tạo giọng ElevenLabs v4 kèm mốc thời gian từng từ (cho karaoke).
 tao_giong(text_co_tag, voice_id, out_dir, ten) -> {"audio": path, "words": [{"w","s","e"}], "dur": s}
-Khóa API đọc từ <thư mục dữ liệu>/.env (không in ra)."""
+Khóa API đọc từ <thư mục dữ liệu>/.env, dự phòng .env gốc repo (không in ra)."""
 import base64, json, os, re, subprocess
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from elevenlabs import ElevenLabs, VoiceSettings
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, REPO, DATA as HUB, cfg as cfg_hub, cfg_tho
 CFG = cfg_hub()
 TEMPO = CFG["giong"]["toc_do"]
 _client = None
 
 
+class ThieuKhoaGiong(RuntimeError):
+    """Chưa có khoá ElevenLabs (thông báo tiếng Việt, hiện thẳng cho chủ app)."""
+
+
+def _khoa_giong():
+    """Khoá ElevenLabs: biến môi trường → <thư mục dữ liệu>/.env → .env gốc repo. Đọc lại file mỗi lần (điền khoá xong không cần khởi động lại)."""
+    key = (os.environ.get("ELEVENLABS_API_KEY") or "").strip()
+    if key:
+        return key
+    for f in (Path(CFG["duong_dan"]["env_file"]), REPO / ".env"):
+        try:
+            if f.is_file():
+                key = (dotenv_values(f).get("ELEVENLABS_API_KEY") or "").strip()
+                if key:
+                    return key
+        except Exception:
+            continue
+    return ""
+
+
+def co_khoa_giong():
+    """True nếu đã có khoá ElevenLabs (không in, không gọi mạng)."""
+    return bool(_khoa_giong())
+
+
 def client():
     global _client
     if _client is None:
-        load_dotenv(CFG["duong_dan"]["env_file"])
-        key = os.environ.get("ELEVENLABS_API_KEY")
+        key = _khoa_giong()
         if not key:
-            raise RuntimeError("Thiếu ELEVENLABS_API_KEY trong .env")
+            raise ThieuKhoaGiong("Chưa điền khoá ElevenLabs (ELEVENLABS_API_KEY) trong file .env của thư mục dữ liệu hub "
+                                 f"({CFG['duong_dan']['env_file']}) - điền khoá rồi chạy lại.")
         _client = ElevenLabs(api_key=key, timeout=120)
     return _client
 

@@ -51,6 +51,7 @@ final class ChromeSettingsController extends Controller
             'telegram' => fn (): array => ['configured' => Telegram::configured()],
             'backgroundMode' => fn (): array => $this->backgroundMode(),
             'extensionPath' => $this->extensionPath(),
+            'latestExtension' => $this->latestExtensionVersion(),
             'serverUrl' => rtrim((string) config('app.url'), '/'),
             'hasWorkspace' => (bool) $request->user()?->current_workspace_id,
         ]);
@@ -241,6 +242,15 @@ final class ChromeSettingsController extends Controller
         $path = base_path('extension/autotok');
 
         return PHP_OS_FAMILY === 'Windows' ? str_replace('/', '\\', $path) : $path;
+    }
+
+    /** Phiên bản tiện ích đi kèm app, đọc từ manifest.json (null nếu không đọc được). */
+    private function latestExtensionVersion(): ?string
+    {
+        $raw = @file_get_contents(base_path('extension/autotok/manifest.json'));
+        $version = is_string($raw) ? data_get(json_decode($raw, true), 'version') : null;
+
+        return is_string($version) && $version !== '' ? $version : null;
     }
 
     private function findClient(string $accountId, int $id): ChromeClient

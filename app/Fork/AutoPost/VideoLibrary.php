@@ -457,16 +457,7 @@ final class VideoLibrary
         $recentGoc = $recent->pluck('goc')->filter()->all();
 
         $candidates = AutoVideo::query()
-            ->where('status', AutoVideo::NEW)
-            // File mp4 của hub chưa có trên đĩa (chế độ API) thì chưa giữ chỗ.
-            ->whereNull('files_deleted_at')
-            // Không có caption do hub viết thì không đăng (chờ hub bổ sung, lần ingest sau cập nhật).
-            ->whereNotNull('caption')->where('caption', '!=', '')
-            // Kho chuẩn mới đã là bản sẵn sàng đăng; kiểu cũ chỉ đăng bản MIXKIT.
-            ->where(fn ($q) => $q->whereIn('source', ['kho', 'hub'])->orWhere('file_name', 'like', '%\_MIXKIT\_%'))
-            // Chế độ API: chỉ đăng video hub đã duyệt (có hub_id). Bản ghi cũ đọc từ thư mục có thể trùng
-            // video hub (hub làm sạch metadata nên sha256 đổi) → không bao giờ đăng, tránh đăng 2 lần.
-            ->when(filled(config('fork.auto.hub_api.key')), fn ($q) => $q->whereNotNull('hub_id'))
+            ->eligibleNew()
             ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
             ->when($map !== null, fn ($q) => $q->where(function ($q) use ($map): void {
                 foreach ($map as $code => $quyCaches) {

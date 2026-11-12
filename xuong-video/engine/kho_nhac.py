@@ -278,7 +278,7 @@ def tai_goi(url=None, sha256=None, cb=None):
     url = (url or c.get("goi_mac_dinh_url") or "").strip()
     sha256 = (sha256 if sha256 is not None else c.get("goi_mac_dinh_sha256") or "").strip().lower()
     if not url:
-        raise ValueError("Chưa có link tải — sẽ có khi đưa lên GitHub.")
+        raise ValueError("Chưa có gói nhạc tải sẵn — bấm «Chọn thư mục» để dùng thư mục nhạc của anh.")
     tmp = GOC_TAI_NGUYEN / "_tai"
     tmp.mkdir(parents=True, exist_ok=True)
     phan = [{"url": url, "sha256": sha256, "ten": "goi"}]
