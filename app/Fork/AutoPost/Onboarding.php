@@ -108,7 +108,11 @@ final class Onboarding
         $enabled = AutoProduct::query()->where('enabled', true)->select('code');
         $linked = ProductLink::query()->whereIn('social_account_id', $accountIds)->whereNull('paused_reason')->select('auto_product_id');
 
-        $withVideos = AutoVideo::query()->eligibleNew()->whereIn('product_code', $enabled);
+        // Video chưa xếp lịch (đủ điều kiện) hoặc đã xếp lịch/giữ chỗ nhưng chưa đăng đều tính là "có video".
+        $withVideos = AutoVideo::query()->whereIn('product_code', $enabled)->where(function ($q): void {
+            $q->where(fn ($n) => $n->eligibleNew())
+                ->orWhere(fn ($s) => $s->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED])->whereNotNull('hub_id'));
+        });
 
         if (! (clone $withVideos)->exists()) {
             return $base + ['done' => false, 'state' => 'todo', 'detail' => 'Chưa có video đã duyệt trong kho. Sản xuất và duyệt video trong Xưởng.',

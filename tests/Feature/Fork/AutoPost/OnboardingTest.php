@@ -108,6 +108,35 @@ test('stock step asks for a cart when videos exist but no product is linked', fu
     expect($step['done'])->toBeFalse()->and($step['action']['href'])->toBe('/auto/gio-hang');
 });
 
+test('stock step counts already-scheduled hub videos as stock', function (): void {
+    onbHubUp();
+    $v = AutoVideo::query()->create([
+        'hash' => hash('sha256', 'onb3'), 'path' => '/x/onb3.mp4', 'batch_date' => '2026-01-05', 'file_name' => 'onb3.mp4',
+        'product_code' => 'nano-dong', 'source' => 'hub', 'hub_id' => 'h1', 'status' => AutoVideo::SCHEDULED, 'caption' => 'xin chào',
+    ]);
+
+    // Có video đã xếp lịch nhưng chưa gắn giỏ: vẫn đòi chọn giỏ, không báo "chưa có video".
+    expect(onbSteps($this)['steps'][2]['action']['href'])->toBe('/auto/gio-hang');
+
+    ProductLink::query()->create(['social_account_id' => $this->sa->id, 'auto_product_id' => 'nano-dong', 'shop_product_id' => '7600000000000000002', 'display_name' => 'SP']);
+    expect(onbSteps($this)['steps'][2]['done'])->toBeTrue();
+
+    $v->update(['status' => AutoVideo::POSTED]);
+    expect(onbSteps($this)['steps'][2]['done'])->toBeFalse()->and(onbSteps($this)['steps'][2]['action']['href'])->toBe('/xuong');
+});
+
+test('auto page stock separates unscheduled from scheduled videos', function (): void {
+    Http::fake(['*' => Http::failedConnection()]);
+    AutoVideo::query()->create([
+        'hash' => hash('sha256', 'onb4'), 'path' => '/x/onb4.mp4', 'batch_date' => '2026-01-05', 'file_name' => 'onb4.mp4',
+        'product_code' => 'nano-dong', 'source' => 'hub', 'hub_id' => 'h2', 'status' => AutoVideo::SCHEDULED, 'caption' => 'xin chào',
+    ]);
+
+    $this->actingAs($this->owner)->get('/auto')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('stock.new_total', 0)
+        ->where('stock.scheduled_total', 1));
+});
+
 test('card disappears when all four steps are done', function (): void {
     onbHubUp();
     onbReady($this);

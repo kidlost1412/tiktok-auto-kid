@@ -242,6 +242,35 @@ test('random never repeats the previous image when there are two or more, and wo
     expect($store->pick($only->fresh()))->toBe($keep['file'])->and($store->pick($only->fresh()))->toBe($keep['file']);
 });
 
+test('random spreads picks evenly over a small set (repeats allowed, never back-to-back)', function (): void {
+    $store = app(CoverStore::class);
+
+    foreach ([2, 3] as $n) {
+        $p = AutoProduct::query()->create(['code' => $this->code.'-'.$n, 'name' => 'X', 'short_name' => 'X', 'facts' => [], 'enabled' => true]);
+        $images = [];
+
+        for ($k = 0; $k < $n; $k++) {
+            $images[] = $store->add($p, pnImage('jpg', 540, 960, 'i'.$k))['entry'];
+            $p->forceFill(['cover_images' => $images])->save();
+        }
+
+        $p->update(['cover_mode' => 'random']);
+        $counts = array_fill_keys(array_column($images, 'file'), 0);
+        $prev = null;
+
+        for ($i = 0; $i < 10 * $n + 1; $i++) {
+            $f = $store->pick($p->fresh());
+            expect($f)->not->toBe($prev);
+            $counts[$f]++;
+            $prev = $f;
+        }
+
+        // 10n+1 lần bốc: chênh lệch giữa ảnh dùng nhiều nhất và ít nhất tối đa 1.
+        expect(max($counts) - min($counts))->toBeLessThanOrEqual(1);
+        File::deleteDirectory(CoverStore::dir($this->code.'-'.$n));
+    }
+});
+
 // ---------------------------------------------------------------- build + job
 
 function pnBuild(object $t): array

@@ -16,7 +16,7 @@ from kiem_khung import scan
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay
 CFG = cfg_hub()
 COT = ["file", "goc", "giong", "gu_dao_dien", "cong_thuc", "diem_giam_khao", "lan_dung", "loi_giam_khao", "y_tuong", "bo_cuc", "khoi",
        "sfx", "nhac", "thoi_luong", "caption", "hashtag", "loi", "canh", "may_sua", "danh_gia_kid", "gop_y_kid", "luot_xem", "don"]
@@ -111,7 +111,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             break
         if voice is None:
             continue
-        if voice["dur"] > CFG["video"]["thoi_luong_max"] - 0.7:
+        if voice["dur"] > khung_giay(sp, CFG)[1] - 0.7:
             log(f"  bỏ {sc['goc']}: giọng {voice['dur']} s quá dài"); continue
         for j in range(per):
             if len(tasks) >= so_video:
@@ -183,7 +183,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         st["_qua"] = sp.get("qua_tang", [])
         t.update(edl=edl, st=st, sua=sua)
         t["plan"] = {"seed": t["rng"].randint(1, 10**9), "phong_cach": st, "canh": t["sc"].get("canh", []), "dong": t["sc"].get("dong"),
-                     "ten_thuong_hieu": sp["ten_goi"].upper(), "edl_segs": segs}
+                     "ten_thuong_hieu": (sp.get("ten_ngan") or sp["ten_goi"]).upper(), "edl_segs": segs,
+                     "vmin": khung_giay(sp, CFG)[0]}
         return t
 
     def dung_nen(t):

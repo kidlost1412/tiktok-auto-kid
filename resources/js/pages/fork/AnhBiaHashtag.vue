@@ -96,8 +96,9 @@ const customTags = computed(
                             <b class="font-medium text-foreground">Ảnh bìa</b>:
                             để <i>Mặc định</i> thì TikTok lấy khung hình trong
                             video. Chọn <i>1 ảnh cố định</i> để mọi bài dùng
-                            chung một ảnh, hoặc <i>Ngẫu nhiên</i> để mỗi bài lấy
-                            một ảnh khác trong bộ ảnh bạn tải lên.
+                            chung một ảnh, hoặc <i>Ngẫu nhiên</i> để xoay vòng
+                            đều các ảnh trong bộ (ít ảnh vẫn dùng lặp lại,
+                            không trùng ảnh bài trước).
                         </span>
                     </li>
                     <li class="flex gap-2.5">

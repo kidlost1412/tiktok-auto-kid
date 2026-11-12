@@ -265,6 +265,33 @@ input.sw:checked::after{transform:translateX(16px)}
 .khothem label.kt .sp-anh{width:34px;height:34px;border-radius:8px}
 .khothem label.kt small{display:block;color:var(--mute);font-weight:400;font-size:12px}
 .khothem details summary{font-weight:500;font-size:13px;margin-top:12px}
+/* ô chọn sản phẩm có ảnh */
+.dd{position:relative;flex:1;min-width:0}
+.dd-bt{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:6px 36px 6px 8px;border:1px solid var(--line2);border-radius:10px;background:var(--input) var(--chev) no-repeat right 10px center/16px;color:var(--ink);font:400 14px var(--font);box-shadow:var(--sh-xs);cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s}
+.dd-bt:hover{border-color:color-mix(in srgb,var(--pri) 40%,var(--line2))}
+.dd-bt:focus-visible,.dd.mo .dd-bt{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px var(--ring)}
+.dd-bt .sp-anh,.dd-it .sp-anh{width:38px;height:38px;border-radius:9px}
+.dd-t{min-width:0;flex:1;display:block}
+.dd-t b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-t small{display:block;color:var(--mute);font-size:12px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-t small.thieu{color:var(--amber)}
+.dd-ls{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 6px);max-height:340px;overflow:auto;padding:6px;border:1px solid var(--line2);border-radius:12px;background:var(--raised);box-shadow:var(--sh-lg)}
+.dd-it{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px 7px 7px;border:0;border-radius:9px;background:transparent;color:var(--ink);font:400 14px var(--font);text-align:left;cursor:pointer}
+.dd-it:hover,.dd-it.cur{background:var(--hover)}
+.dd-it.on{background:var(--pri-soft)}
+.dd-it.off{cursor:not-allowed}
+.dd-it.off .sp-anh{opacity:.5}
+.dd-it.off .dd-t b{color:var(--mute)}
+/* độ dài video */
+.dur{grid-column:1/-1}
+.dur .dur-in{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;color:var(--mute)}
+.dur .dur-in input{width:84px}
+/* thẻ giọng đọc */
+.gd-it{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.gd-it .gd-t{min-width:0;flex:1}
+.gd-it .gd-t b{display:block;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gd-it .gd-t small{display:block;color:var(--mute);font-size:12px}
+.gd-ls{max-height:320px;overflow:auto;margin-top:12px}
 .shop-tim{display:flex;gap:8px;align-items:center;margin-bottom:10px}
 .shop-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;max-height:300px;overflow:auto;padding:2px}
 .shop-it{display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;font:500 12px/1.35 var(--font);position:relative;transition:border-color .15s,box-shadow .15s}
@@ -485,8 +512,13 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-clap"/></svg></span>
         <div class="t"><h2>Làm video mới</h2><p class="sub">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</p></div></div>
       <div class="fgrid">
-        <div><label for="spChon">Sản phẩm</label><div class="row nowrap" style="gap:10px"><span id="chonAnh"></span><select id="spChon" style="flex:1;min-width:0"></select></div></div>
+        <div><label for="spDd">Sản phẩm</label><select id="spChon" class="hidden" tabindex="-1" aria-hidden="true"></select>
+          <div class="dd" id="dd"><button type="button" class="dd-bt" id="spDd" aria-haspopup="listbox" aria-expanded="false"></button><div class="dd-ls hidden" id="spDdLs" role="listbox"></div></div></div>
         <div><label for="soVideo">Số video</label><input id="soVideo" type="number" min="1" max="200" value="10"></div>
+        <div class="dur"><label for="durChon">Độ dài video</label>
+          <select id="durChon"><option value="10-15">10–15 giây</option><option value="15-20">15–20 giây</option><option value="20-25">20–25 giây (mặc định)</option><option value="25-30">25–30 giây</option><option value="30-40">30–40 giây</option><option value="tuy">Tuỳ chỉnh</option></select>
+          <div class="dur-in hidden" id="durTuy">Từ <input type="number" id="durMin" min="10" max="57" step="1" value="20"> đến <input type="number" id="durMax" min="13" max="60" step="1" value="25"> giây <span>(10–60 giây, cách nhau ít nhất 3)</span></div>
+          <p class="note" style="margin:6px 0 0">AI viết lời vừa đủ dài cho khoảng này; mỗi sản phẩm tự nhớ lựa chọn (tự động cũng dùng).</p></div>
         <div><label for="tkDung">Chạy bằng tài khoản Claude</label><select id="tkDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
         <div class="f-tg"><label class="tg"><input type="checkbox" id="tkChuyen" class="sw"> Hết thì tự chuyển tài khoản khác</label></div>
       </div>
@@ -647,6 +679,8 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div id="spBan2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,440px));gap:16px;margin-top:18px">
         <div><label for="spTenNgan">Tên gọi khi đọc trong video (ngắn, ≤40 ký tự)</label><input type="text" id="spTenNgan" maxlength="40" placeholder="vd. MIG 38">
           <p class="note" style="margin:6px 0 0">Lời đọc bắt buộc nhắc tên này. Tên Shop dài (NPK 33-11-11 …) thì AI không đọc nguyên văn → lời bị loại.</p></div>
+        <div><label for="spDocLa">Cách đọc tên (cho giọng đọc)</label><textarea id="spDocLa" style="min-height:84px;height:84px;padding-top:9px;line-height:1.5" spellcheck="false" placeholder="MIG 38 = Mích ba mươi tám"></textarea>
+          <p class="note" style="margin:6px 0 0">Giọng đọc sai tên? Ghi chữ viết = cách đọc. Phụ đề vẫn hiện chữ viết. Mỗi dòng 1 cặp, tối đa 10 cặp.</p></div>
         <div><label for="spGio">Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
       </div>
     </div>
@@ -763,6 +797,21 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
         <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
       <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
     </div>
+    <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
+      <div class="t"><h2>Giọng đọc</h2><p class="sub">Chọn giọng ElevenLabs cho video</p></div></div>
+      <label>Đang dùng</label>
+      <div id="gdDs"><div class="note">Đang tải…</div></div>
+      <p class="note">Mỗi video chọn ngẫu nhiên 1 giọng trong danh sách đang dùng. Muốn chỉ 1 giọng thì để lại 1.</p>
+      <hr class="sep">
+      <button class="btn ghost" id="btnGdTk"><svg class="i"><use href="#i-mic"/></svg>Chọn từ tài khoản ElevenLabs</button>
+      <div class="gd-ls hidden" id="gdTk"></div>
+      <div style="margin-top:18px"><label for="gdId">Thêm bằng Voice ID</label>
+        <div class="row nowrap" style="gap:8px"><input type="text" id="gdId" placeholder="Dán Voice ID (giọng trong Voice Library)" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
+          <button class="btn go" id="btnGdId"><svg class="i"><use href="#i-plus"/></svg>Thêm</button></div>
+        <div id="gdLoi"></div>
+        <p class="note" style="margin:6px 0 0">Giọng lấy từ Thư viện giọng (Voice Library) phải được thêm vào "My Voices" trên elevenlabs.io trước thì mới dùng được.</p></div>
+      <audio id="gdAudio" class="hidden" preload="none"></audio>
+    </div>
     <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
       <div class="t"><h2>Chất lượng AI</h2><p class="sub">Model, mức suy nghĩ và số đạo diễn mỗi lời đọc</p></div></div>
       <div class="grid g2e" style="gap:16px">
@@ -835,7 +884,63 @@ function veKhoThem() {
     const r = await api('/api/kho-them', {san_pham: ma, kho_them: ds}); toast(r.ok ? 'Đã nhớ lựa chọn kho phụ' : (r.loi || 'Không lưu được'));
   });
 }
-function hienAnhChon() { const v = $('#spChon').value; $('#chonAnh').innerHTML = v ? anhSp(urlAnh(v)) : ''; }
+// ---------- Ô CHỌN SẢN PHẨM CÓ ẢNH (hiển thị thay cho <select id="spChon">; select ẩn vẫn giữ giá trị + tuỳ chọn)
+const spLam = () => ((typeof ST !== 'undefined' && ST.san_pham) || []).filter(p => p.loai !== 'kho-chung');
+const ddSub = p => { const ng = (p.ten_ngan || '').trim(); return ng && ng.toLowerCase() !== (p.ten || '').trim().toLowerCase() ? esc(ng) + ' · ' : ''; };
+const ddDong = p => `${anhSp(p.anh)}<span class="dd-t"><b>${esc(p.ten)}</b><small>${ddSub(p)}${p.so_canh} cảnh</small>${p.san_sang ? '' : `<small class="thieu">— thiếu: ${esc(p.thieu.join(', '))}</small>`}</span>`;
+let DD_K = null;
+function hienAnhChon() {
+  const v = $('#spChon').value, p = spLam().find(x => x.ma === v), k = p ? [p.ma, p.ten, p.anh, p.so_canh, p.ten_ngan].join('|') : '';
+  if (k === DD_K) return; DD_K = k;
+  $('#spDd').innerHTML = p ? ddDong({...p, san_sang: true}) : '<span class="dd-t"><b style="color:var(--mute)">Chọn sản phẩm…</b></span>';
+}
+function ddVe() {
+  const v = $('#spChon').value;
+  $('#spDdLs').innerHTML = spLam().map(p => `<button type="button" role="option" class="dd-it${p.san_sang ? '' : ' off'}${p.ma === v ? ' on' : ''}" data-ma="${esc(p.ma)}" aria-selected="${p.ma === v}"${p.san_sang ? '' : ' aria-disabled="true" title="Chưa đủ hồ sơ — bổ sung ở tab Sản phẩm"'}>${ddDong(p)}</button>`).join('');
+}
+function ddMo(mo) {
+  const L = $('#spDdLs'), B = $('#spDd');
+  if (mo) { ddVe(); L.classList.remove('hidden'); const cur = L.querySelector('.on') || L.querySelector('.dd-it:not(.off)'); if (cur) { cur.classList.add('cur'); cur.scrollIntoView({block: 'nearest'}); } }
+  else L.classList.add('hidden');
+  B.setAttribute('aria-expanded', mo); $('#dd').classList.toggle('mo', mo);
+}
+function ddChon(ma) {
+  const o = [...$('#spChon').options].find(x => x.value === ma); if (!o || o.disabled) return;
+  $('#spChon').value = ma; ddMo(false); $('#spChon').onchange(); $('#spDd').focus();
+}
+$('#spDd').onclick = () => ddMo($('#spDdLs').classList.contains('hidden'));
+$('#spDdLs').onclick = e => { const b = e.target.closest('.dd-it'); if (b) ddChon(b.dataset.ma); };
+document.addEventListener('mousedown', e => { if (!$('#spDdLs').classList.contains('hidden') && !e.target.closest('#dd')) ddMo(false); });
+$('#dd').addEventListener('keydown', e => {
+  const L = $('#spDdLs'), mo = !L.classList.contains('hidden');
+  if (e.key === 'Escape' && mo) { e.preventDefault(); ddMo(false); $('#spDd').focus(); return; }
+  if (e.key === 'Tab' && mo) { ddMo(false); return; }
+  if (!['ArrowDown', 'ArrowUp', 'Enter', ' ', 'Home', 'End'].includes(e.key)) return;
+  const its = [...L.querySelectorAll('.dd-it:not(.off)')];
+  if (!mo) { if (e.key !== 'Enter' && e.key !== ' ') { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ddMo(true); } return; } return; }
+  e.preventDefault(); if (!its.length) return;
+  let i = its.findIndex(x => x.classList.contains('cur'));
+  if (e.key === 'Enter' || e.key === ' ') { if (i >= 0) ddChon(its[i].dataset.ma); return; }
+  i = e.key === 'Home' ? 0 : e.key === 'End' ? its.length - 1 : e.key === 'ArrowDown' ? Math.min(its.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1);
+  its.forEach(x => x.classList.remove('cur')); its[i].classList.add('cur'); its[i].scrollIntoView({block: 'nearest'});
+});
+// ---------- ĐỘ DÀI VIDEO (nhớ theo sản phẩm: thoi_luong [min,max])
+const DUR = {ma: null};
+function durVe(ma) {                       // chọn sẵn theo giá trị đã nhớ của sản phẩm, không có thì theo cấu hình chung
+  if (DUR.ma === ma) return; DUR.ma = ma;
+  const p = spLam().find(x => x.ma === ma) || {};
+  const g = Array.isArray(p.thoi_luong) && p.thoi_luong.length === 2 ? p.thoi_luong : (ST.thoi_luong_mac_dinh || [20, 25]);
+  const k = Math.round(g[0]) + '-' + Math.round(g[1]), co = [...$('#durChon').options].some(o => o.value === k && Math.round(g[0]) === +g[0] && Math.round(g[1]) === +g[1]);
+  $('#durChon').value = co ? k : 'tuy'; $('#durMin').value = Math.round(g[0]); $('#durMax').value = Math.round(g[1]); durHien();
+}
+function durHien() { $('#durTuy').classList.toggle('hidden', $('#durChon').value !== 'tuy'); }
+function durLay() {                        // [min,max] hoặc null (đã báo lỗi)
+  const v = $('#durChon').value; let a, b;
+  if (v === 'tuy') { a = parseFloat($('#durMin').value); b = parseFloat($('#durMax').value); } else [a, b] = v.split('-').map(Number);
+  if (!(a >= 10) || !(b <= 60) || !(b - a >= 3)) { toast('Độ dài video: từ 10 đến 60 giây, 2 số cách nhau ít nhất 3 giây'); return null; }
+  return [a, b];
+}
+$('#durChon').onchange = durHien;
 function hienAnhSua(url) { const m = $('#spSua').value; url = url || urlAnh(m); $('#spAnh').innerHTML = anhSp(url, 'lg'); $('#khoAnh').innerHTML = anhSp(url, 'lg'); }
 // đọc file ảnh → thu nhỏ (cạnh dài ≤ 800px) → data URL jpg; không đọc được thì gửi nguyên bản
 function docAnh(file) {
@@ -925,9 +1030,10 @@ async function capNhat() {
   if (!sel.options.length) {
     ST.san_pham.filter(p => p.loai !== 'kho-chung').forEach(p => { const o = new Option(`${p.ten} (${p.so_canh} cảnh)${p.san_sang ? '' : ' — thiếu: ' + p.thieu.join(', ')}`, p.ma); o.disabled = !p.san_sang; sel.add(o); });
     const tot = ST.san_pham.find(p => p.san_sang && p.ma === 'tc01') || ST.san_pham.find(p => p.san_sang); if (tot) sel.value = tot.ma;
+    DD_K = null; DUR.ma = null;
   }
   if (!$('#spSua').options.length) { ST.san_pham.forEach(p => $('#spSua').add(new Option(p.ten, p.ma))); hienAnhSua(); }
-  hienAnhChon(); veKhoThem();
+  hienAnhChon(); veKhoThem(); durVe(sel.value);
   const td = ST.tien_do, chay = ST.dang_chay;
   $('#btnChay').classList.toggle('hidden', chay); $('#btnDung').classList.toggle('hidden', !chay || ST.chay_ngoai_app);
   const pct = td.tong ? Math.round(100 * td.xong / td.tong) : 0;
@@ -1011,8 +1117,10 @@ $('#btnThemTk').onclick = async () => { const ten = prompt('Tên tài khoản (v
 $('#soVideo').oninput = capNhat;
 $('#btnChay').onclick = async () => {
   const sp = $('#spChon').value, n = +$('#soVideo').value;
-  if (!confirm(`Làm ${n} video cho ${$('#spChon').selectedOptions[0].text}?`)) return;
-  const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon()});
+  const giay = durLay(); if (!giay) return;
+  if (!confirm(`Làm ${n} video cho ${$('#spChon').selectedOptions[0].text}, dài ${giay[0]}–${giay[1]} giây?`)) return;
+  const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon(), giay});
+  if (r.ok) { const p = spLam().find(x => x.ma === sp); if (p) p.thoi_luong = giay; }
   toast(r.ok ? 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.' : r.loi); capNhat();
 };
 $('#btnDung').onclick = async () => { if (confirm('Dừng lô đang làm? Video đã xong vẫn giữ.')) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
@@ -1350,6 +1458,7 @@ async function taiSp() {
   const sp = await api('/api/san-pham/' + $('#spSua').value);
   SUA_SHOP = sp.shop_product_id || null; veShopTatCa(); $('#sShopBox').classList.add('hidden');
   $('#spKho').value = sp.kho_video || ''; $('#spGio').value = typeof sp.ten_gio === 'string' ? sp.ten_gio : ''; $('#spTenNgan').value = sp.ten_ngan || sp.ten_goi || '';
+  $('#spDocLa').value = sp.doc_la && typeof sp.doc_la === 'object' ? Object.entries(sp.doc_la).map(([k, v]) => `${k} = ${v}`).join('\n') : '';
   const chung = sp.loai === 'kho-chung' || !!sp.chi_la_kho_canh;
   ['#spBan1', '#spBan2', '#spBan3'].forEach(i => $(i).classList.toggle('hidden', chung));
   $('#spChungNote').classList.toggle('hidden', !chung); $('#spChungMd').classList.toggle('hidden', !chung); $('#spTron').checked = !!sp.tron_mac_dinh;
@@ -1372,12 +1481,12 @@ VE_SHOP.push(() => {                 // dòng "đang gắn với sản phẩm Sh
 });
 luoiShop($('#sShopLuoi'), () => SUA_SHOP, x => { if (x && confirm('Đổi ảnh sản phẩm sang ảnh của "' + tenGon(x.tieu_de) + '"?')) { SUA_SHOP = x.id; datAnhSua({tu_shop: x.id}, $('#btnSAnhShop')); veShopTatCa(); } });
 $('#btnSAnhShop').onclick = () => $('#sShopBox').classList.toggle('hidden');
-$('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); };
+$('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); durVe($('#spChon').value); };
 $('#btnLuuSp').onclick = async () => {
   const L = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
   const chung = !$('#spChungNote').classList.contains('hidden');       // kho chung: chỉ lưu thư mục kho + cờ trộn mặc định, không đụng ô bán hàng
   await api('/api/san-pham/' + $('#spSua').value, chung ? {kho: $('#spKho').value, tron_mac_dinh: $('#spTron').checked}
-    : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value, ten_ngan: $('#spTenNgan').value});
+    : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value, ten_ngan: $('#spTenNgan').value, doc_la: $('#spDocLa').value});
   toast('Đã lưu. Lô sau dùng thông tin mới.'); $('#spChon').innerHTML = ''; KT.ma = null; taiKho(); taiTongQuan(true); capNhat();
 };
 // ---------- GU
@@ -1407,7 +1516,67 @@ $('#btnLuuKg').onclick = async () => {
   if (!r.ok) return toast(r.loi || 'Không lưu được');
   $('#kgKhoa').value = ''; toast('Đã lưu khoá ElevenLabs'); taiKg();
 };
-async function taiCd() { taiNhac(); taiODia(); taiTp(); taiKg(); $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; taiTk(); }
+// ---------- GIỌNG ĐỌC (giong.danh_sach trong config.json)
+let GD = {ds: [], co_khoa: false};
+const gdPhat = async (url, nut) => {
+  const a = $('#gdAudio');
+  if (!url) return toast('Giọng này chưa có bản nghe thử');
+  if (a.dataset.u === url && !a.paused) { a.pause(); return; }
+  a.src = url; a.dataset.u = url; try { await a.play(); } catch (e) { toast('Không phát được bản nghe thử'); }
+};
+function gdVe() {
+  const mot = GD.ds.length <= 1;
+  $('#gdDs').innerHTML = GD.ds.length ? GD.ds.map((g, i) => `<div class="gd-it"><span class="chip g" style="width:34px;height:34px;flex:none">${ic('mic')}</span>
+    <div class="gd-t"><b>${esc(g.ten)}</b><small class="pc-code" style="display:inline;padding:0">${esc(g.id_ngan)}</small></div>
+    <button type="button" class="btn ghost sm" data-gd-nghe="${i}">${ic('play')}Nghe thử</button>
+    <button type="button" class="btn ghost sm dz" data-gd-xoa="${i}" ${mot ? 'disabled title="Phải giữ lại ít nhất 1 giọng"' : ''}>${ic('trash')}Bỏ</button></div>`).join('') : '<div class="note">Chưa có giọng nào.</div>';
+}
+async function taiGd() {
+  let r; try { r = await api('/api/giong'); } catch (e) { return; }
+  GD = r; gdVe();
+}
+$('#gdDs').onclick = async e => {
+  const n = e.target.closest('[data-gd-nghe]'), x = e.target.closest('[data-gd-xoa]');
+  if (n) {
+    const g = GD.ds[+n.dataset.gdNghe]; n.disabled = true;
+    try { const r = await api('/api/giong-mau?id=' + encodeURIComponent(g.id)); if (r.nghe_thu) await gdPhat(r.nghe_thu); else toast(r.loi || 'Không có bản nghe thử'); } finally { n.disabled = false; }
+  } else if (x && !x.disabled) {
+    const g = GD.ds[+x.dataset.gdXoa]; if (!confirm(`Bỏ giọng "${g.ten}" khỏi danh sách đang dùng? (Giọng vẫn còn trong tài khoản ElevenLabs)`)) return;
+    const r = await api('/api/giong', {xoa: g.ten}); if (!r.ok) return toast(r.loi || 'Không lưu được'); GD = r; gdVe(); toast('Đã bỏ giọng');
+  }
+};
+$('#btnGdTk').onclick = async () => {
+  const b = $('#btnGdTk'), L = $('#gdTk'), t = b.innerHTML; b.disabled = true; b.innerHTML = ic('loader') + 'Đang tải…';
+  let r; try { r = await api('/api/giong-tai-khoan'); } catch (e) { r = {ok: false, loi: 'Không kết nối được hub'}; }
+  b.disabled = false; b.innerHTML = t;
+  if (!r.ok) { L.classList.remove('hidden'); L.innerHTML = `<div class="errbox">${esc(r.loi || 'Không lấy được danh sách giọng')}</div>`; return; }
+  L.classList.remove('hidden'); L._ds = r.ds;
+  const dung = new Set(GD.ds.map(g => g.id));
+  L.innerHTML = r.ds.length ? r.ds.map((v, i) => {
+    const nhan = [v.loai, v.gioi_tinh, v.giong_vung, v.do_tuoi].filter(Boolean).map(esc).join(' · ');
+    return `<div class="gd-it"><div class="gd-t"><b>${esc(v.ten)}</b><small>${nhan}</small></div>
+      ${v.nghe_thu ? `<button type="button" class="btn ghost sm" data-tk-nghe="${i}">${ic('play')}Nghe</button>` : ''}
+      <button type="button" class="btn ${dung.has(v.id) ? 'soft' : 'go'} sm" data-tk-dung="${i}" ${dung.has(v.id) ? 'disabled' : ''}>${dung.has(v.id) ? 'Đang dùng' : 'Dùng giọng này'}</button></div>`;
+  }).join('') : '<div class="note">Tài khoản chưa có giọng nào. Thêm giọng vào "My Voices" trên elevenlabs.io.</div>';
+};
+$('#gdTk').onclick = async e => {
+  const L = $('#gdTk'), n = e.target.closest('[data-tk-nghe]'), d = e.target.closest('[data-tk-dung]');
+  if (n) return gdPhat(L._ds[+n.dataset.tkNghe].nghe_thu);
+  if (d && !d.disabled) {
+    const v = L._ds[+d.dataset.tkDung]; d.disabled = true;
+    const r = await api('/api/giong', {them: {id: v.id, ten: v.ten}});
+    if (!r.ok) { d.disabled = false; return toast(r.loi || 'Không thêm được'); }
+    GD = r; gdVe(); d.textContent = 'Đang dùng'; d.className = 'btn soft sm'; toast('Đã thêm giọng ' + v.ten);
+  }
+};
+$('#btnGdId').onclick = async () => {
+  const id = $('#gdId').value.trim(); if (!id) return toast('Dán Voice ID vào ô trước đã');
+  const b = $('#btnGdId'), t = b.innerHTML; b.disabled = true; b.innerHTML = ic('loader') + 'Đang kiểm…';
+  const r = await api('/api/giong', {them: {id, kiem: true}}); b.disabled = false; b.innerHTML = t;
+  if (!r.ok) { $('#gdLoi').innerHTML = `<div class="errbox" style="margin-top:8px">${esc(r.loi || 'Không thêm được')}</div>`; return; }
+  $('#gdLoi').innerHTML = ''; GD = r; gdVe(); $('#gdId').value = ''; toast('Đã thêm giọng');
+};
+async function taiCd() { taiNhac(); taiODia(); taiTp(); taiKg(); taiGd(); $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; taiTk(); }
 // ---------- NHẠC & ÂM THANH
 let NH_T = null;
 async function taiNhac() {

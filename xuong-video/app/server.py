@@ -299,8 +299,147 @@ def san_pham_ds():
                                      # tên Shop dài nguyên văn → AI không đọc trọn → mọi lời bị loại "thiếu tên thương hiệu"
                                      ("tên gọi ngắn khi đọc", len((sp.get("ten_ngan") or sp.get("ten_goi") or "").split()) <= 6)) if not ok]
             out.append({"ma": d.name, "ten": sp.get("ten_goi", d.name), "so_canh": n, "san_sang": not thieu, "thieu": thieu, "loai": "ban", "so_dung_duoc": dem_dung_duoc(d.name),
-                        "kho_them": kho_them_cua(d.name, sp), "anh": anh_sp.url_anh(d.name)})
+                        "kho_them": kho_them_cua(d.name, sp), "anh": anh_sp.url_anh(d.name),
+                        "ten_ngan": sp.get("ten_ngan") or "", "thoi_luong": sp.get("thoi_luong")})
     return out
+
+
+def thoi_luong_mac_dinh():
+    v = cfg().get("video") or {}
+    try:
+        return [float(v.get("thoi_luong_min", 20)), float(v.get("thoi_luong_max", 25))]
+    except (TypeError, ValueError):
+        return [20.0, 25.0]
+
+
+def kiem_thoi_luong(g):
+    """giay = [min, max]: số, 10 <= min, max <= 60, max-min >= 3. Trả (list|None, lỗi|None)."""
+    try:
+        if not isinstance(g, (list, tuple)) or len(g) != 2 or any(isinstance(x, bool) for x in g):
+            raise ValueError
+        a, b = float(g[0]), float(g[1])
+    except (TypeError, ValueError):
+        return None, "Độ dài video không hợp lệ (cần 2 số: ít nhất – nhiều nhất, tính bằng giây)."
+    if not (a == a and b == b) or a < 10 or b > 60 or b - a < 3:
+        return None, "Độ dài video phải từ 10 đến 60 giây, và khoảng cách giữa 2 số ít nhất 3 giây."
+    f = lambda x: int(x) if x == int(x) else round(x, 1)
+    return [f(a), f(b)], None
+
+
+def doc_la_tu_text(t, toi_da=10):
+    """'MIG 38 = Mích ba mươi tám' mỗi dòng (hoặc ngăn bằng ;) → {viết: đọc}. Bỏ dòng trống/thiếu vế, mỗi vế ≤ 60 ký tự."""
+    out = {}
+    for dong in re.split(r"[\r\n;]+", str(t or "")):
+        k, _, v = dong.partition("=")
+        k, v = " ".join(k.split()), " ".join(v.split())
+        if k and v and len(k) <= 60 and len(v) <= 60 and k not in out:
+            out[k] = v
+        if len(out) >= toi_da:
+            break
+    return out
+
+
+# ---- Giọng đọc: danh sách giong.danh_sach trong config.json + chọn từ tài khoản ElevenLabs (không bao giờ trả khoá ra giao diện) ----
+def _giong_ds():
+    d = (cfg().get("giong") or {}).get("danh_sach") or {}
+    return {str(k): str(v) for k, v in d.items() if str(k) and str(v)}
+
+
+def giong_trang_thai():
+    return {"ok": True, "co_khoa": bool(_khoa_hien_tai()),
+            "ds": [{"ten": k, "id": v, "id_ngan": (v[:4] + "…" + v[-4:]) if len(v) > 10 else v} for k, v in _giong_ds().items()]}
+
+
+def _el_client():
+    sys.path.insert(0, str(CODE / "engine"))
+    from giong import client
+    return client()
+
+
+def _voice_dict(v):
+    lb = getattr(v, "labels", None) or {}
+    return {"id": getattr(v, "voice_id", "") or "", "ten": getattr(v, "name", "") or "", "loai": getattr(v, "category", "") or "",
+            "gioi_tinh": str(lb.get("gender") or ""), "giong_vung": str(lb.get("accent") or ""), "do_tuoi": str(lb.get("age") or ""),
+            "nghe_thu": getattr(v, "preview_url", "") or ""}
+
+
+def giong_tai_khoan():
+    if not _khoa_hien_tai():
+        return {"ok": False, "loi": "Chưa có khoá ElevenLabs. Dán khoá ở mục \"Khoá ElevenLabs\" rồi Lưu."}
+    try:
+        c = _el_client()
+        try:
+            r = c.voices.search(page_size=100)
+            ds = list(getattr(r, "voices", None) or [])
+        except Exception:
+            r = c.voices.get_all()
+            ds = list(getattr(r, "voices", None) or [])
+        return {"ok": True, "ds": [_voice_dict(v) for v in ds if getattr(v, "voice_id", None)]}
+    except Exception as e:
+        return {"ok": False, "loi": f"Không lấy được danh sách giọng ({type(e).__name__}). Kiểm tra khoá ElevenLabs và mạng."}
+
+
+def giong_mau(vid):
+    """Link nghe thử của 1 giọng ĐANG DÙNG (chỉ nhận id nằm trong danh sách, không nhận id tuỳ ý)."""
+    if vid not in _giong_ds().values():
+        return {"ok": False, "loi": "Giọng này không có trong danh sách đang dùng."}
+    if not _khoa_hien_tai():
+        return {"ok": False, "loi": "Chưa có khoá ElevenLabs."}
+    try:
+        url = getattr(_el_client().voices.get(vid), "preview_url", "") or ""
+    except Exception:
+        return {"ok": False, "loi": "Không lấy được bản nghe thử của giọng này."}
+    return {"ok": bool(url), "nghe_thu": url, "loi": None if url else "Giọng này chưa có bản nghe thử."}
+
+
+def _khoa_ten_giong(ten, da_co):
+    import unicodedata
+    t = unicodedata.normalize("NFD", str(ten or "").replace("đ", "d").replace("Đ", "D"))
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    t = "".join(w[:1].upper() + w[1:] for w in re.split(r"[^A-Za-z0-9]+", t) if w)[:26] or "Giong"
+    if len(t) < 2:
+        t += "X"
+    k, i = t, 2
+    while k in da_co:
+        k = f"{t[:26]}{i}"; i += 1
+    return k
+
+
+def giong_luu(b):
+    """b: {"ds": {ten: id}} ghi đè cả danh sách (≥1) · hoặc {"them": {"id", "ten"?}} (kiểm id) · hoặc {"xoa": ten}."""
+    c = cfg(); g = c.setdefault("giong", {})
+    ds = dict(_giong_ds())
+    if isinstance(b.get("ds"), dict):
+        moi = {}
+        for k, v in b["ds"].items():
+            if re.fullmatch(r"[A-Za-z0-9_]{2,30}", str(k)) and re.fullmatch(r"[A-Za-z0-9]{10,40}", str(v)):
+                moi[str(k)] = str(v)
+        ds = moi
+    elif isinstance(b.get("them"), dict):
+        vid = str(b["them"].get("id") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9]{10,40}", vid):
+            return {"ok": False, "loi": "Voice ID không đúng (thường là 20 ký tự chữ và số)."}
+        if vid in ds.values():
+            return {"ok": False, "loi": "Giọng này đã có trong danh sách đang dùng."}
+        ten = str(b["them"].get("ten") or "").strip()
+        if not ten or b["them"].get("kiem"):
+            if not _khoa_hien_tai():
+                return {"ok": False, "loi": "Chưa có khoá ElevenLabs. Dán khoá ở mục \"Khoá ElevenLabs\" rồi Lưu."}
+            try:
+                v = _el_client().voices.get(vid)
+                ten = ten or getattr(v, "name", "") or ""
+            except Exception:
+                return {"ok": False, "loi": "Không tìm thấy giọng này trong tài khoản của anh. Với giọng lấy từ Thư viện giọng (Voice Library), anh vào elevenlabs.io, bấm \"Add to My Voices\" cho giọng đó trước, rồi thử lại."}
+        ds[_khoa_ten_giong(ten, ds)] = vid
+    elif isinstance(b.get("xoa"), str):
+        ds.pop(b["xoa"], None)
+    else:
+        return {"ok": False, "loi": "Yêu cầu không hợp lệ."}
+    if not ds:
+        return {"ok": False, "loi": "Phải giữ lại ít nhất 1 giọng."}
+    g["danh_sach"] = ds
+    luu_cfg(c)
+    return giong_trang_thai()
 
 
 KHO_JOB = {}
@@ -330,9 +469,9 @@ def tao_san_pham(b):
     if re.fullmatch(r"[0-9]{1,32}", shop_id) and sp.get("loai") != "kho-chung":
         sp["shop_product_id"] = shop_id           # nhớ sản phẩm Shop đã chọn (để gắn giỏ hàng trong TikTok Auto)
     if b.get("doc_la"):
-        k, _, v = b["doc_la"].partition("=")
-        if v.strip():
-            sp["doc_la"] = {k.strip(): v.strip()}
+        dl = doc_la_tu_text(b["doc_la"])
+        if dl:
+            sp["doc_la"] = dl
     if sp.get("loai") == "kho-chung":
         for k, mac_dinh in (("su_that_duoc_noi", []), ("qua_tang", []), ("khong_duoc_noi", []), ("goc_ban", []), ("loai_tru", {"file": [], "doan": []})):
             sp.setdefault(k, mac_dinh)
@@ -636,7 +775,7 @@ def video_ngay(ngay):
     return out
 
 
-def chay(sp, so, kho_them=None):
+def chay(sp, so, kho_them=None, giay=None):
     """kho_them: danh sách mã kho phụ anh chọn ("Dùng thêm cảnh từ kho khác"); None = giữ lựa chọn đã nhớ (tự động dùng cái này).
     Lựa chọn được ghi vào hồ sơ sản phẩm (kho_them) — engine đọc từ đó, lần sau/tự động dùng lại."""
     if dang_chay():
@@ -652,6 +791,15 @@ def chay(sp, so, kho_them=None):
     from tu_dong import san_sang
     if not san_sang(sp):
         return {"ok": False, "loi": "Sản phẩm chưa đủ hồ sơ (sự thật / quà tặng / kho cảnh) — vào tab Sản phẩm để bổ sung."}
+    if giay is not None:                     # độ dài video anh chọn: nhớ vào hồ sơ sản phẩm (engine đọc sp["thoi_luong"], tự động dùng lại)
+        gv, loi = kiem_thoi_luong(giay)
+        if loi:
+            return {"ok": False, "loi": loi}
+        f = HUB / "san-pham" / sp / "san-pham.json"
+        hs = json.loads(f.read_text(encoding="utf-8"))
+        if hs.get("thoi_luong") != gv:
+            hs["thoi_luong"] = gv
+            f.write_text(json.dumps(hs, ensure_ascii=False, indent=1), encoding="utf-8")
     if kho_them is not None:
         sys.path.insert(0, str(CODE / "engine"))
         f = HUB / "san-pham" / sp / "san-pham.json"
@@ -800,7 +948,7 @@ class H(BaseHTTPRequestHandler):
             ngoai = (not dang_chay()) and bool(lines) and not td["da_xong"] and not td["het_han_muc"] \
                 and nk.exists() and time.time() - nk.stat().st_mtime < 240 and not any("DỪNG" in l for l in lines[-2:])
             return self._json({"dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai, "bat_dau": RUN["bat_dau"], "tien_do": td,
-                               "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(),
+                               "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(), "che_do": c.get("che_do", "ekip"),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
         if u.path == "/api/tai-khoan-ds":
@@ -835,6 +983,12 @@ class H(BaseHTTPRequestHandler):
             return self._json(nhac_trang_thai())
         if u.path == "/api/khoa-giong":
             return self._json(khoa_giong_trang_thai())
+        if u.path == "/api/giong":
+            return self._json(giong_trang_thai())
+        if u.path == "/api/giong-mau":
+            return self._json(giong_mau(q.get("id", [""])[0]))
+        if u.path == "/api/giong-tai-khoan":
+            return self._json(giong_tai_khoan())
         if u.path == "/api/hieu-qua":         # số liệu thật TikTok → AI (engine/hieu_qua.py)
             sys.path.insert(0, str(CODE / "engine"))
             try:
@@ -897,7 +1051,8 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": False, "loi": "Yêu cầu không hợp lệ"}, 403)
         u = urlparse(self.path); b = self._body()
         if u.path == "/api/chay":
-            return self._json(chay(b["san_pham"], max(1, min(200, int(b.get("so_video", 4)))), b.get("kho_them") if isinstance(b.get("kho_them"), list) else None))
+            return self._json(chay(b["san_pham"], max(1, min(200, int(b.get("so_video", 4)))), b.get("kho_them") if isinstance(b.get("kho_them"), list) else None,
+                                    b.get("giay") if "giay" in b else None))
         if u.path.startswith("/api/xoa-san-pham/"):
             return self._json(xoa_san_pham(u.path.split("/")[-1]))
         if u.path == "/api/lam-lai":
@@ -993,6 +1148,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(nhac_nguon_sua(b))
         if u.path == "/api/khoa-giong":
             return self._json(khoa_giong_luu(b.get("khoa")))
+        if u.path == "/api/giong":
+            return self._json(giong_luu(b))
         if u.path == "/api/nhac-tai":
             return self._json(nhac_tai_bat_dau())
         if u.path == "/api/mo-thu-muc":
@@ -1027,6 +1184,12 @@ class H(BaseHTTPRequestHandler):
                 sp["ten_gio"] = str(b["ten_gio"]).strip().upper()[:30]   # tên sản phẩm trên giỏ hàng TikTok (app TikTok Auto dùng)
             if str(b.get("ten_ngan") or "").strip():                       # tên gọi ngắn AI đọc trong video (bắt buộc có trong lời)
                 sp["ten_ngan"] = " ".join(str(b["ten_ngan"]).split())[:40]
+            if "doc_la" in b:                                               # cách đọc tên cho giọng đọc: {chữ viết: cách đọc}; rỗng → bỏ khoá
+                dl = doc_la_tu_text(b["doc_la"]) if isinstance(b["doc_la"], str) else {}
+                if dl:
+                    sp["doc_la"] = dl
+                else:
+                    sp.pop("doc_la", None)
             for k in ("qua_tang", "khong_duoc_noi", "su_that_duoc_noi"):
                 if isinstance(b.get(k), list):
                     sp[k] = [x.strip() for x in b[k] if str(x).strip()]

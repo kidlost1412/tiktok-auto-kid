@@ -160,7 +160,25 @@ type Patch = Partial<{
 let pollCancel: { cancel: () => void } | null = null;
 let visiting = false;
 
+// Chip sản phẩm sáng lên ngay khi bấm (không chờ máy chủ trả lưới mới); khi dữ liệu về thì theo filters thật.
+const pickedProduct = ref<string | null>(null);
+
+watch(
+    () => props.filters.product,
+    () => (pickedProduct.value = null),
+);
+
+const activeProduct = computed(() => pickedProduct.value ?? props.filters.product);
+
+const pickProduct = (code: string) => {
+    go({ product: activeProduct.value === code ? '' : code });
+};
+
 const go = (patch: Patch) => {
+    if ('product' in patch) {
+        pickedProduct.value = patch.product ?? '';
+    }
+
     pollCancel?.cancel();
     pollCancel = null;
     const next = {
@@ -202,6 +220,7 @@ const go = (patch: Patch) => {
         },
         onFinish: () => {
             visiting = false;
+            pickedProduct.value = null;
             callbacks.onFinish();
         },
     });
@@ -501,7 +520,8 @@ const description = computed(
             >
                 <Button
                     size="sm"
-                    :variant="filters.product === '' ? 'default' : 'outline'"
+                    :variant="activeProduct === '' ? 'default' : 'outline'"
+                    :aria-pressed="activeProduct === ''"
                     class="h-9 shrink-0 rounded-full"
                     @click="go({ product: '' })"
                 >
@@ -516,15 +536,10 @@ const description = computed(
                     )"
                     :key="p.code"
                     size="sm"
-                    :variant="
-                        filters.product === p.code ? 'default' : 'outline'
-                    "
+                    :variant="activeProduct === p.code ? 'default' : 'outline'"
+                    :aria-pressed="activeProduct === p.code"
                     class="h-9 shrink-0 rounded-full"
-                    @click="
-                        go({
-                            product: filters.product === p.code ? '' : p.code,
-                        })
-                    "
+                    @click="pickProduct(p.code)"
                 >
                     <ProductThumb :src="p.image" class="size-5 rounded" />
                     {{ p.name }}

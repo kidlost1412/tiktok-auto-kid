@@ -125,7 +125,7 @@ const statLine = computed(() => {
 <template>
     <Dialog :open="viewer.open" @update:open="viewer.open = $event">
         <DialogContent
-            class="gap-0 overflow-hidden p-0 sm:max-w-4xl"
+            class="max-w-[calc(100vw-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-[1150px]"
             data-testid="fork-kho-dialog"
         >
             <DialogHeader class="sr-only">
@@ -146,11 +146,11 @@ const statLine = computed(() => {
 
             <div
                 v-else
-                class="grid max-h-[88vh] overflow-y-auto sm:grid-cols-[minmax(0,320px)_1fr] sm:overflow-hidden"
+                class="grid max-h-[92vh] overflow-y-auto sm:grid-cols-[auto_minmax(0,1fr)] sm:overflow-hidden"
             >
-                <!-- Trình phát -->
+                <!-- Trình phát: cao tới ~85% màn hình, giữ tỉ lệ 9:16 -->
                 <div
-                    class="relative flex items-center justify-center bg-black p-3 sm:max-h-[88vh]"
+                    class="relative flex items-center justify-center bg-black p-2 sm:max-h-[92vh]"
                 >
                     <video
                         v-if="viewer.open && video.can_preview"
@@ -163,11 +163,11 @@ const statLine = computed(() => {
                         autoplay
                         playsinline
                         preload="metadata"
-                        class="aspect-[9/16] max-h-[80vh] w-full rounded-lg bg-black object-contain"
+                        class="mx-auto aspect-[9/16] max-h-[60vh] w-auto max-w-full rounded-lg bg-black object-contain sm:h-[min(85vh,860px)] sm:max-h-none"
                     />
                     <div
                         v-else
-                        class="relative aspect-[9/16] w-full max-w-[280px] overflow-hidden rounded-lg bg-zinc-900"
+                        class="relative mx-auto aspect-[9/16] max-h-[60vh] w-auto max-w-full overflow-hidden rounded-lg bg-zinc-900 sm:h-[min(85vh,860px)] sm:max-h-none"
                     >
                         <img
                             v-if="video.has_cover"
@@ -202,7 +202,7 @@ const statLine = computed(() => {
 
                 <!-- Thông tin -->
                 <div
-                    class="flex min-w-0 flex-col gap-4 p-5 sm:max-h-[88vh] sm:overflow-y-auto"
+                    class="flex min-w-0 flex-col gap-4 p-5 text-[15px] sm:max-h-[92vh] sm:overflow-y-auto sm:p-6 [&_dl]:text-[15px]"
                 >
                     <div class="flex items-start gap-3 pr-8">
                         <ProductThumb

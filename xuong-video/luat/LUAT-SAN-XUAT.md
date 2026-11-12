@@ -1,13 +1,13 @@
 # LUẬT SẢN XUẤT — Kid đã duyệt (09/11/2026). Chỉ sửa khi Kid yêu cầu.
 
 ## Mục tiêu
-Video TikTok bán hàng giỏ hàng, 20–25 s (đích 20–22 s), 9:16. Thuần bán hàng: không hỏi han, không xin bình luận, không tư vấn.
+Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VIỆC CẦN LÀM (mặc định 20–25 s), 9:16. Thuần bán hàng: không hỏi han, không xin bình luận, không tư vấn.
 
 ## Lời đọc (kiểu Kid đã ưng: TVC ngắn, có lực)
-- Mỗi video MỘT góc bán chính. Tên sản phẩm (ten_goi trong hồ sơ) nói trong 5 giây đầu. Luật riêng từng sản phẩm: mục luat_rieng trong hồ sơ sản phẩm (bắt buộc).
+- Mỗi video MỘT góc bán chính. Tên sản phẩm (ten_ngan trong hồ sơ, không có thì ten_goi) nói trong 5 giây đầu. Luật riêng từng sản phẩm: mục luat_rieng trong hồ sơ sản phẩm (bắt buộc).
 - Câu ngắn, có lực; sản phẩm + công dụng chủ lực nói sớm; có MỘT hình ảnh cụ thể dễ nhớ (vd. "một chai, một phuy").
 - Chốt: giỏ hàng + MỘT mức quà tặng cụ thể lấy đúng từ qua_tang trong hồ sơ (xoay vòng các mức). Không nói giá, không nói giá trị quà.
-- 77–86 âm tiết (không tính tag) → ~20–22 s sau tốc độ 1,1×.
+- Số âm tiết theo mục ĐỘ DÀI (không tính tag; ~3,9 âm tiết = 1 giây sau tốc độ 1,1×).
 - CẤM câu kiểu thuyết minh/báo cáo: "đây là điểm đáng cân nhắc", "đó là lượng pha theo hướng dẫn", "với người quan tâm…", "quy cách rõ ràng", "đúng nhu cầu, đúng sản phẩm", "tham khảo / xem chi tiết / tìm hiểu thêm".
 - CẤM giả giọng bằng "nha/nè/á", ngôi tôi bịa trải nghiệm, số liệu chưa chốt.
 - Không lặp NGUYÊN CÂU đã dùng (xem danh sách câu đã dùng). Lặp ý và từ khóa thì được.

@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 const props = defineProps<{
     accounts: AccountRow[];
     lich: Lich;
-    stock: { new_total: number; days_left: number | null; low: boolean };
+    stock: { new_total: number; scheduled_total?: number; days_left: number | null; low: boolean };
 }>();
 
 const today = computed(() => {
@@ -64,6 +64,17 @@ const nextLeft = computed(() => {
 
 const on = computed(() => props.accounts.filter((a) => a.enabled).length);
 
+const stockHint = computed(() => {
+    const sched = props.stock.scheduled_total ?? 0;
+    const days = props.stock.days_left !== null ? `đủ khoảng ${props.stock.days_left} ngày đăng` : '';
+
+    if (sched > 0) {
+        return `${sched} bài đã xếp lịch chờ đăng${days ? ` · ${days}` : ''}`;
+    }
+
+    return days ? `Đủ khoảng ${props.stock.days_left} ngày đăng` : 'Video đã duyệt, chưa xếp lịch';
+});
+
 const cards = computed<{ key: string; label: string; value: string; unit?: string; hint: string; tone: Tone; icon: typeof IconRobot }[]>(() => [
     {
         key: 'today',
@@ -97,7 +108,7 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
         label: 'Video trong kho',
         value: String(props.stock.new_total),
         unit: 'video',
-        hint: props.stock.days_left !== null ? `Đủ khoảng ${props.stock.days_left} ngày đăng` : 'Video đã duyệt, chưa đăng',
+        hint: stockHint.value,
         tone: props.stock.low ? 'warn' : 'neutral',
         icon: IconMovie,
     },

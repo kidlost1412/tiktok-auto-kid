@@ -111,7 +111,7 @@ def main(ma_sp, so_video):
             voice = tao_giong(sc["text"], CFG["giong"]["danh_sach"][sc["giong"]], out_dir / "_giong", vname)
         except Exception as e:
             log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__}"); continue
-        if voice["dur"] > CFG["video"]["thoi_luong_max"] - 0.7:
+        if voice["dur"] > CFG["video"]["thoi_luong_max"] - 0.7:   # đường cũ (che_do khác ekip)
             log(f"  bỏ {sc['goc']}: giọng {voice['dur']} s quá dài"); continue
         for j in range(per):
             if queued >= so_video:

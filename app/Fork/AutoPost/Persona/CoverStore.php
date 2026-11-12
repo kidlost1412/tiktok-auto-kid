@@ -173,7 +173,7 @@ final class CoverStore
 
     /**
      * Chọn ảnh bìa cho một bài mới theo chế độ của sản phẩm; null = dùng bìa mặc định của TikTok.
-     * Ngẫu nhiên thì không chọn lại ảnh vừa dùng cho bài trước (khi có từ 2 ảnh trở lên).
+     * Ngẫu nhiên = xoay vòng đều: ưu tiên ảnh đã dùng ít nhất, không lặp ảnh vừa dùng (khi có từ 2 ảnh trở lên).
      */
     public function pick(AutoProduct $p): ?string
     {
@@ -196,10 +196,22 @@ final class CoverStore
                 return $files->contains($fresh->cover_fixed) ? $fresh->cover_fixed : $files->first();
             }
 
+            // Xoay vòng đều: chọn ảnh đã dùng ít nhất (đếm ở cover_images[].used), hoà thì bốc ngẫu nhiên,
+            // không lặp lại ảnh vừa dùng ngay trước đó khi bộ có từ 2 ảnh. Ít ảnh vẫn được dùng lặp lại.
+            $images = collect($fresh->cover_images ?? []);
+            $used = fn (string $f): int => (int) ($images->first(fn ($i): bool => ($i['file'] ?? null) === $f)['used'] ?? 0);
             $pool = $files->count() > 1 ? $files->reject(fn ($f): bool => $f === $fresh->cover_last)->values() : $files;
-            $chosen = $pool[random_int(0, $pool->count() - 1)];
+            $min = $pool->map(fn ($f): int => $used($f))->min();
+            $ties = $pool->filter(fn ($f): bool => $used($f) === $min)->values();
+            $chosen = $ties[random_int(0, $ties->count() - 1)];
 
-            $fresh->forceFill(['cover_last' => $chosen])->save();
+            $fresh->forceFill([
+                'cover_last' => $chosen,
+                'cover_images' => $images->map(fn ($i) => is_array($i) && ($i['file'] ?? null) === $chosen
+                    ? array_merge($i, ['used' => $used($chosen) + 1])
+                    : $i)->values()->all(),
+            ])->save();
+            $p->cover_images = $fresh->cover_images;
             $p->cover_last = $chosen;
 
             return $chosen;

@@ -102,14 +102,22 @@ final class AutoController extends Controller
             ->eligibleNew()
             ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
             ->count();
+        // Video hub đã xếp lịch/giữ chỗ nhưng chưa đăng: vẫn là "hàng trong kho" chờ đến giờ.
+        $scheduledTotal = AutoVideo::query()
+            ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED])
+            ->whereNotNull('hub_id')
+            ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+            ->count();
+        $pool = $newTotal + $scheduledTotal;
 
         return Inertia::render('fork/Auto', [
             'products' => $products,
             'stock' => [
                 'new_total' => $newTotal,
+                'scheduled_total' => $scheduledTotal,
                 'daily_cap' => (int) $dailyCap,
-                'days_left' => $dailyCap > 0 ? round($newTotal / $dailyCap, 1) : null,
-                'low' => $dailyCap > 0 ? $newTotal < $dailyCap : $newTotal === 0,
+                'days_left' => $dailyCap > 0 ? round($pool / $dailyCap, 1) : null,
+                'low' => $dailyCap > 0 ? $pool < $dailyCap : $pool === 0,
                 // Số liệu đọc trực tiếp từ DB lúc này; trang tự làm mới mỗi 30 giây.
                 'updated_at' => now()->toIso8601String(),
                 'last_ingest_at' => Cache::get(VideoLibrary::LAST_INGEST_CACHE_KEY),

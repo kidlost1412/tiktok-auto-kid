@@ -5,7 +5,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet
 CFG = cfg_hub()
 from dung_remotion import MENU  # noqa: E402  (menu khâu dựng v2: nền FFmpeg + chữ Remotion)
 from cong_thuc import RECIPES, DATA_SPEC  # noqa: E402
@@ -99,14 +99,14 @@ Viết như copywriter TVC giỏi nhất: câu ngắn, có lực, có hình ản
 
 CÂU MỞ ĐÃ DÙNG GẦN ĐÂY (cấm lặp ý/khung câu):
 {json.dumps((mo_dau or [])[-60:], ensure_ascii=False)}
-Mỗi bản 77–86 âm tiết (không tính tag), 4–7 câu, kết bằng câu chốt giỏ hàng + đúng MỘT mức quà (xoay vòng giữa các bản).
+ĐỘ DÀI: video đích {khung_giay(sp)[0]:g}–{khung_giay(sp)[1]:g} giây → mỗi bản {khung_am_tiet(sp)[0]}–{khung_am_tiet(sp)[1]} âm tiết (không tính tag; nhắm khoảng {(khung_am_tiet(sp)[0] + khung_am_tiet(sp)[1]) // 2}, ĐẾM KỸ, không viết ngắn hơn), {khung_am_tiet(sp)[4]}–{khung_am_tiet(sp)[5]} câu, kết bằng câu chốt giỏ hàng + đúng MỘT mức quà (xoay vòng giữa các bản).
 Dùng tag giọng đúng luật. Không lặp nguyên câu nào trong CÂU ĐÃ DÙNG.
 
 CÂU ĐÃ DÙNG (không được lặp nguyên văn):
 {json.dumps(used[-150:], ensure_ascii=False)}
 
 === ĐỊNH DẠNG MỖI PHẦN TỬ ===
-{{"goc": "<mã góc>", "giong": "XuanLuong|NhatPhong",
+{{"goc": "<mã góc>", "giong": "{"|".join(CFG["giong"]["danh_sach"])}",
  "text": "<lời đọc có tag [..], mỗi câu kết thúc bằng . ! hoặc ?>",
  "dong": ["<dòng phụ đề 1>", ...]  ← chia LỜI ĐỌC (bỏ tag) thành dòng phụ đề theo CỤM Ý trọn nghĩa, 5–10 từ/dòng; ghép lại phải đúng y lời đọc,
  "y_canh": ["<câu 1 nên thấy hình gì, ≤12 từ>", ... đúng bằng số câu],
@@ -134,8 +134,9 @@ def check(item, sp, used_norm):
     text = item.get("text", "")
     plain = re.sub(r"\[[^\]]*\]", "", text)
     n = len(re.findall(r"\w+", plain))
-    if not 70 <= n <= 92:
-        errs.append(f"{n} âm tiết")
+    _lo, _hi, nho, lon, _c1, _c2 = khung_am_tiet(sp)
+    if not nho <= n <= lon:
+        errs.append(f"{n} âm tiết (cần {_lo}–{_hi})")
     if not any(_chuan(nm) in _chuan(plain) for nm in ten_phai_nhac(sp)):
         errs.append("thiếu tên thương hiệu")
     low = " " + plain.lower() + " "
@@ -154,7 +155,7 @@ def check(item, sp, used_norm):
 
 def viet(ma_sp, so_ban, log=print):
     sp = json.loads((HUB / "san-pham" / ma_sp / "san-pham.json").read_text(encoding="utf-8"))
-    sp_for_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu")}
+    sp_for_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them")}
     used = history_sentences()
     used_norm = {norm(s) for s in used}
     goc = [g["ma"] for g in sp.get("goc_ban") or []] or ["cong-dung", "cach-dung", "thuong-hieu", "qua-tang"]   # sản phẩm mới chưa có góc bán

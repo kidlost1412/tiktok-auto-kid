@@ -63,6 +63,33 @@ def _python_mac_dinh():
     return sys.executable
 
 
+AM_TIET_MOI_GIAY = 3.9          # đo từ giọng thật (sau tốc độ 1,1×): ~3,9 âm tiết/giây
+
+
+def khung_giay(sp=None, c=None):
+    """Độ dài video đích (giây) [min, max]: sp["thoi_luong"] (anh chọn khi làm video, mỗi sản phẩm tự nhớ) → config video → 20–25."""
+    v = ((c or cfg_tho()).get("video") or {})
+    lo, hi = float(v.get("thoi_luong_min") or 20), float(v.get("thoi_luong_max") or 25)
+    t = (sp or {}).get("thoi_luong")
+    if isinstance(t, (list, tuple)) and len(t) == 2:
+        try:
+            a, b = float(t[0]), float(t[1])
+            if 10 <= a and b <= 60 and b - a >= 3:
+                lo, hi = a, b
+        except (TypeError, ValueError):
+            pass
+    return lo, hi
+
+
+def khung_am_tiet(sp=None, c=None):
+    """(đích_min, đích_max, chấp_nhận_min, chấp_nhận_max, câu_min, câu_max) cho lời đọc theo độ dài video đích.
+    Giọng + 0,6 s đệm = video → nhắm giọng dài [min+0,3 ; max−1,0] giây."""
+    a, b = khung_giay(sp, c)
+    lo, hi = round((a + 0.3) * AM_TIET_MOI_GIAY), round((b - 1.0) * AM_TIET_MOI_GIAY)
+    c_lo = max(2, round(lo / 20)); c_hi = max(c_lo + 1, round(hi / 12))
+    return lo, hi, max(20, lo - 8), hi + 5, c_lo, c_hi
+
+
 def cfg():
     """config.json + các đường dẫn đã giải (trống -> mặc định; tương đối -> so với DATA). Mã remotion luôn lấy từ CODE."""
     c = cfg_tho()

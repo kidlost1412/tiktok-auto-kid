@@ -96,6 +96,14 @@ def _gop_doc(words, doc):
     return words
 
 
+def _mau_doc(goc):
+    """'MIG 38' khớp cả 'MiG 38', 'Mig-38', 'MIG38' (không phân biệt hoa thường, nối bằng cách/gạch/chấm hoặc liền) — nguyên từ."""
+    tu = re.findall(r"\w+", goc)
+    if not tu:
+        return re.compile(re.escape(goc), re.I)
+    return re.compile(r"(?<!\w)" + r"[\s\-_.]*".join(re.escape(t) for t in tu) + r"(?!\w)", re.I)
+
+
 def tao_giong(text, voice_id, out_dir, ten, doc=None):
     """doc: {"TC01": "Tê Xê Không Một"} — chữ hiển thị → cách đọc cho ElevenLabs."""
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
@@ -103,8 +111,8 @@ def tao_giong(text, voice_id, out_dir, ten, doc=None):
     if final.exists() and meta.exists():
         return json.loads(meta.read_text(encoding="utf-8"))
     noi = text
-    for goc, cach in (doc or {}).items():
-        noi = re.sub(re.escape(goc), cach, noi, flags=re.I)
+    for goc, cach in sorted((doc or {}).items(), key=lambda kv: -len(kv[0])):
+        noi = re.sub(_mau_doc(goc), lambda m, c=cach: c, noi)
     r = client().text_to_speech.convert_with_timestamps(
         voice_id=voice_id, text=noi, model_id=CFG["giong"]["model"], language_code="vi",
         output_format="mp3_44100_128",

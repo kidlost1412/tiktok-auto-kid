@@ -65,6 +65,7 @@ const props = defineProps<{
     products: ProductRow[];
     stock: {
         new_total: number;
+        scheduled_total?: number;
         daily_cap: number;
         days_left: number | null;
         low: boolean;
@@ -132,11 +133,13 @@ const blocked = computed(() => {
 const channelsOn = computed(() => props.accounts.filter((a) => a.enabled));
 
 const description = computed(() => {
-    const base = `Còn ${fmtNum(props.stock.new_total)} video đã duyệt trong kho`;
+    const sched = props.stock.scheduled_total ?? 0;
+    const base = `Còn ${fmtNum(props.stock.new_total)} video chưa xếp lịch`;
+    const withSched = sched > 0 ? `${base} · ${fmtNum(sched)} bài đã xếp lịch chờ đăng` : base;
 
     return props.stock.days_left !== null
-        ? `${base} (đủ khoảng ${props.stock.days_left} ngày đăng).`
-        : `${base}.`;
+        ? `${withSched} (đủ khoảng ${props.stock.days_left} ngày đăng).`
+        : `${withSched}.`;
 });
 
 // Số liệu đọc từ DB lúc tải trang; tự làm mới để không hiện số cũ.
@@ -239,8 +242,8 @@ const analyses = computed(() => [
                 tone="warn"
                 data-testid="fork-auto-low-stock"
             >
-                Video mới còn lại ({{ stock.new_total }}) không đủ cho một ngày
-                đăng ({{ stock.daily_cap }} bài). Hãy sản xuất thêm video trong
+                Video còn lại ({{ stock.new_total + (stock.scheduled_total ?? 0) }},
+                gồm cả bài đã xếp lịch) không đủ cho một ngày đăng ({{ stock.daily_cap }} bài). Hãy sản xuất thêm video trong
                 hub.
             </Callout>
             <Callout v-if="accounts.length && !channelsOn.length" tone="danger">

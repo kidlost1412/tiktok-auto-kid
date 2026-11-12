@@ -234,7 +234,7 @@ const modes = [
     {
         v: 'random',
         t: 'Ngẫu nhiên trong bộ ảnh',
-        d: 'Mỗi bài một ảnh, không lặp ảnh bài trước',
+        d: 'Xoay vòng đều các ảnh trong bộ, ít ảnh vẫn dùng lặp lại',
     },
 ] as const;
 </script>
