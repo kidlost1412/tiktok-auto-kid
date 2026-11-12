@@ -6,23 +6,26 @@ import { IconBolt, IconBrandTiktok } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import ChannelCard from '@/components/fork/auto/ChannelCard.vue';
-import KpiStrip from '@/components/fork/auto/KpiStrip.vue';
 import HealthStrip from '@/components/fork/auto/HealthStrip.vue';
+import KpiStrip from '@/components/fork/auto/KpiStrip.vue';
+import OnboardingCard from '@/components/fork/auto/OnboardingCard.vue';
 import RecentPosts from '@/components/fork/auto/RecentPosts.vue';
 import ScheduleTimeline from '@/components/fork/auto/ScheduleTimeline.vue';
 import type {
     AccountRow,
+    FailedRow,
     Health,
     HubStatus,
     Lich,
+    Onboarding,
     ProductRow,
     RecentRow,
 } from '@/components/fork/auto/types';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
-import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
+import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import { fmtNum } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -60,6 +63,9 @@ const props = defineProps<{
     plan_ahead_hours: number;
     upcoming: UpcomingRow[];
     recent: RecentRow[];
+    failed_recent?: FailedRow[];
+    /** Tải sau (hỏi hub); null = đã xong hoặc đã ẩn. */
+    onboarding?: Onboarding | null;
     insights: Record<string, Group[]>;
     hasWorkspace: boolean;
 }>();
@@ -130,6 +136,8 @@ onMounted(() => {
                     'stock',
                     'upcoming',
                     'recent',
+                    'failed_recent',
+                    'onboarding',
                     'lich',
                     'health',
                     'accounts',
@@ -178,6 +186,8 @@ const analyses = computed(() => [
                 {{ planning ? 'Đang xếp lịch…' : 'Xếp lịch ngay' }}
             </Button>
         </template>
+
+        <OnboardingCard v-if="onboarding" :onboarding="onboarding" />
 
         <KpiStrip :accounts="accounts" :lich="lich" :stock="stock" />
 
@@ -263,7 +273,11 @@ const analyses = computed(() => [
             :accounts="accounts"
         />
 
-        <RecentPosts :recent="recent" :product-name="productName" />
+        <RecentPosts
+            :recent="recent"
+            :failed="failed_recent ?? []"
+            :product-name="productName"
+        />
 
         <!-- Kho video theo sản phẩm -->
         <details

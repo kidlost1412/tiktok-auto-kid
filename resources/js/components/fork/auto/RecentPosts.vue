@@ -1,28 +1,55 @@
 <script setup lang="ts">
 // Các bài đã thật sự lên TikTok (giờ đăng đã qua), dạng thẻ gọn có ảnh bìa, sản phẩm và lượt xem. Bấm thẻ để xem video.
-import { Link } from '@inertiajs/vue3';
+// Phía trên là các bài lỗi gần đây, có nút "Thử lại" khi chắc chắn bài chưa lên TikTok.
+import { Link, router } from '@inertiajs/vue3';
 import {
+    IconAlertCircle,
     IconChartBar,
     IconExternalLink,
     IconEye,
     IconPlayerPlayFilled,
+    IconRefresh,
     IconSend,
 } from '@tabler/icons-vue';
+import { ref } from 'vue';
 
-import type { RecentRow } from '@/components/fork/auto/types';
+import type { FailedRow, RecentRow } from '@/components/fork/auto/types';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import { fmtNum } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
-import { openVideo } from '@/components/fork/viewer';
 import VideoThumb from '@/components/fork/VideoThumb.vue';
+import { openVideo } from '@/components/fork/viewer';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
 
-const props = defineProps<{
-    recent: RecentRow[];
-    productName: (code: string | null) => string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        recent: RecentRow[];
+        failed?: FailedRow[];
+        productName: (code: string | null) => string;
+    }>(),
+    { failed: () => [] },
+);
+
+const retrying = ref<number | null>(null);
+
+// Máy chủ kiểm lại lần nữa (chưa có gì lên TikTok) rồi mới đưa video về kho; kết quả hiện bằng thông báo.
+const retry = (id: number) => {
+    retrying.value = id;
+    router.post(
+        `/auto/videos/${id}/thu-lai`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retrying.value = null;
+            },
+        },
+    );
+};
 
 const open = (id: number) =>
     openVideo(
@@ -45,6 +72,67 @@ const open = (id: number) =>
                 Xem số liệu chi tiết
             </Link>
         </SectionHeading>
+
+        <div
+            v-if="failed.length"
+            class="overflow-hidden rounded-2xl border border-red-200 bg-card shadow-xs dark:border-red-900"
+            data-testid="fork-auto-failed"
+        >
+            <div
+                class="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+            >
+                <IconAlertCircle class="size-4" />
+                {{ failed.length }} bài đăng lỗi gần đây
+            </div>
+            <ul class="divide-y">
+                <li
+                    v-for="f in failed"
+                    :key="f.id"
+                    class="flex items-center gap-3 px-4 py-3"
+                    :data-testid="`fork-auto-failed-${f.id}`"
+                >
+                    <ProductThumb :src="f.product_image" class="size-9" />
+                    <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-medium">
+                            {{ productName(f.product_code) }}
+                            <span class="font-normal text-muted-foreground">
+                                · @{{ f.username }} ·
+                                {{
+                                    f.at
+                                        ? dayjs(f.at).format('HH:mm DD/MM')
+                                        : '—'
+                                }}
+                            </span>
+                        </div>
+                        <p
+                            v-if="f.error"
+                            class="line-clamp-2 text-sm text-red-700 dark:text-red-300"
+                        >
+                            {{ f.error }}
+                        </p>
+                        <p
+                            v-if="!f.can_retry && f.retry_note"
+                            class="mt-0.5 line-clamp-2 text-xs text-muted-foreground"
+                        >
+                            {{ f.retry_note }}
+                        </p>
+                    </div>
+                    <Button
+                        v-if="f.can_retry"
+                        size="sm"
+                        variant="outline"
+                        class="shrink-0"
+                        :disabled="retrying !== null"
+                        :data-testid="`fork-auto-retry-${f.id}`"
+                        @click="retry(f.id)"
+                    >
+                        <Spinner v-if="retrying === f.id" class="size-4" />
+                        <IconRefresh v-else class="size-4" />
+                        Thử lại
+                    </Button>
+                </li>
+            </ul>
+        </div>
 
         <EmptyState
             v-if="!recent.length"
@@ -109,7 +197,9 @@ const open = (id: number) =>
                         </template>
                         <template v-else>Chưa có số liệu</template>
                     </div>
-                    <div class="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                    <div
+                        class="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
+                    >
                         <IconPlayerPlayFilled class="size-4" />
                         Bấm để xem video
                     </div>

@@ -703,6 +703,13 @@ def danh_gia(body):
     if gy:      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc
         nhan = "ƯNG" if body.get("ket_qua") == "dat" else "KHÔNG ƯNG"
         parts = f.split("_")
+        hs = {}
+        try:
+            for jf in Path(cfg()["duong_dan"]["ra"]).glob(f"*/{Path(f).stem}.json"):
+                hs = json.loads(jf.read_text(encoding="utf-8")); break
+        except Exception:
+            hs = {}
+        parts = [hs.get("ma") or parts[0], hs.get("goc") or (parts[1] if len(parts) > 1 else ""), hs.get("dao_dien") or (parts[2] if len(parts) > 2 else "")]
         with open(LS / "so-gu.md", "a", encoding="utf-8") as fh:
             fh.write(f"- [{datetime.date.today():%d/%m}] Kid {nhan} ({parts[0]}, góc {parts[1] if len(parts) > 1 else ''}, "
                      f"đạo diễn {parts[2] if len(parts) > 2 else ''}): {gy}\n")
@@ -826,6 +833,13 @@ class H(BaseHTTPRequestHandler):
             return self._json(nhac_trang_thai())
         if u.path == "/api/khoa-giong":
             return self._json(khoa_giong_trang_thai())
+        if u.path == "/api/hieu-qua":         # số liệu thật TikTok → AI (engine/hieu_qua.py)
+            sys.path.insert(0, str(CODE / "engine"))
+            try:
+                from hieu_qua import bao_cao
+                return self._json({"ok": True, **bao_cao(q.get("ma", [""])[0])})
+            except Exception as e:
+                return self._json({"ok": False, "loi": f"{type(e).__name__}: {e}"})
         if u.path == "/api/shop-sp":          # sản phẩm TikTok Shop (từ app TikTok Auto) để chọn khi thêm sản phẩm
             ds = anh_sp.ds_shop("moi" in q)
             return self._json({"ok": ds is not None, "ds": [{"id": x["id"], "tieu_de": x["tieu_de"], "ten_ngan": x["ten_ngan"], "gia": x["gia"], "ma": x["ma"],

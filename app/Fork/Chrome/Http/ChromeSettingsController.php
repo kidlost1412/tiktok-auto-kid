@@ -16,6 +16,7 @@ use App\Fork\Notify\Telegram;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,65 @@ final class ChromeSettingsController extends Controller
         $accountId = $this->authorizeOwner($request);
 
         return response()->json(['jobs' => $this->jobList($accountId)]);
+    }
+
+    /**
+     * Trạng thái ghép nối cho thanh tiến trình trên trang (giao diện hỏi mỗi ~2 giây, tối đa ~3 phút).
+     * Lần hỏi đầu không gửi `since`: máy chủ trả mốc thời gian của chính nó để khỏi lệ thuộc đồng hồ trình duyệt.
+     * `profile` (+ `browser`) tuỳ chọn: thư mục profile vừa yêu cầu mở; khi trợ lý chưa báo thấy profile này thì
+     * coi như Chrome còn đang mở.
+     */
+    public function pairStatus(Request $request): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+
+        $data = $request->validate([
+            'since' => ['nullable', 'integer', 'min:0'],
+            'profile' => ['nullable', 'string', 'max:64'],
+            'browser' => ['nullable', 'string', 'in:chrome,edge'],
+        ]);
+
+        // Lùi 5 giây: tiện ích tự ghép nhanh hơn lần hỏi đầu tiên cũng không bị bỏ sót.
+        $since = isset($data['since']) ? (int) $data['since'] : time() - 5;
+
+        $client = ChromeClient::query()
+            ->where('account_id', $accountId)
+            ->whereNull('revoked_at')
+            ->where('created_at', '>=', CarbonImmutable::createFromTimestamp($since)->setTimezone((string) config('app.timezone')))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $profile = trim((string) ($data['profile'] ?? ''));
+        $profileSeen = null;
+
+        if ($profile !== '' && self::validProfileDir($profile)) {
+            $browser = ChromeProfiles::normalizeBrowser($data['browser'] ?? null);
+            $profileSeen = collect(ChromeProfiles::reported())
+                ->contains(fn (array $p): bool => $p['dir'] === $profile && $p['browser'] === $browser);
+        }
+
+        $username = $client ? ltrim((string) $client->tiktok_username, '@') : '';
+
+        $stage = match (true) {
+            $client !== null && $username !== '' && filled($client->tiktok_user_id) => 'account',
+            $client !== null => 'paired',
+            $profileSeen === false => 'opening',
+            default => 'waiting_extension',
+        };
+
+        return response()->json([
+            'since' => $since,
+            'stage' => $stage,
+            'pair_active' => $this->currentPair($accountId) !== null,
+            'launcher_alive' => app(ChromeKeepAlive::class)->launcherAlive(),
+            'profile_seen' => $profileSeen,
+            'client' => $client ? [
+                'id' => $client->id,
+                'label' => $client->label,
+                'tiktok_username' => $username !== '' ? $username : null,
+            ] : null,
+        ]);
     }
 
     public function pairCode(Request $request): RedirectResponse

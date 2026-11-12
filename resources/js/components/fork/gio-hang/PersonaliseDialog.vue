@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3';
 import { IconPhotoPlus, IconTrash } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+import CoverPreview from '@/components/fork/gio-hang/CoverPreview.vue';
 import type { Persona } from '@/components/fork/gio-hang/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +39,8 @@ const sample = ref('');
 const busy = ref(false);
 const preview = ref<{ text: string; length: number; max: number } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+/** Ảnh đang xem trước ở chế độ ngẫu nhiên (bấm ảnh để đổi). */
+const previewFile = ref<string | null>(null);
 
 watch(
     () => props.open,
@@ -52,6 +55,7 @@ watch(
         tagMode.value = props.state.hashtag_mode ?? 'append';
         pick.value = props.state.hashtag_pick ?? 0;
         sample.value = '';
+        previewFile.value = null;
         void loadPreview();
     },
 );
@@ -64,6 +68,22 @@ const effectiveFixed = computed(
         covers.value[0]?.file ??
         null,
 );
+
+// Cố định: xem đúng ảnh đã chọn. Ngẫu nhiên: ảnh vừa bấm, mặc định ảnh đầu tiên.
+const previewCover = computed(() => {
+    const file =
+        coverMode.value === 'fixed' ? effectiveFixed.value : previewFile.value;
+
+    return covers.value.find((c) => c.file === file) ?? covers.value[0] ?? null;
+});
+
+function selectCover(file: string) {
+    if (coverMode.value === 'fixed') {
+        coverFixed.value = file;
+    } else {
+        previewFile.value = file;
+    }
+}
 
 const tagCount = computed(
     () => tags.value.split(/[\s,;]+/).filter((t) => t.replace(/#/g, '')).length,
@@ -328,6 +348,10 @@ const modes = [
                                         coverMode === 'fixed' &&
                                             effectiveFixed === c.file &&
                                             'ring-2 ring-primary',
+                                        coverMode === 'random' &&
+                                            covers.length > 1 &&
+                                            previewCover?.file === c.file &&
+                                            'ring-2 ring-muted-foreground/50',
                                     )
                                 "
                             >
@@ -335,10 +359,7 @@ const modes = [
                                     type="button"
                                     class="block aspect-[3/4] w-full"
                                     :title="`${c.name} · ${c.w}×${c.h}`"
-                                    @click="
-                                        coverMode === 'fixed' &&
-                                        (coverFixed = c.file)
-                                    "
+                                    @click="selectCover(c.file)"
                                 >
                                     <img
                                         :src="c.url"
@@ -368,6 +389,14 @@ const modes = [
                         >
                             Bấm vào ảnh để chọn ảnh cố định (viền xanh).
                         </p>
+
+                        <CoverPreview
+                            v-if="previewCover"
+                            :cover="previewCover"
+                            :random="
+                                coverMode === 'random' && covers.length > 1
+                            "
+                        />
                     </template>
                 </section>
 

@@ -39,23 +39,6 @@
   --blue:#6EA9F0; --blue-soft:#172739; --shadow:0 6px 22px rgba(0,0,0,.35);
   --panel:#0F1612; --input:#111A15; --y-ink:#F0D06A; --w-ink:#F0D06A; color-scheme:dark;
 }
-/* chế độ nhúng: bỏ logo + tên app (trang cha đã có), giữ thanh tab, nền trùng trang cha */
-:root[data-nhung] header{position:static;padding:10px 24px;background:transparent}
-:root[data-nhung] header .logo, :root[data-nhung] header .brand{display:none}
-:root[data-nhung] nav{margin-left:0}
-:root[data-nhung] main{padding-top:18px}
-/* nhúng: bớt khác biệt với app chính — font hệ thống, bo góc nhỏ, viền trung tính, bỏ bóng nổi 3D ở nút (cả sáng lẫn tối) */
-:root[data-nhung]{--r:12px;--line:#E4E4E7;--shadow:0 1px 2px rgba(0,0,0,.05);--font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-:root[data-nhung][data-theme="dark"]{--line:#2E2E33;--shadow:none}
-:root[data-nhung] body, :root[data-nhung] nav button, :root[data-nhung] .btn,
-:root[data-nhung] select, :root[data-nhung] input, :root[data-nhung] textarea{font-family:var(--font)}
-:root[data-nhung] .btn{border-radius:10px;font-weight:700}
-:root[data-nhung] nav button{border-radius:10px;font-weight:700}
-:root[data-nhung] select, :root[data-nhung] input[type=number], :root[data-nhung] input[type=text], :root[data-nhung] input[type=password], :root[data-nhung] textarea{border-radius:10px;border-width:1px;font-weight:500}
-:root[data-nhung] .btn.go, :root[data-nhung] .btn.go:active, :root[data-nhung] .btn.stop{box-shadow:none}
-:root[data-nhung] .btn.go:active{transform:none;filter:brightness(.92)}
-:root[data-nhung] .vid{border-width:1px}
-:root[data-nhung] .vid.dat{border-width:2px} :root[data-nhung] .vid.bo{border-width:2px}
 *{box-sizing:border-box}
 input[type=checkbox],input[type=radio]{accent-color:var(--green)}
 select option{background:var(--input);color:var(--ink)}
@@ -161,7 +144,138 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .tmit:hover{background:var(--green-soft)}
 .tmit .ten{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 input.pick{background:var(--panel);cursor:default}
+/* tab Sản phẩm: danh sách · thêm mới · chi tiết */
+.lui{border:0;background:transparent;color:var(--mute);font:800 14px Nunito;cursor:pointer;padding:4px 0;margin:0 0 12px;display:inline-flex;align-items:center;gap:6px}
+.lui:hover{color:var(--ink)}
+.dau{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.tbl-wrap{overflow-x:auto;margin-top:14px}
+.tbl{width:100%;border-collapse:collapse}
+.tbl td{padding:8px 6px;vertical-align:middle}
+#tqBang tr[data-ma]{cursor:pointer;transition:background-color .12s}
+#tqBang tr[data-ma]:hover{background:var(--panel)}
+.ct-dau{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.ct-dau .sp-anh.lg{width:64px;height:64px;border-radius:14px}
+.ct-dau .sp-anh.lg.rong{font-size:28px}
+.subtabs{display:flex;gap:4px;margin:18px 0 14px;border-bottom:2px solid var(--line);flex-wrap:wrap}
+.subtabs button{border:0;border-bottom:2px solid transparent;margin-bottom:-2px;background:transparent;padding:10px 14px;font:800 15px Nunito;color:var(--mute);cursor:pointer}
+.subtabs button:hover{color:var(--ink)}
+.subtabs button.on{color:var(--green);border-bottom-color:var(--green)}
+.khung{border:2px solid var(--line);border-radius:16px;padding:12px 14px}
+.khung-hep{max-width:960px}
+.buoc-ds{margin:14px 0 0;padding-left:20px}
+.buoc-ds li{margin:4px 0}
 @media (max-width:900px){.g2{grid-template-columns:1fr}.mbox{grid-template-columns:1fr}.mbox video{height:60vh}header{flex-wrap:wrap}}
+/* ===== chế độ nhúng (?nhung=1) trong TikTok Auto Kid: giống app chính — font hệ thống, màu trung tính, viền 1px, bo 8–12px, nút phẳng, ít emoji (cả sáng lẫn tối).
+   Đặt cuối <style> để thắng luật gốc; --bg thật do __xvApplyTheme gán inline (nền trùng trang cha). ===== */
+:root[data-nhung] header{position:static;padding:14px 24px 0;background:transparent;border-bottom:0}
+:root[data-nhung] header .logo, :root[data-nhung] header .brand{display:none}
+:root[data-nhung] nav{margin-left:0}
+:root[data-nhung] main{padding:16px 24px 64px}
+:root[data-nhung]{
+  --r:12px; --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --bg:#FFFFFF; --card:#FFFFFF; --ink:#292928; --mute:#5A5A59; --line:#EAE8E5; --line2:#DEDCD9; --panel:#F7F6F3; --input:#FFFFFF; --sec:#EFEDEA; --tab-on:#FFFFFF;
+  --pri:#6D28D9; --pri-h:#5B21B6; --on-pri:#FFFFFF; --pri-soft:#EDE9FE; --pri-ink:#6D28D9; --ring:rgba(124,58,237,.22);
+  --green:#337046; --green-soft:#E3F3DD; --on-g:#FFFFFF; --red:#B42318; --red-soft:#FDE8E5; --on-r:#FFFFFF; --danger:#C02E1C;
+  --blue:#004781; --blue-soft:#E3F1FF; --yellow-soft:#FEF3C7; --y-ink:#8A4B08; --w-ink:#8A4B08; --shadow:0 1px 2px rgba(16,16,16,.04);
+  --log-bg:#F7F6F3; --log-ink:#3A3A39; --log-ok:#337046; --log-bad:#B42318; --log-warn:#8A4B08;
+}
+:root[data-nhung][data-theme="dark"]{
+  --bg:#0D0E12; --card:#15171D; --ink:#F1F1F4; --mute:#B4B7C3; --line:#2A2D38; --line2:#3A3E4C; --panel:#1A1D25; --input:#111318; --sec:#262A35; --tab-on:#2C303C;
+  --pri:#A78BFA; --pri-h:#B9A3FB; --on-pri:#14102A; --pri-soft:#241A4A; --pri-ink:#C4B5FD; --ring:rgba(167,139,250,.35);
+  --green:#86EFAC; --green-soft:#12301F; --on-g:#052E16; --red:#FCA5A5; --red-soft:#3A1717; --on-r:#2B0508; --danger:#DC2626;
+  --blue:#93C5FD; --blue-soft:#0F2A4D; --yellow-soft:#33290B; --y-ink:#FCD34D; --w-ink:#FCD34D; --shadow:none;
+  --log-bg:#0B0C10; --log-ink:#D4D6DE; --log-ok:#86EFAC; --log-bad:#FCA5A5; --log-warn:#FCD34D;
+}
+:root[data-nhung] *{font-family:var(--font)!important}
+:root[data-nhung] .log, :root[data-nhung] .log *{font-family:var(--mono)!important}
+:root[data-nhung] body{font-size:14px;-webkit-font-smoothing:antialiased}
+:root[data-nhung] a{color:var(--pri-ink)}
+:root[data-nhung] input[type=checkbox], :root[data-nhung] input[type=radio]{accent-color:var(--pri)}
+:root[data-nhung][data-theme="dark"] *{scrollbar-color:#3A3E4C transparent}
+:root[data-nhung] .ic{display:none}
+:root[data-nhung] b, :root[data-nhung] strong{font-weight:600}
+/* thanh tab chính: kiểu segmented như app */
+:root[data-nhung] nav{display:inline-flex;gap:2px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+:root[data-nhung] nav button{padding:7px 14px;border-radius:7px;font-size:14px;font-weight:500;color:var(--mute);transition:background-color .15s,color .15s}
+:root[data-nhung] nav button:hover{color:var(--ink)}
+:root[data-nhung] nav button.on{background:var(--tab-on);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+/* chữ */
+:root[data-nhung] h2{font-size:17px;font-weight:600;letter-spacing:-.01em}
+:root[data-nhung] h3{font-size:14.5px;font-weight:600}
+:root[data-nhung] label{font-size:13px;font-weight:500;color:var(--ink)}
+:root[data-nhung] .note{font-weight:400;font-size:13px}
+:root[data-nhung] summary{font-weight:500}
+/* thẻ */
+:root[data-nhung] .card{border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+:root[data-nhung] .stat div{border:1px solid var(--line);border-radius:10px;padding:12px}
+:root[data-nhung] .stat b{font-size:22px;font-weight:600}
+:root[data-nhung] .stat span{font-weight:400;font-size:12.5px}
+/* nút */
+:root[data-nhung] .btn{border-radius:8px;padding:9px 16px;font-size:14px;font-weight:500;line-height:1.3;transition:background-color .15s,border-color .15s,color .15s}
+:root[data-nhung] .btn.big{padding:12px 22px;font-size:15px}
+:root[data-nhung] .btn.go{background:var(--pri);color:var(--on-pri);box-shadow:none}
+:root[data-nhung] .btn.go:hover:not(:disabled){background:var(--pri-h)}
+:root[data-nhung] .btn.go:active, :root[data-nhung] .btn.stop:active{transform:translateY(1px);box-shadow:none;filter:none}
+:root[data-nhung] .btn.stop{background:var(--danger);color:#fff;box-shadow:none}
+:root[data-nhung] .btn.soft{background:var(--sec);color:var(--ink)}
+:root[data-nhung] .btn.soft:hover:not(:disabled){background:var(--line2)}
+:root[data-nhung] .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+:root[data-nhung] .btn.ghost:hover:not(:disabled){background:var(--panel)}
+:root[data-nhung] .btn:disabled{opacity:.5}
+:root[data-nhung] :focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+/* ô nhập */
+:root[data-nhung] select, :root[data-nhung] input[type=number], :root[data-nhung] input[type=text], :root[data-nhung] input[type=password], :root[data-nhung] textarea{border:1px solid var(--line2);border-radius:8px;padding:9px 12px;font-size:14px;font-weight:400}
+:root[data-nhung] :is(select,input[type=number],input[type=text],input[type=password],textarea):focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--ring)}
+/* nhãn trạng thái */
+:root[data-nhung] .pill{padding:2px 8px;border-radius:6px;font-weight:500;font-size:12px;line-height:1.55}
+/* bảng: hàng đầu là tiêu đề cột */
+:root[data-nhung] .tbl td{padding:10px!important;font-size:13.5px}
+:root[data-nhung] .tbl td[style*="font-weight:800"]{font-weight:500!important}
+:root[data-nhung] .tbl tr:first-child td{font-weight:500!important;font-size:12px!important;color:var(--mute)!important;padding-top:4px!important;padding-bottom:8px!important}
+/* hộp thông báo, nhật ký, thanh tiến độ */
+:root[data-nhung] .warnbox, :root[data-nhung] .errbox{border-radius:10px;font-weight:500;font-size:14px;padding:12px 14px}
+:root[data-nhung] .cap{border-radius:10px;font-weight:400;border:1px solid var(--line)}
+:root[data-nhung] .khung{border-width:1px;border-radius:10px}
+:root[data-nhung] .bar{background:var(--sec)}
+:root[data-nhung] .bar>i{background:var(--pri)}
+:root[data-nhung] .log{background:var(--log-bg);color:var(--log-ink);border:1px solid var(--line);border-radius:10px;font-weight:400;font-size:12.5px}
+:root[data-nhung] .log .ok{color:var(--log-ok)} :root[data-nhung] .log .bad{color:var(--log-bad)} :root[data-nhung] .log .warn{color:var(--log-warn)}
+/* thẻ video */
+:root[data-nhung] .vids{gap:16px}
+:root[data-nhung] .vid{border-width:1px;border-radius:12px}
+:root[data-nhung] .vid.dat, :root[data-nhung] .vid.bo{border-width:2px}
+:root[data-nhung] .vid .t{font-weight:600;font-size:14px}
+:root[data-nhung] .vid .m{font-weight:400;font-size:12.5px}
+:root[data-nhung] .vid .act button{border-radius:8px;font-weight:500;font-size:14px;padding:8px 6px}
+/* hộp thoại + thông báo nổi */
+:root[data-nhung] .modal{background:rgba(0,0,0,.5)}
+:root[data-nhung] .mbox{border-radius:12px;border:1px solid var(--line);box-shadow:0 16px 48px rgba(0,0,0,.25)}
+:root[data-nhung] .mside .x{background:transparent;border:1px solid var(--line2);border-radius:8px;font-size:14px;font-weight:500;color:var(--ink);padding:6px 12px}
+:root[data-nhung] .tmbox{border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.25)}
+:root[data-nhung] .tmds{border-width:1px;border-radius:10px}
+:root[data-nhung] .tmit{font-size:14px;font-weight:400;padding:9px 14px}
+:root[data-nhung] .tmit:hover{background:var(--panel)}
+:root[data-nhung] .tmcrumb button{background:var(--sec);color:var(--ink);border-radius:6px;font-size:13px;font-weight:500}
+:root[data-nhung] .toast{background:var(--card);color:var(--ink);border:1px solid var(--line2);border-radius:10px;font-weight:500;font-size:14px;padding:11px 18px;box-shadow:0 8px 28px rgba(0,0,0,.14)}
+:root[data-nhung][data-theme="dark"] .toast{box-shadow:0 8px 28px rgba(0,0,0,.55)}
+/* kho phụ, lưới TikTok Shop, ảnh sản phẩm */
+:root[data-nhung] .khothem{border:1px solid var(--line);border-radius:10px}
+:root[data-nhung] .khothem label.kt{border-width:1px;border-radius:10px;font-weight:500}
+:root[data-nhung] .khothem label.kt:has(input:checked){border-color:var(--pri);background:var(--pri-soft)}
+:root[data-nhung] .khothem label.kt small{font-weight:400}
+:root[data-nhung] .shop-it{border-width:1px;border-radius:10px;font-weight:500}
+:root[data-nhung] .shop-it:hover{border-color:var(--line2);background:var(--panel)}
+:root[data-nhung] .shop-it.chon{border-color:var(--pri);background:var(--pri-soft);box-shadow:0 0 0 1px var(--pri)}
+:root[data-nhung] .shop-it img, :root[data-nhung] .shop-it .rong{border-radius:6px;background:var(--panel)}
+:root[data-nhung] .shop-it .gan{font-weight:500;border-radius:5px}
+:root[data-nhung] .shop-chon{background:var(--pri-soft);border-radius:10px}
+:root[data-nhung] .sp-anh{border-radius:8px;background:var(--panel)}
+:root[data-nhung] .sp-anh.lg{border-radius:12px}
+/* tab con + nút quay lại ở trang sản phẩm */
+:root[data-nhung] .subtabs{border-bottom-width:1px}
+:root[data-nhung] .subtabs button{font-size:14px;font-weight:500;margin-bottom:-1px}
+:root[data-nhung] .subtabs button.on{color:var(--ink);border-bottom-color:var(--pri)}
+:root[data-nhung] .lui{font-size:13.5px;font-weight:500}
 </style>
 </head>
 <body>
@@ -169,11 +283,11 @@ input.pick{background:var(--panel);cursor:default}
   <div class="logo">X</div>
   <div class="brand"><h1>Xưởng Video</h1><div class="sub" id="hdrSub">ê-kíp AI</div></div>
   <nav>
-    <button data-tab="sx" class="on">🎬 Sản xuất</button>
-    <button data-tab="kho">📺 Kho video</button>
-    <button data-tab="sp">🎁 Sản phẩm &amp; quà</button>
-    <button data-tab="gu">💬 Gu &amp; bài học</button>
-    <button data-tab="cd">⚙️ Cài đặt</button>
+    <button data-tab="sx" class="on"><span class="ic">🎬</span> Sản xuất</button>
+    <button data-tab="kho"><span class="ic">📺</span> Kho video</button>
+    <button data-tab="sp"><span class="ic">🎁</span> Sản phẩm &amp; quà</button>
+    <button data-tab="gu"><span class="ic">💬</span> Gu &amp; bài học</button>
+    <button data-tab="cd"><span class="ic">⚙️</span> Cài đặt</button>
   </nav>
 </header>
 
@@ -216,20 +330,20 @@ input.pick{background:var(--panel);cursor:default}
     </div>
   </div>
   <div class="card" style="margin-top:18px">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📊 Chi phí từng lô</h2>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0"><span class="ic">📊</span> Chi phí từng lô</h2>
       <span class="note">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</span></div>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px" id="loBang"></table></div>
+    <div style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;margin-top:10px;font-size:14px" id="loBang"></table></div>
   </div>
   <div class="card" style="margin-top:18px">
     <div class="row" style="justify-content:space-between">
-      <h2 style="margin:0">🤖 Tự động giữ kho video</h2>
+      <h2 style="margin:0"><span class="ic">🤖</span> Tự động giữ kho video</h2>
       <label class="row" style="gap:8px;margin:0;font-size:16px;color:var(--ink)"><input type="checkbox" id="tdBat" style="width:22px;height:22px"> Bật tự động</label>
     </div>
     <p class="note">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
       App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
       <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã ✅ và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự ✅) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
       <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;margin-top:8px" id="tdBang"></table></div>
+    <div style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;margin-top:8px" id="tdBang"></table></div>
     <div class="row" style="margin-top:12px;justify-content:space-between">
       <span class="note" id="tdTrangThai"></span>
       <div class="row"><span class="note">Kiểm mỗi</span><input type="number" id="tdPhut" min="5" value="15" style="width:90px"><span class="note">phút</span>
@@ -270,14 +384,23 @@ input.pick{background:var(--panel);cursor:default}
 
 <!-- SẢN PHẨM -->
 <section id="sp" class="hidden">
-  <div class="card" style="margin-bottom:18px">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0">📦 Tất cả sản phẩm <span class="note" id="tqTom"></span></h2>
-      <button class="btn ghost" id="btnTqMoi">↻ Đếm lại</button></div>
-    <table style="width:100%;border-collapse:collapse;margin-top:12px" id="tqBang"></table>
-    <p class="note">🗑 Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm KHÔNG bị xoá.</p>
+  <!-- 3 màn: danh sách (mặc định) · thêm sản phẩm mới · chi tiết 1 sản phẩm (JS: spXem / moChiTiet / ctMo) -->
+  <div id="spDs">
+    <div class="card">
+      <div class="dau">
+        <div><h2 style="margin:0"><span class="ic">📦</span> Sản phẩm</h2><div class="note" id="tqTom" style="margin-top:4px"></div></div>
+        <div class="row" style="gap:8px"><button class="btn ghost" id="btnTqMoi">↻ Đếm lại</button>
+          <button class="btn go" id="btnMoThem">＋ Thêm sản phẩm mới</button></div>
+      </div>
+      <div class="tbl-wrap"><table class="tbl" id="tqBang"></table></div>
+      <p class="note" style="margin:12px 0 0">Bấm vào một sản phẩm để sửa quà tặng, sự thật, kho cảnh và ảnh. Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được) — video gốc và video đã làm KHÔNG bị xoá.</p>
+    </div>
   </div>
-  <div class="grid g2" style="margin-bottom:18px">
-    <div class="card"><h2>➕ Thêm sản phẩm mới</h2>
+
+  <div id="spThem" class="hidden">
+    <button type="button" class="lui" data-ve="ds">← Danh sách sản phẩm</button>
+    <div class="card khung-hep"><h2><span class="ic">➕</span> Thêm sản phẩm mới</h2>
+      <p class="note" style="margin:-6px 0 16px">Điền từ trên xuống. Tạo xong, app mở trang của sản phẩm để anh điền quà tặng, sự thật rồi học cảnh.</p>
       <div style="margin-bottom:12px"><label>Loại</label>
         <select id="mLoai"><option value="ban">Sản phẩm bán (làm video bán hàng)</option><option value="kho-chung">Kho cảnh chung (chỉ cho sản phẩm khác mượn cảnh)</option></select></div>
       <div id="mShopBox" style="margin-bottom:12px"><label>① Chọn sản phẩm từ TikTok Shop</label>
@@ -296,57 +419,99 @@ input.pick{background:var(--panel);cursor:default}
           <div><div class="row" style="gap:8px"><button class="btn soft" id="btnMAnhFile" style="padding:10px 14px;font-size:15px">🖼 Chọn ảnh</button>
             <button class="btn soft" id="btnMAnhVid" style="padding:10px 14px;font-size:15px">🎞 Lấy ảnh từ video</button></div>
             <div class="note" style="margin-top:6px">Không chọn cũng được — hub tự lấy 1 khung hình từ video. <a href="#" id="mShopLai">← Chọn từ TikTok Shop</a></div></div></div></div>
-      <div class="row" style="margin-top:12px"><button class="btn go" id="btnTaoSp">➕ Tạo sản phẩm</button>
-        <span class="note" id="mGhiChu">Tạo xong: điền sự thật + quà tặng bên dưới → bấm "Chuẩn bị kho".</span></div>
-    </div>
-    <div class="card"><h2>🎞 Kho cảnh của sản phẩm</h2>
-      <div class="row nowrap" style="gap:14px;align-items:flex-start"><span id="khoAnh"></span><div id="khoInfo" class="note" style="min-width:0">Chọn sản phẩm bên dưới.</div></div>
-      <div class="row" style="margin-top:12px"><button class="btn go" id="btnHoc">🧠 Học cảnh</button>
-        <button class="btn ghost" id="btnAgy2" title="Trạng thái Antigravity / model" style="padding:8px 12px;font-size:14px">⚙ Antigravity</button>
-        <button class="btn soft" id="btnKho">🧩 Chuẩn bị kho (nạp cảnh + AI soát)</button>
-        <button class="btn soft" id="btnKiem">🩺 Kiểm định dạng</button></div>
-      <div id="hocBox" class="hidden" style="margin-top:12px"><div class="bar"><i id="hocFill"></i></div>
-        <p class="note" id="hocText" style="margin:8px 0 0"></p></div>
-      <div id="hocSetup" class="hidden" style="margin-top:12px;border:2px solid var(--line);border-radius:16px;padding:10px 14px">
-        <div class="row nowrap" style="gap:10px"><b id="agyTt" style="flex:1">Antigravity: …</b>
-          <button class="btn soft hidden" id="btnAgyMo" style="padding:8px 14px;font-size:14px">Mở Antigravity</button>
-          <select id="hsModel" title="Model học cảnh" style="max-width:170px"></select>
-          <button class="btn ghost" id="btnHsDong" title="Thu gọn" style="padding:4px 10px;font-size:14px">✕</button></div>
-      </div>
-      <div id="hocLoi" class="note" style="margin-top:6px"></div>
-      <div id="kdBox" class="hidden" style="margin-top:12px;border:2px solid var(--line);border-radius:16px;padding:14px"></div>
-      <p class="note">Bấm <b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
-        <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</p>
-      <div class="note" id="khoBuoc" style="margin-top:12px"></div>
-      <div class="log" id="khoLog" style="height:120px;margin-top:8px"></div>
+      <div class="row" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><button class="btn go" id="btnTaoSp">➕ Tạo sản phẩm</button>
+        <button type="button" class="btn ghost" data-ve="ds">Huỷ</button>
+        <span class="note" id="mGhiChu">Tạo xong: điền sự thật + quà tặng → bấm "Chuẩn bị kho".</span></div>
     </div>
   </div>
-  <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <div class="row nowrap" style="gap:16px"><span id="spAnh"></span>
-        <div style="width:280px"><label>Sản phẩm</label><select id="spSua"></select>
-          <div class="row" style="gap:8px;margin-top:8px"><button class="btn soft" id="btnSAnhFile" style="padding:8px 12px;font-size:14px">🖼 Chọn ảnh</button>
-            <button class="btn soft" id="btnSAnhVid" style="padding:8px 12px;font-size:14px">🎞 Lấy ảnh từ video</button>
-            <button class="btn soft" id="btnSAnhShop" style="padding:8px 12px;font-size:14px">🛍 Đổi ảnh: lấy từ TikTok Shop</button></div></div></div>
-      <button class="btn go" id="btnLuuSp">💾 Lưu</button>
+
+  <div id="spCt" class="hidden">
+    <button type="button" class="lui" data-ve="ds">← Danh sách sản phẩm</button>
+    <div class="card ct-dau">
+      <div class="row nowrap" style="gap:14px;min-width:0;flex:1 1 320px"><span id="spAnh"></span>
+        <div style="min-width:0"><h2 id="spTenCt" style="margin:0">…</h2><div class="row" id="spTtCt" style="gap:6px;margin-top:6px"></div></div></div>
+      <div class="row" style="gap:8px">
+        <span class="note">Chuyển sang</span><select id="spSua" title="Chuyển sang sản phẩm khác" style="width:220px"></select>
+        <button class="btn go" id="btnLuuSp">💾 Lưu thay đổi</button></div>
     </div>
-    <div id="sShopBox" class="hidden" style="margin-top:12px"><div id="sShopLuoi"></div></div>
-    <div class="warnbox hidden" id="spChungNote" style="margin-top:14px;background:var(--green-soft);color:var(--green)">Kho cảnh chung: chỉ để sản phẩm khác mượn cảnh khi làm video. Không bán, không quà tặng, không có lời nói.</div>
-    <label class="row hidden" id="spChungMd" style="gap:8px;margin:12px 0 0;color:var(--ink);font-size:15px"><input type="checkbox" id="spTron" style="width:20px;height:20px"> Tự trộn vào video của mọi sản phẩm (khi anh chưa chọn kho phụ)</label>
-    <div class="grid g2" id="spBan1" style="margin-top:18px">
-      <div><h3>🎁 Quà tặng chương trình (mỗi dòng 1 mức)</h3>
-        <textarea id="qua" style="min-height:190px" placeholder="Mua 1 chai: tặng 1 gói siêu kali bo"></textarea>
-        <p class="note">Biên kịch chỉ được nói đúng các mức quà ở đây. Đổi quà (vd. Nano Lân) thì sửa rồi bấm Lưu. Không ghi giá.</p></div>
-      <div><h3>🚫 Không được nói</h3><textarea id="cam" style="min-height:190px"></textarea></div>
+    <div class="subtabs" id="spTabs" role="tablist">
+      <button type="button" data-ct="tt" class="on">Thông tin &amp; quà</button>
+      <button type="button" data-ct="kc">Kho cảnh</button>
+      <button type="button" data-ct="shop">Ảnh &amp; sản phẩm Shop</button>
+      <button type="button" data-ct="hq">Hiệu quả</button>
     </div>
-    <div class="grid" style="grid-template-columns:2fr 1fr;gap:12px;margin-top:12px">
-      <div><label>Thư mục kho video</label><div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn soft" id="btnSKho" style="white-space:nowrap">📁 Chọn thư mục</button></div></div>
-      <div id="spBan2"><label>Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
+
+    <!-- THÔNG TIN & QUÀ -->
+    <div class="card" id="ctTt">
+      <div class="warnbox hidden" id="spChungNote" style="background:var(--green-soft);color:var(--green)">Kho cảnh chung: chỉ để sản phẩm khác mượn cảnh khi làm video. Không bán, không quà tặng, không có lời nói. Thư mục kho nằm ở mục "Kho cảnh".</div>
+      <label class="row hidden" id="spChungMd" style="gap:8px;margin:12px 0 0;color:var(--ink);font-size:15px"><input type="checkbox" id="spTron" style="width:20px;height:20px"> Tự trộn vào video của mọi sản phẩm (khi anh chưa chọn kho phụ)</label>
+      <div class="grid g2" id="spBan1">
+        <div><h3><span class="ic">🎁</span> Quà tặng chương trình <span class="note">(mỗi dòng 1 mức)</span></h3>
+          <textarea id="qua" style="min-height:190px" placeholder="Mua 1 chai: tặng 1 gói siêu kali bo"></textarea>
+          <p class="note">Biên kịch chỉ được nói đúng các mức quà ở đây. Đổi quà (vd. Nano Lân) thì sửa rồi bấm Lưu. Không ghi giá.</p></div>
+        <div><h3><span class="ic">🚫</span> Không được nói</h3><textarea id="cam" style="min-height:190px"></textarea></div>
+      </div>
+      <div id="spBan3"><div class="row" style="margin-top:14px;justify-content:space-between"><h3 style="margin:0"><span class="ic">✔</span> Sự thật được nói về sản phẩm <span class="note">(anh đã xác nhận)</span></h3>
+        <button class="btn soft" id="btnDocNhan">🔍 AI đọc nhãn, điền gợi ý</button></div>
+      <p class="note">AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới. Anh kiểm, xoá dòng sai, rồi bấm Lưu.</p>
+      <textarea id="suThat" style="min-height:170px"></textarea></div>
+      <div id="spBan2" style="max-width:420px;margin-top:14px"><label>Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
     </div>
-    <div id="spBan3"><div class="row" style="margin-top:12px;justify-content:space-between"><h3 style="margin:0">✔ Sự thật được nói về sản phẩm (anh đã xác nhận)</h3>
-      <button class="btn soft" id="btnDocNhan">🔍 AI đọc nhãn, điền gợi ý</button></div>
-    <p class="note">AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới. Anh kiểm, xoá dòng sai, rồi bấm Lưu.</p>
-    <textarea id="suThat" style="min-height:170px"></textarea></div>
+
+    <!-- KHO CẢNH -->
+    <div id="ctKc" class="hidden">
+      <div class="card">
+        <h3>Thư mục kho video</h3>
+        <div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn soft" id="btnSKho" style="white-space:nowrap">📁 Chọn thư mục</button></div>
+        <p class="note" style="margin:8px 0 0">Đổi thư mục xong nhớ bấm <b>💾 Lưu thay đổi</b> ở trên.</p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>Cảnh trong kho</h3>
+        <div class="row nowrap" style="gap:14px;align-items:flex-start"><span id="khoAnh" class="hidden"></span><div id="khoInfo" class="note" style="min-width:0">Đang tải…</div></div>
+        <div class="row" style="margin-top:14px"><button class="btn go" id="btnHoc">🧠 Học cảnh</button>
+          <button class="btn soft" id="btnKho">🧩 Chuẩn bị kho (nạp cảnh + AI soát)</button>
+          <button class="btn soft" id="btnKiem">🩺 Kiểm định dạng</button>
+          <button class="btn ghost" id="btnAgy2" title="Trạng thái Antigravity / model" style="padding:8px 12px;font-size:14px">⚙ Antigravity</button></div>
+        <div id="hocBox" class="hidden" style="margin-top:12px"><div class="bar"><i id="hocFill"></i></div>
+          <p class="note" id="hocText" style="margin:8px 0 0"></p></div>
+        <div id="hocSetup" class="hidden khung" style="margin-top:12px">
+          <div class="row nowrap" style="gap:10px"><b id="agyTt" style="flex:1">Antigravity: …</b>
+            <button class="btn soft hidden" id="btnAgyMo" style="padding:8px 14px;font-size:14px">Mở Antigravity</button>
+            <select id="hsModel" title="Model học cảnh" style="max-width:170px"></select>
+            <button class="btn ghost" id="btnHsDong" title="Thu gọn" style="padding:4px 10px;font-size:14px">✕</button></div>
+        </div>
+        <div id="hocLoi" class="note" style="margin-top:6px"></div>
+        <div id="kdBox" class="hidden khung" style="margin-top:12px"></div>
+        <ol class="note buoc-ds">
+          <li><b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
+            <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</li>
+          <li><b>Chuẩn bị kho</b>: nạp cảnh đã mô tả vào kho và cho AI soát lại. Học cảnh xong hub tự chạy bước này; bấm tay khi anh làm tay bằng Antigravity hoặc tự sửa mô tả.</li>
+          <li><b>Kiểm định dạng</b>: soát các bản mô tả, báo file hỏng / video thiếu mô tả và đề nghị sửa (giữ bản gốc). Dùng khi chuẩn bị kho báo lỗi.</li>
+        </ol>
+        <div class="note" id="khoBuoc" style="margin-top:12px"></div>
+        <div class="log" id="khoLog" style="height:140px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- ẢNH & SẢN PHẨM SHOP -->
+    <div class="card hidden" id="ctShop">
+      <h3>Ảnh sản phẩm</h3>
+      <p class="note" style="margin-top:0">Ảnh chỉ để anh dễ nhận ra sản phẩm trong app. Đổi ảnh có hiệu lực ngay, không cần bấm Lưu.</p>
+      <div class="row" style="gap:8px"><button class="btn soft" id="btnSAnhFile">🖼 Chọn ảnh từ máy</button>
+        <button class="btn soft" id="btnSAnhVid">🎞 Lấy ảnh từ video</button>
+        <button class="btn soft" id="btnSAnhShop">🛍 Lấy ảnh từ TikTok Shop</button></div>
+      <div class="note" id="spShopGan" style="margin-top:14px"></div>
+      <div id="sShopBox" class="hidden" style="margin-top:12px"><div id="sShopLuoi"></div></div>
+    </div>
+    <!-- HIỆU QUẢ: số liệu thật TikTok nuôi biên kịch & đạo diễn -->
+    <div class="card hidden" id="ctHq">
+      <h3>Video nào ăn khách</h3>
+      <p class="note" style="margin-top:0">App tự lấy lượt xem 24 giờ của video đã đăng, so theo góc bán, dạng bài, gu đạo diễn và câu mở. Khi đủ số liệu, biên kịch và đạo diễn AI đọc phần tóm tắt dưới đây để làm video sau tốt hơn (chỉ là gợi ý, vẫn giữ đa dạng).</p>
+      <div id="hqTrang" class="note">Đang tải…</div>
+      <div id="hqTop" style="margin-top:12px"></div>
+      <h3 style="margin-top:16px">Đang gửi cho AI</h3>
+      <pre id="hqTxt" class="note" style="white-space:pre-wrap;margin:0;font-family:inherit"></pre>
+    </div>
   </div>
 </section>
 
@@ -367,23 +532,23 @@ input.pick{background:var(--panel);cursor:default}
 <section id="cd" class="hidden">
   <div class="grid g2">
     <div class="card" style="grid-column:1/-1"><div class="row" style="justify-content:space-between">
-      <h2 style="margin:0">🔑 Tài khoản Claude (hub tự chuyển tài khoản còn dư)</h2>
+      <h2 style="margin:0"><span class="ic">🔑</span> Tài khoản Claude (hub tự chuyển tài khoản còn dư)</h2>
       <div class="row"><button class="btn ghost" id="btnKiemTk">↻ Làm mới</button><button class="btn soft" id="btnThemTk">➕ Thêm tài khoản</button></div></div>
       <div id="tkChiTiet" style="margin-top:12px" class="note">Đang kiểm…</div>
       <p class="note">Mỗi tài khoản đăng nhập riêng: bấm 🔑 Đăng nhập → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
         Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
         tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi cả 3 đều hết.</p>
     </div>
-    <div class="card"><h2>🔗 Kết nối app TikTok Auto Kid</h2>
+    <div class="card"><h2><span class="ic">🔗</span> Kết nối app TikTok Auto Kid</h2>
       <div class="note">Kết nối tự động, không cần nhập gì. Cổng nội bộ: <b id="tpDiaChi">…</b></div>
       <p class="note">App chỉ lấy video anh đã bấm ✅ Ưng và chưa đăng. Đăng xong / lỗi đăng sẽ hiện ngay trong Kho video.</p>
     </div>
-    <div class="card"><h2>💾 Ổ đĩa</h2>
+    <div class="card"><h2><span class="ic">💾</span> Ổ đĩa</h2>
       <div id="oDia" class="note">Đang tính…</div>
       <p class="note">Hub tự dọn file tạm (bản dựng dở, giọng cũ hơn 7 ngày, bản giám khảo chưa đạt cũ hơn 5 ngày) sau mỗi lô và mỗi lần mở app.
         Video thành phẩm KHÔNG bao giờ tự xoá — ngày nào đã đăng xong anh tự chép ra ổ khác hoặc xoá.</p>
     </div>
-    <div class="card" style="grid-column:1/-1"><h2>🎵 Nhạc &amp; âm thanh</h2>
+    <div class="card" style="grid-column:1/-1"><h2><span class="ic">🎵</span> Nhạc &amp; âm thanh</h2>
       <div id="nhMacDinh" class="row" style="justify-content:space-between;gap:12px"><span class="note">Đang kiểm…</span></div>
       <div id="nhTai" class="note hidden" style="margin-top:8px"></div>
       <div class="grid g2" style="margin-top:14px;gap:18px">
@@ -395,7 +560,7 @@ input.pick{background:var(--panel);cursor:default}
       <p class="note">Hub chọn nhạc/âm thanh từ kho mặc định + mọi thư mục đang bật. Nhạc của anh không có nhãn nên coi là "chung" (hợp mọi kiểu video), chỉ dùng bài dài từ 40 giây.
         SFX được xếp nhóm theo tên thư mục con hoặc tên file (whoosh, impact, click, ding, coin…); file không đoán được thì bỏ qua. Hỗ trợ mp3, wav, m4a, ogg, flac.</p>
     </div>
-    <div class="card"><h2>🎙 Khoá ElevenLabs (giọng đọc)</h2>
+    <div class="card"><h2><span class="ic">🎙</span> Khoá ElevenLabs (giọng đọc)</h2>
       <div class="note" id="kgTrangThai">Đang kiểm…</div>
       <div class="row" style="margin-top:10px;flex-wrap:nowrap"><input type="password" id="kgKhoa" placeholder="Dán khoá API ElevenLabs vào đây" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
         <button class="btn go" id="btnLuuKg">💾 Lưu khoá</button></div>
@@ -431,7 +596,7 @@ input.pick{background:var(--panel);cursor:default}
   </div>
 </div></div>
 <div class="modal" id="tmModal"><div class="tmbox">
-  <h2 id="tmTieuDe">📁 Chọn thư mục kho video</h2>
+  <h2 id="tmTieuDe"><span class="ic">📁</span> Chọn thư mục kho video</h2>
   <div class="tmcrumb" id="tmCrumb"></div>
   <div class="tmds" id="tmDs"></div>
   <div class="note" id="tmInfo"></div>
@@ -544,7 +709,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('main>section').forEach(s => s.classList.toggle('hidden', s.id !== b.dataset.tab));
   if (b.dataset.tab === 'kho') { taiNgay(); taiTdy(); }
-  if (b.dataset.tab === 'sp') { taiSp(); taiTongQuan(); }
+  if (b.dataset.tab === 'sp') { taiTongQuan(); if (SPV.xem === 'ct') taiSp(); }
   if (b.dataset.tab === 'gu') taiGu();
   if (b.dataset.tab === 'cd') taiCd();
 });
@@ -602,7 +767,7 @@ async function taiTk(moi) {
   const the = t => {
     const het = t.het_den && t.het_den * 1000 > Date.now();
     const tt = !t.dang_nhap ? '<span class="pill r">Chưa đăng nhập</span>' : het ? `<span class="pill r">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g">Sẵn sàng</span>';
-    return `<div style="border:2px solid var(--line);border-radius:16px;padding:12px">
+    return `<div class="khung">
       <div class="row" style="justify-content:space-between"><b>${esc(t.ten)}</b>${tt}</div>
       <div class="note" style="margin:4px 0 8px">${esc(t.email || '—')} ${t.goi ? '· gói ' + esc(t.goi) : ''}</div>
       ${vach(t.five_hour, 'Phiên 5 giờ')}${vach(t.seven_day, 'Cả tuần')}
@@ -729,20 +894,65 @@ $('#btnDocNhan').onclick = async () => {
   $('#suThat').value = (cu ? cu + nl : '') + moi.join(nl);
   toast('Đã điền ' + moi.length + ' gợi ý — anh kiểm rồi bấm Lưu');
 };
+// ba màn của tab Sản phẩm: 'ds' danh sách · 'them' thêm mới · 'ct' chi tiết 1 sản phẩm
+const SPV = {xem: 'ds', ct: 'tt'};
+let TQ = [];                          // số liệu tổng quan (dùng cho dòng trạng thái ở trang chi tiết)
+function spXem(v) {
+  SPV.xem = v;
+  $('#spDs').classList.toggle('hidden', v !== 'ds'); $('#spThem').classList.toggle('hidden', v !== 'them'); $('#spCt').classList.toggle('hidden', v !== 'ct');
+  window.scrollTo(0, 0);
+}
+async function taiHq() {
+  const ma = $('#spSua').value; if (!ma) return;
+  $('#hqTrang').textContent = 'Đang tải…'; $('#hqTop').innerHTML = ''; $('#hqTxt').textContent = '';
+  let r; try { r = await (await fetch('/api/hieu-qua?ma=' + encodeURIComponent(ma))).json(); } catch (e) { r = { ok: false, loi: 'Xưởng không phản hồi' }; }
+  if (!r.ok) { $('#hqTrang').textContent = 'Chưa đọc được số liệu: ' + (r.loi || ''); return; }
+  if (!r.bat) { $('#hqTrang').textContent = 'Đang tắt (config "hieu_qua": bat = false).'; return; }
+  $('#hqTrang').textContent = r.n_tat_ca < r.can
+    ? `Mới có ${r.n_tat_ca} video có số liệu (cần ít nhất ${r.can}). Cứ đăng tiếp, app tự học dần.`
+    : `Sản phẩm này: ${r.n} video có số liệu · tất cả sản phẩm: ${r.n_tat_ca}.` + (r.n < r.can ? ' Sản phẩm này chưa đủ video nên AI đang học từ mọi sản phẩm.' : '');
+  const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if (r.top && r.top.length) $('#hqTop').innerHTML = '<table class="tbl" style="width:100%"><thead><tr><th>Câu mở</th><th>Góc</th><th>Dạng</th><th style="text-align:right">View 24h</th></tr></thead><tbody>'
+    + r.top.map(x => `<tr><td>${esc(x.cau_mo)}</td><td>${esc(x.goc)}</td><td>${esc(x.dang)}</td><td style="text-align:right">${esc(x.xem)}</td></tr>`).join('') + '</tbody></table>';
+  $('#hqTxt').textContent = [r.bien_kich && ('Biên kịch:\n' + r.bien_kich), r.dao_dien && ('Đạo diễn:\n' + r.dao_dien)].filter(Boolean).join('\n\n') || '(chưa đủ số liệu — AI làm như bình thường)';
+}
+function ctMo(k) {
+  SPV.ct = k;
+  document.querySelectorAll('#spTabs [data-ct]').forEach(b => { b.classList.toggle('on', b.dataset.ct === k); b.setAttribute('aria-selected', b.dataset.ct === k); });
+  $('#ctTt').classList.toggle('hidden', k !== 'tt'); $('#ctKc').classList.toggle('hidden', k !== 'kc'); $('#ctShop').classList.toggle('hidden', k !== 'shop'); $('#ctHq').classList.toggle('hidden', k !== 'hq'); if (k === 'hq') taiHq();
+  $('#btnLuuSp').classList.toggle('hidden', k === 'shop' || k === 'hq');          // ảnh đổi là lưu ngay, không cần nút Lưu
+}
+function moChiTiet(ma, k, ten) {
+  const s = $('#spSua');
+  if (![...s.options].some(o => o.value === ma)) s.add(new Option(ten || ma, ma));
+  s.value = ma; spXem('ct'); ctMo(k || ((TQ.find(x => x.ma === ma) || {}).loai === 'kho-chung' ? 'kc' : 'tt')); taiSp();   // kho chung: mở thẳng mục Kho cảnh
+}
+function veDauCt() {
+  const ma = $('#spSua').value, p = TQ.find(x => x.ma === ma), o = $('#spSua').selectedOptions[0];
+  $('#spTenCt').textContent = (p && p.ten) || (o && o.text) || ma || '';
+  $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g">Sẵn sàng làm video</span>' : `<span class="pill y">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`) +
+    `<span class="note">${p.video_kho} video gốc · ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được · ${p.da_lam} video đã làm</span>`;
+}
+document.querySelectorAll('#sp [data-ve]').forEach(b => b.onclick = () => { spXem(b.dataset.ve); if (b.dataset.ve === 'ds') taiTongQuan(); });
+document.querySelectorAll('#spTabs [data-ct]').forEach(b => b.onclick = () => ctMo(b.dataset.ct));
+$('#btnMoThem').onclick = () => spXem('them');
 async function taiTongQuan(moi) {
   const ds = await api('/api/tong-quan' + (moi ? '?moi=1' : ''));
+  TQ = ds; if (SPV.xem === 'ct') veDauCt();
   const sx = ds.filter(p => p.loai !== 'kho-chung');
-  $('#tqTom').textContent = `· ${sx.length} sản phẩm, ${sx.filter(p => p.san_sang).length} sẵn sàng làm video, ${ds.reduce((a, p) => a + p.da_lam, 0)} video đã làm`;
+  $('#tqTom').textContent = `${sx.length} sản phẩm · ${sx.filter(p => p.san_sang).length} sẵn sàng làm video · ${ds.reduce((a, p) => a + p.da_lam, 0)} video đã làm`;
   const th = s => `<td style="padding:8px 6px;font-weight:800;color:var(--mute);font-size:13px">${s}</td>`;
-  $('#tqBang').innerHTML = '<tr>' + ['Sản phẩm', 'Video gốc', 'Đã mô tả', 'Cảnh dùng được', 'Video đã làm', 'Còn tồn', 'Trạng thái', ''].map(th).join('') + '</tr>' +
-    ds.map(p => `<tr style="border-top:1px solid var(--line)">
+  $('#tqBang').innerHTML = !ds.length ? '<tr><td class="note" style="padding:18px 6px">Chưa có sản phẩm nào — bấm "＋ Thêm sản phẩm mới".</td></tr>' :
+    '<tr>' + ['Sản phẩm', 'Video gốc', 'Đã mô tả', 'Cảnh dùng được', 'Video đã làm', 'Còn tồn', 'Trạng thái', ''].map(th).join('') + '</tr>' +
+    ds.map(p => `<tr data-ma="${esc(p.ma)}" data-ten="${esc(p.ten)}" style="border-top:1px solid var(--line)" title="Mở ${esc(p.ten)}">
       <td style="padding:8px 6px;font-weight:800"><div class="sp-ten">${anhSp(p.anh)}<div>${esc(p.ten)}<div class="note" style="font-size:12px">${esc(p.ma)}</div></div></div></td>
       <td>${p.video_kho}</td><td>${p.mo_ta}${p.video_kho > p.mo_ta ? ` <span class="pill y">thiếu ${p.video_kho - p.mo_ta}</span>` : ''}</td>
       <td>${p.so_canh}</td><td><b>${p.da_lam}</b></td><td>${p.ton}</td>
       <td>${p.loai === 'kho-chung' ? `<span class="pill b">Kho cảnh chung · ${p.so_dung_duoc ?? p.so_canh} cảnh</span>` : p.san_sang ? '<span class="pill g">Sẵn sàng</span>' : `<span class="pill y">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`}</td>
-      <td style="white-space:nowrap"><button class="btn soft" style="padding:6px 12px;font-size:14px" data-sua="${p.ma}">✏️ Sửa</button>
-        <button class="btn ghost" style="padding:6px 12px;font-size:14px;color:var(--red)" data-xoa="${p.ma}" data-ten="${esc(p.ten)}">🗑 Xoá</button></td></tr>`).join('');
-  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => { $('#spSua').value = b.dataset.sua; taiSp(); $('#spSua').scrollIntoView({behavior: 'smooth'}); });
+      <td style="white-space:nowrap;text-align:right"><button class="btn soft" style="padding:6px 12px;font-size:14px" data-sua="${esc(p.ma)}">Mở →</button>
+        <button class="btn ghost" style="padding:6px 12px;font-size:14px;color:var(--red)" data-xoa="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Xoá sản phẩm">🗑 Xoá</button></td></tr>`).join('');
+  document.querySelectorAll('#tqBang tr[data-ma]').forEach(r => r.onclick = e => { if (!e.target.closest('button')) moChiTiet(r.dataset.ma, '', r.dataset.ten); });
+  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => moChiTiet(b.dataset.sua, '', b.closest('tr').dataset.ten));
   document.querySelectorAll('[data-xoa]').forEach(b => b.onclick = async () => {
     if (!confirm(`Xoá sản phẩm "${b.dataset.ten}" khỏi app?
 Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm vẫn giữ.`)) return;
@@ -754,6 +964,7 @@ Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video
   });
 }
 $('#btnTqMoi').onclick = () => taiTongQuan(true);
+const spCtHien = () => SPV.xem === 'ct' && !$('#sp').classList.contains('hidden');
 async function taiKho() {
   const k = await api('/api/kho/' + $('#spSua').value);
   $('#khoInfo').innerHTML = !k.kho ? '⚠ Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.'
@@ -767,7 +978,7 @@ async function taiKho() {
     : !k.dang_chay && k.buoc === 4 ? '✅ Chuẩn bị kho xong (3/3)'
     : !k.dang_chay && k.buoc >= 1 && k.buoc <= 3 ? `<span style="color:var(--red)">⚠ Dừng ở ${BUOC[k.buoc]} — xem nhật ký bên dưới</span>` : '';
   $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)'; taiHoc();
-  if (k.dang_chay) setTimeout(taiKho, 4000);
+  if (k.dang_chay && spCtHien()) setTimeout(taiKho, 4000);           // chỉ tự làm mới khi đang mở trang chi tiết
 }
 $('#linkTay').onclick = async e => { e.preventDefault(); const r = await api('/api/lenh-gemini/' + $('#spSua').value); try { await navigator.clipboard.writeText(r.lenh); toast('Đã chép lệnh — dán vào Antigravity, làm xong bấm Chuẩn bị kho'); } catch (x) { toast('Không chép được — thử lại'); } };
 const HOC = {t: null, h: null, xongBao: null, moTay: false, ra: null};
@@ -800,6 +1011,7 @@ async function taiHoc() {
   $('#hocBox').classList.toggle('hidden', !hien);
   const hb = $('#btnHoc'); hb.textContent = chay ? '⏹ Dừng học' : '🧠 Học cảnh'; hb.disabled = !!h.job_khac || (!chay && h.dang_chay_lo);
   hb.title = h.dang_chay_lo ? 'Đang làm video — đợi xong' : '';
+  if (!spCtHien()) return;                                          // rời trang chi tiết: ngừng hỏi, mở lại sẽ tự tải tiếp
   if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
 }
 $('#btnHoc').onclick = async () => {
@@ -887,7 +1099,7 @@ $('#mShopLai').onclick = e => { e.preventDefault(); MA.tay = false; MA.data = nu
 $('#mLoai').onchange = () => { const c = $('#mLoai').value === 'kho-chung'; mCheDo();
   $('#mDocWrap').classList.toggle('hidden', c); $('#mTenNhan').textContent = c ? 'Tên kho cảnh' : 'Tên gọi trong video';
   $('#mTenSp').placeholder = c ? 'vd. Cảnh chăm cây' : 'vd. Đạm cá Toàn Cầu';
-  $('#mGhiChu').textContent = c ? 'Tạo xong: bấm "Chuẩn bị kho". Kho chung không cần sự thật hay quà tặng.' : 'Tạo xong: điền sự thật + quà tặng bên dưới → bấm "Chuẩn bị kho".'; };
+  $('#mGhiChu').textContent = c ? 'Tạo xong: bấm "Chuẩn bị kho". Kho chung không cần sự thật hay quà tặng.' : 'Tạo xong: điền sự thật + quà tặng → bấm "Chuẩn bị kho".'; };
 $('#btnMKho').onclick = () => moThuMuc($('#mKho').value, p => { $('#mKho').value = p; });
 $('#btnMAnhFile').onclick = async () => { const d = await chonFileAnh(); if (d) { MA.data = d; $('#mAnhXem').innerHTML = anhSp(d, 'lg'); } };
 $('#btnMAnhVid').onclick = async () => {
@@ -904,11 +1116,12 @@ $('#btnTaoSp').onclick = async () => {
   if (theoShop) { if (r.canh_bao) toast(r.canh_bao); taiTongQuan(true); MA.shop = null; mVeChon(); }
   else if (MA.data) { const a = await api('/api/anh-sp/' + r.ma, {data: MA.data}); if (!a.ok) toast(a.loi); MA.data = null; $('#mAnhXem').innerHTML = anhSp(''); }
   else api('/api/anh-sp/' + r.ma, {tu_video: true}).then(() => { taiTongQuan(true); capNhat(); });      // không chọn ảnh → tự lấy 1 khung từ video
-  toast('Đã tạo. Điền sự thật + quà tặng rồi Lưu.'); $('#spSua').add(new Option($('#mTenSp').value, r.ma)); $('#spSua').value = r.ma;
-  $('#spChon').innerHTML = ''; KT.ma = null; taiSp(); capNhat();
+  toast(chung ? 'Đã tạo. Chọn xong thư mục thì bấm Học cảnh / Chuẩn bị kho.' : 'Đã tạo. Điền sự thật + quà tặng rồi Lưu.');
+  const tenMoi = $('#mTenSp').value; $('#mTenSp').value = ''; $('#mDoc').value = ''; $('#mKho').value = '';
+  $('#spChon').innerHTML = ''; KT.ma = null; moChiTiet(r.ma, chung ? 'kc' : 'tt', tenMoi); taiTongQuan(true); capNhat();
 };
 async function taiSp() {
-  taiKho(); hienAnhSua();
+  taiKho(); hienAnhSua(); veDauCt();
   const sp = await api('/api/san-pham/' + $('#spSua').value);
   SUA_SHOP = sp.shop_product_id || null; veShopTatCa(); $('#sShopBox').classList.add('hidden');
   $('#spKho').value = sp.kho_video || ''; $('#spGio').value = typeof sp.ten_gio === 'string' ? sp.ten_gio : '';
@@ -928,6 +1141,10 @@ async function datAnhSua(body, nut) {
 $('#btnSAnhFile').onclick = async () => { const d = await chonFileAnh(); if (d) datAnhSua({data: d}, $('#btnSAnhFile')); };
 $('#btnSAnhVid').onclick = () => datAnhSua({tu_video: true}, $('#btnSAnhVid'));
 let SUA_SHOP = null;                 // sản phẩm Shop hiện gắn với sản phẩm đang sửa
+VE_SHOP.push(() => {                 // dòng "đang gắn với sản phẩm Shop nào" ở mục Ảnh & sản phẩm Shop
+  const x = SUA_SHOP && (SHOP.ds || []).find(s => s.id === SUA_SHOP);
+  $('#spShopGan').innerHTML = x ? `<div class="sp-ten">${anhSp(x.anh)}<span>Đang gắn với sản phẩm Shop: <b>${esc(x.tieu_de)}</b></span></div>` : SUA_SHOP ? 'Đã gắn 1 sản phẩm TikTok Shop.' : 'Chưa gắn sản phẩm TikTok Shop nào — bấm "🛍 Lấy ảnh từ TikTok Shop" để chọn.';
+});
 luoiShop($('#sShopLuoi'), () => SUA_SHOP, x => { if (x && confirm('Đổi ảnh sản phẩm sang ảnh của "' + tenGon(x.tieu_de) + '"?')) { SUA_SHOP = x.id; datAnhSua({tu_shop: x.id}, $('#btnSAnhShop')); veShopTatCa(); } });
 $('#btnSAnhShop').onclick = () => $('#sShopBox').classList.toggle('hidden');
 $('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); };
@@ -936,7 +1153,7 @@ $('#btnLuuSp').onclick = async () => {
   const chung = !$('#spChungNote').classList.contains('hidden');       // kho chung: chỉ lưu thư mục kho + cờ trộn mặc định, không đụng ô bán hàng
   await api('/api/san-pham/' + $('#spSua').value, chung ? {kho: $('#spKho').value, tron_mac_dinh: $('#spTron').checked}
     : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value});
-  toast('Đã lưu. Lô sau dùng thông tin mới.'); $('#spChon').innerHTML = ''; KT.ma = null; taiKho(); capNhat();
+  toast('Đã lưu. Lô sau dùng thông tin mới.'); $('#spChon').innerHTML = ''; KT.ma = null; taiKho(); taiTongQuan(true); capNhat();
 };
 // ---------- GU
 async function taiGu() { const g = await api('/api/so-gu'); $('#soGu').value = g.so_gu; $('#baiHoc').textContent = g.bai_hoc || '(chưa có)'; }

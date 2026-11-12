@@ -11,6 +11,22 @@ from dung_remotion import MENU  # noqa: E402  (menu khâu dựng v2: nền FFmpe
 from cong_thuc import RECIPES, DATA_SPEC  # noqa: E402
 from ai import goi, lay_json, HetHanMuc  # noqa: E402
 
+
+def _he_so(ma, chieu):
+    try:
+        from hieu_qua import he_so
+        return he_so(ma, chieu)
+    except Exception:
+        return {}
+
+
+def _tom_tat(ma, cho="bien_kich"):
+    try:
+        from hieu_qua import tom_tat
+        return tom_tat(ma, cho)
+    except Exception:
+        return ""
+
 BANNED = ["chữa khỏi", "khỏi hẳn", "100%", "số 1", "số một", "nhất thị trường", "duy nhất", "không độc", "ăn ngay",
           "tham khảo", "xem chi tiết", "tìm hiểu thêm", "đáng cân nhắc", "theo hướng dẫn của", "quy cách rõ ràng",
           "đúng nhu cầu", " nha", " nè", "giá chỉ", "nghìn đồng", "k/chai"]
@@ -56,7 +72,7 @@ def dem_lich_su(ten, n=200):
     return f.read_text(encoding="utf-8").splitlines()[-n:] if f.exists() else []
 
 
-def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None):
+def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua=""):
     luat = (CODE / "luat" / "LUAT-SAN-XUAT.md").read_text(encoding="utf-8")
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     so_gu = so_gu_f.read_text(encoding="utf-8")[-3000:] if so_gu_f.exists() else "(chưa có)"
@@ -70,7 +86,7 @@ def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None):
 
 === SỔ GU CỦA CHỦ HÀNG ===
 {so_gu}
-
+{("" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10))}
 === VIỆC CẦN LÀM ===
 Viết {n} kịch bản. Bản thứ i dùng GÓC angles[i] và DẠNG BÀI dang[i] (bắt buộc, theo đúng thứ tự):
 angles = {json.dumps(angles, ensure_ascii=False)}
@@ -136,12 +152,14 @@ def viet(ma_sp, so_ban, log=print):
         dem_g = {g: 0 for g in goc}
         for l in dem_lich_su(f"goc-{ma_sp}.txt"):
             if l in dem_g: dem_g[l] += 1
-        angles = sorted(goc, key=lambda g: (dem_g[g], random.random()))[:need]
+        hs_g = _he_so(ma_sp, "goc")             # góc từng ra nhiều view được xoay tới sớm hơn (0.7–1.5), thiếu số liệu → đều nhau
+        angles = sorted(goc, key=lambda g: (dem_g[g] / hs_g.get(g, 1.0), random.random()))[:need]
         while len(angles) < need: angles.append(random.choice(goc))
         dem_d = {d: 0 for d in DANG_BAI}
         for l in dem_lich_su(f"dang-{ma_sp}.txt"):
             if l in dem_d: dem_d[l] += 1
-        dang = sorted(DANG_BAI, key=lambda d: (dem_d[d], random.random()))[:need]
+        hs_d = _he_so(ma_sp, "dang")
+        dang = sorted(DANG_BAI, key=lambda d: (dem_d[d] / hs_d.get(d, 1.0), random.random()))[:need]
         qcs = [q["ten"] for q in sp.get("quy_cach") or []]
         if qcs:
             dem_q = {q: 0 for q in qcs}
@@ -153,7 +171,7 @@ def viet(ma_sp, so_ban, log=print):
         while len(dang) < need: dang.append(random.choice(list(DANG_BAI)))
         log(f"  gọi Claude viết {need} bản (lần {tries})…")
         try:
-            items = lay_json(goi("biên kịch", build_prompt(sp_for_ai, need, angles, used, recent_styles(), dang, dem_lich_su(f"mo-dau-{ma_sp}.txt"), qc))[0])
+            items = lay_json(goi("biên kịch", build_prompt(sp_for_ai, need, angles, used, recent_styles(), dang, dem_lich_su(f"mo-dau-{ma_sp}.txt"), qc, _tom_tat(ma_sp)))[0])
         except HetHanMuc:
             raise
         except Exception as e:

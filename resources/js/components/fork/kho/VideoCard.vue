@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // Thẻ video trong kho: rê chuột để xem trước (tự phát, tắt tiếng), có thao tác nhanh chép caption / mở TikTok.
+import { router } from '@inertiajs/vue3';
 import {
     IconCopy,
     IconExternalLink,
     IconMovie,
     IconPlayerPlayFilled,
+    IconRefresh,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
@@ -16,8 +18,8 @@ import {
     type KhoVideo,
     videoUrl,
 } from '@/components/fork/kho/kho';
-import { toneClasses } from '@/components/fork/shared/status';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
+import { toneClasses } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +54,22 @@ const leave = () => {
 };
 
 onBeforeUnmount(() => clearTimeout(timer));
+
+// "Thử lại" bài lỗi: máy chủ kiểm lại (chưa có gì lên TikTok) rồi đưa video về kho.
+const retrying = ref(false);
+const retry = () => {
+    retrying.value = true;
+    router.post(
+        `/auto/videos/${props.video.id}/thu-lai`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retrying.value = false;
+            },
+        },
+    );
+};
 </script>
 
 <template>
@@ -172,6 +190,21 @@ onBeforeUnmount(() => clearTimeout(timer));
             >
                 {{ line.text }}
             </p>
+            <button
+                v-if="video.status === 'failed' && video.can_retry"
+                type="button"
+                class="mt-1 inline-flex items-center justify-center gap-1.5 self-start rounded-md border bg-background px-2.5 py-1 text-xs font-medium shadow-xs transition hover:bg-muted disabled:opacity-60"
+                :disabled="retrying"
+                :data-testid="`fork-kho-retry-${video.id}`"
+                @click.stop="retry"
+                @keydown.enter.stop
+                @keydown.space.stop
+            >
+                <IconRefresh
+                    :class="cn('size-3.5', retrying && 'animate-spin')"
+                />
+                Thử lại
+            </button>
         </div>
     </div>
 </template>

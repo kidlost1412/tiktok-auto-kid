@@ -13,6 +13,7 @@ import {
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import PairProgress from '@/components/fork/chrome/PairProgress.vue';
 import SettingsSection from '@/components/settings/SettingsSection.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -188,12 +189,22 @@ const connectedClients = computed(() =>
 );
 const paired = computed(() => connectedClients.value.length > 0);
 
+// Thanh tiến trình ghép nối. Nút tạo hồ sơ Chrome mới gọi
+// pairProgress.value?.start({ mode: 'create', profile, browser }) sau khi app đã yêu cầu mở Chrome.
+const pairProgress = ref<InstanceType<typeof PairProgress> | null>(null);
+
+const onPairChanged = (): void => router.reload({ only });
+
 const makeCode = (): void =>
     run('pair', (done) =>
         router.post(
             '/settings/chrome/pair-code',
             {},
-            { preserveScroll: true, onFinish: done },
+            {
+                preserveScroll: true,
+                onSuccess: () => pairProgress.value?.start({ mode: 'code' }),
+                onFinish: done,
+            },
         ),
     );
 
@@ -554,6 +565,8 @@ const chromeOnlyCandidates = computed(() => {
                     Bấm “Tạo mã ghép nối”. Mã chỉ dùng được trong 5 phút và tối
                     đa 5 lần nhập.
                 </div>
+
+                <PairProgress ref="pairProgress" @changed="onPairChanged" />
 
                 <details class="rounded-lg border p-4 text-sm">
                     <summary class="cursor-pointer font-emphasis">

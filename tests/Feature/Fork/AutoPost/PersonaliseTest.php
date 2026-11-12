@@ -363,3 +363,17 @@ test('Studio minimum 324x432 is enforced on the cropped result, by exact boundar
     $this->actingAs($this->owner)->post("/auto/products/{$this->code}/covers", ['images' => [pnImage('jpg', 300, 400)]])
         ->assertSessionHas('flash.error', fn ($m): bool => str_contains($m, '324×432'));
 });
+
+test('describe exposes the original size so the dialog can show what was cropped', function (): void {
+    $this->actingAs($this->owner)->post("/auto/products/{$this->code}/covers", ['images' => [
+        pnImage('jpg', 1080, 1920, 'tall'),
+    ]])->assertRedirect();
+
+    $p = $this->product->fresh();
+    $p->update(['cover_images' => [...$p->cover_images, ['file' => 'old.jpg', 'name' => 'old', 'w' => 540, 'h' => 720]]]);
+
+    $described = app(CoverStore::class)->describe($p->fresh());
+
+    expect($described[0])->toMatchArray(['w' => 1080, 'h' => 1440, 'orig_w' => 1080, 'orig_h' => 1920])
+        ->and($described[1])->toMatchArray(['orig_w' => null, 'orig_h' => null]);
+});

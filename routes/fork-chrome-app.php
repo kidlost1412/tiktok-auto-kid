@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['web', 'auth'])->prefix('settings/chrome')->name('fork.chrome.')->group(function (): void {
     Route::get('/', [ChromeSettingsController::class, 'index'])->name('index');
     Route::get('jobs', [ChromeSettingsController::class, 'jobs'])->name('jobs');
+    Route::get('pair-status', [ChromeSettingsController::class, 'pairStatus'])->name('pair-status');
     Route::post('pair-code', [ChromeSettingsController::class, 'pairCode'])->name('pair-code');
     Route::patch('clients/{client}', [ChromeSettingsController::class, 'updateClient'])->name('clients.update');
     Route::post('clients/{client}/keep-alive', [ChromeSettingsController::class, 'setKeepAlive'])->name('clients.keep-alive');

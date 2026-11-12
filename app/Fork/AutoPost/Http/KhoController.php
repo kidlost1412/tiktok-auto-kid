@@ -18,6 +18,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\VideoComment;
 use App\Fork\AutoPost\Scheduling\Readiness;
+use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\VideoLibrary;
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
@@ -487,6 +488,8 @@ final class KhoController extends Controller
             'scheduled_for' => ($held ? $v->posted_at : $v->scheduled_for)?->copy()->timezone($tz)->toIso8601String(),
             'posted_at' => $held ? null : $v->posted_at?->copy()->timezone($tz)->toIso8601String(),
             'reason' => $v->skip_reason,
+            // Bài lỗi chắc chắn chưa lên TikTok thì hiện nút "Thử lại" (máy chủ vẫn kiểm lại khi bấm).
+            'can_retry' => $v->status === AutoVideo::FAILED && app(RetryFailed::class)->refusal($v) === null,
             'readiness' => $assessment,
             'has_cover' => (is_string(data_get($v->meta, 'anh_bia')) && data_get($v->meta, 'anh_bia') !== '') || app(HubFiles::class)->hasCoverUrl($v),
             'duration' => $v->duration,

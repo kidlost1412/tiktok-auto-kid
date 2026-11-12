@@ -250,7 +250,12 @@ final class CoverStore
         }
     }
 
-    /** @return list<array{file: string, name: string, w: int, h: int, size: int, url: string}> */
+    /**
+     * orig_w/orig_h: kích thước ảnh gốc trước khi cắt 3:4 (null với ảnh tải lên từ bản cũ), để giao diện
+     * cho thấy phần đã bị cắt.
+     *
+     * @return list<array{file: string, name: string, w: int, h: int, orig_w: int|null, orig_h: int|null, size: int, url: string}>
+     */
     public function describe(AutoProduct $p): array
     {
         return collect($p->cover_images ?? [])
@@ -260,6 +265,8 @@ final class CoverStore
                 'name' => (string) ($i['name'] ?? ''),
                 'w' => (int) ($i['w'] ?? 0),
                 'h' => (int) ($i['h'] ?? 0),
+                'orig_w' => isset($i['orig_w']) ? (int) $i['orig_w'] : null,
+                'orig_h' => isset($i['orig_h']) ? (int) $i['orig_h'] : null,
                 'size' => (int) ($i['size'] ?? 0),
                 'url' => '/auto/anh-bia/'.rawurlencode((string) $p->code).'/'.$i['file'],
             ])->values()->all();

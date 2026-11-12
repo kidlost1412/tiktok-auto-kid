@@ -13,10 +13,12 @@ use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Onboarding;
 use App\Fork\AutoPost\Scheduling\FutureUploads;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PlanPreview;
 use App\Fork\AutoPost\Scheduling\ResultWatcher;
+use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\AutoPost\Stats\Insights;
@@ -119,6 +121,9 @@ final class AutoController extends Controller
             'plan_ahead_hours' => (int) config('fork.auto.plan_ahead_hours', 6),
             'upcoming' => $this->upcoming($accounts),
             'recent' => $this->recent($accounts, $images),
+            'failed_recent' => $this->failedRecent($accounts, $images),
+            // Thẻ "Bắt đầu" hỏi hub (có thể chậm vài giây) nên tải sau, cùng nhóm với hub.
+            'onboarding' => Inertia::defer(fn (): ?array => app(Onboarding::class)->forAccounts($accounts->pluck('id')->map(fn ($id): string => (string) $id)->all())),
             'insights' => $insights->breakdowns(),
             'hasWorkspace' => (bool) $request->user()?->current_workspace_id,
         ]);
@@ -184,6 +189,34 @@ final class AutoController extends Controller
         })->implode('; ');
 
         return back()->with($created > 0 ? 'flash.success' : 'flash.error', ($created > 0 ? 'Đã xếp lịch xong. ' : 'Chưa tạo thêm bài nào. ').$lines.'.');
+    }
+
+    /** "Ẩn hướng dẫn": không hiện thẻ "Bắt đầu" nữa. */
+    public function hideOnboarding(Request $request): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+        Onboarding::hide();
+
+        return back()->with('flash.success', 'Đã ẩn hướng dẫn bắt đầu.');
+    }
+
+    /**
+     * "Thử lại" bài lỗi: video về kho để lần xếp lịch sau đăng lại. Chỉ khi chắc chắn chưa có gì lên TikTok
+     * (xem RetryFailed), còn nghi ngờ thì từ chối kèm lý do.
+     */
+    public function retryVideo(Request $request, AutoVideo $video): RedirectResponse
+    {
+        $accounts = $this->tiktokAccounts($this->authorizeOwner($request));
+
+        abort_if($video->social_account_id !== null && ! $accounts->contains('id', $video->social_account_id), 404);
+
+        $refusal = app(RetryFailed::class)->retry($video);
+
+        if ($refusal !== null) {
+            return back()->with('flash.error', $refusal);
+        }
+
+        return back()->with('flash.success', 'Đã đưa video về kho. App sẽ xếp lịch đăng lại ở lượt kế tiếp (hoặc bấm "Xếp lịch ngay").');
     }
 
     public function pause(Request $request, string $socialAccount): RedirectResponse
@@ -480,6 +513,39 @@ final class AutoController extends Controller
                 'views_24h' => data_get($v->stats, 'h24.views'),
                 'link' => $this->safeLink(data_get($v->stats, 'link')),
             ])->all();
+    }
+
+    /**
+     * Bài lỗi trong 14 ngày gần đây (để bấm "Thử lại"). `can_retry` cho biết có chắc chắn chưa đăng hay không.
+     *
+     * @param  Collection<int, SocialAccount>  $accounts
+     * @return list<array<string, mixed>>
+     */
+    private function failedRecent($accounts, ProductImageLookup $images): array
+    {
+        $retry = app(RetryFailed::class);
+
+        return AutoVideo::query()
+            ->where('status', AutoVideo::FAILED)
+            ->whereIn('social_account_id', $accounts->pluck('id'))
+            ->where('updated_at', '>=', now()->subDays(14))
+            ->orderByDesc('updated_at')
+            ->limit(6)
+            ->get()
+            ->map(function (AutoVideo $v) use ($accounts, $images, $retry): array {
+                $refusal = $retry->refusal($v);
+
+                return [
+                    'id' => $v->id,
+                    'product_code' => $v->product_code,
+                    'product_image' => $images->forSlot((string) $v->social_account_id, $v->product_code, $v->quy_cach),
+                    'username' => $accounts->firstWhere('id', $v->social_account_id)?->username,
+                    'at' => ($v->scheduled_for ?? $v->updated_at)?->toIso8601String(),
+                    'error' => $this->snippet($v->skip_reason),
+                    'can_retry' => $refusal === null,
+                    'retry_note' => $refusal,
+                ];
+            })->all();
     }
 
     private function snippet(?string $text): ?string

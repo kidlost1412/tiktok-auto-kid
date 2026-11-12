@@ -70,6 +70,7 @@ Không bao giờ in giá trị khoá/token ra màn hình, log, commit hay câu t
 - Mô tả cảnh video (Học cảnh / `*.mo-ta.json`): `xuong-video/luat/MO-TA-VIDEO-GEMINI.md`. Luật sản xuất: `xuong-video/luat/LUAT-SAN-XUAT.md`, `SO-TAY-EDITOR.md`.
 - Kho video hub -> app (mp4 + json cùng tên trong `kho-dang/`): `app/Fork/AutoPost/KHO-CHUAN.md`.
 - Hợp đồng cổng hub (`/trypost/videos`, `/giu`, `/nha`, `/da-dang`, `/loi`, `/so-lieu`, tải file; header `X-Key`): docstring đầu `xuong-video/app/cong_trypost.py`. (Tên "trypost" là tên cũ, giữ nguyên.)
+- Vòng phản hồi số liệu: `/so-lieu` → `lich-su/so-lieu.csv` → `engine/hieu_qua.py` ghép với hồ sơ video (`ra/<ngày>/<id>.json`), lưu bền `lich-su/hieu-qua.json`, đưa tóm tắt "ăn khách / kém" (đủ mẫu mới nói) vào prompt biên kịch (`viet_loi.py`) và đạo diễn (`dao_dien.py`), và nghiêng nhẹ việc xoay vòng góc/dạng bài (hệ số 0.7–1.5). Tắt: config `"hieu_qua": {"bat": false}`; ngưỡng `mau_tong` (6), `mau_nhom` (3). Xem thử: `python xuong-video/engine/hieu_qua.py <mã>`.
 - Giao thức tiện ích <-> app: `extension/autotok/PROTOCOL.md`; API Studio: `STUDIO-API.md`.
 
 ## 6. Chạy test an toàn

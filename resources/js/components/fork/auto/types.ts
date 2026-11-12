@@ -135,3 +135,31 @@ export interface ProductRow {
         failed: number;
     };
 }
+
+/** Bài lỗi gần đây (khu "Gần đây"), kèm cờ có thử lại an toàn hay không. */
+export interface FailedRow {
+    id: number;
+    product_code: string | null;
+    product_image?: string | null;
+    username: string | null;
+    at: string | null;
+    error: string | null;
+    can_retry: boolean;
+    retry_note: string | null;
+}
+
+export interface OnboardingStep {
+    key: 'xuong' | 'chrome' | 'stock' | 'auto';
+    title: string;
+    done: boolean;
+    state: 'done' | 'todo' | 'waiting' | 'offline';
+    detail: string;
+    action: { label: string; href: string } | null;
+}
+
+/** Thẻ "Bắt đầu" cho máy mới cài; null = đã xong hoặc đã ẩn. */
+export interface Onboarding {
+    steps: OnboardingStep[];
+    done: number;
+    total: number;
+}

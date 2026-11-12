@@ -27,6 +27,8 @@ export interface KhoVideo {
     scheduled_for: string | null;
     posted_at: string | null;
     reason: string | null;
+    /** Bài lỗi chắc chắn chưa lên TikTok: hiện nút "Thử lại". */
+    can_retry?: boolean;
     readiness: Readiness | null;
     has_cover: boolean;
     duration: number | null;

@@ -272,6 +272,13 @@ def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=()
         mau=list(MENU_NEN["mau"]), sfx=["gon", "vua", "soi_dong", "mo_dau_am"],
         nhac=["que-acoustic", "vui-mua-sam", "tvc-doanh-nghiep", "tet-le-hoi", "chill-nen", "piano-nhe"],
         cuoi=len(sents) - 1, n=len(sents))
+    try:                                  # số liệu thật: gu/công thức dựng nào từng ra nhiều view (gợi ý, không phải luật)
+        from hieu_qua import tom_tat
+        hq = tom_tat(ma, "dao_dien")
+    except Exception:
+        hq = ""
+    if hq:
+        p += "\n\n=== SỐ LIỆU THẬT TỪ TIKTOK (gợi ý khi chọn bố cục/nhịp, không phải luật) ===\n" + hq
     if gop_y:
         p += f"\n\n=== GIÁM KHẢO YÊU CẦU SỬA BẢN TRƯỚC (bắt buộc làm theo) ===\n{gop_y}"
     txt, _ = goi(f"đạo diễn {gu_key}", p, anh=[anh])
