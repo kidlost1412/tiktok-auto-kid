@@ -295,7 +295,9 @@ def san_pham_ds():
                             "so_dung_duoc": dem_dung_duoc(d.name), "tron_mac_dinh": bool(sp.get("tron_mac_dinh")), "anh": anh_sp.url_anh(d.name)})
                 continue
             thieu = [t for t, ok in (("sự thật sản phẩm", sp.get("su_that_duoc_noi")), ("quà tặng", sp.get("qua_tang")),
-                                     ("kho cảnh", n > 0)) if not ok]
+                                     ("kho cảnh", n > 0),
+                                     # tên Shop dài nguyên văn → AI không đọc trọn → mọi lời bị loại "thiếu tên thương hiệu"
+                                     ("tên gọi ngắn khi đọc", len((sp.get("ten_ngan") or sp.get("ten_goi") or "").split()) <= 6)) if not ok]
             out.append({"ma": d.name, "ten": sp.get("ten_goi", d.name), "so_canh": n, "san_sang": not thieu, "thieu": thieu, "loai": "ban", "so_dung_duoc": dem_dung_duoc(d.name),
                         "kho_them": kho_them_cua(d.name, sp), "anh": anh_sp.url_anh(d.name)})
     return out
@@ -1023,6 +1025,8 @@ class H(BaseHTTPRequestHandler):
                 sp["shop_product_id"] = str(b["shop_product_id"])
             if "ten_gio" in b:
                 sp["ten_gio"] = str(b["ten_gio"]).strip().upper()[:30]   # tên sản phẩm trên giỏ hàng TikTok (app TikTok Auto dùng)
+            if str(b.get("ten_ngan") or "").strip():                       # tên gọi ngắn AI đọc trong video (bắt buộc có trong lời)
+                sp["ten_ngan"] = " ".join(str(b["ten_ngan"]).split())[:40]
             for k in ("qua_tang", "khong_duoc_noi", "su_that_duoc_noi"):
                 if isinstance(b.get(k), list):
                     sp[k] = [x.strip() for x in b[k] if str(x).strip()]

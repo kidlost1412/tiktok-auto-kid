@@ -88,6 +88,7 @@ def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, h
 {so_gu}
 {("" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10))}
 === VIỆC CẦN LÀM ===
+TÊN SẢN PHẨM: mỗi bản PHẢI đọc đúng nguyên văn ít nhất một lần một trong các tên: {json.dumps(ten_phai_nhac(sp), ensure_ascii=False)} (ưu tiên tên đầu, ngắn gọn).
 Viết {n} kịch bản. Bản thứ i dùng GÓC angles[i] và DẠNG BÀI dang[i] (bắt buộc, theo đúng thứ tự):
 angles = {json.dumps(angles, ensure_ascii=False)}
 dang = {json.dumps([f"{d}: {DANG_BAI[d]}" for d in (dang or [])], ensure_ascii=False)}
@@ -115,15 +116,27 @@ CÂU ĐÃ DÙNG (không được lặp nguyên văn):
 """
 
 
+def _chuan(s):
+    """So tên không phân biệt hoa thường / dấu câu / khoảng trắng: 'NPK 33-11-11' ~ 'npk 33 11 11'."""
+    return " " + " ".join(re.findall(r"\w+", (s or "").lower())) + " "
+
+
+def ten_phai_nhac(sp):
+    """Các cách gọi hợp lệ của sản phẩm (lời đọc phải chứa ít nhất 1): tên ngắn, tên gọi, tên khác."""
+    ds = [sp.get("ten_ngan"), sp.get("ten_goi")] + list(sp.get("ten_khac") or [])
+    if sp.get("ma") == "nano-dong":
+        ds.append("chai nano đồng này")
+    return [x for x in ds if isinstance(x, str) and x.strip()]
+
+
 def check(item, sp, used_norm):
     errs = []
     text = item.get("text", "")
     plain = re.sub(r"\[[^\]]*\]", "", text)
     n = len(re.findall(r"\w+", plain))
-    if not 74 <= n <= 90:
+    if not 70 <= n <= 92:
         errs.append(f"{n} âm tiết")
-    names = [x.lower() for x in (sp.get("ten_goi"), sp.get("ten_ngan")) if x] + (["chai nano đồng này"] if sp.get("ma") == "nano-dong" else [])
-    if not any(nm in plain.lower() for nm in names):
+    if not any(_chuan(nm) in _chuan(plain) for nm in ten_phai_nhac(sp)):
         errs.append("thiếu tên thương hiệu")
     low = " " + plain.lower() + " "
     errs += [f"từ cấm '{b.strip()}'" for b in BANNED

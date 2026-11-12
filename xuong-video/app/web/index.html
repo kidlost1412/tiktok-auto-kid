@@ -644,7 +644,11 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
           <div class="t"><h3 style="margin:0">Sự thật được nói về sản phẩm</h3><p class="sub">Anh đã xác nhận. AI đọc chữ trên nhãn trong kho video và thêm gợi ý vào ô dưới — anh kiểm, xoá dòng sai, rồi bấm Lưu.</p></div>
           <div class="act"><button class="btn ghost" id="btnDocNhan"><svg class="i"><use href="#i-scan"/></svg>AI đọc nhãn, điền gợi ý</button></div></div>
         <textarea id="suThat" style="min-height:170px"></textarea></div>
-      <div id="spBan2" style="max-width:440px;margin-top:18px"><label for="spGio">Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
+      <div id="spBan2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,440px));gap:16px;margin-top:18px">
+        <div><label for="spTenNgan">Tên gọi khi đọc trong video (ngắn, ≤40 ký tự)</label><input type="text" id="spTenNgan" maxlength="40" placeholder="vd. MIG 38">
+          <p class="note" style="margin:6px 0 0">Lời đọc bắt buộc nhắc tên này. Tên Shop dài (NPK 33-11-11 …) thì AI không đọc nguyên văn → lời bị loại.</p></div>
+        <div><label for="spGio">Tên trên giỏ hàng TikTok (IN HOA, ≤30 ký tự)</label><input type="text" id="spGio" maxlength="30" style="text-transform:uppercase" placeholder="vd. KÍCH RỄ TC01 100ML"></div>
+      </div>
     </div>
 
     <!-- KHO CẢNH -->
@@ -1345,7 +1349,7 @@ async function taiSp() {
   taiKho(); hienAnhSua(); veDauCt();
   const sp = await api('/api/san-pham/' + $('#spSua').value);
   SUA_SHOP = sp.shop_product_id || null; veShopTatCa(); $('#sShopBox').classList.add('hidden');
-  $('#spKho').value = sp.kho_video || ''; $('#spGio').value = typeof sp.ten_gio === 'string' ? sp.ten_gio : '';
+  $('#spKho').value = sp.kho_video || ''; $('#spGio').value = typeof sp.ten_gio === 'string' ? sp.ten_gio : ''; $('#spTenNgan').value = sp.ten_ngan || sp.ten_goi || '';
   const chung = sp.loai === 'kho-chung' || !!sp.chi_la_kho_canh;
   ['#spBan1', '#spBan2', '#spBan3'].forEach(i => $(i).classList.toggle('hidden', chung));
   $('#spChungNote').classList.toggle('hidden', !chung); $('#spChungMd').classList.toggle('hidden', !chung); $('#spTron').checked = !!sp.tron_mac_dinh;
@@ -1373,7 +1377,7 @@ $('#btnLuuSp').onclick = async () => {
   const L = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
   const chung = !$('#spChungNote').classList.contains('hidden');       // kho chung: chỉ lưu thư mục kho + cờ trộn mặc định, không đụng ô bán hàng
   await api('/api/san-pham/' + $('#spSua').value, chung ? {kho: $('#spKho').value, tron_mac_dinh: $('#spTron').checked}
-    : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value});
+    : {qua_tang: L('#qua'), khong_duoc_noi: L('#cam'), su_that_duoc_noi: L('#suThat'), kho: $('#spKho').value, ten_gio: $('#spGio').value, ten_ngan: $('#spTenNgan').value});
   toast('Đã lưu. Lô sau dùng thông tin mới.'); $('#spChon').innerHTML = ''; KT.ma = null; taiKho(); taiTongQuan(true); capNhat();
 };
 // ---------- GU
