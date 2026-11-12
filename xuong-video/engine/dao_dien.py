@@ -12,7 +12,7 @@ from soat_kho import bad, nguoi_noi
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay
 FPS = 30
 SO_TAY = lambda: (CODE / "luat" / "SO-TAY-EDITOR.md").read_text(encoding="utf-8")   # sổ tay editor cao cấp — mọi vai dựng/chấm đọc
 
@@ -181,10 +181,7 @@ PROMPT_DD = """=== SỔ TAY EDITOR CAO CẤP (bắt buộc) ===
 === GU CỦA BẠN ===
 {gu}
 
-=== SỔ GU CỦA CHỦ HÀNG (bắt buộc tôn trọng) ===
-{so_gu}
-
-=== BÀI HỌC TỪ GIÁM KHẢO (lỗi các bản trước — TRÁNH lặp lại) ===
+{so_gu}=== BÀI HỌC TỪ GIÁM KHẢO (lỗi các bản trước — TRÁNH lặp lại) ===
 {bai_hoc}
 - Khối chữ/phụ đề không được che chữ trên nhãn chai: câu có khối chữ giữa bài nên dùng cảnh vườn/rễ/phun, hoặc bố cục khung_nho.
 - Lời nói tới thứ gì (rễ, nhãn thành phần, cây con, phun…) thì hình PHẢI thấy đúng thứ đó.
@@ -197,7 +194,8 @@ PROMPT_DD = """=== SỔ TAY EDITOR CAO CẤP (bắt buộc) ===
 Tổng thời lượng video: {total} s. Chữ nhấn do biên kịch đề xuất: {nhan}
 
 === CẢNH ỨNG VIÊN ===
-Xem tờ ảnh (số vàng = id). Danh sách: id | vai trò | mô tả | dài (s)
+Xem tờ ảnh (số vàng = id). Danh sách: id | vai trò | mô tả | dài (s).
+id bắt đầu "Q-" = QUÀ TẶNG THẬT (dùng ở câu nhắc quà); id bắt đầu "V-" = KHO PHỤ (b-roll, chỉ làm cảnh phụ/chuyển ý, không quá ~30% số cảnh).
 {ds}
 Gợi ý theo câu (không bắt buộc): {goi_y}
 
@@ -222,9 +220,20 @@ Trả về DUY NHẤT 1 đối tượng JSON:
  "ly_do":"≤12 từ: ý tưởng dựng"}}"""
 
 
+def bai_hoc_cho(ma):
+    """Bài học giám khảo gửi đạo diễn: luật CHUNG (mọi sản phẩm) + bài học RIÊNG của đúng sản phẩm đang làm — không lẫn sản phẩm khác."""
+    def doc(f, n):
+        return [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()][-n:] if f.exists() else []
+    chung = doc(HUB / "lich-su" / "bai-hoc.txt", 20)
+    rieng = doc(HUB / "lich-su" / f"bai-hoc-{ma}.txt", 15)
+    if not chung and not rieng:
+        return "(chưa có)"
+    return "\n".join(chung + (["Riêng sản phẩm này:"] + rieng if rieng else []))
+
+
 def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None):
     sents = sentence_times(voice["text"], voice["words"])
-    total = round(max(voice["dur"] + 0.6, 20.3), 2)
+    total = round(max(voice["dur"] + 0.6, khung_giay(sp)[0] + 0.3), 2)      # khớp dung.render (độ dài đích theo sản phẩm)
     f_dd = HUB / "lich-su" / f"canh-da-dung-{ma}.txt"
     dem_dung = {}
     if f_dd.exists():
@@ -247,15 +256,15 @@ def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=()
     ids = list(chon)
     anh = to_ung_vien(ma, ids, Path(work) / f"ung-vien-{gu_key}.jpg")
     so_gu_f = HUB / "lich-su" / "so-gu.md"
-    so_gu = so_gu_f.read_text(encoding="utf-8")[-4000:] if so_gu_f.exists() else "(chưa có)"
-    sp_ngan = {k: sp.get(k) for k in ("ten_goi", "su_that_duoc_noi", "qua_tang", "khong_duoc_noi", "nhan_dien_chai")}
-    bh_f = HUB / "lich-su" / "bai-hoc.txt"
-    bai_hoc = "\n".join(bh_f.read_text(encoding="utf-8").splitlines()[-30:]) if bh_f.exists() else "(chưa có)"
+    so_gu = so_gu_f.read_text(encoding="utf-8")[-4000:].strip() if so_gu_f.exists() else ""
+    so_gu = f"=== SỔ GU CỦA CHỦ HÀNG (bắt buộc tôn trọng) ===\n{so_gu}\n\n" if so_gu else ""      # chưa có sổ gu → không gửi khung trống
+    sp_ngan = {k: sp.get(k) for k in ("ten_goi", "ten_ngan", "su_that_duoc_noi", "qua_tang", "khong_duoc_noi", "nhan_dien_chai") if sp.get(k)}
+    bai_hoc = bai_hoc_cho(ma)
     p = PROMPT_DD.format(
         gu=GU[gu_key], so_gu=so_gu, bai_hoc=bai_hoc, so_tay=SO_TAY(), sp=json.dumps(sp_ngan, ensure_ascii=False),
         cau="\n".join(f"[{k}] {s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for k, s in enumerate(sents)),
         total=total, nhan=script.get("nhan_tu", []),
-        ds="\n".join(f"{i} | {'QUÀ TẶNG THẬT (dùng ở câu nhắc quà) | ' if i.startswith('Q-') else ('CẢNH KHO PHỤ (b-roll, chỉ làm cảnh phụ/chuyển ý, không quá ~30% số cảnh) | ' if i.startswith('V-') else '')}{','.join(chon[i]['vai_tro'])}{' | NGƯỜI NÓI (chỉ đặt trong khung/ô)' if nguoi_noi(chon[i]) else ''} | {(chon[i].get('soat') or {}).get('ghi') or chon[i]['mo_ta'][:60]} | {chon[i]['dai']}"
+        ds="\n".join(f"{i} | {','.join(chon[i]['vai_tro'])}{' | NGƯỜI NÓI (chỉ đặt trong khung/ô)' if nguoi_noi(chon[i]) else ''} | {(chon[i].get('soat') or {}).get('ghi') or chon[i]['mo_ta'][:60]} | {chon[i]['dai']}"
                      for i in ids),
         goi_y=json.dumps({k: v for k, v in enumerate(per)}),
         bo_cuc=json.dumps(BO_CUC_MO_TA, ensure_ascii=False),
@@ -429,8 +438,7 @@ PROMPT_GK = """Bạn là editor trưởng chấm bản dựng video quảng cáo
 Lời đọc theo thời gian:
 {cau}
 Bảng dựng đạo diễn đã làm (tóm tắt): {tom}
-SỔ GU CỦA CHỦ HÀNG: {so_gu}
-
+{so_gu}
 Chấm theo tiêu chí: (1) hình hợp lời (đủ phù hợp là được, không khắt khe); (2) mở đầu giật mắt; (3) câu chốt thấy rõ chai {ten}; (4) chữ/khối không che sản phẩm,
 không đè nhau, đọc được; (5) người đang nói chỉ được nằm trong khung/ô (không full màn), không chữ chèn to che hình, không hàng khác; (6) đẹp, sang, đa dạng, không nhàm; (7) không lỗi hình (tối, mờ, méo).
 Trả về DUY NHẤT JSON, NGẮN GỌN: {{"diem": 1-10, "dat": true|false (đạt khi ≥ 7 và không lỗi nặng), "loi": ["tối đa 3 lỗi nặng nhất, mỗi lỗi ≤ 12 từ, có giây"],
@@ -442,9 +450,9 @@ def giam_khao(sp, video, sents, edl, work):
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     tom = {"cong_thuc": edl.get("cong_thuc"), "gu": edl.get("gu"), "khoi": [k.get("loai") for k in edl.get("khoi", []) if isinstance(k, dict)],
            "y_tuong": edl.get("ly_do")}
-    p = PROMPT_GK.format(so_tay=SO_TAY(), ten=sp["ten_goi"], cau="\n".join(f"{s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for s in sents),
+    p = PROMPT_GK.format(so_tay=SO_TAY(), ten=sp.get("ten_ngan") or sp["ten_goi"], cau="\n".join(f"{s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for s in sents),
                          tom=json.dumps(tom, ensure_ascii=False),
-                         so_gu=so_gu_f.read_text(encoding="utf-8")[-2000:] if so_gu_f.exists() else "(chưa có)")
+                         so_gu=("SỔ GU CỦA CHỦ HÀNG: " + so_gu_f.read_text(encoding="utf-8")[-2000:].strip() + chr(10)) if so_gu_f.exists() and so_gu_f.read_text(encoding="utf-8").strip() else "")
     for lan in range(2):                 # trả sai định dạng → hỏi lại 1 lần; vẫn sai thì để trống điểm (không ghi 0 gây hiểu nhầm)
         txt, _ = goi("giám khảo", p, anh=[anh])
         try:

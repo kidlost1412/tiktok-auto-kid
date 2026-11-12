@@ -120,10 +120,10 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             k += 1
             tasks.append({"sc": sc, "voice": voice, "gu": gu, "rng": random.Random(f"{vname}-{j}"), "j": j,
                           "work": tam / f"{vname}-{j}", "vname": vname})
-        with open(HUB / "lich-su" / "cau-da-dung.txt", "a", encoding="utf-8") as f:
-            for s in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", sc["text"]).strip()):
-                if s.strip():
-                    f.write(s.strip() + "\n")
+        cau_moi = [x.strip() for x in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", sc["text"]).strip()) if x.strip()]
+        for ten_f in ("cau-da-dung.txt", f"cau-da-dung-{ma_sp}.txt"):     # chung (máy chống trùng) + riêng sản phẩm (gửi biên kịch)
+            with open(HUB / "lich-su" / ten_f, "a", encoding="utf-8") as f:
+                f.write("".join(x + "\n" for x in cau_moi))
     for i, ll in enumerate(lam_lai or []):
         meta = ll.get("meta") or {}
         sc = meta.get("kich_ban") or {"goc": meta.get("goc") or "lam-lai", "giong": meta.get("giong") or "XuanLuong",
@@ -237,7 +237,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 return t, r
             with ThreadPoolExecutor(3) as ex:
                 kq = list(ex.map(cham, xong))
-            ghi_bai_hoc([x for _, r in kq for x in r["loi"] if not x.startswith("chưa chấm")])
+            ghi_bai_hoc([x for _, r in kq for x in r["loi"] if not x.startswith("chưa chấm")], ma_sp)
             for t, r in kq:
                 t["gk"] = r; t["lan"] = 1
                 log(f"  giám khảo {t['fname']}: {r.get('diem')}/10 {'ĐẠT' if r.get('dat') else 'CHƯA ĐẠT'} {'; '.join((r.get('loi') or [])[:2])}")
@@ -356,7 +356,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     except Exception as e:
         log(f"  (tự duyệt lỗi: {str(e)[:80]})")
     try:
-        gom_bai_hoc(log)
+        gom_bai_hoc(ma_sp, log)
     except Exception as e:
         log(f"  (gom bài học lỗi: {str(e)[:80]})")
     try:
@@ -371,9 +371,9 @@ def _sents(t):
     return sentence_times(t["voice"]["text"], t["voice"]["words"])
 
 
-def ghi_bai_hoc(loi):
-    """Lỗi giám khảo bắt được → sổ bài học cho đạo diễn lần sau (bỏ mốc giây, bỏ trùng)."""
-    f = HUB / "lich-su" / "bai-hoc.txt"
+def ghi_bai_hoc(loi, ma_sp):
+    """Lỗi giám khảo bắt được → sổ bài học RIÊNG của sản phẩm (bỏ mốc giây, bỏ trùng). Gom bài học tách phần chung sau."""
+    f = HUB / "lich-su" / f"bai-hoc-{ma_sp}.txt"
     cu = set(f.read_text(encoding="utf-8").splitlines()) if f.exists() else set()
     moi = []
     for x in loi:
@@ -391,25 +391,39 @@ def cap_cua(t):
     return caps[t["j"] % len(caps)]
 
 
-def gom_bai_hoc(log=print, nguong=25):
-    """Sổ bài học dài quá → AI gom ý trùng thành ≤ 15 luật ngắn, lỗi hay gặp lên đầu (giữ sổ gọn, đạo diễn đọc nhanh, ít token)."""
+def gom_bai_hoc(ma_sp, log=print, nguong=25):
+    """Sổ bài học RIÊNG của sản phẩm dài quá → AI gom thành 2 phần: luật CHUNG (đúng cho mọi sản phẩm, không nêu tên sản phẩm/cây)
+    ghi vào bai-hoc.txt, và bài học RIÊNG (chỉ đúng với sản phẩm này) giữ ở bai-hoc-<mã>.txt. Đạo diễn đọc chung + riêng của đúng sản phẩm."""
     from ai import goi
     nl = chr(10)
-    f = HUB / "lich-su" / "bai-hoc.txt"
+    f = HUB / "lich-su" / f"bai-hoc-{ma_sp}.txt"
+    fc = HUB / "lich-su" / "bai-hoc.txt"
     if not f.exists():
         return
     dong = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
     if len(dong) <= nguong:
         return
-    p = ("Dưới đây là các lỗi giám khảo bắt được khi dựng video quảng cáo TikTok. Gom các ý trùng/na ná thành TỐI ĐA 15 luật "
-         "ngắn (≤ 18 từ/luật) cho đạo diễn dựng, lỗi gặp nhiều nhất đặt lên đầu, ghi kiểu 'Tránh …' hoặc 'Luôn …'. "
-         "Chỉ trả về các dòng bắt đầu bằng '- ', không chữ nào khác." + nl + nl + nl.join(dong))
+    chung = [l for l in fc.read_text(encoding="utf-8").splitlines() if l.strip()] if fc.exists() else []
+    p = ("Dưới đây là lỗi giám khảo bắt được khi dựng video quảng cáo TikTok cho MỘT sản phẩm, và sổ LUẬT CHUNG hiện có (áp cho mọi sản phẩm)."
+         + nl + "Gom các ý trùng/na ná, lỗi gặp nhiều đặt lên đầu, mỗi dòng ≤ 18 từ, ghi kiểu 'Tránh …' hoặc 'Luôn …'. Trả về đúng 2 phần:" + nl
+         + "CHUNG: (tối đa 15 dòng) sổ luật chung mới = luật chung cũ + lỗi nào đúng với MỌI sản phẩm. KHÔNG nêu tên sản phẩm, tên chai, tên cây, tên quà cụ thể." + nl
+         + "RIENG: (tối đa 10 dòng) lỗi chỉ đúng với sản phẩm này (tên, chai, quà, cây trồng riêng của nó)." + nl
+         + "Mỗi dòng bắt đầu bằng '- '. Không chữ nào khác ngoài 2 dòng tiêu đề CHUNG: và RIENG:." + nl + nl
+         + "LUẬT CHUNG HIỆN CÓ:" + nl + (nl.join(chung) or "(chưa có)") + nl + nl + "LỖI CỦA SẢN PHẨM NÀY:" + nl + nl.join(dong))
     txt, _ = goi("gom bài học", p, model="sonnet", effort="low")
-    moi = [l.strip() for l in txt.splitlines() if l.strip().startswith("- ")][:15]
-    if len(moi) >= 5:
-        (HUB / "lich-su" / "bai-hoc-cu.txt").write_text(nl.join(dong) + nl, encoding="utf-8")
-        f.write_text(nl.join(moi) + nl, encoding="utf-8")
-        log(f"  📚 Gom sổ bài học: {len(dong)} dòng → {len(moi)} luật")
+    phan, moi = None, {"CHUNG": [], "RIENG": []}
+    for l in txt.splitlines():
+        l = l.strip()
+        if l.upper().startswith("CHUNG"):
+            phan = "CHUNG"
+        elif l.upper().startswith("RI"):
+            phan = "RIENG"
+        elif phan and l.startswith("- "):
+            moi[phan].append(l)
+    if len(moi["CHUNG"]) >= 3:
+        fc.write_text(nl.join(moi["CHUNG"][:15]) + nl, encoding="utf-8")
+        f.write_text(nl.join(moi["RIENG"][:10]) + (nl if moi["RIENG"] else ""), encoding="utf-8")
+        log(f"  📚 Gom sổ bài học {ma_sp}: {len(dong)} dòng → {len(moi['CHUNG'][:15])} luật chung + {len(moi['RIENG'][:10])} riêng")
 
 
 def bao_chi_phi(t0, made, log, ma_sp=""):

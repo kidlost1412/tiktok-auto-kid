@@ -10,14 +10,13 @@ Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VI�
 - Số âm tiết theo mục ĐỘ DÀI (không tính tag; ~3,9 âm tiết = 1 giây sau tốc độ 1,1×).
 - CẤM câu kiểu thuyết minh/báo cáo: "đây là điểm đáng cân nhắc", "đó là lượng pha theo hướng dẫn", "với người quan tâm…", "quy cách rõ ràng", "đúng nhu cầu, đúng sản phẩm", "tham khảo / xem chi tiết / tìm hiểu thêm".
 - CẤM giả giọng bằng "nha/nè/á", ngôi tôi bịa trải nghiệm, số liệu chưa chốt.
-- Không lặp NGUYÊN CÂU đã dùng (xem danh sách câu đã dùng). Lặp ý và từ khóa thì được.
+- Không lặp NGUYÊN CÂU đã dùng (xem danh sách câu đã dùng). Thân bài được lặp ý và từ khóa; riêng CÂU MỞ không được giống hay na ná câu mở đã dùng.
 - Chỉ dùng sự thật trong san-pham.json; tôn trọng mục khong_duoc_noi.
 
 ## Tag giọng ElevenLabs v4 (Kid đã duyệt)
 - Mỗi câu một tag NGẮN tiếng Anh, cảm xúc vừa phải: [confident], [warm, confident], [serious], [proud], [proud, confident], [satisfied], [excited], [upbeat], [confident, slightly frustrated].
 - CẤM tag nhập vai/mô tả nhân vật (like a farmer…, tired, regretful lower voice, storytelling…): làm đổi giọng, thở giả.
 - Dùng "…" để ngắt/nhấn (tối đa 3 lần/bài). Có thể viết HOA một chữ cần nhấn.
-- Giọng: Xuân Lượng hoặc Nhật Phong; stability 0.3; tốc độ 1,1× (FFmpeg atempo, giữ cao độ).
 
 ## Dựng (chuẩn chỉn chu, KHÔNG lặp một khuôn)
 - Font chuẩn: DT Phudu (Black) cho mọi chữ trên hình. FFmpeg dựng nền; Remotion dựng lớp chữ; không dùng CapCut.

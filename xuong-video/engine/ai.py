@@ -91,11 +91,57 @@ def chon_tai_khoan(bo_qua=()):
     return ung[0][2]
 
 
-def _goi_1(tk, vai, prompt, anh, model, effort, timeout):
+MAX_BYTE_ANH = 3_500_000      # ảnh > 3.5MB (hoặc cạnh > 7900px) → nén lại JPEG trước khi gửi
+MAX_CANH_ANH = 7900
+_MIME = ((b"\xff\xd8\xff", "image/jpeg"), (b"\x89PNG\r\n\x1a\n", "image/png"), (b"RIFF", "image/webp"))
+
+
+class LoiNhungAnh(RuntimeError):
+    """Không gửi ảnh nhúng thẳng được → goi() lùi về cách cũ (công cụ Read)."""
+
+
+def _nap_anh(path):
+    """→ (media_type, base64) cho 1 ảnh; nén/thu nhỏ trong bộ nhớ nếu quá lớn. Không bao giờ phóng to."""
+    import base64, io
+    try:
+        raw = Path(path).read_bytes()
+        mime = next((m for sig, m in _MIME if raw.startswith(sig) and (m != "image/webp" or raw[8:12] == b"WEBP")), None)
+        if mime is None or len(raw) > MAX_BYTE_ANH:
+            from PIL import Image
+            im = Image.open(io.BytesIO(raw)); im.load()
+            if mime is None or max(im.size) > MAX_CANH_ANH or len(raw) > MAX_BYTE_ANH:
+                if im.mode not in ("RGB", "L"):
+                    nen = Image.new("RGB", im.size, (255, 255, 255))
+                    im = im.convert("RGBA"); nen.paste(im, mask=im.split()[3]); im = nen
+                elif im.mode == "L":
+                    im = im.convert("RGB")
+                k = min(1.0, MAX_CANH_ANH / max(im.size))
+                while True:
+                    cur = im if k >= 1.0 else im.resize((max(1, int(im.width * k)), max(1, int(im.height * k))), Image.LANCZOS)
+                    buf = io.BytesIO(); cur.save(buf, "JPEG", quality=88, optimize=True)
+                    if buf.tell() <= MAX_BYTE_ANH or k < 0.2:
+                        break
+                    k *= 0.85
+                raw, mime = buf.getvalue(), "image/jpeg"
+        return mime, base64.b64encode(raw).decode("ascii")
+    except Exception as e:
+        raise LoiNhungAnh(f"không nạp được ảnh {Path(path).name}: {e}")
+
+
+def _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung=False):
+    """nhung=True: ảnh gửi THẲNG trong 1 tin nhắn (stream-json, không công cụ → đúng 1 lượt). nhung=False: cách cũ (Read)."""
     claude = cfg()["duong_dan"]["claude"]
     cmd = [claude, "-p", "--output-format", "stream-json", "--verbose", "--model", model, "--effort", effort,
            "--strict-mcp-config", "--no-chrome", "--no-session-persistence", "--system-prompt", HE_THONG.format(vai=vai)]
-    if anh:
+    stdin = prompt
+    if anh and nhung:
+        khoi = [{"type": "text", "text": prompt}]
+        for a in anh:
+            mime, b64 = _nap_anh(a)
+            khoi.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}})
+        stdin = json.dumps({"type": "user", "message": {"role": "user", "content": khoi}}, ensure_ascii=False) + "\n"
+        cmd += ["--input-format", "stream-json", "--tools", ""]
+    elif anh:
         cmd += ["--tools", "Read", "--allowedTools", "Read"]
         for d in sorted({str(Path(a).parent) for a in anh}):
             cmd += ["--add-dir", d]
@@ -104,7 +150,7 @@ def _goi_1(tk, vai, prompt, anh, model, effort, timeout):
     pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
                           errors="replace", cwd=str(HUB), env=env_tk(tk))
     try:
-        out, err = pr.communicate(prompt, timeout=timeout)
+        out, err = pr.communicate(stdin, timeout=timeout)
     except subprocess.TimeoutExpired:                # quá giờ → tắt CẢ cây tiến trình (node), không để chạy ngầm tốn hạn mức
         subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
         pr.communicate()
@@ -136,15 +182,29 @@ def _goi_1(tk, vai, prompt, anh, model, effort, timeout):
 def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
     cl = cfg().get("claude", {})
     model = model or cl.get("model", "opus"); effort = effort or cl.get("effort", "high")
-    if anh:
-        prompt += "\n\nẢNH CẦN XEM (dùng công cụ Read mở TỪNG ảnh trước khi trả lời):\n" + "\n".join(str(a) for a in anh)
+    prompt_goc = prompt
+    nhung = bool(anh) and cfg().get("anh_nhung", True)          # mặc định gửi ảnh nhúng thẳng (1 lượt); anh_nhung=false → cách cũ
+    if anh and nhung:
+        prompt = prompt_goc + "\n\nẢnh đính kèm theo thứ tự: " + " ".join(f"{i}) {Path(str(a)).name}" for i, a in enumerate(anh, 1))
+    elif anh:
+        prompt = prompt_goc + "\n\nẢNH CẦN XEM (dùng công cụ Read mở TỪNG ảnh trước khi trả lời):\n" + "\n".join(str(a) for a in anh)
     da_thu = []
     while True:
         tk = chon_tai_khoan(bo_qua=da_thu)
         if tk is None:
             raise HetHanMuc("Mọi tài khoản Claude đều đã hết hạn mức hoặc chưa đăng nhập" + (f" (đã thử: {', '.join(da_thu)})" if da_thu else ""))
         t0 = datetime.datetime.now()
-        r, d, rl = _goi_1(tk, vai, prompt, anh, model, effort, timeout)
+        try:
+            r, d, rl = _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung)
+            if nhung and (r.returncode != 0 or d.get("is_error")) and re.search(
+                    r"input[- ]format|image|too large|exceed|stream-json|unexpected|invalid.*(message|content)",
+                    (d.get("result") or "") + " " + (r.stderr or ""), re.I) and not re.search(r"hit your .*limit|usage limit|limit reached|login|oauth", (d.get("result") or "") + (r.stderr or ""), re.I):
+                raise LoiNhungAnh(((d.get("result") or r.stderr or "")[:200]).replace("\n", " "))
+        except LoiNhungAnh as e:                                # lùi về cách cũ cho lần gọi này
+            print(f"[ai] gửi ảnh nhúng lỗi ({vai}): {e} → dùng công cụ Read", flush=True)
+            nhung = False
+            prompt = prompt_goc + "\n\nẢNH CẦN XEM (dùng công cụ Read mở TỪNG ảnh trước khi trả lời):\n" + "\n".join(str(a) for a in anh)
+            r, d, rl = _goi_1(tk, vai, prompt, anh, model, effort, timeout, False)
         res = d.get("result") or ""
         u = d.get("usage") or {}
         with _lock:

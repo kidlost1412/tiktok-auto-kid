@@ -1,6 +1,7 @@
 """Viết lời + phương án dựng bằng Claude CLI headless (mỗi lần gọi là phiên MỚI, không lịch sử chat).
 viet(ma_sp, so_ban) -> list kịch bản đã qua kiểm."""
 import json, random, re
+from pathlib import Path
 
 
 import sys as _s0; from pathlib import Path as _P0
@@ -34,6 +35,24 @@ def history_sentences(limit=400):
     f = HUB / "lich-su" / "cau-da-dung.txt"
     if not f.exists():
         return []
+    return [l.strip() for l in f.read_text(encoding="utf-8").splitlines() if l.strip()][-limit:]
+
+
+def cau_cua_sp(ma, limit=150):
+    """Câu đã dùng của RIÊNG sản phẩm này (gửi biên kịch). Chưa có sổ riêng → dựng từ hồ sơ các video đã làm của sản phẩm."""
+    f = HUB / "lich-su" / f"cau-da-dung-{ma}.txt"
+    if not f.exists():
+        ds = []
+        for j in sorted(Path(CFG["duong_dan"]["ra"]).glob(f"*/{ma}_*.json")):
+            try:
+                t = (json.loads(j.read_text(encoding="utf-8")).get("kich_ban") or {}).get("text") or ""
+            except Exception:
+                continue
+            ds += [x.strip() for x in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", t).strip()) if x.strip()]
+        ds = list(dict.fromkeys(ds))
+        if ds:
+            f.write_text("".join(x + "\n" for x in ds), encoding="utf-8")
+        return ds[-limit:]
     return [l.strip() for l in f.read_text(encoding="utf-8").splitlines() if l.strip()][-limit:]
 
 
@@ -71,8 +90,10 @@ def dem_lich_su(ten, n=200):
 
 def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua=""):
     luat = (CODE / "luat" / "LUAT-SAN-XUAT.md").read_text(encoding="utf-8")
+    luat = luat.split("## Dựng")[0].rstrip()          # phần Dựng là việc của đạo diễn/máy dựng, biên kịch không cần
     so_gu_f = HUB / "lich-su" / "so-gu.md"
-    so_gu = so_gu_f.read_text(encoding="utf-8")[-3000:] if so_gu_f.exists() else "(chưa có)"
+    so_gu = so_gu_f.read_text(encoding="utf-8")[-3000:].strip() if so_gu_f.exists() else ""
+    so_gu = ("=== SỔ GU CỦA CHỦ HÀNG ===" + chr(10) + so_gu + chr(10)) if so_gu else ""
     return f"""Bạn là BIÊN KỊCH của ê-kíp video quảng cáo TikTok. Chỉ trả về MỘT mảng JSON hợp lệ, không chữ nào khác.
 
 === LUẬT (bắt buộc) ===
@@ -81,9 +102,7 @@ def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, h
 === SẢN PHẨM (chỉ dùng sự thật ở đây; luat_rieng là bắt buộc) ===
 {json.dumps(sp, ensure_ascii=False, indent=1)}
 
-=== SỔ GU CỦA CHỦ HÀNG ===
-{so_gu}
-{("" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10))}
+{so_gu}{("" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10))}
 === VIỆC CẦN LÀM ===
 TÊN SẢN PHẨM: mỗi bản PHẢI đọc đúng nguyên văn ít nhất một lần một trong các tên: {json.dumps(ten_phai_nhac(sp), ensure_ascii=False)} (ưu tiên tên đầu, ngắn gọn).
 Viết {n} kịch bản. Bản thứ i dùng GÓC angles[i] và DẠNG BÀI dang[i] (bắt buộc, theo đúng thứ tự):
@@ -152,9 +171,9 @@ def check(item, sp, used_norm):
 
 def viet(ma_sp, so_ban, log=print):
     sp = json.loads((HUB / "san-pham" / ma_sp / "san-pham.json").read_text(encoding="utf-8"))
-    sp_for_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them")}
-    used = history_sentences()
-    used_norm = {norm(s) for s in used}
+    sp_for_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them", "shop_product_id")}
+    used_norm = {norm(s) for s in history_sentences()}      # máy chống trùng: câu của mọi sản phẩm
+    used = cau_cua_sp(ma_sp)                                 # gửi biên kịch: chỉ câu đã dùng của RIÊNG sản phẩm này
     goc = [g["ma"] for g in sp.get("goc_ban") or []] or ["cong-dung", "cach-dung", "thuong-hieu", "qua-tang"]   # sản phẩm mới chưa có góc bán
     out, tries = [], 0
     while len(out) < so_ban and tries < 4:
