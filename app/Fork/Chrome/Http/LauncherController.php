@@ -6,6 +6,7 @@ namespace App\Fork\Chrome\Http;
 
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeClient;
+use App\Fork\Chrome\Support\ChromeKeepAlive;
 use App\Fork\Chrome\Support\ChromeProfiles;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -16,9 +17,36 @@ final class LauncherController extends Controller
 {
     public const PROFILES_KEY = 'fork:chrome:profiles';
 
-    public function launchRequests(ChromeJobs $jobs): JsonResponse
+    /**
+     * requests = mở vì có bài đang chờ; keepalive = "Giữ Chrome luôn chạy nền" (tiện ích im lặng quá lâu
+     * hoặc người dùng bấm "Mở Chrome nền ngay"). Cả hai mở profile không cửa sổ.
+     */
+    public function launchRequests(ChromeJobs $jobs, ChromeKeepAlive $keepAlive): JsonResponse
     {
-        return response()->json(['ok' => true, 'requests' => $jobs->launchRequests()]);
+        $keepAlive->markLauncherSeen();
+        $requests = $jobs->launchRequests();
+        $exclude = array_map(fn (array $r): int => (int) $r['client_id'], $requests);
+
+        return response()->json([
+            'ok' => true,
+            'requests' => $requests,
+            'keepalive' => $keepAlive->requests(null, $exclude),
+        ]);
+    }
+
+    public function keepaliveResult(Request $request, ChromeKeepAlive $keepAlive): JsonResponse
+    {
+        $data = $request->validate([
+            'client_id' => ['required', 'integer'],
+            'ok' => ['required', 'boolean'],
+            'error' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (! $keepAlive->recordResult((int) $data['client_id'], (bool) $data['ok'], $data['error'] ?? null)) {
+            return response()->json(['ok' => false, 'error' => 'not_found', 'message' => 'Không có Chrome này.'], 404);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function launched(Request $request, ChromeJobs $jobs): JsonResponse
@@ -41,6 +69,9 @@ final class LauncherController extends Controller
     {
         $data = $request->validate([
             'profiles' => ['present', 'array', 'max:200'],
+            'browser_settings' => ['nullable', 'array'],
+            'browser_settings.chrome.background_mode' => ['nullable', 'boolean'],
+            'browser_settings.edge.background_mode' => ['nullable', 'boolean'],
             'profiles.*.dir' => ['required', 'string', 'regex:/^(Default|Profile \d+|[A-Za-z0-9 _.\-]{1,64})$/'],
             'profiles.*.name' => ['nullable', 'string', 'max:128'],
             'profiles.*.has_extension' => ['nullable', 'boolean'],
@@ -64,6 +95,16 @@ final class LauncherController extends Controller
             ->all();
 
         Cache::put(self::PROFILES_KEY, $profiles, now()->addDay());
+
+        // Chỉ đọc "Tiếp tục chạy ứng dụng nền" từ Local State; app không tự sửa cấu hình của Chrome.
+        if (is_array($data['browser_settings'] ?? null)) {
+            $settings = [];
+            foreach (['chrome', 'edge'] as $browser) {
+                $value = $data['browser_settings'][$browser]['background_mode'] ?? null;
+                $settings[$browser] = ['background_mode' => $value === null ? null : (bool) $value];
+            }
+            Cache::put(ChromeKeepAlive::BROWSER_SETTINGS_KEY, $settings, now()->addDay());
+        }
 
         // Chrome nào chưa có profile mà chỉ còn một lựa chọn thì gán luôn.
         ChromeClient::query()->whereNull('revoked_at')->whereNull('chrome_profile_dir')

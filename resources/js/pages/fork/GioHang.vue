@@ -2,12 +2,15 @@
 // Trang riêng của bản Việt hoá: chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
 import { router } from '@inertiajs/vue3';
-import { IconPlugConnectedX, IconRefresh } from '@tabler/icons-vue';
+import { IconHash, IconPlugConnectedX, IconRefresh } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import HubProductCard from '@/components/fork/gio-hang/HubProductCard.vue';
+import PersonaliseDialog from '@/components/fork/gio-hang/PersonaliseDialog.vue';
 import ShopPickerDialog from '@/components/fork/gio-hang/ShopPickerDialog.vue';
 import type {
+    Persona,
+    PersonaDefault,
     Row,
     ShopCard,
     ShopProduct,
@@ -35,6 +38,8 @@ const props = defineProps<{
     rows: Row[];
     name_max: number;
     sync_ttl_minutes: number;
+    personalise?: Record<string, Persona>;
+    personalise_default?: PersonaDefault;
 }>();
 
 const busy = ref<string | null>(null);
@@ -216,6 +221,46 @@ const clearRow = (r: Row) => {
     });
 };
 
+// ---- Cá nhân hoá (ảnh bìa, hashtag) theo sản phẩm hub; 'default' = hashtag mặc định chung ----
+const emptyPersona: Persona = {
+    cover_mode: 'default',
+    cover_fixed: null,
+    covers: [],
+    hashtags: [],
+    hashtag_mode: 'append',
+    hashtag_pick: 0,
+};
+const personaOf = (code: string): Persona =>
+    props.personalise?.[code] ?? emptyPersona;
+const personalising = ref<{ code: string; label: string } | null>(null);
+const editingDefault = ref(false);
+
+const dialogState = computed<Persona>(() => {
+    if (editingDefault.value) {
+        const d = props.personalise_default;
+
+        return {
+            ...emptyPersona,
+            hashtags: d?.tags ?? [],
+            hashtag_mode: d?.mode ?? 'append',
+            hashtag_pick: d?.pick ?? 0,
+        };
+    }
+
+    return personalising.value
+        ? personaOf(personalising.value.code)
+        : emptyPersona;
+});
+const dialogOpen = computed(
+    () => editingDefault.value || personalising.value !== null,
+);
+const closePersonalise = (v: boolean) => {
+    if (!v) {
+        editingDefault.value = false;
+        personalising.value = null;
+    }
+};
+
 // ---- Sắp xếp: thẻ có video chờ mà chưa có giỏ lên đầu ----
 // Một thẻ đã chọn sản phẩm trong nháp (chưa lưu) vẫn tính là chưa có giỏ cho tới khi lưu.
 const rank = (r: Row) => {
@@ -381,6 +426,21 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                     class="flex flex-col gap-3"
                     data-testid="fork-gio-hang-rows"
                 >
+                    <div class="flex justify-end">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid="fork-personalise-default"
+                            @click="editingDefault = true"
+                        >
+                            <IconHash class="size-4" />
+                            Hashtag mặc định chung{{
+                                personalise_default?.tags.length
+                                    ? ` (${personalise_default.tags.length})`
+                                    : ''
+                            }}
+                        </Button>
+                    </div>
                     <SectionHeading
                         title="Video nào gắn sản phẩm nào"
                         description="Mỗi thẻ là một sản phẩm của hub theo từng quy cách. Phải chọn đúng một sản phẩm shop cho mỗi thẻ."
@@ -410,6 +470,13 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             :dirty="isDirty(r)"
                             :has-draft="!!draft[r.key]"
                             :busy="busy === `row-${r.key}`"
+                            :persona="personaOf(r.code)"
+                            @personalise="
+                                personalising = {
+                                    code: r.code,
+                                    label: r.hub_name,
+                                }
+                            "
                             @pick="picking = r.key"
                             @update:name="(v: string) => editName(r, v)"
                             @save="saveRow(r)"
@@ -429,6 +496,15 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                 </section>
             </template>
         </div>
+
+        <PersonaliseDialog
+            :open="dialogOpen"
+            :scope="editingDefault ? 'default' : 'product'"
+            :code="personalising?.code ?? ''"
+            :label="personalising?.label ?? ''"
+            :state="dialogState"
+            @update:open="closePersonalise"
+        />
 
         <ShopPickerDialog
             :open="picking !== null"

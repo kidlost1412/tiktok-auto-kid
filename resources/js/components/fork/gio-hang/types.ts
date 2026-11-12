@@ -42,3 +42,26 @@ export interface Sync {
     requested_at: string | null;
     synced_at: string | null;
 }
+
+/** Cá nhân hoá theo sản phẩm hub (ảnh bìa, hashtag). */
+export interface Persona {
+    cover_mode: 'default' | 'fixed' | 'random';
+    cover_fixed: string | null;
+    covers: {
+        file: string;
+        name: string;
+        w: number;
+        h: number;
+        size: number;
+        url: string;
+    }[];
+    hashtags: string[];
+    hashtag_mode: 'append' | 'replace';
+    hashtag_pick: number;
+}
+
+export interface PersonaDefault {
+    tags: string[];
+    mode: 'append' | 'replace';
+    pick: number;
+}

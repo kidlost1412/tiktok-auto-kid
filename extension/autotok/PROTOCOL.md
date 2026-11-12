@@ -377,3 +377,22 @@ Page-context (MAIN world) fetches are governed by CORS, not by `host_permissions
 first (cookies of the tab); if the browser refuses them, the same GET (exact host + path, https, GET only, only for the active
 job/sync tab) is relayed content.js -> service worker, which is not subject to CORS because of the new host permission. The
 same permission serves the product confirmation of 10.4. Nothing else is added: no content script matches shop.tiktok.com.
+
+## 11. Per-product cover and window behaviour (extension 1.4.2) -- optional, protocol stays v1
+
+### 11.1 Job field `options.cover` and `GET /api/ext/cover?id=<job>`
+Present only when the post's product has a custom cover (modes "fixed" / "random" in the app):
+`"options": {..., "cover": {"url": "/api/ext/cover?id=ej_...", "name": "cover.jpg", "mime": "image/jpeg", "size": 123456, "sha256": "<64 hex>", "field": "cover_uri"}}`.
+The cover is a JPEG <= 5 MB, served with the same rules as `/api/ext/video` (claiming client, job running). The extension downloads it
+(size + sha256 checked), uploads it to TikTok through the same VOD pipeline as the video with `FileType=image`, and puts the resulting
+uri into `single_post_req_list[0].single_post_feature_info[<field>]`. Jobs without `options.cover` are byte-identical to before.
+
+**Never fatal.** Any problem (download, checksum, upload, bad meta) only drops the cover: the post goes out with TikTok's default
+cover (`poster_delay: 0`, first frame) and the result carries `cover_status: "failed"` + `cover_warning: "<reason>"`. A successful
+upload reports `cover_status: "applied"`. The body field name (`field`, default `cover_uri`) is NOT verified against a real TikTok post
+yet; if TikTok ignores it the post simply has the default cover.
+
+### 11.2 Work windows never steal focus
+Job / sync / collection windows follow `windowStrategy`. A `tab` strategy with no normal window open (Chrome started in the background)
+uses a minimized, unfocused window instead of letting `tabs.create` open a visible one; a minimized window that came up in the normal
+state is minimized again. The extension closes what it opened.

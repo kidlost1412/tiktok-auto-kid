@@ -4,11 +4,12 @@ import {
     IconAlertTriangle,
     IconCheck,
     IconPackage,
+    IconPalette,
     IconShoppingCartPlus,
 } from '@tabler/icons-vue';
 import { computed } from 'vue';
 
-import type { Row, ShopCard } from '@/components/fork/gio-hang/types';
+import type { Persona, Row, ShopCard } from '@/components/fork/gio-hang/types';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ const props = defineProps<{
     dirty: boolean;
     hasDraft: boolean;
     busy: boolean;
+    persona?: Persona | null;
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +32,7 @@ const emit = defineEmits<{
     'update:name': [value: string];
     save: [];
     clear: [];
+    personalise: [];
 }>();
 
 type Tone = 'need' | 'bad' | 'ok' | 'idle';
@@ -58,6 +61,26 @@ const frame: Record<Tone, string> = {
 };
 
 const left = computed(() => props.name.length);
+
+// Tóm tắt cá nhân hoá hiện ở nút (chỉ xem nhanh, sửa trong hộp thoại).
+const personaSummary = computed(() => {
+    const p = props.persona;
+    const parts: string[] = [];
+
+    if (p && p.cover_mode !== 'default' && p.covers.length) {
+        parts.push(
+            p.cover_mode === 'random'
+                ? `bìa ngẫu nhiên (${p.covers.length} ảnh)`
+                : 'bìa cố định',
+        );
+    }
+
+    if (p && p.hashtags.length) {
+        parts.push(`${p.hashtags.length} hashtag`);
+    }
+
+    return parts.join(' · ');
+});
 </script>
 
 <template>
@@ -188,6 +211,19 @@ const left = computed(() => props.name.length);
                 "
             />
         </label>
+
+        <button
+            type="button"
+            class="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+            :data-testid="`fork-personalise-open-${row.code}-${row.quy_cach ?? ''}`"
+            @click="emit('personalise')"
+        >
+            <IconPalette class="size-4 shrink-0" />
+            <span class="font-medium text-foreground">Cá nhân hoá</span>
+            <span class="truncate">{{
+                personaSummary || 'ảnh bìa, hashtag riêng'
+            }}</span>
+        </button>
 
         <div v-if="card" class="flex flex-wrap items-center gap-2">
             <Button

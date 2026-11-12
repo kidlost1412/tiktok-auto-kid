@@ -126,7 +126,7 @@
   }
 
   // ---- post body (uploader.py:543-598) ----
-  function buildPayload({ creationId, videoId, caption, markup, textExtra, visibility, allowComment = true, allowDuet = false, allowStitch = false, aiLabel = false, probe = null, scheduleTime = null, anchors = [] }) {
+  function buildPayload({ creationId, videoId, caption, markup, textExtra, visibility, allowComment = true, allowDuet = false, allowStitch = false, aiLabel = false, probe = null, scheduleTime = null, anchors = [], coverUri = null, coverField = 'cover_uri' }) {
     const feature = {
       geofencing_regions: [], playlist_name: '', playlist_id: '', tcm_params: '{"commerce_toggle_info":{}}',
       sound_exemption: 0, music_copyright: { result: 1 }, anchors,
@@ -142,6 +142,7 @@
       if (probe.duration_ms) info.video_track_time_range_list = [{ start_time_in_ms: 0, end_time_in_ms: probe.duration_ms }];
       if ('has_audio' in probe) info.has_original_audio = probe.has_audio ? 1 : 0;
     }
+    if (coverUri && COVER_FIELD_RE.test(coverField)) info[coverField] = coverUri;
     if (scheduleTime != null) feature.schedule_time = scheduleTime;
     return { post_common_info: { creation_id: creationId, enter_post_page_from: 8, post_type: 3 }, feature_common_info_list: [feature],
       single_post_req_list: [{ batch_index: 0, video_id: videoId, is_long_video: 0, single_post_feature_info: info }] };
@@ -236,6 +237,35 @@
     const o = job.options || {};
     const options = { allowComment: flag(o, 'allow_comment', 1), allowDuet: flag(o, 'allow_duet', 0), allowStitch: flag(o, 'allow_stitch', 0), aiLabel: flag(o, 'ai_label', 0) };
     return { vis, scheduleUnix: unix, options };
+  }
+
+
+  // ---- per-product cover image (optional, never fatal: any problem here = post with TikTok's default cover) ----
+  const COVER_MAX_BYTES = 5 * 1024 * 1024;
+  const COVER_FIELD_RE = /^[a-z][a-z0-9_]{0,40}$/;
+  // job.options.cover -> {ok, field} | {ok:false, reason}
+  function validateCoverMeta(cv) {
+    if (!cv || typeof cv !== 'object') return { ok: false, reason: 'no-cover' };
+    if (typeof cv.url !== 'string' || !cv.url.startsWith('/api/ext/cover')) return { ok: false, reason: 'bad-url' };
+    if (!['image/jpeg', 'image/png'].includes(cv.mime)) return { ok: false, reason: 'bad-mime' };
+    const size = Number(cv.size);
+    if (!Number.isInteger(size) || size <= 0 || size > COVER_MAX_BYTES) return { ok: false, reason: 'bad-size' };
+    if (typeof cv.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(cv.sha256)) return { ok: false, reason: 'bad-sha256' };
+    const field = typeof cv.field === 'string' && COVER_FIELD_RE.test(cv.field) ? cv.field : 'cover_uri';
+    return { ok: true, field, size, mime: cv.mime, sha256: cv.sha256 };
+  }
+  const coverApplyPath = (size) => `/top/v1?Action=ApplyUploadInner&Version=2020-11-19&SpaceName=tiktok&FileType=image&IsInner=1&FileSize=${size}&s=g158iqx8434`;
+  // ApplyUploadInner response for FileType=image -> {ok, host, uri, auth, sessionKey} | {ok:false, reason}
+  function parseCoverApply(j) {
+    try {
+      const node = j.Result.InnerUploadAddress.UploadNodes[0]; const store = node.StoreInfos[0];
+      if (!store.StoreUri || !store.Auth || !node.UploadHost || !node.SessionKey) return { ok: false, reason: 'incomplete' };
+      return { ok: true, host: node.UploadHost, uri: store.StoreUri, auth: store.Auth, sessionKey: node.SessionKey };
+    } catch (_) { return { ok: false, reason: 'unexpected-response' }; }
+  }
+  // CommitUploadInner response -> the image uri when the commit names one, else null (caller falls back to StoreUri)
+  function parseCoverCommit(j) {
+    try { const r = j.Result.Results[0]; return typeof r.Uri === 'string' && r.Uri ? r.Uri : null; } catch (_) { return null; }
   }
 
   // ---- sanitized response (uploader.py:196-217): drop secret-looking keys/values, cap the size ----
@@ -449,7 +479,7 @@
   }
 
   const api = { validateJob, sanitizeResponse, mapPublishResult, extractPostId, parseKeepNumbers, createPublishGate, checkIdentity, CHUNK_SIZE, MAX_CAPTION_LENGTH, crc32Hex, splitParts, sigv4, sha256Hex, pyStrip, codePointLength, validateCaption, TOKEN_RE, mentionsIn,
-    buildCaption, visibilityCode, resolveSchedule, finalizeSchedule, buildPayload,
+    buildCaption, visibilityCode, resolveSchedule, finalizeSchedule, buildPayload, validateCoverMeta, coverApplyPath, parseCoverApply, parseCoverCommit, COVER_MAX_BYTES,
     buildProductAnchors, buildProductAnchorsDetailed, rewriteAnchors, rewriteAnchorsDetailed, parseShopProducts, checkProductAvailable, extractAnchorCapture, shopSearchUrl };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AutotokLib = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

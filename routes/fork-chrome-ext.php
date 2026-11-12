@@ -26,6 +26,7 @@ Route::prefix('api/ext')->middleware(['api', ExtensionCors::class])->group(funct
         Route::post('comments', [ExtensionController::class, 'comments']);
         Route::get('video/meta', [ExtensionController::class, 'videoMeta']);
         Route::get('video', [ExtensionController::class, 'video']);
+        Route::get('cover', [ExtensionController::class, 'cover']);
         Route::post('progress', [ExtensionController::class, 'progress']);
         Route::post('authorize', [ExtensionController::class, 'authorize']);
         Route::post('result', [ExtensionController::class, 'result']);

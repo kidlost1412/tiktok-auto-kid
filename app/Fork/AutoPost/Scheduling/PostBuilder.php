@@ -13,8 +13,11 @@ use App\Enums\Post\Status as PostStatus;
 use App\Enums\PostPlatform\ContentType;
 use App\Fork\AutoPost\Hub\HubFiles;
 use App\Fork\AutoPost\HubText;
+use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
+use App\Fork\AutoPost\Persona\CoverStore;
+use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Models\Media;
@@ -48,7 +51,13 @@ final class PostBuilder
         $workspace = $social->workspace ?? throw new RuntimeException('Tài khoản không có workspace.');
         $owner = $workspace->owner ?? throw new RuntimeException('Workspace không có chủ.');
         $hashtags = array_values($caption['hashtags'] ?? []);
-        $content = HubText::compose($caption['caption'], $hashtags);
+
+        // Cá nhân hoá theo sản phẩm: hashtag riêng (hoặc mặc định chung) và ảnh bìa riêng. Caption/hashtag hub gốc vẫn được
+        // lưu vào AutoVideo bên dưới; chữ cuối cùng chỉ nằm ở nội dung bài.
+        $product = filled($video->product_code) ? AutoProduct::query()->find($video->product_code) : null;
+        $final = app(Hashtags::class)->apply($caption['caption'], $hashtags, $product);
+        $coverFile = $product !== null ? app(CoverStore::class)->pick($product) : null;
+        $content = HubText::compose($final['caption'], $final['hashtags']);
 
         if ($content === '') {
             throw new RuntimeException('Caption rỗng.');
@@ -75,7 +84,7 @@ final class PostBuilder
         $storedPath = null;
 
         try {
-            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, &$storedPath): Post {
+            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, &$storedPath): Post {
                 $post = $workspace->posts()->forceCreate([
                     'post_group_id' => (string) Str::uuid7(),
                     'user_id' => $owner->id,
@@ -99,6 +108,7 @@ final class PostBuilder
                         'fork_auto_video_id' => $video->id,
                         'fork_shop_product_id' => (string) $link->shop_product_id,
                         'fork_shop_product_name' => $cartName,
+                        ...($coverFile !== null ? ['fork_cover' => $coverFile] : []),
                     ],
                 ]);
 

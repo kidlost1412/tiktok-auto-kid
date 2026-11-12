@@ -10,6 +10,7 @@ use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\Models\ChromeAccount;
@@ -49,6 +50,9 @@ final class GioHangController extends Controller
             'products' => [],
             'rows' => [],
             'name_max' => CartRules::NAME_MAX,
+            // Cá nhân hoá (ảnh bìa, hashtag) theo mã sản phẩm hub, và hashtag mặc định chung.
+            'personalise' => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p)])->all(),
+            'personalise_default' => Hashtags::defaults(),
             'sync_ttl_minutes' => intdiv(ShopSync::REQUEST_TTL, 60),
         ];
 

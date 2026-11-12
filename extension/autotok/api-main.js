@@ -114,8 +114,47 @@
     return { ids, parts: parts.length, chunkCredentials: cc };
   }
 
+  // Per-product cover image (job.options.cover): same VOD pipeline as the video with FileType=image (one part, <= 5 MiB).
+  // NEVER fatal: returns {uri} or {warning}; the caller posts with TikTok's default cover when there is no uri.
+  async function uploadCover(job, blob) {
+    const meta = L.validateCoverMeta(job.options && job.options.cover);
+    if (!meta.ok) return { warning: 'cover-invalid: ' + meta.reason };
+    if (!blob || blob.size !== meta.size) return { warning: 'cover-size: ' + (blob && blob.size) + ' != ' + meta.size };
+    try {
+      const cc = job.chunk_credentials === 'include' ? 'include' : 'omit';
+      const au = await step('cover-upload-auth', `/api/v1/video/upload/auth/?aid=${AID}`, { credentials: 'include' }, { json: true });
+      const tok = au.data && au.data.video_token_v5;
+      if (!tok || !tok.access_key_id || !tok.secret_acess_key || !tok.session_token) return { warning: 'cover-auth: no video_token_v5' };
+      const creds = { accessKeyId: tok.access_key_id, secretAccessKey: tok.secret_acess_key, sessionToken: tok.session_token, region: REGION, service: 'vod' };
+      const applyUrl = L.coverApplyPath(blob.size);
+      const sA = await L.sigv4({ method: 'GET', url: location.origin + applyUrl, ...creds, now: new Date() });
+      const ap = await step('cover-apply-upload', applyUrl, { credentials: 'include', headers: sA.headers }, { json: true });
+      const node = L.parseCoverApply(ap.data);
+      if (!node.ok) return { warning: 'cover-apply: ' + node.reason };
+      const uploadId = uuid();
+      const buf = await blob.arrayBuffer();
+      const crc = L.crc32Hex(buf);
+      await step('cover-upload-part', `https://${node.host}/${node.uri}?partNumber=1&uploadID=${uploadId}&phase=transfer`, {
+        method: 'POST', credentials: cc, body: buf,
+        headers: { Authorization: node.auth, 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="undefined"', 'Content-Crc32': crc },
+      });
+      await step('cover-finish-upload', `https://${node.host}/${node.uri}?uploadID=${uploadId}&phase=finish&uploadmode=part`, {
+        method: 'POST', credentials: 'omit', headers: { Authorization: node.auth, 'Content-Type': 'text/plain;charset=UTF-8' }, body: '1:' + crc,
+      });
+      const commitUrl = '/top/v1?Action=CommitUploadInner&Version=2020-11-19&SpaceName=tiktok';
+      const commitBody = JSON.stringify({ SessionKey: node.sessionKey, Functions: [] });
+      const sC = await L.sigv4({ method: 'POST', url: location.origin + commitUrl, body: commitBody, ...creds, now: new Date() });
+      const cm = await step('cover-commit-upload', commitUrl, { method: 'POST', credentials: 'include', body: commitBody, headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }, sC.headers) }, { json: true });
+      const uri = L.parseCoverCommit(cm.data) || node.uri;
+      progress('cover', 'đã tải ảnh bìa lên TikTok', null, { field: meta.field, uriLen: uri.length });
+      return { uri, field: meta.field };
+    } catch (e) {
+      return { warning: 'cover-upload: ' + String(e && e.message).slice(0, 200) };
+    }
+  }
+
   // Everything except `text`/`markup_text` content is kept; ids are not secrets. Nothing here is sent anywhere.
-  async function buildBody(job, ids, blob, v, anchors) {
+  async function buildBody(job, ids, blob, v, anchors, cover) {
     let sched = null;
     if (v.scheduleUnix != null) {
       const now = Math.floor(Date.now() / 1000);
@@ -127,7 +166,7 @@
     }
     const { markup, textExtra } = L.buildCaption(job.caption, userIds);
     const probe = await probeVideo(blob);
-    const payload = L.buildPayload({ creationId: ids.creation_id, videoId: ids.video_id, caption: job.caption, markup, textExtra, visibility: v.vis, probe, scheduleTime: sched, anchors, ...v.options });
+    const payload = L.buildPayload({ creationId: ids.creation_id, videoId: ids.video_id, caption: job.caption, markup, textExtra, visibility: v.vis, probe, scheduleTime: sched, anchors, coverUri: cover && cover.uri, coverField: cover && cover.field, ...v.options });
     return { payload, probe, resolvedMentions: Object.keys(userIds), tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
   }
 
@@ -327,9 +366,17 @@
       const up = await upload(job, blob);
       let result = { outcome: job.mode === 'selftest' ? 'selftest_ok' : 'intercepted', note: 'đã tải video lên TikTok, CHƯA đăng', ids: up.ids, parts: up.parts, chunkCredentials: up.chunkCredentials, identity: id0, elapsed_ms: Date.now() - t0, mem: mem() };
       if (job.mode !== 'selftest') {
-        const b = await buildBody(job, up.ids, blob, v, anchors);
+        let cover = null, coverWarn = msg.coverWarn || null;
+        if (job.mode !== 'selftest' && job.options && job.options.cover && msg.coverBlobUrl) {
+          let cb = null;
+          try { cb = await (await fetch(msg.coverBlobUrl)).blob(); } catch (e) { coverWarn = 'cover-blob: ' + String(e && e.message).slice(0, 100); }
+          const cu = cb ? await uploadCover(job, cb) : { warning: coverWarn };
+          if (cu.uri) cover = cu; else { coverWarn = cu.warning; progress('cover', 'WARN bỏ ảnh bìa riêng, dùng bìa mặc định: ' + coverWarn); }
+        }
+        const b = await buildBody(job, up.ids, blob, v, anchors, cover);
         if (job.mode === 'intercept') Object.assign(result, { sent: false, body: b.payload, probe: b.probe, resolvedMentions: b.resolvedMentions, tz: b.tz });
-        else result = Object.assign({ ids: up.ids, parts: up.parts, elapsed_ms: Date.now() - t0 }, await doPost(job, up, b, id0));
+        else result = Object.assign({ ids: up.ids, parts: up.parts, elapsed_ms: Date.now() - t0 }, await doPost(job, up, b, id0),
+          job.options && job.options.cover ? { cover_status: cover ? 'applied' : 'failed', cover_warning: cover ? undefined : coverWarn || 'cover-missing' } : {});
       }
       post('done', { result });
     } catch (e) {

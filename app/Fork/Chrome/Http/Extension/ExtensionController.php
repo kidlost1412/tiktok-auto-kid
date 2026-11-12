@@ -347,6 +347,21 @@ final class ExtensionController
         }, $status, $headers);
     }
 
+    /** Ảnh bìa riêng của job (jpg <= 5 MB). Cùng điều kiện truy cập với /api/ext/video. */
+    public function cover(Request $request): Response
+    {
+        $job = $this->videoJob($request);
+        $cv = is_array($job->options['cover'] ?? null) ? $job->options['cover'] : null;
+        $product = $cv === null ? null : \App\Fork\AutoPost\Models\AutoProduct::query()->find((string) ($cv['code'] ?? ''));
+        $path = $product === null ? null : \App\Fork\AutoPost\Persona\CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
+
+        if ($path === null) {
+            throw new ExtError(404, 'unknown_job', 'việc này không có ảnh bìa (hoặc file đã mất)');
+        }
+
+        return response()->file($path, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'no-store']);
+    }
+
     public function progress(Request $request): JsonResponse
     {
         $body = $this->body($request);

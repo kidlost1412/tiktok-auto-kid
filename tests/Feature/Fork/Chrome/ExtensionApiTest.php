@@ -640,3 +640,24 @@ test('hello with an avatar_url downloads it once onto the bound channel', functi
     // Bản cũ không gửi avatar: hello vẫn chạy bình thường.
     helloAs($this, $token)->assertOk();
 });
+
+test('cover is served only to the claiming client for a job that has one', function () {
+    $token = pairExtension($this);
+    $other = pairExtension($this, 'Chrome khác');
+    helloAs($this, $token);
+
+    $product = \App\Fork\AutoPost\Models\AutoProduct::query()->create(['code' => 'cv-'.Str::random(6), 'name' => 'X', 'short_name' => 'X', 'facts' => [], 'enabled' => true]);
+    $dir = \App\Fork\AutoPost\Persona\CoverStore::dir($product->code);
+    @mkdir($dir, 0775, true);
+    file_put_contents($dir.'/a.jpg', 'JPEGDATA');
+    $product->update(['cover_images' => [['file' => 'a.jpg', 'name' => 'a', 'w' => 1, 'h' => 1, 'size' => 8, 'sha256' => 'x']]]);
+
+    $withCover = makeQueuedJob($this, overrides: ['options' => ['visibility_type' => 0, 'schedule_time' => null, 'cover' => ['code' => $product->code, 'file' => 'a.jpg', 'name' => 'cover.jpg', 'mime' => 'image/jpeg', 'size' => 8, 'sha256' => 'x']]]);
+    $this->getJson('/api/ext/next?wait=0', extHeaders($token))->assertOk();
+
+    $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($token))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($other))->assertStatus(403);
+
+    \Illuminate\Support\Facades\File::deleteDirectory($dir);
+    $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($token))->assertStatus(404);
+});

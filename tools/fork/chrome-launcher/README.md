@@ -4,6 +4,14 @@ Khi một bài cần đăng qua tiện ích TikTok Auto Kid mà Chrome của tà
 
 Nó cũng báo danh sách profile Chrome (tên, đã cài tiện ích chưa) để trang **Cài đặt, Kết nối Chrome** cho chọn profile.
 
+## Giữ Chrome luôn chạy nền
+
+Mỗi Chrome đã ghép nối và đã chọn profile có công tắc "Giữ Chrome luôn chạy nền" (mặc định bật). Khi tiện ích im lặng quá 3 phút (dùng `last_seen_at`), app đưa profile đó vào danh sách `keepalive` của `launch-requests` và trợ lý mở nó bằng `--profile-directory=X --no-startup-window` (không cửa sổ, không cướp tiêu điểm). App chờ tối thiểu 5 phút giữa hai lần mở cùng profile, dừng sau 5 lần mở mà tiện ích không báo về và hiện lỗi ở trang Kết nối Chrome (nút "Mở Chrome nền ngay" thử lại). Trợ lý báo kết quả qua `POST /api/fork/chrome/keepalive-result`.
+
+Trợ lý chỉ ĐỌC `Local State` (`background_mode.enabled`) và báo cho trang cài đặt; không bao giờ ghi vào cấu hình của Chrome.
+
+Thử không cần app: `-DryRun -FakeResponse file.json` (file giả phản hồi `launch-requests`).
+
 ## Chạy
 
 Không cần cài riêng: launcher (`TikTokAuto.exe`) chạy nó như dịch vụ `chrome-launcher` (xem `scripts/native/services.json`). Cấu hình lấy từ `.env` (`APP_URL`, `FORK_CHROME_LAUNCHER_SECRET`, do `scripts\native\setup.ps1` tạo). Log ở `chrome-launcher.log` cạnh script.

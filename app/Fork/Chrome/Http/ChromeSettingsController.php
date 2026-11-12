@@ -10,6 +10,7 @@ use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Fork\Chrome\Support\ChromeAccountLinker;
+use App\Fork\Chrome\Support\ChromeKeepAlive;
 use App\Fork\Chrome\Support\ChromeProfiles;
 use App\Fork\Notify\Telegram;
 use App\Http\Controllers\Controller;
@@ -48,6 +49,7 @@ final class ChromeSettingsController extends Controller
             'jobs' => fn (): array => $this->jobList($accountId),
             'profiles' => fn (): array => ChromeProfiles::reported(),
             'telegram' => fn (): array => ['configured' => Telegram::configured()],
+            'backgroundMode' => fn (): array => $this->backgroundMode(),
             'extensionPath' => $this->extensionPath(),
             'serverUrl' => rtrim((string) config('app.url'), '/'),
             'hasWorkspace' => (bool) $request->user()?->current_workspace_id,
@@ -93,6 +95,33 @@ final class ChromeSettingsController extends Controller
         }
 
         return back()->with('flash.success', 'Đã lưu profile Chrome.');
+    }
+
+    public function setKeepAlive(Request $request, int $client): RedirectResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $model = $this->findClient($accountId, $client);
+        $on = $request->boolean('keep_alive');
+
+        $model->update(['keep_alive' => $on]);
+
+        return back()->with('flash.success', $on
+            ? 'Đã bật giữ Chrome luôn chạy nền. App sẽ tự mở Chrome (không hiện cửa sổ) khi tiện ích im lặng.'
+            : 'Đã tắt giữ Chrome luôn chạy nền. Chrome chỉ tự mở khi có bài đang chờ.');
+    }
+
+    public function openNow(Request $request, int $client, ChromeKeepAlive $keepAlive): RedirectResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $model = $this->findClient($accountId, $client);
+
+        if (blank($model->chrome_profile_dir)) {
+            return back()->with('flash.error', 'Hãy chọn profile Chrome cho kết nối này trước.');
+        }
+
+        $keepAlive->requestNow($model);
+
+        return back()->with('flash.success', 'Đã yêu cầu mở Chrome nền. Trợ lý sẽ mở trong vòng khoảng 30 giây, không hiện cửa sổ.');
     }
 
     public function telegramTest(Request $request): RedirectResponse
@@ -192,6 +221,21 @@ final class ChromeSettingsController extends Controller
         return (string) $request->user()->account_id;
     }
 
+    /**
+     * "Tiếp tục chạy ứng dụng nền khi đóng Chrome" theo Local State do trợ lý báo; null = chưa biết.
+     *
+     * @return array{chrome: bool|null, edge: bool|null}
+     */
+    private function backgroundMode(): array
+    {
+        $s = Cache::get(ChromeKeepAlive::BROWSER_SETTINGS_KEY, []);
+
+        return [
+            'chrome' => is_array($s) ? ($s['chrome']['background_mode'] ?? null) : null,
+            'edge' => is_array($s) ? ($s['edge']['background_mode'] ?? null) : null,
+        ];
+    }
+
     private function extensionPath(): string
     {
         $path = base_path('extension/autotok');
@@ -262,6 +306,8 @@ final class ChromeSettingsController extends Controller
     private function clients(string $accountId): array
     {
         $jobs = app(ChromeJobs::class);
+        $keepAlive = app(ChromeKeepAlive::class);
+
         return ChromeClient::query()
             ->where('account_id', $accountId)
             ->whereNull('revoked_at')
@@ -280,6 +326,8 @@ final class ChromeSettingsController extends Controller
                 'chrome_browser' => $c->chrome_profile_dir ? ChromeProfiles::normalizeBrowser($c->chrome_browser) : null,
                 'last_seen_at' => $c->last_seen_at?->toIso8601String(),
                 'status' => $jobs->clientStatus($c),
+                'keep_alive' => (bool) $c->keep_alive,
+                'keepalive' => $keepAlive->state($c),
             ])
             ->values()
             ->all();

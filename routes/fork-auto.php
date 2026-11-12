@@ -6,6 +6,7 @@ use App\Fork\AutoPost\Http\AutoController;
 use App\Fork\AutoPost\Http\GioHangController;
 use App\Fork\AutoPost\Http\KhoController;
 use App\Fork\AutoPost\Http\MediaController;
+use App\Fork\AutoPost\Http\PersonaliseController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
 use App\Fork\Chrome\Http\Extension\AuthenticateExtension;
@@ -27,6 +28,14 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::patch('accounts/{socialAccount}/shop-products/{productId}', [GioHangController::class, 'setHidden'])
         ->where('productId', '[0-9]{6,25}')->name('accounts.shop-products.hide');
     Route::patch('products/{code}', [AutoController::class, 'updateProduct'])->name('products.update');
+    // Cá nhân hoá theo sản phẩm hub: ảnh bìa riêng và hashtag riêng.
+    Route::put('products/{code}/personalise', [PersonaliseController::class, 'update'])->name('products.personalise');
+    Route::post('products/{code}/personalise/preview', [PersonaliseController::class, 'preview'])->middleware('throttle:60,1')->name('products.personalise.preview');
+    Route::post('products/{code}/covers', [PersonaliseController::class, 'upload'])->middleware('throttle:30,1')->name('products.covers.upload');
+    Route::delete('products/{code}/covers/{file}', [PersonaliseController::class, 'destroy'])->name('products.covers.destroy');
+    Route::get('anh-bia/{code}/{file}', [PersonaliseController::class, 'image'])->name('cover-image');
+    Route::put('hashtag-mac-dinh', [PersonaliseController::class, 'updateDefault'])->name('hashtags.default');
+    Route::post('hashtag-mac-dinh/preview', [PersonaliseController::class, 'previewDefault'])->middleware('throttle:60,1')->name('hashtags.default.preview');
     // Ảnh bìa sản phẩm TikTok Shop (tải về máy, link CDN gốc hết hạn).
     Route::get('anh-san-pham/{shopProduct}', [MediaController::class, 'productImage'])->whereNumber('shopProduct')->name('product-image');
     // Số liệu: video đã đăng, lượt xem và tương tác.

@@ -113,6 +113,28 @@
     return { blob, meta, stats: { bytes: meta.size, chunks: n, ms: Date.now() - t0, memBefore: mem0, memAfter: mem() } };
   }
 
+
+  // ---- per-product cover: one SW fetch (<= 5 MB), size + sha256 checked. Never fatal: the caller posts without it on any error. ----
+  const hex = (buf) => Array.from(new Uint8Array(buf), (x) => x.toString(16).padStart(2, '0')).join('');
+  async function fetchCover(cv) {
+    const size = Number(cv && cv.size);
+    const v = cv && typeof cv.url === 'string' && cv.url.startsWith('/api/ext/cover') && Number.isInteger(size) && size > 0 && size <= 5 * 1024 * 1024 && /^[0-9a-f]{64}$/.test(cv.sha256 || '') && ['image/jpeg', 'image/png'].includes(cv.mime)
+      ? { ok: true, size, sha256: cv.sha256, mime: cv.mime } : { ok: false, reason: 'invalid meta' };
+    if (!v.ok) throw new Error('cover meta: ' + v.reason);
+    let last = 'unknown';
+    for (let a = 1; a <= 3; a++) {
+      const r = await send('coverGet').catch((e) => ({ ok: false, error: e.message }));
+      if (r && r.ok) {
+        const bytes = decode(r.b64); r.b64 = null;
+        if (bytes.length !== v.size) { last = `size ${bytes.length} != ${v.size}`; }
+        else if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== v.sha256) { last = 'sha256 mismatch'; }
+        else return new Blob([bytes], { type: v.mime });
+      } else last = (r && r.error) || 'no reply';
+      await sleep(1000 * a);
+    }
+    throw new Error(last);
+  }
+
   async function arm(mode) {
     window.postMessage({ __autotok: 1, kind: 'arm', nonce: NONCE, mode }, location.origin);
     await waitFor(() => seen.armed, { timeout: 5000, interval: 100, what: 'hook MAIN-world chưa cài (hook-main.js)' });
@@ -146,9 +168,16 @@
     const { blob, meta, stats } = await buildBlob();
     R.steps.transfer = stats;
     let url = URL.createObjectURL(blob);
-    const revoke = () => { if (url) { URL.revokeObjectURL(url); url = null; } };
+    // Per-product cover (optional). A failure only drops the cover: the post goes out with TikTok's default one.
+    let coverUrl = null, coverWarn = null;
+    const cv = job.mode !== 'selftest' && job.options && job.options.cover;
+    if (cv) {
+      try { const cb = await fetchCover(cv); coverUrl = URL.createObjectURL(cb); await report('cover', 'đã tải ảnh bìa riêng ' + Math.round(cb.size / 1024) + ' KB'); }
+      catch (e) { coverWarn = 'cover-download: ' + String(e && e.message).slice(0, 200); await report('cover', 'WARN không tải được ảnh bìa, dùng bìa mặc định: ' + coverWarn); }
+    }
+    const revoke = () => { if (url) { URL.revokeObjectURL(url); url = null; } if (coverUrl) { URL.revokeObjectURL(coverUrl); coverUrl = null; } };
     try {
-      window.postMessage({ __autotok: 1, from: 'content', kind: 'run', nonce: NONCE, job, blobUrl: url, size: meta.size, name: meta.name }, location.origin);
+      window.postMessage({ __autotok: 1, from: 'content', kind: 'run', nonce: NONCE, job, blobUrl: url, size: meta.size, name: meta.name, coverBlobUrl: coverUrl, coverWarn }, location.origin);
       const t0 = Date.now();
       const done = await waitFor(() => api.done, { timeout: PROCESS_MS, interval: 500, what: 'MAIN-world runner (api-main.js)' });
       R.steps.api = { ms: Date.now() - t0 };

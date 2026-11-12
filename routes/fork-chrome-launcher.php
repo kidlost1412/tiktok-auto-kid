@@ -12,5 +12,6 @@ Route::prefix('api/fork/chrome')
     ->group(function (): void {
         Route::get('launch-requests', [LauncherController::class, 'launchRequests']);
         Route::post('launched', [LauncherController::class, 'launched']);
+        Route::post('keepalive-result', [LauncherController::class, 'keepaliveResult']);
         Route::post('profiles', [LauncherController::class, 'profiles']);
     });

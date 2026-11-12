@@ -25,6 +25,9 @@ class AutoProduct extends Model
             'facts' => 'array',
             'quy_cach' => 'array',
             'enabled' => 'boolean',
+            'cover_images' => 'array',
+            'hashtags' => 'array',
+            'hashtag_pick' => 'integer',
         ];
     }
 

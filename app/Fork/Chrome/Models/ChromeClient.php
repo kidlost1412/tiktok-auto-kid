@@ -23,6 +23,10 @@ class ChromeClient extends Model
             'last_seen_at' => 'datetime',
             'last_launch_at' => 'datetime',
             'revoked_at' => 'datetime',
+            'keep_alive' => 'boolean',
+            'keepalive_last_start_at' => 'datetime',
+            'keepalive_requested_at' => 'datetime',
+            'keepalive_failures' => 'integer',
         ];
     }
 

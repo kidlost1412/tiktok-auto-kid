@@ -41,6 +41,22 @@ interface ChromeClient {
     status: string;
     profile_needs_choice?: boolean;
     profile_conflict_with?: string | null;
+    keep_alive?: boolean;
+    keepalive?: KeepAlive;
+}
+
+interface KeepAlive {
+    state:
+        | 'running'
+        | 'starting'
+        | 'failed'
+        | 'waiting'
+        | 'launcher_down'
+        | 'off'
+        | 'no_profile';
+    message: string | null;
+    last_start_at: string | null;
+    failures: number;
 }
 
 interface TikTokAccount {
@@ -84,9 +100,18 @@ const props = defineProps<{
     extensionPath: string;
     serverUrl: string;
     hasWorkspace: boolean;
+    backgroundMode?: { chrome: boolean | null; edge: boolean | null };
 }>();
 
-const only = ['pair', 'clients', 'accounts', 'jobs', 'profiles', 'telegram'];
+const only = [
+    'pair',
+    'clients',
+    'accounts',
+    'jobs',
+    'profiles',
+    'telegram',
+    'backgroundMode',
+];
 usePoll(5000, { only });
 
 const busy = ref<string | null>(null);
@@ -227,6 +252,83 @@ const addFromClient = (client: ChromeClient): void =>
         ),
     );
 
+const setKeepAlive = (client: ChromeClient, value: boolean): void =>
+    run(`keepalive-${client.id}`, (done) =>
+        router.post(
+            `/settings/chrome/clients/${client.id}/keep-alive`,
+            { keep_alive: value },
+            { preserveScroll: true, onFinish: done },
+        ),
+    );
+
+const openNow = (client: ChromeClient): void =>
+    run(`open-${client.id}`, (done) =>
+        router.post(
+            `/settings/chrome/clients/${client.id}/open-now`,
+            {},
+            { preserveScroll: true, onFinish: done },
+        ),
+    );
+
+const keepAliveChip = (
+    client: ChromeClient,
+): {
+    label: string;
+    variant: 'success' | 'warning' | 'destructive-subtle' | 'secondary';
+} | null => {
+    const k = client.keepalive;
+    if (!k) return null;
+    switch (k.state) {
+        case 'running':
+            return { label: 'Đang chạy', variant: 'success' };
+        case 'starting':
+            return { label: 'Đang tự mở…', variant: 'warning' };
+        case 'failed':
+            return {
+                label: `Không mở được: ${(k.message ?? 'lỗi không rõ').slice(0, 90)}`,
+                variant: 'destructive-subtle',
+            };
+        case 'launcher_down':
+            return { label: 'Trợ lý mở Chrome chưa chạy', variant: 'warning' };
+        case 'waiting':
+            return { label: 'Sắp tự mở…', variant: 'warning' };
+        case 'off':
+            return { label: 'Không tự mở (đang tắt)', variant: 'secondary' };
+        default:
+            return null;
+    }
+};
+
+const offlineHint = (client: ChromeClient): string => {
+    if (!client.chrome_profile_dir) {
+        return 'Chọn profile Chrome bên dưới để app tự mở Chrome này khi cần.';
+    }
+    if (client.keep_alive === false) {
+        return 'Bạn đã tắt “Giữ Chrome luôn chạy nền”: app chỉ mở Chrome (không hiện cửa sổ) khi có bài đang chờ. Số liệu và bình luận sẽ không được thu khi Chrome tắt.';
+    }
+    return 'App sẽ tự mở Chrome này ở chế độ nền (không hiện cửa sổ) sau khoảng 3 phút mất liên lạc; nếu chưa được sẽ thử lại mỗi 5 phút. Bài đã hẹn giờ trên TikTok vẫn đăng đúng giờ; bài chưa hẹn chờ Chrome bật lại.';
+};
+
+const clientsNeedBackgroundHint = computed(() => {
+    const bm = props.backgroundMode;
+    return connectedClients.value.some((c) => {
+        const v = c.chrome_browser === 'edge' ? bm?.edge : bm?.chrome;
+        return v !== true;
+    });
+});
+
+const backgroundModeOff = computed(
+    () =>
+        props.backgroundMode?.chrome === false ||
+        props.backgroundMode?.edge === false,
+);
+
+const settingsUrl = computed(() =>
+    connectedClients.value.some((c) => c.chrome_browser === 'edge')
+        ? 'edge://settings/system'
+        : 'chrome://settings/system',
+);
+
 const clientStatus: Record<
     string,
     { label: string; variant: 'success' | 'warning' | 'destructive-subtle' }
@@ -244,7 +346,7 @@ const clientStatus: Record<
 const readiness: Record<string, string> = {
     ok: 'Sẵn sàng',
     chrome_unbound: 'Chưa có Chrome đăng nhập tài khoản này',
-    chrome_offline: 'Chrome đang tắt: mở Chrome (profile này) để đăng tiếp',
+    chrome_offline: 'Chrome đang tắt: app sẽ tự mở Chrome nền để đăng tiếp',
     chrome_conflict: 'Có hai Chrome cùng tài khoản',
     chrome_need_reload: 'Cần tải lại tiện ích',
 };
@@ -503,11 +605,19 @@ const chromeOnlyCandidates = computed(() => {
                         <p
                             v-if="client.status === 'offline'"
                             class="w-full text-sm text-amber-700 dark:text-amber-400"
+                            data-testid="fork-chrome-offline-hint"
                         >
-                            Chrome của profile này đang tắt hoặc tiện ích không
-                            liên lạc được với app. Hãy mở Chrome (đã đăng nhập
-                            TikTok). Bài đã hẹn giờ trên TikTok vẫn đăng đúng
-                            giờ; bài chưa hẹn sẽ chờ Chrome bật lại.
+                            {{ offlineHint(client) }}
+                        </p>
+                        <p
+                            v-if="
+                                client.keepalive?.state === 'failed' &&
+                                client.keepalive.message
+                            "
+                            class="w-full text-sm text-destructive"
+                            data-testid="fork-chrome-keepalive-error"
+                        >
+                            {{ client.keepalive.message }}
                         </p>
                         <Badge
                             :variant="
@@ -516,6 +626,14 @@ const chromeOnlyCandidates = computed(() => {
                             "
                         >
                             {{ clientStatus[client.status]?.label ?? client.status }}
+                        </Badge>
+                        <Badge
+                            v-if="keepAliveChip(client)"
+                            :variant="keepAliveChip(client)!.variant"
+                            data-testid="fork-chrome-keepalive-chip"
+                            class="max-w-full whitespace-normal"
+                        >
+                            {{ keepAliveChip(client)!.label }}
                         </Badge>
                         <Badge
                             v-if="client.profile_needs_choice"
@@ -560,6 +678,42 @@ const chromeOnlyCandidates = computed(() => {
                             @change="saveProfile(client, profileOf(client))"
                         />
 
+                        <div
+                            v-if="client.chrome_profile_dir"
+                            class="flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+                        >
+                            <label class="flex items-center gap-2">
+                                <Switch
+                                    :model-value="client.keep_alive ?? true"
+                                    :disabled="busy === `keepalive-${client.id}`"
+                                    aria-label="Giữ Chrome luôn chạy nền"
+                                    data-testid="fork-chrome-keepalive-toggle"
+                                    @update:model-value="
+                                        setKeepAlive(client, Boolean($event))
+                                    "
+                                />
+                                Giữ Chrome luôn chạy nền
+                            </label>
+                            <span class="text-muted-foreground">
+                                <template v-if="client.keepalive?.last_start_at">
+                                    Tự mở lần cuối
+                                    {{ fromNow(client.keepalive.last_start_at) }}
+                                </template>
+                                <template v-else>Chưa tự mở lần nào</template>
+                            </span>
+                            <Button
+                                v-if="client.keepalive?.state !== 'running'"
+                                variant="outline"
+                                size="sm"
+                                :disabled="busy === `open-${client.id}`"
+                                data-testid="fork-chrome-open-now"
+                                @click="openNow(client)"
+                            >
+                                <IconPlayerPlay class="size-4" />
+                                Mở Chrome nền ngay
+                            </Button>
+                        </div>
+
                         <Button
                             variant="ghost"
                             size="sm"
@@ -583,6 +737,51 @@ const chromeOnlyCandidates = computed(() => {
                     Chưa có danh sách profile từ trợ lý mở Chrome. Bạn có thể
                     gõ tên thư mục profile (Default, Profile 1, ...).
                 </p>
+            </SettingsSection>
+
+            <SettingsSection
+                v-if="clients.length && clientsNeedBackgroundHint"
+                title="Cho Chrome chạy nền khi đóng cửa sổ"
+                description="Làm một lần: để tiện ích không tắt theo khi bạn đóng cửa sổ Chrome cuối cùng."
+            >
+                <div
+                    class="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm"
+                    data-testid="fork-chrome-background-hint"
+                >
+                    <p v-if="backgroundModeOff">
+                        Trợ lý đọc thấy cài đặt này đang <b>TẮT</b> trong trình
+                        duyệt của bạn.
+                    </p>
+                    <p v-else>
+                        Chưa xác định được cài đặt này trên máy (trợ lý chưa báo
+                        về). Hãy kiểm tra giúp.
+                    </p>
+                    <ol class="list-decimal space-y-1 pl-5">
+                        <li>
+                            Mở một tab mới, dán địa chỉ
+                            <code>{{ settingsUrl }}</code> rồi Enter (trang web
+                            không mở được trang này giúp bạn).
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                class="ml-1"
+                                @click="copy(settingsUrl)"
+                            >
+                                <IconCopy class="size-4" />
+                                Chép địa chỉ
+                            </Button>
+                        </li>
+                        <li>
+                            Bật “Tiếp tục chạy ứng dụng nền khi đóng Google
+                            Chrome” (Edge: “Tiếp tục chạy tiện ích và ứng dụng
+                            nền khi Microsoft Edge đóng”).
+                        </li>
+                        <li>
+                            Xong. App không tự sửa cấu hình này của Chrome vì
+                            Chrome có thể ghi đè khi đang chạy.
+                        </li>
+                    </ol>
+                </div>
             </SettingsSection>
 
             <SettingsSection

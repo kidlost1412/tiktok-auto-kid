@@ -3,14 +3,19 @@
   Trợ lý mở Chrome cho app TikTok Auto Kid (Windows PowerShell 5.1).
 
 .DESCRIPTION
-  Cứ 30 giây hỏi app xem có bài nào đang chờ mà Chrome (profile) tương ứng chưa mở.
-  Nếu có thì mở đúng profile đó ở chế độ không hiện cửa sổ để tiện ích TikTok Auto Kid chạy nền.
+  Cứ 30 giây hỏi app xem Chrome (profile) nào cần mở: (1) có bài đang chờ mà Chrome chưa mở,
+  (2) "Giữ Chrome luôn chạy nền": tiện ích im lặng quá ~3 phút (app giữ bộ đếm thời gian chờ 5 phút
+  và số lần thử tối đa, script chỉ nghe lời app và tự chặn thêm 5 phút mỗi profile).
+  Luôn mở ở chế độ không hiện cửa sổ (--no-startup-window) để không cướp tiêu điểm.
   Mỗi 5 phút báo danh sách profile Chrome trên máy cho trang "Kết nối Chrome".
   Cấu hình lấy APP_URL và FORK_CHROME_LAUNCHER_SECRET từ .env ở thư mục gốc dự án (setup.ps1 tạo sẵn).
   Máy chủ có thể ghi đè bằng -Server hoặc biến môi trường FORK_LAUNCHER_SERVER.
 
 .PARAMETER DryRun
   Chỉ quét và in ra việc sẽ làm; không mở Chrome, không gửi POST nào lên máy chủ.
+
+.PARAMETER FakeResponse
+  Đường dẫn file JSON giả làm phản hồi của launch-requests (chỉ dùng với -DryRun, để thử không cần app).
 
 .PARAMETER Once
   Chạy đúng một vòng rồi thoát (dùng để thử).
@@ -19,7 +24,8 @@
 param(
     [switch]$DryRun,
     [switch]$Once,
-    [string]$Server
+    [string]$Server,
+    [string]$FakeResponse
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,8 +34,10 @@ $script:LogPath = Join-Path $script:Dir 'chrome-launcher.log'
 $script:PollSeconds = 30
 $script:ProfilesEverySeconds = 300
 $script:LaunchEverySeconds = 180
+$script:KeepAliveEverySeconds = 300
 $script:ProfileDirRe = '^(Default|Profile \d+|[A-Za-z0-9 _.\-]{1,64})$'
 $script:LastLaunch = @{}
+$script:LastKeepAlive = @{}
 
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.ServicePointManager]::SecurityProtocol } catch { }
 
@@ -83,7 +91,7 @@ function Read-LauncherConfig {
     if (-not $server) { $server = 'http://localhost:8010' }
     $server = $server.TrimEnd('/')
     $secret = [string]$dotenv['FORK_CHROME_LAUNCHER_SECRET']
-    if (-not $secret) { throw 'Chưa có FORK_CHROME_LAUNCHER_SECRET trong .env (chạy lại scripts\native\setup.ps1).' }
+    if (-not $secret -and -not ($DryRun -and $FakeResponse)) { throw 'Chưa có FORK_CHROME_LAUNCHER_SECRET trong .env (chạy lại scripts\native\setup.ps1).' }
     $manifest = Join-Path (Get-BundleExtensionDir) 'manifest.json'
     try { $extId = [string](Get-ExtensionIdFromManifest -ManifestPath $manifest) } catch { $extId = '' }
     $chromePath = ''
@@ -219,6 +227,26 @@ function Get-ChromeProfiles {
     return $result
 }
 
+function Get-BrowserSettings {
+    # Chỉ ĐỌC Local State: "Tiếp tục chạy ứng dụng nền khi đóng Chrome" (background_mode.enabled).
+    # Khoá không có = mặc định của Chrome (bật). Không đọc được = null. Không bao giờ ghi vào Local State.
+    $out = @{}
+    foreach ($br in Get-Browsers) {
+        $value = $null
+        $path = Join-Path $br.userData 'Local State'
+        if (Test-Path -LiteralPath $path) {
+            try {
+                $ls = Read-JsonFile -Path $path
+                $value = $true
+                $bm = $ls['background_mode']
+                if ($bm -is [System.Collections.IDictionary] -and $bm.ContainsKey('enabled')) { $value = [bool]$bm['enabled'] }
+            } catch { $value = $null }
+        }
+        $out[$br.id] = @{ background_mode = $value }
+    }
+    return $out
+}
+
 function ConvertTo-JsonText {
     param($Value)
     Add-Type -AssemblyName System.Web.Extensions
@@ -256,13 +284,18 @@ function Invoke-Cycle {
         $profiles = @(Get-ChromeProfiles -ExtensionId $Cfg.ExtensionId)
         Write-Log ("Quét thấy {0} profile (Chrome + Edge); tiện ích ở {1}." -f $profiles.Count, (Get-BundleExtensionDir))
         foreach ($p in $profiles) { Write-Log ("  {0} | {1} | {2} | co_tien_ich={3} | dung_thu_muc_nay={4}" -f $p.browser, $p.dir, $p.name, $p.has_extension, $p.bundle_extension) }
+        $settings = Get-BrowserSettings
+        foreach ($k in $settings.Keys) { Write-Log ("  {0}: tiep_tuc_chay_nen_khi_dong={1}" -f $k, $settings[$k].background_mode) }
         if (-not $DryRun) {
-            try { [void](Invoke-Api -Method POST -Path '/api/fork/chrome/profiles' -Body @{ profiles = $profiles } -Cfg $Cfg) }
+            try { [void](Invoke-Api -Method POST -Path '/api/fork/chrome/profiles' -Body @{ profiles = $profiles; browser_settings = $settings } -Cfg $Cfg) }
             catch { Write-Log ("Gửi danh sách profile lỗi: {0}" -f $_.Exception.Message) }
         }
     }
 
-    try { $resp = Invoke-Api -Method GET -Path '/api/fork/chrome/launch-requests' -Body $null -Cfg $Cfg }
+    try {
+        if ($DryRun -and $FakeResponse) { $resp = [IO.File]::ReadAllText($FakeResponse, [Text.Encoding]::UTF8) | ConvertFrom-Json }
+        else { $resp = Invoke-Api -Method GET -Path '/api/fork/chrome/launch-requests' -Body $null -Cfg $Cfg }
+    }
     catch { Write-Log ("Hỏi launch-requests lỗi: {0}" -f $_.Exception.Message); return }
 
     foreach ($r in @($resp.requests)) {
@@ -298,6 +331,55 @@ function Invoke-Cycle {
         try { [void](Invoke-Api -Method POST -Path '/api/fork/chrome/launched' -Body @{ client_id = $clientId; job_id = $jobId } -Cfg $Cfg) }
         catch { Write-Log ("Báo launched lỗi: {0}" -f $_.Exception.Message) }
     }
+
+    # "Giữ Chrome luôn chạy nền": app bảo mở profile vì tiện ích đã im lặng quá lâu.
+    foreach ($r in @($resp.keepalive)) {
+        if ($null -eq $r) { continue }
+        $dir = [string]$r.profile_dir
+        $clientId = [int]$r.client_id
+        if ($dir -cnotmatch $script:ProfileDirRe -or $dir.Trim(' ', '.') -ne $dir) {
+            Write-Log ("Bỏ qua profile không hợp lệ: '{0}'" -f $dir)
+            continue
+        }
+        $browser = [string]$r.browser
+        if ($browser -ne 'edge') { $browser = 'chrome' }
+        $key = $browser + '|' + $dir
+        $manual = ([string]$r.reason -eq 'manual')
+        # Tự chặn thêm một lớp: không mở lại cùng profile thường hơn 5 phút (trừ khi người dùng bấm nút).
+        $last = $script:LastKeepAlive[$key]
+        if (-not $manual -and $last -and ((Get-Date) - $last).TotalSeconds -lt $script:KeepAliveEverySeconds) { continue }
+        $override = $Cfg.ChromePath
+        if ($browser -eq 'edge') { $override = $Cfg.EdgePath }
+        $exe = Find-BrowserExe -Browser $browser -Override $override
+        if (-not $exe) {
+            Write-Log ("Không tìm thấy trình duyệt {0} trên máy." -f $browser)
+            if (-not $DryRun) {
+                $script:LastKeepAlive[$key] = Get-Date
+                Send-KeepAliveResult -Cfg $Cfg -ClientId $clientId -Ok $false -ErrorText ("Không tìm thấy trình duyệt {0} trên máy." -f $browser)
+            }
+            continue
+        }
+        if ($DryRun) {
+            Write-Log ("[DryRun] Giữ nền: sẽ mở `"{0}`" --profile-directory=`"{1}`" --no-startup-window (client {2}, {3})" -f $exe, $dir, $clientId, $r.reason)
+            continue
+        }
+        $script:LastKeepAlive[$key] = Get-Date
+        $script:LastLaunch[$key] = Get-Date
+        try {
+            Start-ChromeProfile -Exe $exe -ProfileDir $dir
+            Write-Log ("Giữ nền: đã mở {0} profile '{1}' (không cửa sổ, {2})." -f $browser, $dir, $r.reason)
+            Send-KeepAliveResult -Cfg $Cfg -ClientId $clientId -Ok $true -ErrorText ''
+        } catch {
+            Write-Log ("Giữ nền: mở Chrome lỗi: {0}" -f $_.Exception.Message)
+            Send-KeepAliveResult -Cfg $Cfg -ClientId $clientId -Ok $false -ErrorText $_.Exception.Message
+        }
+    }
+}
+
+function Send-KeepAliveResult {
+    param([hashtable]$Cfg, [int]$ClientId, [bool]$Ok, [string]$ErrorText)
+    try { [void](Invoke-Api -Method POST -Path '/api/fork/chrome/keepalive-result' -Body @{ client_id = $ClientId; ok = $Ok; error = $ErrorText } -Cfg $Cfg) }
+    catch { Write-Log ("Báo keepalive-result lỗi: {0}" -f $_.Exception.Message) }
 }
 
 # ---- main ----

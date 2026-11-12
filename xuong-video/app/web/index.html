@@ -11,10 +11,17 @@
   const nhung = q.get('nhung') === '1';
   let th = q.get('theme');
   if (th !== 'dark' && th !== 'light') th = nhung ? 'dark' : 'light';
-  h.dataset.theme = th;
   if (nhung) h.dataset.nhung = '1';
   const bg = q.get('bg');                       // tuỳ chọn: ?bg=%23101418 → nền trùng hẳn màu trang cha
-  if (bg && /^#[0-9a-fA-F]{3,8}$/.test(bg)) h.style.setProperty('--bg', bg);
+  // --bg chỉ áp khi hợp theme (độ sáng khớp) và bị gỡ khi đổi theme → không còn dải trắng/hộp trắng ở nền tối
+  const lum = c => { let x = c.slice(1); if (x.length < 6) x = x.split('').map(d => d + d).join(''); const n = [0, 2, 4].map(i => parseInt(x.substr(i, 2), 16)); return (0.299 * n[0] + 0.587 * n[1] + 0.114 * n[2]) / 255; };
+  const bgOk = bg && /^#[0-9a-fA-F]{3,8}$/.test(bg) ? bg : '';
+  window.__xvApplyTheme = t => {
+    h.dataset.theme = t;
+    if (bgOk && (lum(bgOk) < 0.5) === (t === 'dark') && t === th) h.style.setProperty('--bg', bgOk);
+    else h.style.removeProperty('--bg');
+  };
+  window.__xvApplyTheme(th);
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,15 +29,15 @@
 <style>
 :root{
   --bg:#F4FBF5; --card:#FFFFFF; --ink:#1F2D24; --mute:#6B7C70; --line:#DCEBDF;
-  --green:#2E9E44; --green-soft:#E2F5E6; --red:#D7262E; --red-soft:#FDE7E8; --yellow:#FFD400; --yellow-soft:#FFF6CC;
+  --green:#23873A; --green-soft:#E2F5E6; --on-g:#fff; --on-r:#fff; --red:#D7262E; --red-soft:#FDE7E8; --yellow:#FFD400; --yellow-soft:#FFF6CC;
   --blue:#2B7BD8; --blue-soft:#E4F0FD; --shadow:0 6px 22px rgba(46,158,68,.10); --r:20px;
-  --input:#FFFFFF; --y-ink:#8a6d00; --w-ink:#6b5500; color-scheme:light;
+  --panel:#F4FBF5; --input:#FFFFFF; --y-ink:#8a6d00; --w-ink:#6b5500; color-scheme:light;
 }
 :root[data-theme="dark"]{
   --bg:#0F1612; --card:#18221C; --ink:#E3F0E7; --mute:#93A89A; --line:#2A3A30;
-  --green:#43C25E; --green-soft:#1B3624; --red:#FF6B71; --red-soft:#3B1C1F; --yellow-soft:#3A3314;
+  --green:#43C25E; --green-soft:#1B3624; --on-g:#06210F; --on-r:#2B0508; --red:#FF6B71; --red-soft:#3B1C1F; --yellow-soft:#3A3314;
   --blue:#6EA9F0; --blue-soft:#172739; --shadow:0 6px 22px rgba(0,0,0,.35);
-  --input:#111A15; --y-ink:#F0D06A; --w-ink:#F0D06A; color-scheme:dark;
+  --panel:#0F1612; --input:#111A15; --y-ink:#F0D06A; --w-ink:#F0D06A; color-scheme:dark;
 }
 /* chế độ nhúng: bỏ logo + tên app (trang cha đã có), giữ thanh tab, nền trùng trang cha */
 :root[data-nhung] header{position:static;padding:10px 24px;background:transparent}
@@ -38,9 +45,16 @@
 :root[data-nhung] nav{margin-left:0}
 :root[data-nhung] main{padding-top:18px}
 *{box-sizing:border-box}
+input[type=checkbox],input[type=radio]{accent-color:var(--green)}
+select option{background:var(--input);color:var(--ink)}
+::placeholder{color:var(--mute);opacity:.8}
+:root[data-theme="dark"] *{scrollbar-color:#3a4f42 transparent}
+a{color:var(--green)}
+table{color:var(--ink)}
+summary{color:var(--mute)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif;font-size:16px}
 header{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--card);border-bottom:2px solid var(--line);position:sticky;top:0;z-index:5}
-.logo{width:44px;height:44px;border-radius:14px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px}
+.logo{width:44px;height:44px;border-radius:14px;background:var(--green);color:var(--on-g);display:grid;place-items:center;font-weight:900;font-size:22px}
 header h1{font-size:22px;margin:0;font-weight:900}
 header .sub{color:var(--mute);font-size:13px;font-weight:700}
 nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
@@ -58,9 +72,9 @@ select,input[type=number],textarea,input[type=text]{width:100%;padding:12px 14px
 textarea{min-height:120px;resize:vertical;line-height:1.5}
 .btn{border:0;border-radius:16px;padding:14px 22px;font:900 17px Nunito;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
 .btn.big{padding:18px 30px;font-size:20px}
-.btn.go{background:var(--green);color:#fff;box-shadow:0 6px 0 #1f7a31}
+.btn.go{background:var(--green);color:var(--on-g);box-shadow:0 6px 0 #1f7a31}
 .btn.go:active{transform:translateY(3px);box-shadow:0 3px 0 #1f7a31}
-.btn.stop{background:var(--red);color:#fff;box-shadow:0 6px 0 #9b161c}
+.btn.stop{background:var(--red);color:var(--on-r);box-shadow:0 6px 0 #9b161c}
 .btn.soft{background:var(--green-soft);color:var(--green)}
 .btn.ghost{background:var(--card);border:2px solid var(--line);color:var(--ink)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -73,12 +87,12 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .log{background:#13201A;color:#CFEBD6;border-radius:16px;padding:14px;height:330px;overflow:auto;font:600 13px/1.55 Consolas,monospace;white-space:pre-wrap}
 .log .ok{color:#7CE38F} .log .bad{color:#FF8D8D} .log .warn{color:#FFD86B}
 .stat{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat div{background:var(--bg);border-radius:16px;padding:14px;text-align:center}
+.stat div{background:var(--panel);border-radius:16px;padding:14px;text-align:center}
 .stat b{display:block;font-size:26px;font-weight:900}
 .stat span{color:var(--mute);font-weight:800;font-size:13px}
 .vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
 .vid{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;border:2px solid var(--line);display:flex;flex-direction:column}
-.vid.dat{border-color:#8fd9a0} .vid.bo{border-color:#f3a5a8;opacity:.75}
+.vid.dat{border-color:var(--green)} .vid.bo{border-color:var(--red);opacity:.75}
 .thumb{position:relative;aspect-ratio:9/16;background:#000;cursor:pointer}
 .thumb video{width:100%;height:100%;object-fit:cover;display:block}
 .thumb .play{position:absolute;inset:0;display:grid;place-items:center;font-size:54px;color:#fff;text-shadow:0 2px 12px #000a}
@@ -94,15 +108,15 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .mbox{background:var(--card);border-radius:24px;display:grid;grid-template-columns:auto minmax(420px,560px);max-height:94vh;overflow:hidden;max-width:96vw}
 .mbox video{height:min(92vh,960px);aspect-ratio:9/16;background:#000;display:block}
 .mside{padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-.mside .x{align-self:flex-end;border:0;background:var(--bg);border-radius:12px;padding:8px 14px;font:900 16px Nunito;cursor:pointer}
-.cap{background:var(--bg);border-radius:14px;padding:12px;font-weight:700;white-space:pre-wrap;font-size:14px}
+.mside .x{align-self:flex-end;border:0;background:var(--panel);border-radius:12px;padding:8px 14px;font:900 16px Nunito;cursor:pointer}
+.cap{background:var(--panel);border-radius:14px;padding:12px;font-weight:700;white-space:pre-wrap;font-size:14px}
 .note{color:var(--mute);font-weight:700;font-size:14px;line-height:1.5}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:14px;font-weight:800;display:none;z-index:30}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--card);padding:12px 22px;border-radius:14px;font-weight:800;display:none;z-index:30}
 .list li{margin:4px 0;font-weight:700}
 .warnbox{background:var(--yellow-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--w-ink)}
 .errbox{background:var(--red-soft);border-radius:16px;padding:14px 16px;font-weight:800;color:var(--red)}
 .hidden{display:none!important}
-.khothem{margin-top:12px;background:var(--bg);border-radius:16px;padding:12px 14px}
+.khothem{margin-top:12px;background:var(--panel);border-radius:16px;padding:12px 14px}
 .khothem .ds{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .khothem label.kt{display:flex;align-items:center;gap:10px;margin:0;padding:8px 12px 8px 8px;border-radius:14px;background:var(--card);border:2px solid var(--line);cursor:pointer;color:var(--ink);font-size:14px}
 .khothem label.kt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
@@ -119,7 +133,7 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .shop-it.chon{border-color:var(--green);background:var(--green-soft)}
 .shop-it img,.shop-it .rong{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--green-soft);display:grid;place-items:center;font-size:24px}
 .shop-it span.t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
-.shop-it .gan{position:absolute;top:8px;left:8px;background:var(--green);color:#fff;border-radius:8px;padding:1px 6px;font:800 10px Nunito;font-style:normal}
+.shop-it .gan{position:absolute;top:8px;left:8px;background:var(--green);color:var(--on-g);border-radius:8px;padding:1px 6px;font:800 10px Nunito;font-style:normal}
 .shop-chon{display:flex;gap:10px;align-items:center;margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--green-soft)}
 .shop-chon .sp-anh{width:44px;height:44px}
 .sp-anh.rong{display:grid;place-items:center;font-size:20px}
@@ -134,7 +148,7 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .tmit{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 14px;font:800 15px Nunito;text-align:left;cursor:pointer}
 .tmit:hover{background:var(--green-soft)}
 .tmit .ten{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-input.pick{background:var(--bg);cursor:default}
+input.pick{background:var(--panel);cursor:default}
 @media (max-width:900px){.g2{grid-template-columns:1fr}.mbox{grid-template-columns:1fr}.mbox video{height:60vh}header{flex-wrap:wrap}}
 </style>
 </head>
@@ -1006,7 +1020,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.replace(/^
 window.addEventListener('message', e => {
   if (!CHA.test(e.origin) || !e.data || typeof e.data !== 'object') return;
   if (e.data.type === 'xuong-video:set-tab') moTab(String(e.data.tab), false);
-  if (e.data.type === 'xuong-video:theme' && /^(dark|light)$/.test(e.data.theme)) document.documentElement.dataset.theme = e.data.theme;
+  if (e.data.type === 'xuong-video:theme' && /^(dark|light)$/.test(e.data.theme)) window.__xvApplyTheme(e.data.theme);
 });
 if (window.parent !== window) window.parent.postMessage({type: 'xuong-video:san-sang', tab: TAB_TEN[document.querySelector('nav button.on')?.dataset.tab] || 'san-xuat'}, '*');
 </script>

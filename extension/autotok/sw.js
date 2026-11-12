@@ -98,7 +98,8 @@ async function noteApiError(e) {
 function toWire(a, r) {
   const w = { id: a.id, nonce: a.nonce, claim_token: a.claim_token, outcome: r.outcome, definite: r.definite === true, not_sent: r.notSent === true,
     reason: r.reason, detail: r.detail, http: r.http, status_code: r.status_code, status_msg: r.status_msg, item_id: r.item_id,
-    creation_id: r.creation_id, video_id: r.video_id, schedule_time: r.schedule_time == null ? null : r.schedule_time, response: r.response, elapsed_ms: r.elapsed_ms };
+    creation_id: r.creation_id, video_id: r.video_id, schedule_time: r.schedule_time == null ? null : r.schedule_time, response: r.response, elapsed_ms: r.elapsed_ms,
+    cover_status: r.cover_status, cover_warning: typeof r.cover_warning === 'string' ? r.cover_warning.slice(0, 300) : undefined };
   for (const k of Object.keys(w)) if (w[k] === undefined) delete w[k];
   return w;
 }
@@ -189,26 +190,36 @@ async function openJobWindow(job) {
   const existing = await findJobTab({ id: job.id, windowId: null, strategy: 'tab' });
   if (existing) { await log(`đã có tab ${existing.id} cho job ${job.id}, không mở thêm`, 'WARN'); await patchActive({ tabId: existing.id, windowId: existing.windowId }, job.id); return; }
   const s = await getSettings();
-  const { tab, windowId } = await createStudioWindow(STUDIO_URL + '#autotok=' + encodeURIComponent(job.id), s);
-  await patchActive({ tabId: tab.id, windowId, phase: 'opened', strategy: s.windowStrategy, lastBeat: Date.now() });
-  await log(`mở tab ${tab.id} (cửa sổ ${windowId}, kiểu ${s.windowStrategy}) cho job ${job.id}`);
+  const { tab, windowId, strategy } = await createStudioWindow(STUDIO_URL + '#autotok=' + encodeURIComponent(job.id), s);
+  await patchActive({ tabId: tab.id, windowId, phase: 'opened', strategy, lastBeat: Date.now() });
+  await log(`mở tab ${tab.id} (cửa sổ ${windowId}, kiểu ${strategy}) cho job ${job.id}`);
 }
 
-// A Studio tab/window the user does not have to look at (job or product sync), by the configured strategy.
+// Is there a normal (user) window? Unknown (API missing / error) counts as "yes": behave exactly as before.
+async function hasNormalWindow() {
+  try { const ws = await chrome.windows.getAll({ windowTypes: ['normal'] }); return Array.isArray(ws) ? ws.length > 0 : true; } catch (_) { return true; }
+}
+
+// A Studio tab/window the user does not have to look at (job, product sync or collection), by the configured strategy.
+// Never steals focus: a background-started Chrome (no window at all) must not pop up a visible "TikTok Studio" window, so
+// the 'tab' strategy falls back to a minimized unfocused window when there is no normal window to hold the tab, and a
+// minimized window that came up in the normal state is minimized again right away.
 async function createStudioWindow(url, s) {
-  let tab, windowId;
-  if (s.windowStrategy === 'tab') {
+  let tab, windowId, strategy = s.windowStrategy;
+  if (s.windowStrategy === 'tab' && await hasNormalWindow()) {
     tab = await chrome.tabs.create({ url, active: false });
     windowId = tab.windowId;
   } else if (s.windowStrategy === 'unfocused') {
     const w = await chrome.windows.create({ url, focused: false, state: 'normal', width: 1100, height: 800, left: 40, top: 40 });
     tab = w.tabs[0]; windowId = w.id;
   } else {
+    if (strategy === 'tab') strategy = 'minimized';   // no normal window to hold a tab: use a minimized one
     const w = await chrome.windows.create({ url, state: 'minimized', focused: false });
     tab = w.tabs[0]; windowId = w.id;
+    if (w.state && w.state !== 'minimized') { try { await chrome.windows.update(w.id, { state: 'minimized', focused: false }); } catch (e) { await log('thu nhỏ cửa sổ: ' + e.message, 'WARN'); } }
   }
   try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) { await log('autoDiscardable: ' + e.message, 'WARN'); }
-  return { tab, windowId };
+  return { tab, windowId, strategy };
 }
 
 async function closeJobWindow(a) {
@@ -488,8 +499,8 @@ async function startSync(rid) {
   await log(`đồng bộ sản phẩm (yêu cầu ${rid})`);
   try {
     const s = await getSettings();
-    const { tab, windowId } = await createStudioWindow(STUDIO_URL + '#autotok=sync-' + encodeURIComponent(rid), s);
-    await patchSync({ tabId: tab.id, windowId, strategy: s.windowStrategy });
+    const { tab, windowId, strategy } = await createStudioWindow(STUDIO_URL + '#autotok=sync-' + encodeURIComponent(rid), s);
+    await patchSync({ tabId: tab.id, windowId, strategy });
   } catch (e) { await finishSync({ outcome: 'failed', reason: 'open-window-failed', detail: e.message }); }
   return true;
 }
@@ -570,8 +581,8 @@ async function collectIfDue(reason, hintTab) {
         if (r && r.ok) { await patchCollect({ tabId: t.id, windowId: t.windowId, mode: 'existing' }); await log(`thu số liệu trong tab đang mở ${t.id}`); return true; }
       } catch (_) { /* content script of an older version / not injected: next tab, else a background window */ }
     }
-    const { tab, windowId } = await createStudioWindow(STUDIO_URL + '#autotok=' + encodeURIComponent(id), s);
-    await patchCollect({ tabId: tab.id, windowId, mode: 'window', strategy: s.windowStrategy });
+    const { tab, windowId, strategy } = await createStudioWindow(STUDIO_URL + '#autotok=' + encodeURIComponent(id), s);
+    await patchCollect({ tabId: tab.id, windowId, mode: 'window', strategy });
   } catch (e) { await finishCollect({ outcome: 'failed', reason: 'open-window-failed', detail: e.message }); }
   return true;
 }
@@ -787,6 +798,18 @@ const handlers = {
     if (!a || a.local) return { ok: false, error: 'no job' };
     const m = await api('/api/ext/video/meta?id=' + encodeURIComponent(a.id));
     return { ok: true, meta: Object.assign({}, m, { chunk: CHUNK }) };
+  },
+
+  // Per-product cover (<= 5 MB, one response). Any failure is reported to the content script, which posts without the cover.
+  async coverGet(msg, sender) {
+    const a = await jobFor(sender, msg);
+    if (!a || a.local) return { ok: false, error: 'no job' };
+    const r = await api('/api/ext/cover?id=' + encodeURIComponent(a.id), { raw: true, timeoutMs: 60000 });
+    if (r.status !== 200) return { ok: false, error: 'HTTP ' + r.status };
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength <= 0 || buf.byteLength > 5 * 1024 * 1024) return { ok: false, error: 'độ dài ảnh sai ' + buf.byteLength };
+    await patchActive({ lastBeat: Date.now() }, a.id);
+    return { ok: true, b64: b64(buf), len: buf.byteLength };
   },
 
   async videoChunk(msg, sender) {

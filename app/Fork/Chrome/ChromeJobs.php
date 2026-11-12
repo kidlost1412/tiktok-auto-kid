@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fork\Chrome;
 
+use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
@@ -368,6 +369,8 @@ final class ChromeJobs
             throw new ChromeRefusal('Không tìm thấy file video hoặc file rỗng — chưa đăng.');
         }
 
+        $cover = config('fork.chrome.cover_enabled', true) ? app(CoverStore::class)->forPost($post) : null;
+
         $caption = app(ContentSanitizer::class)->forPost($post) ?? '';
 
         if (trim($caption) === '') {
@@ -379,7 +382,7 @@ final class ChromeJobs
         }
 
         try {
-            return DB::transaction(function () use ($post, $account, $chrome, $mode, $item, $name, $mime, $size, $caption, $visibility, $meta, $scheduleTime, $deliverBy): ChromeJob {
+            return DB::transaction(function () use ($post, $account, $chrome, $mode, $item, $name, $mime, $size, $caption, $visibility, $meta, $scheduleTime, $deliverBy, $cover): ChromeJob {
                 $attempt = (int) ChromeJob::query()->where('post_id', $post->id)->max('attempt') + 1;
 
                 return ChromeJob::create([
@@ -401,6 +404,7 @@ final class ChromeJobs
                         'allow_stitch' => (int) (bool) data_get($meta, 'allow_stitch', false),
                         'ai_label' => (int) (bool) data_get($meta, 'is_aigc', false),
                         'schedule_time' => $scheduleTime,
+                        ...($cover !== null ? ['cover' => $cover] : []),
                     ],
                     'state' => 'queued',
                     'nonce' => bin2hex(random_bytes(16)),
@@ -447,6 +451,15 @@ final class ChromeJobs
                 'allow_duet' => $opts['allow_duet'] ?? 0,
                 'allow_stitch' => $opts['allow_stitch'] ?? 0,
                 'ai_label' => $opts['ai_label'] ?? 0,
+                // Ảnh bìa riêng của sản phẩm (tuỳ chọn). Tiện ích tải qua GET /api/ext/cover?id=<job>; lỗi bìa không làm hỏng bài.
+                ...(is_array($opts['cover'] ?? null) ? ['cover' => [
+                    'url' => '/api/ext/cover?id='.$j->id,
+                    'name' => (string) ($opts['cover']['name'] ?? 'cover.jpg'),
+                    'mime' => (string) ($opts['cover']['mime'] ?? 'image/jpeg'),
+                    'size' => (int) ($opts['cover']['size'] ?? 0),
+                    'sha256' => (string) ($opts['cover']['sha256'] ?? ''),
+                    'field' => (string) config('fork.chrome.cover_field', 'cover_uri'),
+                ]] : []),
             ],
             'expect_account' => $c->tiktok_username,
             'expect_user_id' => $j->expect_user_id,
@@ -721,7 +734,7 @@ final class ChromeJobs
         $notSent = ($body['not_sent'] ?? null) === true || ($body['notSent'] ?? null) === true;
 
         $keep = [];
-        foreach (['outcome', 'definite', 'reason', 'detail', 'http', 'status_code', 'status_msg', 'item_id', 'creation_id', 'video_id', 'schedule_time', 'elapsed_ms', 'authorized'] as $key) {
+        foreach (['outcome', 'definite', 'reason', 'detail', 'http', 'status_code', 'status_msg', 'item_id', 'creation_id', 'video_id', 'schedule_time', 'elapsed_ms', 'authorized', 'cover_status', 'cover_warning'] as $key) {
             if (array_key_exists($key, $body) && (is_scalar($body[$key]) || $body[$key] === null)) {
                 $keep[$key] = $body[$key];
             }
