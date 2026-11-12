@@ -510,17 +510,82 @@ def kho_trang_thai(ma):
             "log": [l for l in dong if not l.startswith("##")][-8:]}
 
 
-PROMPT_GEMINI = CODE / "luat" / "MO-TA-VIDEO-GEMINI.md"   # mẫu Gemini mô tả từng cảnh (hub đọc đúng mẫu này)
-
-
 def lenh_gemini(ma):
     """Lệnh dán cho Gemini để nó xem từng video trong kho và ghi mô tả từng cảnh (đúng mẫu hub đang đọc)."""
     sp = json.loads((HUB / "san-pham" / ma / "san-pham.json").read_text(encoding="utf-8"))
-    nl = chr(10)
-    return nl.join(["Phân tích toàn bộ video trong:", sp.get("kho_video", "<thư mục kho>"), "",
-                    "Đọc và làm đúng hướng dẫn, đủ schema JSON tại:", str(PROMPT_GEMINI), "",
-                    "Video nào đã có _mo-ta/<tên>.mo-ta.json hợp lệ thì bỏ qua, chỉ làm video mới. Làm cuốn chiếu tới hết, "
-                    "không dừng hỏi sau mỗi đợt; ghi tiến độ vào _mo-ta/_tien-do.txt."])
+    sys.path.insert(0, str(CODE / "engine"))
+    import prompt_mau                               # mẫu lệnh chỉnh được ở tab Prompt AI; đường dẫn trỏ bản Mô tả video đang dùng (bản sửa nếu có)
+    return prompt_mau.dien("lenh-gemini", kho_video=sp.get("kho_video", "<thư mục kho>"),
+                           duong_dan_mo_ta=str(prompt_mau.duong_dan_hieu_luc("mo-ta-gemini")))
+
+
+def _pm():
+    sys.path.insert(0, str(CODE / "engine"))
+    import prompt_mau
+    return prompt_mau
+
+
+def prompt_ds():
+    """Tab Prompt AI: danh sách vai + nội dung đang dùng."""
+    pm = _pm(); out = []
+    for k, v in pm.VAI.items():
+        text, sua = pm.doc(k)
+        out.append({"ten": k, "ten_hien_thi": v["ten"], "mo_ta": v["mo_ta"], "bien": v["bien"], "bat_buoc": v["bat_buoc"],
+                    "la_ban_sua": sua, "text": text, "loai": "tai_lieu" if v["file"].startswith("luat/") else "de_bai"})
+    return out
+
+
+def prompt_mac_dinh(ten):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    return {"ok": True, "text": pm.mac_dinh(ten)}
+
+
+def prompt_ban_cu(ten):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    return {"ok": True, "ds": pm.ds_ban_cu(ten)}
+
+
+def prompt_luu(ten, text):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    if not isinstance(text, str) or not text.strip():
+        return {"ok": False, "loi": "Đề bài đang trống — hãy nhập nội dung hoặc bấm \"Khôi phục mặc định\"."}
+    kq = pm.kiem(ten, text)
+    if kq["thieu"]:
+        return {"ok": False, "loi": "Thiếu chỗ điền bắt buộc: " + ", ".join("{{" + b + "}}" for b in kq["thieu"])
+                + ". Máy cần các chỗ này để gửi dữ liệu sản phẩm cho AI — hãy thêm lại rồi lưu."}
+    pm.luu(ten, text)
+    canh_bao = ["{{" + b + "}} không phải chỗ điền hợp lệ của vai này — máy sẽ gửi nguyên chữ đó cho AI." for b in kq["la"]]
+    return {"ok": True, "canh_bao": canh_bao, "la_ban_sua": pm.doc(ten)[1]}
+
+
+def prompt_khoi_phuc(ten):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    pm.khoi_phuc(ten)
+    return {"ok": True, "text": pm.mac_dinh(ten)}
+
+
+def prompt_xem_thu(ten, ma_sp, text=None):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    if text is not None and not isinstance(text, str):
+        text = None
+    try:
+        r = pm.xem_thu(ten, ma_sp, text)
+    except Exception as e:
+        return {"ok": False, "loi": "Không dựng thử được: " + str(e)[:200]}
+    r["ok"] = not r.get("thieu_du_lieu")
+    if not r["ok"]:
+        r["loi"] = (r.get("canh_bao") or ["Chưa có dữ liệu để xem thử."])[-1]
+    return r
 
 
 def chuan_bi_kho(ma):
@@ -1030,6 +1095,12 @@ class H(BaseHTTPRequestHandler):
             sys.path.insert(0, str(CODE / "engine"))
             from don_dep import dung_luong
             return self._json(dung_luong())
+        if u.path == "/api/prompt":
+            return self._json(prompt_ds())
+        if u.path == "/api/prompt/mac-dinh":
+            return self._json(prompt_mac_dinh(q.get("ten", [""])[0]))
+        if u.path == "/api/prompt/ban-cu":
+            return self._json(prompt_ban_cu(q.get("ten", [""])[0]))
         if u.path == "/api/so-gu":
             f = LS / "so-gu.md"; bh = LS / "bai-hoc.txt"
             return self._json({"so_gu": f.read_text(encoding="utf-8") if f.exists() else "",
@@ -1205,6 +1276,12 @@ class H(BaseHTTPRequestHandler):
                 td["san_pham"][ma] = {"bat": bool(v.get("bat", True)), "ton_toi_thieu": max(0, int(v.get("ton_toi_thieu", 10))),
                                       "toi_da_ngay": max(0, int(v.get("toi_da_ngay", 30))), "lo": max(1, min(50, int(v.get("lo", 10))))}
             luu_cfg(c); return self._json({"ok": True})
+        if u.path == "/api/prompt":
+            return self._json(prompt_luu(b.get("ten", ""), b.get("text")))
+        if u.path == "/api/prompt/khoi-phuc":
+            return self._json(prompt_khoi_phuc(b.get("ten", "")))
+        if u.path == "/api/prompt/xem-thu":
+            return self._json(prompt_xem_thu(b.get("ten", ""), b.get("ma_sp", ""), b.get("text")))
         if u.path == "/api/so-gu":
             (LS / "so-gu.md").write_text(b.get("so_gu", ""), encoding="utf-8"); return self._json({"ok": True})
         self.send_error(404)

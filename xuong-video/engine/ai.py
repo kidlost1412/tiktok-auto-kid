@@ -13,9 +13,14 @@ _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
 F_TK = HUB / "lich-su" / "tai-khoan.json"
 _lock = threading.Lock()
-HE_THONG = ("Bạn là một thành viên ê-kíp sản xuất video quảng cáo TikTok nông nghiệp (vai: {vai}), mang kinh nghiệm của "
-            "editor/creative quảng cáo cao cấp hơn 10 năm. "
-            "Làm đúng việc được giao, KHÔNG trò chuyện, KHÔNG giải thích ngoài định dạng yêu cầu.")
+
+
+def he_thong(vai):
+    """Lời dặn chung gửi mọi vai AI — mẫu prompt/he-thong.md (chỉnh được trong tab Prompt AI)."""
+    import prompt_mau
+    return prompt_mau.dien("he-thong", vai=vai)
+
+
 NGUONG_DOI = 0.92      # dùng quá 92% cửa sổ 5 giờ / 7 ngày → ưu tiên tài khoản khác
 
 
@@ -132,7 +137,7 @@ def _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung=False):
     """nhung=True: ảnh gửi THẲNG trong 1 tin nhắn (stream-json, không công cụ → đúng 1 lượt). nhung=False: cách cũ (Read)."""
     claude = cfg()["duong_dan"]["claude"]
     cmd = [claude, "-p", "--output-format", "stream-json", "--verbose", "--model", model, "--effort", effort,
-           "--strict-mcp-config", "--no-chrome", "--no-session-persistence", "--system-prompt", HE_THONG.format(vai=vai)]
+           "--strict-mcp-config", "--no-chrome", "--no-session-persistence", "--system-prompt", he_thong(vai)]
     stdin = prompt
     if anh and nhung:
         khoi = [{"type": "text", "text": prompt}]

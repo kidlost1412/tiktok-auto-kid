@@ -391,6 +391,12 @@ def cap_cua(t):
     return caps[t["j"] % len(caps)]
 
 
+def ctx_gom(chung, dong):
+    """Dữ liệu điền vào mẫu prompt/gom-bai-hoc.md."""
+    nl = chr(10)
+    return {"luat_chung": nl.join(chung) or "(chưa có)", "loi_san_pham": nl.join(dong)}
+
+
 def gom_bai_hoc(ma_sp, log=print, nguong=25):
     """Sổ bài học RIÊNG của sản phẩm dài quá → AI gom thành 2 phần: luật CHUNG (đúng cho mọi sản phẩm, không nêu tên sản phẩm/cây)
     ghi vào bai-hoc.txt, và bài học RIÊNG (chỉ đúng với sản phẩm này) giữ ở bai-hoc-<mã>.txt. Đạo diễn đọc chung + riêng của đúng sản phẩm."""
@@ -404,12 +410,8 @@ def gom_bai_hoc(ma_sp, log=print, nguong=25):
     if len(dong) <= nguong:
         return
     chung = [l for l in fc.read_text(encoding="utf-8").splitlines() if l.strip()] if fc.exists() else []
-    p = ("Dưới đây là lỗi giám khảo bắt được khi dựng video quảng cáo TikTok cho MỘT sản phẩm, và sổ LUẬT CHUNG hiện có (áp cho mọi sản phẩm)."
-         + nl + "Gom các ý trùng/na ná, lỗi gặp nhiều đặt lên đầu, mỗi dòng ≤ 18 từ, ghi kiểu 'Tránh …' hoặc 'Luôn …'. Trả về đúng 2 phần:" + nl
-         + "CHUNG: (tối đa 15 dòng) sổ luật chung mới = luật chung cũ + lỗi nào đúng với MỌI sản phẩm. KHÔNG nêu tên sản phẩm, tên chai, tên cây, tên quà cụ thể." + nl
-         + "RIENG: (tối đa 10 dòng) lỗi chỉ đúng với sản phẩm này (tên, chai, quà, cây trồng riêng của nó)." + nl
-         + "Mỗi dòng bắt đầu bằng '- '. Không chữ nào khác ngoài 2 dòng tiêu đề CHUNG: và RIENG:." + nl + nl
-         + "LUẬT CHUNG HIỆN CÓ:" + nl + (nl.join(chung) or "(chưa có)") + nl + nl + "LỖI CỦA SẢN PHẨM NÀY:" + nl + nl.join(dong))
+    import prompt_mau
+    p = prompt_mau.dien("gom-bai-hoc", **ctx_gom(chung, dong))
     txt, _ = goi("gom bài học", p, model="sonnet", effort="low")
     phan, moi = None, {"CHUNG": [], "RIENG": []}
     for l in txt.splitlines():

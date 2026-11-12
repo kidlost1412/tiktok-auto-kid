@@ -11,11 +11,14 @@ import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
 
-PROMPT = """Đọc CHÍNH XÁC chữ in trên nhãn/bao bì sản phẩm "{ten}" trong các ảnh (nhiều góc: mặt trước, mặt sau, thành phần, hướng dẫn).
-Chỉ ghi điều ĐỌC ĐƯỢC RÕ trên nhãn; không đoán, không suy từ cảnh xung quanh; chữ mờ thì bỏ qua. Bỏ qua sản phẩm khác.
-Trả về DUY NHẤT JSON:
-{{"su_that": ["mỗi dòng 1 ý ngắn, ghi rõ đọc ở đâu, vd. 'Mặt trước nhãn: Kích rễ cực mạnh'", "... (tên, dung tích, công dụng, thành phần, cách pha/liều, đối tượng cây, nhà sản xuất)"],
- "chua_ro": ["điều thấy một phần nhưng chưa đọc chắc — để chủ hàng xác nhận"]}}"""
+def ctx(sp, ma):
+    """Dữ liệu điền vào mẫu prompt/doc-nhan.md."""
+    return {"ten": sp.get("ten_goi", ma)}
+
+
+def dung_prompt(sp, ma):
+    import prompt_mau
+    return prompt_mau.dien("doc-nhan", **ctx(sp, ma))
 
 
 def doc(ma, n=8):
@@ -48,7 +51,7 @@ def doc(ma, n=8):
             anh.append(f)
     if not anh:
         return {"loi": "Không tìm thấy cảnh chai/nhãn rõ trong kho."}
-    txt, _ = goi("đọc nhãn", PROMPT.format(ten=sp.get("ten_goi", ma)), anh=anh)
+    txt, _ = goi("đọc nhãn", dung_prompt(sp, ma), anh=anh)
     kq = lay_json(txt)
     return kq if isinstance(kq, dict) else {"loi": "AI trả sai định dạng"}
 

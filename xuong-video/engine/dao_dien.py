@@ -5,6 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ai import goi, lay_json
+import prompt_mau
 from bo_cuc import SO_PHU, la_chai
 from cong_thuc import RECIPES, DATA_SPEC
 from dung import sentence_times, MENU as MENU_NEN
@@ -14,7 +15,7 @@ import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay
 FPS = 30
-SO_TAY = lambda: (CODE / "luat" / "SO-TAY-EDITOR.md").read_text(encoding="utf-8")   # sổ tay editor cao cấp — mọi vai dựng/chấm đọc
+SO_TAY = lambda: prompt_mau.doc_luat("SO-TAY-EDITOR.md")   # sổ tay editor cao cấp — mọi vai dựng/chấm đọc
 
 GU = {   # mỗi đạo diễn một gu → cùng lời ra các video khác hẳn nhau
     "tvc_cao_cap": "Đạo diễn TVC cao cấp: nhịp chắc, cảnh đẹp nhất, ít mà sang, chữ gọn, màu sạch, chuyển cảnh mượt; khoe sản phẩm như quảng cáo truyền hình.",
@@ -175,51 +176,6 @@ def to_ung_vien(ma, ids, out, cols=8):
 
 
 # ---------------------------------------------------------------- ĐẠO DIỄN
-PROMPT_DD = """=== SỔ TAY EDITOR CAO CẤP (bắt buộc) ===
-{so_tay}
-
-=== GU CỦA BẠN ===
-{gu}
-
-{so_gu}=== BÀI HỌC TỪ GIÁM KHẢO (lỗi các bản trước — TRÁNH lặp lại) ===
-{bai_hoc}
-- Khối chữ/phụ đề không được che chữ trên nhãn chai: câu có khối chữ giữa bài nên dùng cảnh vườn/rễ/phun, hoặc bố cục khung_nho.
-- Lời nói tới thứ gì (rễ, nhãn thành phần, cây con, phun…) thì hình PHẢI thấy đúng thứ đó.
-
-=== SẢN PHẨM ===
-{sp}
-
-=== LỜI ĐỌC (đã có giọng, mốc thời gian từng câu, đơn vị giây) ===
-{cau}
-Tổng thời lượng video: {total} s. Chữ nhấn do biên kịch đề xuất: {nhan}
-
-=== CẢNH ỨNG VIÊN ===
-Xem tờ ảnh (số vàng = id). Danh sách: id | vai trò | mô tả | dài (s).
-id bắt đầu "Q-" = QUÀ TẶNG THẬT (dùng ở câu nhắc quà); id bắt đầu "V-" = KHO PHỤ (b-roll, chỉ làm cảnh phụ/chuyển ý, không quá ~30% số cảnh).
-{ds}
-Gợi ý theo câu (không bắt buộc): {goi_y}
-
-=== VIỆC CẦN LÀM ===
-Lên BẢNG DỰNG cho video này theo gu của bạn. Chọn cảnh NHÌN ĐÚNG ý từng câu (đọc tới đâu, hình tới đó), mở đầu phải giật mắt,
-câu chốt phải có cảnh chai sản phẩm rõ nhãn. Không dùng 1 cảnh 2 lần. Mỗi câu 1–2 cảnh; mỗi cảnh ≥ 1,8 s (thường 2–3,5 s) — Kid: không chuyển cảnh quá nhanh, để người xem kịp nhìn.
-Chống reup: không để cảnh nguyên khung toàn màn quá 2,8 s — đổi bố cục.
-ĐA DẠNG BỐ CỤC (bắt buộc): ít nhất 1/3 số đoạn dùng khung/ô/chia (khung_mo, khung_nho, pip_troi, pip_giua, chia_doi, chia_ngang, luoi_4);
-mỗi video có ≥ 1 lần chia_doi/chia_ngang/luoi_4 (ô phụ lấy cảnh khác: người dùng sản phẩm, vườn, rễ…) và ≥ 1 ô trời (pip_troi/pip_giua)
-trên cảnh vườn có trời. Cảnh NGƯỜI NÓI (AFF dùng sản phẩm) rất nên dùng làm ô phụ hoặc trong khung — tăng chân thật.
-
-BỐ CỤC: {bo_cuc}
-CÔNG THỨC DỰNG (chọn 1): {ct}
-{data_spec}
-MENU: phu_de={phu_de}; mau_nhan={mau_nhan}; chuyen_canh={chuyen_canh}; chuyen_dong={chuyen_dong}; mau={mau}; sfx={sfx}; nhac={nhac}
-
-Trả về DUY NHẤT 1 đối tượng JSON:
-{{"cong_thuc":"..","phu_de":"..","mau_nhan":"..","chuyen_canh":"..","chuyen_dong":"..","mau":"..","sfx":"..","nhac":"..",
- "nhan_tu":["2–4 từ cần phóng to"],
- "khoi":[{{"loai":"<khối mở của công thức>","cau":0,"du_lieu":{{..}}}}, {{"loai":"<0–2 khối giữa>","cau":<k>,"du_lieu":{{..}}}}, {{"loai":"<khối chốt>","cau":{cuoi},"du_lieu":{{..}}}}],
- "doan":[{{"cau":0,"canh":[{{"id":"<id>","bo_cuc":"<bố cục>","phu":["<id ô phụ nếu bố cục cần>"]}}]}}, ... đủ {n} câu],
- "ly_do":"≤12 từ: ý tưởng dựng"}}"""
-
-
 def bai_hoc_cho(ma):
     """Bài học giám khảo gửi đạo diễn: luật CHUNG (mọi sản phẩm) + bài học RIÊNG của đúng sản phẩm đang làm — không lẫn sản phẩm khác."""
     def doc(f, n):
@@ -231,7 +187,8 @@ def bai_hoc_cho(ma):
     return "\n".join(chung + (["Riêng sản phẩm này:"] + rieng if rieng else []))
 
 
-def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None):
+def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), qua=None, chung=None):
+    """Dữ liệu điền vào mẫu prompt/dao-dien.md → (ctx, sents, total, ids cảnh ứng viên). Không ghi file, không gọi AI."""
     sents = sentence_times(voice["text"], voice["words"])
     total = round(max(voice["dur"] + 0.6, khung_giay(sp)[0] + 0.3), 2)      # khớp dung.render (độ dài đích theo sản phẩm)
     f_dd = HUB / "lich-su" / f"canh-da-dung-{ma}.txt"
@@ -254,14 +211,17 @@ def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=()
                 for x in rng.sample(ds, k=min(3, len(ds))):
                     chon[x["id"]] = x; per[k].append(x["id"])
     ids = list(chon)
-    anh = to_ung_vien(ma, ids, Path(work) / f"ung-vien-{gu_key}.jpg")
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     so_gu = so_gu_f.read_text(encoding="utf-8")[-4000:].strip() if so_gu_f.exists() else ""
     so_gu = f"=== SỔ GU CỦA CHỦ HÀNG (bắt buộc tôn trọng) ===\n{so_gu}\n\n" if so_gu else ""      # chưa có sổ gu → không gửi khung trống
     sp_ngan = {k: sp.get(k) for k in ("ten_goi", "ten_ngan", "su_that_duoc_noi", "qua_tang", "khong_duoc_noi", "nhan_dien_chai") if sp.get(k)}
-    bai_hoc = bai_hoc_cho(ma)
-    p = PROMPT_DD.format(
-        gu=GU[gu_key], so_gu=so_gu, bai_hoc=bai_hoc, so_tay=SO_TAY(), sp=json.dumps(sp_ngan, ensure_ascii=False),
+    try:                                  # số liệu thật: gu/công thức dựng nào từng ra nhiều view (gợi ý, không phải luật)
+        from hieu_qua import tom_tat
+        hq = tom_tat(ma, "dao_dien")
+    except Exception:
+        hq = ""
+    ctx = dict(
+        gu=GU[gu_key], so_gu=so_gu, bai_hoc=bai_hoc_cho(ma), so_tay=SO_TAY(), sp=json.dumps(sp_ngan, ensure_ascii=False),
         cau="\n".join(f"[{k}] {s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for k, s in enumerate(sents)),
         total=total, nhan=script.get("nhan_tu", []),
         ds="\n".join(f"{i} | {','.join(chon[i]['vai_tro'])}{' | NGƯỜI NÓI (chỉ đặt trong khung/ô)' if nguoi_noi(chon[i]) else ''} | {(chon[i].get('soat') or {}).get('ghi') or chon[i]['mo_ta'][:60]} | {chon[i]['dai']}"
@@ -274,16 +234,16 @@ def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=()
         mau_nhan=["vang", "xanh_la", "cam", "do", "xanh_duong"], chuyen_canh=MENU_NEN["chuyen_canh"], chuyen_dong=MENU_NEN["chuyen_dong"],
         mau=list(MENU_NEN["mau"]), sfx=["gon", "vua", "soi_dong", "mo_dau_am"],
         nhac=["que-acoustic", "vui-mua-sam", "tvc-doanh-nghiep", "tet-le-hoi", "chill-nen", "piano-nhe"],
-        cuoi=len(sents) - 1, n=len(sents))
-    try:                                  # số liệu thật: gu/công thức dựng nào từng ra nhiều view (gợi ý, không phải luật)
-        from hieu_qua import tom_tat
-        hq = tom_tat(ma, "dao_dien")
-    except Exception:
-        hq = ""
-    if hq:
-        p += "\n\n=== SỐ LIỆU THẬT TỪ TIKTOK (gợi ý khi chọn bố cục/nhịp, không phải luật) ===\n" + hq
-    if gop_y:
-        p += f"\n\n=== GIÁM KHẢO YÊU CẦU SỬA BẢN TRƯỚC (bắt buộc làm theo) ===\n{gop_y}"
+        cuoi=len(sents) - 1, n=len(sents),
+        so_lieu_tiktok=("\n\n=== SỐ LIỆU THẬT TỪ TIKTOK (gợi ý khi chọn bố cục/nhịp, không phải luật) ===\n" + hq) if hq else "",
+        gop_y_giam_khao=f"\n\n=== GIÁM KHẢO YÊU CẦU SỬA BẢN TRƯỚC (bắt buộc làm theo) ===\n{gop_y}" if gop_y else "")
+    return ctx, sents, total, ids
+
+
+def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None):
+    ctx, sents, total, ids = ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y, tranh, qua, chung)
+    anh = to_ung_vien(ma, ids, Path(work) / f"ung-vien-{gu_key}.jpg")
+    p = prompt_mau.dien("dao-dien", **ctx)
     txt, _ = goi(f"đạo diễn {gu_key}", p, anh=[anh])
     edl = lay_json(txt)
     if not isinstance(edl, dict):
@@ -432,27 +392,19 @@ def to_ban_dung(video, sents, out, blocks=None):
     return out, ts
 
 
-PROMPT_GK = """Bạn là editor trưởng chấm bản dựng video quảng cáo {ten}, theo SỔ TAY EDITOR CAO CẤP dưới đây.
-{so_tay}
- Xem tờ ảnh: mỗi ô là 1 khung của video ở giây ghi góc trên trái.
-Lời đọc theo thời gian:
-{cau}
-Bảng dựng đạo diễn đã làm (tóm tắt): {tom}
-{so_gu}
-Chấm theo tiêu chí: (1) hình hợp lời (đủ phù hợp là được, không khắt khe); (2) mở đầu giật mắt; (3) câu chốt thấy rõ chai {ten}; (4) chữ/khối không che sản phẩm,
-không đè nhau, đọc được; (5) người đang nói chỉ được nằm trong khung/ô (không full màn), không chữ chèn to che hình, không hàng khác; (6) đẹp, sang, đa dạng, không nhàm; (7) không lỗi hình (tối, mờ, méo).
-Trả về DUY NHẤT JSON, NGẮN GỌN: {{"diem": 1-10, "dat": true|false (đạt khi ≥ 7 và không lỗi nặng), "loi": ["tối đa 3 lỗi nặng nhất, mỗi lỗi ≤ 12 từ, có giây"],
-"sua": "≤ 35 từ chỉ dẫn đổi cảnh/bố cục; rỗng nếu đạt"}}"""
+def ctx_giam_khao(sp, sents, edl):
+    """Dữ liệu điền vào mẫu prompt/giam-khao.md. Không gọi AI."""
+    so_gu_f = HUB / "lich-su" / "so-gu.md"
+    tom = {"cong_thuc": edl.get("cong_thuc"), "gu": edl.get("gu"), "khoi": [k.get("loai") for k in edl.get("khoi", []) if isinstance(k, dict)],
+           "y_tuong": edl.get("ly_do")}
+    return dict(so_tay=SO_TAY(), ten=sp.get("ten_ngan") or sp["ten_goi"], cau="\n".join(f"{s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for s in sents),
+                tom=json.dumps(tom, ensure_ascii=False),
+                so_gu=("SỔ GU CỦA CHỦ HÀNG: " + so_gu_f.read_text(encoding="utf-8")[-2000:].strip() + chr(10)) if so_gu_f.exists() and so_gu_f.read_text(encoding="utf-8").strip() else "")
 
 
 def giam_khao(sp, video, sents, edl, work):
     anh, _ = to_ban_dung(video, sents, Path(work) / "ban-dung.jpg")
-    so_gu_f = HUB / "lich-su" / "so-gu.md"
-    tom = {"cong_thuc": edl.get("cong_thuc"), "gu": edl.get("gu"), "khoi": [k.get("loai") for k in edl.get("khoi", []) if isinstance(k, dict)],
-           "y_tuong": edl.get("ly_do")}
-    p = PROMPT_GK.format(so_tay=SO_TAY(), ten=sp.get("ten_ngan") or sp["ten_goi"], cau="\n".join(f"{s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for s in sents),
-                         tom=json.dumps(tom, ensure_ascii=False),
-                         so_gu=("SỔ GU CỦA CHỦ HÀNG: " + so_gu_f.read_text(encoding="utf-8")[-2000:].strip() + chr(10)) if so_gu_f.exists() and so_gu_f.read_text(encoding="utf-8").strip() else "")
+    p = prompt_mau.dien("giam-khao", **ctx_giam_khao(sp, sents, edl))
     for lan in range(2):                 # trả sai định dạng → hỏi lại 1 lần; vẫn sai thì để trống điểm (không ghi 0 gây hiểu nhầm)
         txt, _ = goi("giám khảo", p, anh=[anh])
         try:

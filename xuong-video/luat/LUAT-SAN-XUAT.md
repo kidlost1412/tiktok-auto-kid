@@ -1,4 +1,4 @@
-# LUẬT SẢN XUẤT — Kid đã duyệt (09/11/2026). Chỉ sửa khi Kid yêu cầu.
+# LUẬT SẢN XUẤT
 
 ## Mục tiêu
 Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VIỆC CẦN LÀM (mặc định 20–25 s), 9:16. Thuần bán hàng: không hỏi han, không xin bình luận, không tư vấn.
@@ -11,7 +11,7 @@ Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VI�
 - CẤM câu kiểu thuyết minh/báo cáo: "đây là điểm đáng cân nhắc", "đó là lượng pha theo hướng dẫn", "với người quan tâm…", "quy cách rõ ràng", "đúng nhu cầu, đúng sản phẩm", "tham khảo / xem chi tiết / tìm hiểu thêm".
 - CẤM giả giọng bằng "nha/nè/á", ngôi tôi bịa trải nghiệm, số liệu chưa chốt.
 - Không lặp NGUYÊN CÂU đã dùng (xem danh sách câu đã dùng). Thân bài được lặp ý và từ khóa; riêng CÂU MỞ không được giống hay na ná câu mở đã dùng.
-- Chỉ dùng sự thật trong san-pham.json; tôn trọng mục khong_duoc_noi.
+- Chỉ dùng sự thật trong hồ sơ SẢN PHẨM; tôn trọng mục khong_duoc_noi.
 
 ## Tag giọng ElevenLabs v4 (Kid đã duyệt)
 - Mỗi câu một tag NGẮN tiếng Anh, cảm xúc vừa phải: [confident], [warm, confident], [serious], [proud], [proud, confident], [satisfied], [excited], [upbeat], [confident, slightly frustrated].

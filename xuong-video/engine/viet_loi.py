@@ -9,6 +9,7 @@ _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet
 CFG = cfg_hub()
 from ai import goi, lay_json, HetHanMuc  # noqa: E402
+import prompt_mau  # noqa: E402
 
 
 def _he_so(ma, chieu):
@@ -88,48 +89,48 @@ def dem_lich_su(ten, n=200):
     return f.read_text(encoding="utf-8").splitlines()[-n:] if f.exists() else []
 
 
-def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua=""):
-    luat = (CODE / "luat" / "LUAT-SAN-XUAT.md").read_text(encoding="utf-8")
+def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua=""):
+    """Dữ liệu điền vào mẫu prompt/bien-kich.md (chỗ nào cần logic/khối tuỳ chọn thì tính ở đây; khối rỗng → "")."""
+    luat = prompt_mau.doc_luat("LUAT-SAN-XUAT.md")
     luat = luat.split("## Dựng")[0].rstrip()          # phần Dựng là việc của đạo diễn/máy dựng, biên kịch không cần
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     so_gu = so_gu_f.read_text(encoding="utf-8")[-3000:].strip() if so_gu_f.exists() else ""
     so_gu = ("=== SỔ GU CỦA CHỦ HÀNG ===" + chr(10) + so_gu + chr(10)) if so_gu else ""
-    return f"""Bạn là BIÊN KỊCH của ê-kíp video quảng cáo TikTok. Chỉ trả về MỘT mảng JSON hợp lệ, không chữ nào khác.
+    kg, kat = khung_giay(sp), khung_am_tiet(sp)
+    return {
+        "luat": luat,
+        # mã nội bộ, tên giỏ hàng và mục rỗng không giúp viết lời → không gửi
+        "san_pham": json.dumps({k: v for k, v in sp.items() if k not in ("ma", "ten_gio") and v not in ("", [], {}, None)},
+                               ensure_ascii=False, indent=1),
+        "so_gu": so_gu,
+        "so_lieu_tiktok": "" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10),
+        "ten_phai_nhac": json.dumps(ten_phai_nhac(sp), ensure_ascii=False),
+        "so_ban": n,
+        "angles": json.dumps(angles, ensure_ascii=False),
+        "dang": json.dumps([f"{d}: {DANG_BAI[d]}" for d in (dang or [])], ensure_ascii=False),
+        "quy_cach": ("quy_cach = " + json.dumps(qc, ensure_ascii=False) + "  ← bản thứ i nói về QUY CÁCH qc[i] (dung tích/đóng gói), chỉ dùng mức quà của ĐÚNG quy cách đó.") if qc else "",
+        "cau_mo_da_dung": json.dumps((mo_dau or [])[-60:], ensure_ascii=False),
+        "giay_toi_thieu": f"{kg[0]:g}", "giay_toi_da": f"{kg[1]:g}",
+        "am_tiet_toi_thieu": kat[0], "am_tiet_toi_da": kat[1], "am_tiet_muc_tieu": (kat[0] + kat[1]) // 2,
+        "cau_toi_thieu": kat[4], "cau_toi_da": kat[5],
+        "cau_da_dung": json.dumps(used[-150:], ensure_ascii=False),
+        "giong": "|".join(CFG["giong"]["danh_sach"]),
+    }
 
-=== LUẬT (bắt buộc) ===
-{luat}
 
-=== SẢN PHẨM (chỉ dùng sự thật ở đây; luat_rieng là bắt buộc) ===
-{json.dumps(sp, ensure_ascii=False, indent=1)}
+def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua=""):
+    return prompt_mau.dien("bien-kich", **ctx_bien_kich(sp, n, angles, used, styles, dang, mo_dau, qc, hieu_qua))
 
-{so_gu}{("" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10))}
-=== VIỆC CẦN LÀM ===
-TÊN SẢN PHẨM: mỗi bản PHẢI đọc đúng nguyên văn ít nhất một lần một trong các tên: {json.dumps(ten_phai_nhac(sp), ensure_ascii=False)} (ưu tiên tên đầu, ngắn gọn).
-Viết {n} kịch bản. Bản thứ i dùng GÓC angles[i] và DẠNG BÀI dang[i] (bắt buộc, theo đúng thứ tự):
-angles = {json.dumps(angles, ensure_ascii=False)}
-dang = {json.dumps([f"{d}: {DANG_BAI[d]}" for d in (dang or [])], ensure_ascii=False)}
-{("quy_cach = " + json.dumps(qc, ensure_ascii=False) + "  ← bản thứ i nói về QUY CÁCH qc[i] (dung tích/đóng gói), chỉ dùng mức quà của ĐÚNG quy cách đó.") if qc else ""}
-Các bản phải KHÁC HẲN NHAU và khác các video đã làm: ý chính khác, câu mở khác, hình ảnh cụ thể khác (cây khác, tình huống khác,
-giai đoạn khác), nhịp câu khác. KHÔNG mở bài giống/na ná các câu mở đã dùng dưới đây.
-Viết như copywriter TVC giỏi nhất: câu ngắn, có lực, có hình ảnh, không sáo rỗng.
 
-CÂU MỞ ĐÃ DÙNG GẦN ĐÂY (cấm lặp ý/khung câu):
-{json.dumps((mo_dau or [])[-60:], ensure_ascii=False)}
-ĐỘ DÀI: video đích {khung_giay(sp)[0]:g}–{khung_giay(sp)[1]:g} giây → mỗi bản {khung_am_tiet(sp)[0]}–{khung_am_tiet(sp)[1]} âm tiết (không tính tag; nhắm khoảng {(khung_am_tiet(sp)[0] + khung_am_tiet(sp)[1]) // 2}, ĐẾM KỸ, không viết ngắn hơn), {khung_am_tiet(sp)[4]}–{khung_am_tiet(sp)[5]} câu, kết bằng câu chốt giỏ hàng + đúng MỘT mức quà (xoay vòng giữa các bản).
-Dùng tag giọng đúng luật. Không lặp nguyên câu nào trong CÂU ĐÃ DÙNG.
-
-CÂU ĐÃ DÙNG (không được lặp nguyên văn):
-{json.dumps(used[-150:], ensure_ascii=False)}
-
-=== ĐỊNH DẠNG MỖI PHẦN TỬ ===
-{{"goc": "<mã góc>", "giong": "{"|".join(CFG["giong"]["danh_sach"])}",
- "text": "<lời đọc có tag [..], mỗi câu kết thúc bằng . ! hoặc ?>",
- "dong": ["<dòng phụ đề 1>", ...]  ← chia LỜI ĐỌC (bỏ tag) thành dòng phụ đề theo CỤM Ý trọn nghĩa, 5–10 từ/dòng; ghép lại phải đúng y lời đọc,
- "y_canh": ["<câu 1 nên thấy hình gì, ≤12 từ>", ... đúng bằng số câu],
- "nhan_tu": ["<2–4 từ cần phóng to>"],
- "caption": ["3 caption KHÁC NHAU (mỗi video dùng 1), mỗi cái ≤ 90 ký tự: 1 câu hook mạnh khiến người ta dừng lại + gợi giỏ hàng; không nói giá"],
- "hashtag": ["đúng 3 hashtag tiếng Việt không dấu, sát sản phẩm + cây trồng"]}}
-"""
+def ctx_xem_thu(ma, sp, n=3):
+    """Dữ liệu thật của sản phẩm cho nút "Xem thử" (chọn góc/dạng bài/quy cách đầu danh sách, không ngẫu nhiên, không ghi sổ)."""
+    sp_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them", "shop_product_id")}
+    goc = [g["ma"] for g in sp.get("goc_ban") or []] or ["cong-dung", "cach-dung", "thuong-hieu", "qua-tang"]
+    angles = (goc * n)[:n]
+    dang = list(DANG_BAI)[:n]
+    qcs = [q["ten"] for q in sp.get("quy_cach") or []]
+    qc = [qcs[i % len(qcs)] for i in range(n)] if qcs else None
+    return ctx_bien_kich(sp_ai, n, angles, cau_cua_sp(ma), recent_styles(), dang, dem_lich_su(f"mo-dau-{ma}.txt"), qc, _tom_tat(ma))
 
 
 def _chuan(s):

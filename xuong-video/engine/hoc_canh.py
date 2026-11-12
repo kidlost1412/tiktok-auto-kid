@@ -14,7 +14,7 @@ import kiem_mo_ta as km
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
-PROMPT_MD = CODE / "luat" / "MO-TA-VIDEO-GEMINI.md"
+import prompt_mau
 LS = HUB / "lich-su"
 MODELS = {"flash": "Flash (mặc định)", "pro": "Pro", "flash_lite": "Flash Lite"}
 MODEL_MAC_DINH = "flash"
@@ -183,13 +183,12 @@ def tim_project(kho):
 
 
 # ----------------------------------------------------------------------------------------------- lời nhắc (cả lô)
-def loi_nhac_lo(viec):
-    """viec: [{rel, dai, src (tuyệt đối), ra (tuyệt đối), ghi_chu?}]. Hướng dẫn chỉ nêu 1 lần, rồi danh sách video + file đầu ra của từng video."""
-    md = PROMPT_MD.read_text(encoding="utf-8")
+def ctx_loi_nhac(viec):
+    """Dữ liệu điền vào mẫu prompt/hoc-canh.md. viec: [{rel, dai, src (tuyệt đối), ra (tuyệt đối), ghi_chu?}]."""
+    md = prompt_mau.doc("mo-ta-gemini")[0]
     a = md.find("Bối cảnh:"); b = md.find("Làm lần lượt"); q = md.find("Quy tắc:")
     boi_canh = md[a:b].strip() if a >= 0 and b > a else ""
     quy_tac = md[q:].strip() if q >= 0 else md
-    n = len(viec)
     ds = []
     for i, v in enumerate(viec, 1):
         s = (f"{i}. Video: '{v['src']}' — dài {v['dai']:.2f} giây → thoi_luong_s = {v['dai']:.2f}, mọi tu_s/den_s nằm trong 0–{v['dai']:.2f}; "
@@ -197,16 +196,12 @@ def loi_nhac_lo(viec):
         if v.get("ghi_chu"):
             s += f" (lần trước chưa đạt: {v['ghi_chu']} — làm lại cho đúng, ghi đè file)"
         ds.append(s)
-    return (f"Bạn là người ghi mô tả cảnh cho kho B-roll. Có {n} video, xử lý LẦN LƯỢT từng video (mỗi video một cú xem riêng, không gộp, không đoán từ tên file): "
-            "XEM TOÀN BỘ video (cả hình và tiếng) tại đường dẫn tuyệt đối rồi tạo MỘT đối tượng JSON theo khung ở cuối và GHI nó (UTF-8, chỉ JSON thuần) "
-            "vào ĐÚNG file đầu ra của video đó. Ghi file của video nào ngay khi xong video đó (đừng đợi cả lô). "
-            "Chỉ được tạo/ghi các file đầu ra liệt kê dưới đây, KHÔNG đọc/ghi/sửa/xoá file nào khác, không chạy lệnh nào khác, không hỏi lại. "
-            "Một video lỗi thì bỏ qua (không ghi file) và làm tiếp video sau.\n\n"
-            f"{boi_canh}\n\n"
-            "DANH SÁCH VIDEO:\n" + "\n".join(ds) + "\n\n"
-            "Mọi tu_s/den_s là SỐ GIÂY (số thực, vd. 5.5), KHÔNG viết dạng \"0:05\". diem là SỐ NGUYÊN 0–5. Tên trường giữ ĐÚNG như khung, không đổi tên, không lồng thêm lớp.\n\n"
-            f"{quy_tac}\n\n"
-            "NỘI DUNG MỖI FILE: chỉ JSON thuần (bắt đầu bằng { kết thúc bằng }), không ``` , không giải thích. Ghi xong file của video cuối là xong việc.")
+    return {"so_video": len(viec), "boi_canh": boi_canh, "ds_video": "\n".join(ds), "quy_tac": quy_tac}
+
+
+def loi_nhac_lo(viec):
+    """Lời nhắc gửi Antigravity cho cả lô (mẫu prompt/hoc-canh.md — hướng dẫn nêu 1 lần, rồi danh sách video + file đầu ra từng video)."""
+    return prompt_mau.dien("hoc-canh", **ctx_loi_nhac(viec))
 
 
 # ----------------------------------------------------------------------------------------------- 1 cuộc trò chuyện = 1 lô: gửi + chờ từng file (có thể thay bằng giả khi thử)
