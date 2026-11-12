@@ -949,7 +949,7 @@ class H(BaseHTTPRequestHandler):
                 and nk.exists() and time.time() - nk.stat().st_mtime < 240 and not any("DỪNG" in l for l in lines[-2:])
             return self._json({"dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai, "bat_dau": RUN["bat_dau"], "tien_do": td,
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
-                               "token": token_hom_nay(), "che_do": c.get("che_do", "ekip"),
+                               "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
         if u.path == "/api/tai-khoan-ds":
             return self._json(tai_khoan_ds("moi" in parse_qs(u.query)))

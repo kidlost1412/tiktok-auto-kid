@@ -51,10 +51,6 @@ class LoiTam(Exception):
     pass
 
 
-class QuaHan(LoiTam):
-    pass
-
-
 # ----------------------------------------------------------------------------------------------- Antigravity: trạng thái / mở / gọi
 def _song(pid):
     try:

@@ -35,7 +35,6 @@ yarn-error.log
 
 # Xuong Video: ma di cung repo, du lieu o ngoai git
 /du-lieu/
-/xuong-video/**/__pycache__/
 /xuong-video/remotion/node_modules/
 /xuong-video/remotion/out/
 /xuong-video/remotion/.cache/

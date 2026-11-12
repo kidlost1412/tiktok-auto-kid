@@ -1,5 +1,5 @@
-"""Chế độ Ê-KÍP AI (Kid duyệt 10/11/2026): Biên kịch → Giọng → Đạo diễn (nhìn cảnh, lên bảng dựng) → Máy dựng → Giám khảo (xem, chấm, bắt sửa 1 lần).
-Gọi từ sanxuat.py khi config "che_do" = "ekip". Mỗi lời đọc → nhiều video, mỗi video một đạo diễn gu khác.
+"""Ê-KÍP AI (Kid duyệt 10/11/2026): Biên kịch → Giọng → Đạo diễn (nhìn cảnh, lên bảng dựng) → Máy dựng → Giám khảo (xem, chấm, bắt sửa 1 lần).
+Gọi từ sanxuat.py. Mỗi lời đọc → nhiều video, mỗi video một đạo diễn gu khác.
 Hết hạn mức Claude → dừng gọn, giữ những video đã xong."""
 import csv, datetime, json, math, os, random, re, shutil, subprocess, threading, time
 from concurrent.futures import ThreadPoolExecutor

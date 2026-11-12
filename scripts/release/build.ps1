@@ -11,8 +11,8 @@
      powershell -ExecutionPolicy Bypass -File scripts\release\build.ps1 -SkipVendor   # chay thu nhanh (khong co vendor)
  Script tu build launcher (go build -> launcher\dist\TikTokAuto.exe, KHONG chay test: chay test rieng truoc khi phat hanh).
  Goi chua TikTokAuto.exe (cai moi) va TikTokAuto.new.exe (cap nhat: launcher tu thay o lan mo ke tiep).
- Ngoai goi zip, script con chep cai-dat.ps1 vao dist\ (trinh cai GUI va CAI-DAT.bat cu van tai cai-dat.ps1 qua releases/latest/download) va build trinh cai GUI
- installer\build.bat -> dist\TikTokAutoKid-Setup.exe (neu co). CAI-DAT.bat khong con dinh kem Release (van nam trong goi zip).
+ Ngoai goi zip, script con chep cai-dat.ps1 vao dist\ (trinh cai GUI van tai cai-dat.ps1 qua releases/latest/download) va build trinh cai GUI
+ installer\build.bat -> dist\TikTokAutoKid-Setup.exe (neu co).
 
  Dang len GitHub (repo cong khai trong .env: UPDATE_REPO=owner/tiktok-auto-kid):
      git tag v<ver> ; git push origin v<ver>
@@ -92,7 +92,7 @@ $pb = Join-Path $Root 'public\build'
 if (Test-Path $pb) { Copy-Item $pb (Join-Path $stage 'public\build') -Recurse } else { Write-Warning 'Khong co public/build' }
 
 # 5. Launcher: build tu launcher\ (go build, khong cua so console). Goi chua:
-#    - TikTokAuto.exe     : cho ban CAI MOI (CAI-DAT.bat)
+#    - TikTokAuto.exe     : cho ban CAI MOI (TikTokAutoKid-Setup.exe)
 #    - TikTokAuto.new.exe : cho ban CAP NHAT (launcher tu thay o lan mo ke tiep; TikTokAuto.exe duoc bao ve khi cap nhat)
 if (-not $SkipLauncher) {
     $go = (Get-Command go -ErrorAction SilentlyContinue)

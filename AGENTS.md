@@ -38,7 +38,7 @@ App một người dùng: không đăng nhập, `APP_SINGLE_USER=true`, chỉ nh
 - `extension/autotok/`: tiện ích Chrome (xem `HUONG-DAN.md`, `PROTOCOL.md`, `STUDIO-API.md`).
 - `launcher/`: Go (`TikTokAuto.exe`), kèm bộ cập nhật (`update_*.go`).
 - `xuong-video/`: `app/` (server + giao diện hub + `cong_trypost.py`), `engine/` (máy dựng, AI), `luat/` (luật và prompt), `remotion/` (lớp chữ), `mau/` (dữ liệu mẫu cho lần chạy đầu).
-- `scripts/native/` (setup, start, stop, test, Caddyfile, services.json, env.template), `scripts/install/cai-dat.ps1` + `CAI-DAT.bat` (trình cài), `scripts/release/build.ps1` (đóng gói).
+- `scripts/native/` (setup, start, stop, test, Caddyfile, services.json, env.template), `scripts/install/cai-dat.ps1` (kịch bản cài, nhúng vào `installer/` -> `TikTokAutoKid-Setup.exe`), `scripts/release/build.ps1` (đóng gói).
 - `tools/fork/chrome-launcher/`, `tests/Feature/Fork` (Pest).
 
 **Dữ liệu người dùng (KHÔNG vào git, KHÔNG bị bản cập nhật ghi đè):**
@@ -87,13 +87,13 @@ Máy có thể yếu/RAM thấp: **chạy từng bước một**, không song so
 
 1. Sửa `VERSION` (semver, ví dụ `1.0.1`), commit mọi thứ (gói được tạo từ `git archive HEAD`).
 2. Chạy test (mục 6), rồi: `powershell -ExecutionPolicy Bypass -File scripts\release\build.ps1`.
-3. Kết quả trong `dist/` (đã .gitignore): `tiktok-auto-kid-<ver>.zip`, `.zip.sha256`, `CAI-DAT.bat`, `cai-dat.ps1`. Zip chứa mã, `vendor` (no-dev), `public/build`, `TikTokAuto.exe` (cài mới) và `TikTokAuto.new.exe` (cập nhật). Không chứa `.env`, `runtime/`, `du-lieu/`, `storage/*`, `node_modules`.
-4. Chủ app tự đăng: `git tag v<ver>`, `git push`, rồi `gh release create v<ver> dist\tiktok-auto-kid-<ver>.zip dist\tiktok-auto-kid-<ver>.zip.sha256 dist\CAI-DAT.bat dist\cai-dat.ps1 --repo kidlost1412/tiktok-auto-kid`. Tên asset phải đúng `tiktok-auto-kid-<ver>.zip` và `.zip.sha256`.
+3. Kết quả trong `dist/` (đã .gitignore): `tiktok-auto-kid-<ver>.zip`, `.zip.sha256`, `TikTokAutoKid-Setup.exe`, `cai-dat.ps1`. Zip chứa mã, `vendor` (no-dev), `public/build`, `TikTokAuto.exe` (cài mới) và `TikTokAuto.new.exe` (cập nhật). Không chứa `.env`, `runtime/`, `du-lieu/`, `storage/*`, `node_modules`.
+4. Chủ app tự đăng: `git tag v<ver>`, `git push`, rồi `gh release create v<ver> dist\tiktok-auto-kid-<ver>.zip dist\tiktok-auto-kid-<ver>.zip.sha256 dist\TikTokAutoKid-Setup.exe dist\cai-dat.ps1 --repo kidlost1412/tiktok-auto-kid`. Tên asset phải đúng `tiktok-auto-kid-<ver>.zip` và `.zip.sha256`.
 5. **Trình cập nhật** (trong launcher + trang Cài đặt > Cập nhật): đọc `UPDATE_REPO`, hỏi GitHub Releases mới nhất, tải zip, kiểm SHA256, ghi đè mã nhưng **bảo vệ** `.env`, `runtime/`, `storage/`, `du-lieu/`, `TikTokAuto.exe`; sao lưu DB trước khi migrate; có quay lại bản trước. `TikTokAuto.new.exe` được launcher thay vào lần mở kế tiếp. Danh sách bảo vệ: `IsProtected` trong `launcher/update_core.go`.
 
 ## 8. Cài đặt và kiểm tra
 
-- Người dùng chạy `CAI-DAT.bat` (-> `scripts/install/cai-dat.ps1`): hỏi thư mục, tải bản phát hành (kiểm SHA256), cài bằng winget (Visual C++, Python 3.11, Node LTS, ffmpeg; máy không có winget thì tải thẳng từ python.org / nodejs.org / gyan.dev, Node và ffmpeg giải vào `runtime/`), `npm i -g @anthropic-ai/claude-code`, chạy `scripts/native/setup.ps1` (PHP/Postgres/Caddy portable từ URL chính thức kèm SHA256, venv, Remotion, `.env`, CSDL), lối tắt Desktop/Start Menu, mở app. Chạy lại = sửa chữa. Nhật ký `runtime/logs/cai-dat.log`.
+- Người dùng chạy `TikTokAutoKid-Setup.exe` (nhúng `scripts/install/cai-dat.ps1`): hỏi thư mục, tải bản phát hành (kiểm SHA256), cài bằng winget (Visual C++, Python 3.11, Node LTS, ffmpeg; máy không có winget thì tải thẳng từ python.org / nodejs.org / gyan.dev, Node và ffmpeg giải vào `runtime/`), `npm i -g @anthropic-ai/claude-code`, chạy `scripts/native/setup.ps1` (PHP/Postgres/Caddy portable từ URL chính thức kèm SHA256, venv, Remotion, `.env`, CSDL), lối tắt Desktop/Start Menu, mở app. Chạy lại = sửa chữa. Nhật ký `runtime/logs/cai-dat.log`.
 - `-ThuKhong`: chạy thử, không đổi gì. `-KiemTra`: kiểm sức khoẻ (phần mềm, tệp, `.env`, khoá hub khớp, dịch vụ, cổng, hub, gợi ý ghép tiện ích) - **dùng khi được yêu cầu "kiểm tra cài đặt"**, mã thoát 1 nếu có lỗi.
 
 ## 9. Lỗi thường gặp và cách xử lý

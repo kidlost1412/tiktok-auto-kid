@@ -10,7 +10,7 @@ Dùng:
 
 Quy tắc an toàn: file gốc luôn được giữ ở _mo-ta/<thư mục con>/_goc-kiem/ TRƯỚC khi ghi lại (kho_canh.py bỏ qua mọi thư mục
 con bắt đầu bằng "_" trong _mo-ta, nên bản gốc không bị nạp 2 lần). Không bao giờ xoá/di chuyển video hay file mô tả."""
-import ast, copy, json, re, subprocess, sys, time
+import ast, copy, json, re, subprocess, sys
 from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
@@ -258,16 +258,6 @@ def _boc_goi(d, ghi):
             continue
         break
     return d
-
-
-def _thoi_gian(v, ten, ghi, dai, moc):
-    """Giây (float) từ mọi dạng; None nếu không hiểu."""
-    if _la_chuoi_gio(v):
-        s = _so(v)
-        if s is not None:
-            moc[ten] = True
-        return s
-    return _so(v)
 
 
 def chuan_hoa_noi_dung(duoi, dai_video=None, video_rel=None, la_obj=False):
@@ -592,7 +582,7 @@ def _doan_loai(t):
     return None
 
 
-# --- ffprobe (cùng lệnh engine dùng: anh_bia.py / bang_soat_lo.py) ----------------------------------------------------------
+# --- ffprobe (cùng lệnh engine dùng: anh_bia.py) ----------------------------------------------------------
 def do_dai_video(v):
     try:
         r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(v)],

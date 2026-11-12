@@ -1,14 +1,12 @@
 """Viết lời + phương án dựng bằng Claude CLI headless (mỗi lần gọi là phiên MỚI, không lịch sử chat).
 viet(ma_sp, so_ban) -> list kịch bản đã qua kiểm."""
-import json, random, re, subprocess
-from pathlib import Path
+import json, random, re
+
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet
 CFG = cfg_hub()
-from dung_remotion import MENU  # noqa: E402  (menu khâu dựng v2: nền FFmpeg + chữ Remotion)
-from cong_thuc import RECIPES, DATA_SPEC  # noqa: E402
 from ai import goi, lay_json, HetHanMuc  # noqa: E402
 
 
@@ -30,7 +28,6 @@ def _tom_tat(ma, cho="bien_kich"):
 BANNED = ["chữa khỏi", "khỏi hẳn", "100%", "số 1", "số một", "nhất thị trường", "duy nhất", "không độc", "ăn ngay",
           "tham khảo", "xem chi tiết", "tìm hiểu thêm", "đáng cân nhắc", "theo hướng dẫn của", "quy cách rõ ràng",
           "đúng nhu cầu", " nha", " nè", "giá chỉ", "nghìn đồng", "k/chai"]
-MUSIC_GROUPS = ["que-acoustic", "vui-mua-sam", "tvc-doanh-nghiep", "tet-le-hoi", "chill-nen", "piano-nhe", "tiktok"]
 
 
 def history_sentences(limit=400):

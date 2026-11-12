@@ -126,7 +126,6 @@ final class AutoController extends Controller
             'health' => $this->health($accounts, $chromeRows),
             'hub' => Inertia::defer(fn (): array => $this->hubStatus()),
             'lich' => $this->lich($accounts, $autoAccounts, $images),
-            'plan_ahead_hours' => (int) config('fork.auto.plan_ahead_hours', 6),
             'upcoming' => $this->upcoming($accounts),
             'recent' => $this->recent($accounts, $images),
             'failed_recent' => $this->failedRecent($accounts, $images),

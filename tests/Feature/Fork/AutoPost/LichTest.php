@@ -127,8 +127,7 @@ test('auto page exposes health, the 3-day schedule and the plan-ahead hint', fun
         ->where("lich.channels.{$this->a['social']->id}.today.cap", 40)
         ->where('health.channels.0.chrome_enabled', true)
         ->where('health.channels.0.chrome_online', false)
-        ->where('health.telegram', false)
-        ->where('plan_ahead_hours', 6));
+        ->where('health.telegram', false));
 });
 
 test('today counts include posts made with mode now (no scheduled_for)', function (): void {

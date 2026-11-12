@@ -3,7 +3,7 @@ python kho_canh.py <ma-san-pham>
 → san-pham/<ma>/canh.json (giữ tương thích máy dựng: id, file, tu, den, dai, crop, vai_tro) + san-pham/<ma>/_khung/<id>.jpg
 Lọc: điểm < 3, chữ chèn sẵn, sản phẩm hãng khác, người nói vào máy (lời đọc AI sẽ lệch khẩu hình), file trong loai_tru.
 Không đụng video gốc."""
-import json, re, subprocess, sys
+import json, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 

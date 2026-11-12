@@ -267,7 +267,7 @@ function Kiem-Tra-Suc-Khoe {
     Write-Host ''
     Write-Host '3. Tệp của app' -ForegroundColor Cyan
     if (-not (La-ThuMucCai $root)) {
-        Dat 'loi' "Không thấy bản cài ở $root (thiếu artisan/VERSION). Chạy CAI-DAT.bat để cài."
+        Dat 'loi' "Không thấy bản cài ở $root (thiếu artisan/VERSION). Chạy TikTokAutoKid-Setup.exe để cài."
         return $kq
     }
     Dat 'ok' ("Phiên bản " + (Get-Content (Join-Path $root 'VERSION') -Raw).Trim())
@@ -283,13 +283,13 @@ function Kiem-Tra-Suc-Khoe {
         'extension\autotok\manifest.json'   = 'tiện ích Chrome'
     }
     foreach ($k in $must.Keys) {
-        if (Test-Path (Join-Path $root $k)) { Dat 'ok' "$k ($($must[$k]))" } else { Dat 'loi' "Thiếu $k ($($must[$k])) - chạy lại CAI-DAT.bat để sửa." }
+        if (Test-Path (Join-Path $root $k)) { Dat 'ok' "$k ($($must[$k]))" } else { Dat 'loi' "Thiếu $k ($($must[$k])) - chạy lại TikTokAutoKid-Setup.exe để sửa." }
     }
     $xvPy = Doc-Env $root 'XUONG_PYTHON'
     if (-not $xvPy) { $xvPy = Join-Path $root 'runtime\xuong-venv\Scripts\python.exe' }
-    if (Test-Path $xvPy) { Dat 'ok' 'Python của Xưởng Video (venv hoặc XUONG_PYTHON) có sẵn' } else { Dat 'loi' "Thiếu Python của Xưởng Video: $xvPy - chạy lại CAI-DAT.bat để sửa." }
+    if (Test-Path $xvPy) { Dat 'ok' 'Python của Xưởng Video (venv hoặc XUONG_PYTHON) có sẵn' } else { Dat 'loi' "Thiếu Python của Xưởng Video: $xvPy - chạy lại TikTokAutoKid-Setup.exe để sửa." }
     foreach ($k in 'APP_KEY','FORK_HUB_KEY', 'FORK_CHROME_LAUNCHER_SECRET', 'XUONG_DATA', 'UPDATE_REPO') {
-        if (Doc-Env $root $k) { Dat 'ok' ".env có $k" } else { Dat 'loi' ".env thiếu $k (chạy lại CAI-DAT.bat; không chép khóa này lên mạng)." }
+        if (Doc-Env $root $k) { Dat 'ok' ".env có $k" } else { Dat 'loi' ".env thiếu $k (chạy lại TikTokAutoKid-Setup.exe; không chép khóa này lên mạng)." }
     }
     $data = Doc-Env $root 'XUONG_DATA'
     $dataAbs = $null
@@ -574,7 +574,7 @@ else {
         if ($ThuKhong) { return }
         if (& $co) { Ok "$ten đã sẵn sàng"; return }
         if (Co-Lenh 'winget') { Noi "  winget chưa cài được $ten - thử tải trực tiếp từ trang chính thức."; Cai-TrucTiep $truc; if (& $co) { Ok "$ten đã sẵn sàng"; return } }
-        Canh-Bao "Chưa thấy $ten sau khi cài - mở cửa sổ mới và chạy lại CAI-DAT.bat (hoặc tự cài $ten)."
+        Canh-Bao "Chưa thấy $ten sau khi cài - mở cửa sổ mới và chạy lại TikTokAutoKid-Setup.exe (hoặc tự cài $ten)."
     }
     Dam-Bao 'Visual C++ 2015-2022 (PHP/PostgreSQL cần; có thể hiện hộp thoại xin quyền quản trị)' 'Microsoft.VCRedist.2015+.x64' @() 'vcredist' { Co-VCRedist } 27 'thư viện Visual C++'
     Dam-Bao 'Python 3.11' 'Python.Python.3.11' @('--scope', 'user') 'python' { [bool](Tim-Python) } 33 'Python'
@@ -593,7 +593,7 @@ else {
         Cap-Nhat-Path
         if (Co-Lenh 'claude') { Ok 'Đã cài Claude Code CLI. Sau khi mở app: vào Xưởng Video, đăng nhập từng tài khoản Claude.' } else { Canh-Bao 'Cài Claude Code CLI chưa thành công (xem log). Thử tay: npm i -g @anthropic-ai/claude-code' }
     }
-    else { Canh-Bao 'Chưa có npm nên chưa cài được Claude Code CLI. Sau khi có Node.js, chạy lại CAI-DAT.bat.' }
+    else { Canh-Bao 'Chưa có npm nên chưa cài được Claude Code CLI. Sau khi có Node.js, chạy lại TikTokAutoKid-Setup.exe.' }
 }
 TD 55 'phan-mem' 'Đã xong phần mềm cần có.'
 if (Tim-Antigravity) { Ok 'Google Antigravity đã có (dùng cho "Học cảnh")' }
@@ -640,7 +640,7 @@ else {
     }
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
-    if ($rc -ne 0) { Loi "setup.ps1 thất bại (mã $rc). Xem $script:LogFile; chạy lại CAI-DAT.bat sẽ tiếp tục từ chỗ dở."; exit 1 }
+    if ($rc -ne 0) { Loi "setup.ps1 thất bại (mã $rc). Xem $script:LogFile; chạy lại TikTokAutoKid-Setup.exe sẽ tiếp tục từ chỗ dở."; exit 1 }
     Ok 'setup.ps1 hoàn tất.'
 }
 

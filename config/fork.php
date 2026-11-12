@@ -45,8 +45,6 @@ return [
             // true = hub phải giữ chỗ được mới đăng (bắt buộc cho máy phụ dùng chung hub).
             'require_claim' => (bool) env('FORK_HUB_REQUIRE_CLAIM', false),
         ],
-        // Không còn dùng để xếp lịch (Planner dùng AutoAccount.schedule_ahead_days); chỉ giữ cho giao diện cũ.
-        'plan_ahead_hours' => 6,
         // Tối đa bao nhiêu bài đã xếp trong tương lai (chưa đăng) mỗi kênh, chặn tải quá nhiều bài hẹn giờ lên TikTok.
         'max_future_posts' => (int) env('FORK_AUTO_MAX_FUTURE_POSTS', 100),
         // Số ngày xếp trước mặc định (cột schedule_ahead_days). TikTok chỉ cho hẹn tối đa 10 ngày.

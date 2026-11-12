@@ -1,5 +1,5 @@
 """8 CÔNG THỨC DỰNG (Kid duyệt 10/11/2026) + xếp khối theo câu/vùng + kiểm nội dung khối + chống lặp trong ngày."""
-import random, re
+import re
 
 FPS = 30
 RECIPES = {
@@ -37,7 +37,6 @@ RECIPES = {
                  "sfx": ["soi_dong", "mo_dau_am", "vua"], "atmos": {"leak": 0.4, "vignette": 0.2, "grain": 0.0}, "nhip": "vua"},
 }
 KHOI_MO = sorted({k for r in RECIPES.values() for k in r["mo"]})
-KHOI_GIUA = sorted({k for r in RECIPES.values() for k in r["giua"]})
 KHOI_CHOT = sorted({k for r in RECIPES.values() for k in r["chot"]})
 ZONE = {"lower_third": "LOWER"}           # còn lại đều ở vùng TOP (trừ hook_dap: CENTER, ngắn)
 SO_HOP_LE = {1, 2, 3, 5, 10, 200, 250, 300, 500, 15000}   # số đã có trong sự thật sản phẩm/quà
@@ -167,12 +166,7 @@ def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu):
 
 def chon_atmos(recipe_key, rng, cuts_f):
     a = RECIPES[recipe_key]["atmos"]
-    leaks = []
-    # Giám khảo 10/11: vệt sáng ở giây đầu làm nhạt chai, mở đầu kém sắc → chỉ đặt vệt sáng ở 1 điểm chuyển cảnh giữa bài
-    giua = [c for c in (cuts_f or []) if 75 <= c <= max(76, (max(cuts_f) if cuts_f else 0) - 60)]
-    if False and giua and rng.random() < a["leak"]:   # Kid/giám khảo 10/11: vệt sáng màu làm mờ hình, nhạt chai → tắt
-        leaks.append(rng.choice(giua) - 10)
-    return {"vignette": rng.random() < a["vignette"], "grain": rng.random() < a["grain"], "leaks": [max(0, l) for l in leaks],
+    return {"vignette": rng.random() < a["vignette"], "grain": rng.random() < a["grain"], "leaks": [],
             "hue": rng.choice([0, 20, 40, 300, 330])}
 
 

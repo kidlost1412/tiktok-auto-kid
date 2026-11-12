@@ -76,7 +76,6 @@ const props = defineProps<{
     health: Health;
     hub?: HubStatus;
     lich: Lich;
-    plan_ahead_hours: number;
     upcoming: UpcomingRow[];
     recent: RecentRow[];
     failed_recent?: FailedRow[];

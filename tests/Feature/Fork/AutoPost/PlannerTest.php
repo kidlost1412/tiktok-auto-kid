@@ -90,7 +90,6 @@ afterEach(function (): void {
 test('does not exceed daily cap and keeps minimum gap', function () {
     $account = ($this->account)(auto: ['daily_cap' => 5, 'window_start' => 0, 'window_end' => 24]);
     ($this->videos)(30);
-    config(['fork.auto.plan_ahead_hours' => 30]);
 
     ($this->planner)()->planAll($this->now);
 
@@ -280,7 +279,6 @@ test('codes without a link are held back in the library', function () {
     $path = $this->hub.'/ra/2026-11-09/KaliBo_x_Y_MIXKIT_1.mp4';
     file_put_contents($path, 'kali');
     AutoVideo::create(['hash' => hash('sha256', 'kali'), 'path' => $path, 'batch_date' => '2026-11-09', 'file_name' => 'KaliBo_x_Y_MIXKIT_1.mp4', 'product_code' => 'kali-bo', 'status' => 'new', 'caption' => 'Kali hub.', 'hashtags' => []]);
-    config(['fork.auto.plan_ahead_hours' => 30]);
 
     ($this->planner)()->planAll($this->now);
 
@@ -434,7 +432,6 @@ function quyCachSetup(object $t, SocialAccount $account, array $link): array
 test('a quy cach without a chosen product keeps its videos in the library', function () {
     $account = ($this->account)(auto: ['daily_cap' => 8], cart: false);
     $ids = quyCachSetup($this, $account, ['1l']);
-    config(['fork.auto.plan_ahead_hours' => 30]);
 
     ($this->planner)()->planAll($this->now);
 
@@ -449,7 +446,6 @@ test('a quy cach without a chosen product keeps its videos in the library', func
 test('each quy cach is posted with its own shop product', function () {
     $account = ($this->account)(auto: ['daily_cap' => 8], cart: false);
     $ids = quyCachSetup($this, $account, ['1l', '5l']);
-    config(['fork.auto.plan_ahead_hours' => 30]);
 
     ($this->planner)()->planAll($this->now);
 
@@ -476,7 +472,6 @@ test('a cart failure pauses only the link of that video quy cach', function () {
     $account = ($this->account)(auto: ['daily_cap' => 8], cart: false);
     quyCachSetup($this, $account, ['1l', '5l']);
     AutoVideo::query()->where('quy_cach', '1l')->delete();
-    config(['fork.auto.plan_ahead_hours' => 30]);
     ($this->planner)()->planAll($this->now);
 
     $video = AutoVideo::query()->where('status', 'scheduled')->firstOrFail();

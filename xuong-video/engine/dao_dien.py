@@ -1,11 +1,11 @@
 """Ê-kíp AI: ĐẠO DIỄN (lên bảng dựng từng câu, NHÌN ảnh cảnh) + GIÁM KHẢO (xem bản dựng, chấm, yêu cầu sửa).
 Máy dựng (dung.py / dung_remotion.py) chỉ làm theo bảng dựng; mọi lựa chọn AI đều được máy kiểm lại."""
-import json, random, re, subprocess
+import json, re, subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ai import goi, lay_json
-from bo_cuc import SO_PHU, TRONG_SO, la_chai
+from bo_cuc import SO_PHU, la_chai
 from cong_thuc import RECIPES, DATA_SPEC
 from dung import sentence_times, MENU as MENU_NEN
 from soat_kho import bad, nguoi_noi
@@ -88,12 +88,6 @@ def canh_qua(ma_sp, cfg_kho_qua):
         if ds:
             out[tu_khoa] = sorted(ds, key=lambda z: -((z.get("soat") or {}).get("dep") or 3))[:12]
     return out
-
-
-def canh_chung(ma_kho="video-vuon"):
-    """Kho cảnh VƯỜN dùng chung (cây, lá, đất, phun, người làm vườn). Bỏ cảnh có chai/gói (có thể là hãng khác).
-    id dạng 'V-<id>', file đường dẫn tuyệt đối. (Giữ cho tương thích; ekip dùng canh_them.)"""
-    return canh_them([ma_kho])
 
 
 def canh_them(ds_ma):
