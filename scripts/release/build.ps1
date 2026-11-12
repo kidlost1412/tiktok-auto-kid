@@ -139,7 +139,7 @@ $ib = Join-Path $Root 'installer\build.bat'
 if (Test-Path $ib) {
     try {
         Push-Location (Join-Path $Root 'installer')
-        try { & cmd.exe /c 'build.bat'; if ($LASTEXITCODE -ne 0) { throw "build.bat tra ma $LASTEXITCODE" } } finally { Pop-Location }
+        try { & cmd.exe /c "`"$ib`""; if ($LASTEXITCODE -ne 0) { throw "build.bat tra ma $LASTEXITCODE" } } finally { Pop-Location }
         $built = Join-Path $Root 'installer\dist\TikTokAutoKid-Setup.exe'
         if (Test-Path $built) { Copy-Item $built (Join-Path $dist 'TikTokAutoKid-Setup.exe') -Force; $setupExe = 'dist\TikTokAutoKid-Setup.exe' }
         else { Write-Warning 'installer\build.bat chay xong nhung khong thay installer\dist\TikTokAutoKid-Setup.exe.' }
