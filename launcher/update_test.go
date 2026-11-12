@@ -500,3 +500,25 @@ func TestRollbackLatest(t *testing.T) {
 		t.Error("snapshot đã dùng phải được xoá")
 	}
 }
+
+func TestClearBootstrapCacheAndDevGuard(t *testing.T) {
+	root := t.TempDir()
+	c := filepath.Join(root, "bootstrap", "cache")
+	os.MkdirAll(c, 0o755)
+	os.WriteFile(filepath.Join(c, "packages.php"), []byte("<?php"), 0o644)
+	os.WriteFile(filepath.Join(c, ".gitignore"), []byte("*"), 0o644)
+	ClearBootstrapCache(root, NewLogger())
+	if _, err := os.Stat(filepath.Join(c, "packages.php")); err == nil {
+		t.Error("packages.php phải bị xoá")
+	}
+	if _, err := os.Stat(filepath.Join(c, ".gitignore")); err != nil {
+		t.Error(".gitignore phải giữ")
+	}
+	if IsDevCheckout(root) {
+		t.Error("chưa có .git")
+	}
+	os.MkdirAll(filepath.Join(root, ".git"), 0o755)
+	if !IsDevCheckout(root) {
+		t.Error("có .git phải là máy lập trình")
+	}
+}

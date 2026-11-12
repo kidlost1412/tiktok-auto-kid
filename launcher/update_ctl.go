@@ -57,6 +57,9 @@ func ApplyPackage(env *updateEnv, zipPath string) error {
 	if !IsNewer(pkg.Version, cur) {
 		return fmt.Errorf("gói %s không mới hơn bản đang cài (%s)", pkg.Version, cur)
 	}
+	if IsDevCheckout(root) {
+		return fmt.Errorf("đây là máy lập trình (thư mục có .git) — cập nhật bằng git, không dùng gói phát hành")
+	}
 
 	env.progress("stopping", "Đang dừng các dịch vụ (giữ lại cơ sở dữ liệu)…", 15)
 	if env.StopServices != nil {
@@ -99,6 +102,7 @@ func ApplyPackage(env *updateEnv, zipPath string) error {
 		} else {
 			msg += ". Đã khôi phục bản " + cur
 		}
+		ClearBootstrapCache(root, env.Log)
 		env.run(root, env.PHP, "artisan", "optimize:clear")
 		if rerr := env.restartSafe(); rerr != nil {
 			msg += "; chạy lại dịch vụ lỗi: " + rerr.Error()
@@ -113,6 +117,7 @@ func ApplyPackage(env *updateEnv, zipPath string) error {
 	if _, err := pkg.Extract(root, env.Log); err != nil {
 		return failRestore(err)
 	}
+	ClearBootstrapCache(root, env.Log)
 	if merr == nil {
 		n := DeleteStale(root, StaleFiles(oldManifest, pkg.Manifest), env.Log)
 		env.Log.Printf("Cập nhật: đã xoá %d file không còn trong bản mới", n)
@@ -205,6 +210,7 @@ func RollbackLatest(env *updateEnv) error {
 		return err
 	}
 	os.RemoveAll(s.Dir)
+	ClearBootstrapCache(root, env.Log)
 	env.run(root, env.PHP, "artisan", "optimize:clear")
 	env.progress("restarting", "Đang khởi động lại các dịch vụ…", 90)
 	if err := env.restartSafe(); err != nil {
@@ -703,4 +709,22 @@ func validExe(p string) bool {
 		return false
 	}
 	return hdr[0] == 'M' && hdr[1] == 'Z'
+}
+
+// ClearBootstrapCache xoá bootstrap/cache/*.php (packages/services/config/routes). Danh sách gói cũ trỏ tới thư viện
+// không còn trong vendor mới (vd gói dev) làm artisan chết ngay ("Class ... CollisionServiceProvider not found").
+// Laravel tự tạo lại khi chạy lệnh kế tiếp.
+func ClearBootstrapCache(root string, log *Logger) {
+	matches, _ := filepath.Glob(filepath.Join(root, "bootstrap", "cache", "*.php"))
+	for _, m := range matches {
+		if err := os.Remove(m); err != nil && log != nil {
+			log.Printf("Cập nhật: không xoá được %s: %v", m, err)
+		}
+	}
+}
+
+// IsDevCheckout: thư mục cài là bản git (máy lập trình) → không cài gói phát hành đè lên (sẽ mất thư viện dev).
+func IsDevCheckout(root string) bool {
+	_, err := os.Stat(filepath.Join(root, ".git"))
+	return err == nil
 }
