@@ -146,8 +146,8 @@
       const sC = await L.sigv4({ method: 'POST', url: location.origin + commitUrl, body: commitBody, ...creds, now: new Date() });
       const cm = await step('cover-commit-upload', commitUrl, { method: 'POST', credentials: 'include', body: commitBody, headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }, sC.headers) }, { json: true });
       const uri = L.parseCoverCommit(cm.data) || node.uri;
-      progress('cover', 'đã tải ảnh bìa lên TikTok', null, { field: meta.field, uriLen: uri.length });
-      return { uri, field: meta.field };
+      progress('cover', 'đã tải ảnh bìa lên TikTok', null, { width: meta.width, height: meta.height, uriLen: uri.length });
+      return { uri, width: meta.width, height: meta.height };
     } catch (e) {
       return { warning: 'cover-upload: ' + String(e && e.message).slice(0, 200) };
     }
@@ -166,7 +166,7 @@
     }
     const { markup, textExtra } = L.buildCaption(job.caption, userIds);
     const probe = await probeVideo(blob);
-    const payload = L.buildPayload({ creationId: ids.creation_id, videoId: ids.video_id, caption: job.caption, markup, textExtra, visibility: v.vis, probe, scheduleTime: sched, anchors, coverUri: cover && cover.uri, coverField: cover && cover.field, ...v.options });
+    const payload = L.buildPayload({ creationId: ids.creation_id, videoId: ids.video_id, caption: job.caption, markup, textExtra, visibility: v.vis, probe, scheduleTime: sched, anchors, cover, ...v.options });
     return { payload, probe, resolvedMentions: Object.keys(userIds), tz: Intl.DateTimeFormat().resolvedOptions().timeZone };
   }
 

@@ -281,7 +281,9 @@ const modes = [
                         >
                             <span class="text-xs text-muted-foreground">
                                 jpg, png, webp · tối đa 5 MB/ảnh · khuyên dùng
-                                1080×1920 (9:16). png/webp được đổi sang jpg.
+                                1080×1440 (3:4), tối thiểu 324×432. Ảnh được cắt
+                                giữa theo 3:4 (TikTok dùng bìa 3:4); png/webp
+                                được đổi sang jpg.
                             </span>
                             <Button
                                 size="sm"
@@ -328,7 +330,7 @@ const modes = [
                             >
                                 <button
                                     type="button"
-                                    class="block aspect-[9/16] w-full"
+                                    class="block aspect-[3/4] w-full"
                                     :title="`${c.name} · ${c.w}×${c.h}`"
                                     @click="
                                         coverMode === 'fixed' &&

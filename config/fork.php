@@ -26,9 +26,8 @@ return [
         'next_max_wait' => 10,
         // Job đăng ngay chờ Chrome nhận tối đa bao nhiêu phút.
         'now_claim_within_minutes' => (int) env('FORK_CHROME_NOW_CLAIM_WITHIN_MINUTES', 120),
-        // Ảnh bìa riêng của sản phẩm: false = không gửi cho tiện ích (công tắc an toàn). Tên trường trong body đăng nhận URI ảnh bìa (chưa kiểm chứng với TikTok thật).
+        // Ảnh bìa riêng của sản phẩm: false = không gửi cho tiện ích (công tắc an toàn).
         'cover_enabled' => (bool) env('FORK_CHROME_COVER_ENABLED', true),
-        'cover_field' => (string) env('FORK_CHROME_COVER_FIELD', 'cover_uri'),
     ],
 
     // Tự động đăng từ hub sản xuất.

@@ -295,7 +295,8 @@ test('the chrome job payload carries options.cover for a personalised post and n
     $cover = app(ChromeJobs::class)->jobPayload($job, $client)['options']['cover'];
     $path = CoverStore::pathFor($this->product->fresh(), $post->meta['fork_cover']);
 
-    expect($cover)->toMatchArray(['url' => '/api/ext/cover?id='.$job->id, 'mime' => 'image/jpeg', 'size' => filesize($path), 'sha256' => hash_file('sha256', $path), 'field' => 'cover_uri'])
+    expect($cover)->toMatchArray(['url' => '/api/ext/cover?id='.$job->id, 'mime' => 'image/jpeg', 'size' => filesize($path), 'sha256' => hash_file('sha256', $path), 'width' => 540, 'height' => 720])
+        ->and($cover)->not->toHaveKey('field')
         ->and($job->options['cover']['code'])->toBe($this->code);
 
     // Công tắc an toàn: tắt thì không gửi bìa.
@@ -323,4 +324,42 @@ test('the Giỏ hàng page exposes the per-product state and the default hashtag
         ->where("personalise.{$this->code}.hashtags", ['#a'])
         ->where('personalise_default.tags', ['#chung'])
         ->where('personalise_default.pick', 2));
+});
+
+test('covers are center-cropped to 3:4 (max 1080x1440) and stored as jpg with the cropped size', function (): void {
+    $this->actingAs($this->owner)->post("/auto/products/{$this->code}/covers", ['images' => [
+        pnImage('jpg', 1080, 1920, 'tall'), pnImage('png', 1600, 900, 'wide'), pnImage('webp', 2160, 2880, 'big'), pnImage('jpg', 540, 720, 'exact'),
+    ]])->assertRedirect()->assertSessionHas('flash.success');
+
+    $p = $this->product->fresh();
+    $dims = collect($p->cover_images)->map(fn ($i): array => [$i['w'], $i['h']])->all();
+
+    expect($dims)->toBe([[1080, 1440], [675, 900], [1080, 1440], [540, 720]]);
+
+    foreach ($p->cover_images as $img) {
+        $size = getimagesize(CoverStore::pathFor($p, $img['file']));
+        expect([$size[0], $size[1]])->toBe([$img['w'], $img['h']])->and($size[2])->toBe(IMAGETYPE_JPEG);
+    }
+
+    expect($p->cover_images[0])->toMatchArray(['orig_w' => 1080, 'orig_h' => 1920]);
+});
+
+test('cropSize keeps 3:4 for tall and wide sources', function (): void {
+    expect(CoverStore::cropSize(1080, 1920))->toBe([1080, 1440])
+        ->and(CoverStore::cropSize(1600, 900))->toBe([675, 900])
+        ->and(CoverStore::cropSize(600, 800))->toBe([600, 800]);
+});
+
+test('Studio minimum 324x432 is enforced on the cropped result, by exact boundary', function (): void {
+    $try = fn (int $w, int $h): bool => $this->actingAs($this->owner)->post("/auto/products/{$this->code}/covers", ['images' => [pnImage('jpg', $w, $h)]])->getSession()->has('flash.success');
+
+    expect($try(324, 432))->toBeTrue()
+        ->and($try(323, 432))->toBeFalse()      // 323x431 after the crop
+        ->and($try(324, 431))->toBeFalse()
+        ->and($try(1000, 431))->toBeFalse()     // wide but too short: crop is 323x431
+        ->and($try(540, 960))->toBeTrue();
+    expect(count($this->product->fresh()->cover_images))->toBe(2);
+
+    $this->actingAs($this->owner)->post("/auto/products/{$this->code}/covers", ['images' => [pnImage('jpg', 300, 400)]])
+        ->assertSessionHas('flash.error', fn ($m): bool => str_contains($m, '324×432'));
 });

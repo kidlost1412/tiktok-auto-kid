@@ -458,7 +458,9 @@ final class ChromeJobs
                     'mime' => (string) ($opts['cover']['mime'] ?? 'image/jpeg'),
                     'size' => (int) ($opts['cover']['size'] ?? 0),
                     'sha256' => (string) ($opts['cover']['sha256'] ?? ''),
-                    'field' => (string) config('fork.chrome.cover_field', 'cover_uri'),
+                    // Kích thước ảnh đã cắt 3:4 (đi vào cover_info.cover_width/cover_height của body đăng).
+                    'width' => (int) ($opts['cover']['width'] ?? 0),
+                    'height' => (int) ($opts['cover']['height'] ?? 0),
                 ]] : []),
             ],
             'expect_account' => $c->tiktok_username,

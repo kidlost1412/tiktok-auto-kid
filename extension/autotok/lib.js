@@ -126,7 +126,7 @@
   }
 
   // ---- post body (uploader.py:543-598) ----
-  function buildPayload({ creationId, videoId, caption, markup, textExtra, visibility, allowComment = true, allowDuet = false, allowStitch = false, aiLabel = false, probe = null, scheduleTime = null, anchors = [], coverUri = null, coverField = 'cover_uri' }) {
+  function buildPayload({ creationId, videoId, caption, markup, textExtra, visibility, allowComment = true, allowDuet = false, allowStitch = false, aiLabel = false, probe = null, scheduleTime = null, anchors = [], cover = null }) {
     const feature = {
       geofencing_regions: [], playlist_name: '', playlist_id: '', tcm_params: '{"commerce_toggle_info":{}}',
       sound_exemption: 0, music_copyright: { result: 1 }, anchors,
@@ -142,7 +142,8 @@
       if (probe.duration_ms) info.video_track_time_range_list = [{ start_time_in_ms: 0, end_time_in_ms: probe.duration_ms }];
       if ('has_audio' in probe) info.has_original_audio = probe.has_audio ? 1 : 0;
     }
-    if (coverUri && COVER_FIELD_RE.test(coverField)) info[coverField] = coverUri;
+    const ci = buildCoverInfo(cover);
+    if (ci) info.cover_info = ci;
     if (scheduleTime != null) feature.schedule_time = scheduleTime;
     return { post_common_info: { creation_id: creationId, enter_post_page_from: 8, post_type: 3 }, feature_common_info_list: [feature],
       single_post_req_list: [{ batch_index: 0, video_id: videoId, is_long_video: 0, single_post_feature_info: info }] };
@@ -242,8 +243,8 @@
 
   // ---- per-product cover image (optional, never fatal: any problem here = post with TikTok's default cover) ----
   const COVER_MAX_BYTES = 5 * 1024 * 1024;
-  const COVER_FIELD_RE = /^[a-z][a-z0-9_]{0,40}$/;
-  // job.options.cover -> {ok, field} | {ok:false, reason}
+  const COVER_MIN_W = 324, COVER_MIN_H = 432;   // Studio: "Upload a file that is at least 324 × 432 pixels"
+  // job.options.cover -> {ok, width, height, size, mime, sha256} | {ok:false, reason}
   function validateCoverMeta(cv) {
     if (!cv || typeof cv !== 'object') return { ok: false, reason: 'no-cover' };
     if (typeof cv.url !== 'string' || !cv.url.startsWith('/api/ext/cover')) return { ok: false, reason: 'bad-url' };
@@ -251,8 +252,19 @@
     const size = Number(cv.size);
     if (!Number.isInteger(size) || size <= 0 || size > COVER_MAX_BYTES) return { ok: false, reason: 'bad-size' };
     if (typeof cv.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(cv.sha256)) return { ok: false, reason: 'bad-sha256' };
-    const field = typeof cv.field === 'string' && COVER_FIELD_RE.test(cv.field) ? cv.field : 'cover_uri';
-    return { ok: true, field, size, mime: cv.mime, sha256: cv.sha256 };
+    const width = Number(cv.width), height = Number(cv.height);
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < COVER_MIN_W || height < COVER_MIN_H) return { ok: false, reason: 'bad-dimensions' };
+    return { ok: true, width, height, size, mime: cv.mime, sha256: cv.sha256 };
+  }
+  // The cover_info object Studio sends for a custom uploaded cover (captured from a real post): cover_type 3 = CUSTOM_IMAGE,
+  // crop_type 2 = AUTO_CROP (the image is already center-cropped to 3:4 by the app). blob_url / coverProject are omitted.
+  // cover = {uri, width, height} -> object | null (anything doubtful = no cover_info, the default first-frame cover stays)
+  function buildCoverInfo(cover) {
+    if (!cover || typeof cover.uri !== 'string' || !cover.uri) return null;
+    const width = Number(cover.width), height = Number(cover.height);
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < COVER_MIN_W || height < COVER_MIN_H) return null;
+    return { cover_type: 3, crop_type: 2, cover_width: width, cover_height: height, frame_duration: 0, is_cover_cut: false,
+      isAutoCropFirstFrame: false, add_template_flag: false, cover_uri: cover.uri };
   }
   const coverApplyPath = (size) => `/top/v1?Action=ApplyUploadInner&Version=2020-11-19&SpaceName=tiktok&FileType=image&IsInner=1&FileSize=${size}&s=g158iqx8434`;
   // ApplyUploadInner response for FileType=image -> {ok, host, uri, auth, sessionKey} | {ok:false, reason}
@@ -479,7 +491,7 @@
   }
 
   const api = { validateJob, sanitizeResponse, mapPublishResult, extractPostId, parseKeepNumbers, createPublishGate, checkIdentity, CHUNK_SIZE, MAX_CAPTION_LENGTH, crc32Hex, splitParts, sigv4, sha256Hex, pyStrip, codePointLength, validateCaption, TOKEN_RE, mentionsIn,
-    buildCaption, visibilityCode, resolveSchedule, finalizeSchedule, buildPayload, validateCoverMeta, coverApplyPath, parseCoverApply, parseCoverCommit, COVER_MAX_BYTES,
+    buildCaption, visibilityCode, resolveSchedule, finalizeSchedule, buildPayload, validateCoverMeta, buildCoverInfo, coverApplyPath, parseCoverApply, parseCoverCommit, COVER_MAX_BYTES,
     buildProductAnchors, buildProductAnchorsDetailed, rewriteAnchors, rewriteAnchorsDetailed, parseShopProducts, checkProductAvailable, extractAnchorCapture, shopSearchUrl };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AutotokLib = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

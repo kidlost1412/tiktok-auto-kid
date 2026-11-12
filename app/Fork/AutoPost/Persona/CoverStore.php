@@ -31,7 +31,14 @@ final class CoverStore
 
     public const int MAX_SIDE = 8000;
 
-    public const int MIN_SIDE = 200;
+    /** Studio từ chối ảnh bìa nhỏ hơn 324x432. Ảnh luôn được cắt giữa theo 3:4 rồi thu về tối đa 1080x1440. */
+    public const int MIN_WIDTH = 324;
+
+    public const int MIN_HEIGHT = 432;
+
+    public const int TARGET_WIDTH = 1080;
+
+    public const int TARGET_HEIGHT = 1440;
 
     public static function normalizeMode(mixed $mode): string
     {
@@ -85,20 +92,21 @@ final class CoverStore
 
         [$w, $h] = [(int) $info[0], (int) $info[1]];
 
-        if (min($w, $h) < self::MIN_SIDE) {
-            throw new InvalidArgumentException('Ảnh quá nhỏ (cạnh ngắn dưới '.self::MIN_SIDE.' px).');
+        [$cw, $ch] = self::cropSize($w, $h);
+
+        if ($cw < self::MIN_WIDTH || $ch < self::MIN_HEIGHT) {
+            throw new InvalidArgumentException('Ảnh quá nhỏ: sau khi cắt 3:4 phải tối thiểu '.self::MIN_WIDTH.'×'.self::MIN_HEIGHT.' px (ảnh này chỉ còn '.$cw.'×'.$ch.').');
         }
 
         if (max($w, $h) > self::MAX_SIDE) {
             throw new InvalidArgumentException('Ảnh quá lớn (cạnh dài trên '.self::MAX_SIDE.' px).');
         }
 
-        if ($info[2] !== IMAGETYPE_JPEG) {
-            $bytes = $this->toJpeg($bytes);
-        }
+        // Luôn cắt giữa theo 3:4 (đúng cách Studio gửi bìa tự tải lên) và đổi sang jpg.
+        [$bytes, $cw, $ch] = $this->cropToJpeg($bytes);
 
         if (strlen($bytes) > self::MAX_BYTES) {
-            throw new InvalidArgumentException('Ảnh sau khi đổi sang jpg vẫn lớn hơn 5 MB.');
+            throw new InvalidArgumentException('Ảnh sau khi cắt và đổi sang jpg vẫn lớn hơn 5 MB.');
         }
 
         $dir = self::dir((string) $p->code);
@@ -116,16 +124,26 @@ final class CoverStore
         $entry = [
             'file' => $file,
             'name' => mb_substr(mb_scrub(pathinfo((string) $upload->getClientOriginalName(), PATHINFO_FILENAME), 'UTF-8'), 0, 80),
-            'w' => $w,
-            'h' => $h,
+            'w' => $cw,
+            'h' => $ch,
+            'orig_w' => $w,
+            'orig_h' => $h,
             'size' => strlen($bytes),
             'sha256' => hash('sha256', $bytes),
         ];
 
         $ratio = $h > 0 ? $w / $h : 0;
-        $warning = abs($ratio - 9 / 16) > 0.03 || $w < 540
-            ? 'Ảnh '.$w.'x'.$h.' chưa đúng khuyến nghị 1080x1920 (tỉ lệ 9:16); TikTok có thể cắt ảnh.'
-            : null;
+        $notes = [];
+
+        if (abs($ratio - 3 / 4) > 0.01) {
+            $notes[] = 'ảnh '.$w.'×'.$h.' không phải 3:4 nên đã được cắt giữa còn '.$cw.'×'.$ch;
+        }
+
+        if ($cw < self::TARGET_WIDTH) {
+            $notes[] = 'khuyên dùng '.self::TARGET_WIDTH.'×'.self::TARGET_HEIGHT.' (3:4) để bìa nét';
+        }
+
+        $warning = $notes === [] ? null : ucfirst(implode('; ', $notes)).'.';
 
         return ['entry' => $entry, 'warning' => $warning];
     }
@@ -211,6 +229,7 @@ final class CoverStore
             }
 
             $path = self::pathFor($product, $file);
+            $entry = collect($product->cover_images ?? [])->first(fn ($i): bool => ($i['file'] ?? null) === $file) ?? [];
 
             if ($path === null || ($size = (int) filesize($path)) <= 0 || $size > self::MAX_BYTES) {
                 return null;
@@ -223,6 +242,8 @@ final class CoverStore
                 'mime' => 'image/jpeg',
                 'size' => $size,
                 'sha256' => (string) hash_file('sha256', $path),
+                'width' => (int) ($entry['w'] ?? 0),
+                'height' => (int) ($entry['h'] ?? 0),
             ];
         } catch (Throwable) {
             return null;
@@ -244,10 +265,21 @@ final class CoverStore
             ])->values()->all();
     }
 
-    private function toJpeg(string $bytes): string
+    /** Kích thước sau khi cắt giữa theo 3:4 (chưa thu nhỏ). @return array{0: int, 1: int} */
+    public static function cropSize(int $w, int $h): array
+    {
+        if ($w * 4 > $h * 3) {
+            return [(int) round($h * 3 / 4), $h];   // rộng hơn 3:4: cắt hai bên
+        }
+
+        return [$w, (int) round($w * 4 / 3)];       // cao hơn 3:4: cắt trên dưới
+    }
+
+    /** @return array{0: string, 1: int, 2: int} jpg, rộng, cao */
+    private function cropToJpeg(string $bytes): array
     {
         if (! function_exists('imagecreatefromstring')) {
-            throw new InvalidArgumentException('Máy chưa có thư viện xử lý ảnh (GD) để đổi png/webp sang jpg; hãy tải ảnh jpg.');
+            throw new InvalidArgumentException('Máy chưa có thư viện xử lý ảnh (GD) để cắt ảnh; hãy liên hệ người cài đặt.');
         }
 
         $src = @imagecreatefromstring($bytes);
@@ -258,14 +290,19 @@ final class CoverStore
 
         $w = imagesx($src);
         $h = imagesy($src);
-        $dst = imagecreatetruecolor($w, $h);
+        [$cw, $ch] = self::cropSize($w, $h);
+        $sx = intdiv($w - $cw, 2);
+        $sy = intdiv($h - $ch, 2);
+        [$ow, $oh] = $cw > self::TARGET_WIDTH ? [self::TARGET_WIDTH, self::TARGET_HEIGHT] : [$cw, $ch];
+
+        $dst = imagecreatetruecolor($ow, $oh);
         imagefill($dst, 0, 0, (int) imagecolorallocate($dst, 255, 255, 255));   // nền trắng cho ảnh trong suốt
-        imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
+        imagecopyresampled($dst, $src, 0, 0, $sx, $sy, $ow, $oh, $cw, $ch);
 
         ob_start();
         imagejpeg($dst, null, 92);
         $out = (string) ob_get_clean();
 
-        return $out;
+        return [$out, $ow, $oh];
     }
 }
