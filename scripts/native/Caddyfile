@@ -42,7 +42,7 @@ http://localhost:8010, http://127.0.0.1:8010 {
 	handle_path /media/ra/* {
 		route {
 			import hub_ra_root
-			@media path_regexp \.(mp4|jpe?g|png|webp)$
+			@media path_regexp (?i)\.(mp4|jpe?g|png|webp)$
 			file_server @media
 			respond 404
 		}
@@ -50,7 +50,7 @@ http://localhost:8010, http://127.0.0.1:8010 {
 	handle_path /media/cache/* {
 		route {
 			root * storage/app/hub-cache
-			@media path_regexp \.(mp4|jpe?g)$
+			@media path_regexp (?i)\.(mp4|jpe?g)$
 			file_server @media
 			respond 404
 		}

@@ -269,8 +269,13 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         for k in ("job", "info", "fname", "gk", "edl", "plan", "music"):
                             t[k] = t["_cu"][k]
                         t["lan"] = 1
+                def cham_lai(t):             # chấm lại lỗi / hết hạn mức → điểm trống → giữ bản cũ (đã chấm), cất bản mới
+                    try:
+                        return t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"])
+                    except Exception as e:
+                        return t, {"diem": None, "dat": None, "loi": [f"chưa chấm: {type(e).__name__}"], "sua": ""}
                 with ThreadPoolExecutor(3) as ex:
-                    kq2 = list(ex.map(lambda t: (t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"])), lai))
+                    kq2 = list(ex.map(cham_lai, lai))
                 for t, r in kq2:
                     cu_t = t.get("_cu") or {}
                     if (r.get("diem") or 0) < (cu_t.get("gk", {}).get("diem") or 0):   # bản dựng lại kém hơn → giữ bản cũ

@@ -11,6 +11,7 @@ use App\Fork\AutoPost\Media\ProductImageLookup;
 use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\KhoStore;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Shop\HubCartAttach;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoSetting;
 use App\Fork\AutoPost\Models\AutoVideo;
@@ -223,6 +224,10 @@ final class KhoController extends Controller
 
         $library = app(VideoLibrary::class);
         $library->syncProducts();
+        try {
+            app(HubCartAttach::class)->run();   // sản phẩm Shop chọn ở Xưởng → gắn giỏ ngay, không chờ 5 phút
+        } catch (Throwable) {
+        }
         $r = $library->ingest();
 
         if (HubApi::enabled()) {

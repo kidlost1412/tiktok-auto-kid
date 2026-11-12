@@ -93,7 +93,7 @@ if (-not (Test-Path (Join-Path $rt 'caddy\caddy.exe'))) {
 $envPath = Join-Path $Root '.env'
 function Get-EnvVal([string]$k) {
     if (-not (Test-Path $envPath)) { return '' }
-    $l = Get-Content $envPath | Where-Object { $_ -match "^$k=" } | Select-Object -First 1
+    $l = Get-Content $envPath -Encoding UTF8 | Where-Object { $_ -match "^$k=" } | Select-Object -First 1
     if ($l) { return (($l -replace "^$k=", '').Trim().Trim('"')) } else { return '' }
 }
 $bs = [string][char]92
@@ -196,7 +196,7 @@ if (-not $SkipBuild) {
 }
 
 # --- Caddy: thu muc media hub (<FORK_HUB_PATH>/ra) cho /media/ra, doc tu .env ---
-$hubEnv = ((Get-Content $envPath | Where-Object { $_ -match '^FORK_HUB_PATH=' } | Select-Object -First 1) -replace '^FORK_HUB_PATH=', '').Trim().Trim('"')
+$hubEnv = ((Get-Content $envPath -Encoding UTF8 | Where-Object { $_ -match '^FORK_HUB_PATH=' } | Select-Object -First 1) -replace '^FORK_HUB_PATH=', '').Trim().Trim('"')
 if (-not $hubEnv) { $hubEnv = $dataDir }
 $hubRa = ($hubEnv.Replace($bs, '/').TrimEnd('/') + '/ra').Replace('"', '')
 [IO.File]::WriteAllText((Join-Path $rt 'hub-root.caddy'), "(hub_ra_root) {`n`troot * `"$hubRa`"`n}`n", (New-Object Text.UTF8Encoding($false)))

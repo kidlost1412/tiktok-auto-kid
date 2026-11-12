@@ -486,8 +486,8 @@ final class Planner
         return AutoVideo::query()
             ->where('social_account_id', $a->social_account_id)
             ->whereIn('status', self::COUNTED)
-            ->where('scheduled_for', '>=', $from)
-            ->where('scheduled_for', '<', $to)
+            // Cùng mốc với trần bài/ngày của VideoLibrary: bài "đăng ngay" (scheduled_for null) cũng tính.
+            ->whereRaw('COALESCE(scheduled_for, posted_at, updated_at) >= ? AND COALESCE(scheduled_for, posted_at, updated_at) < ?', [$from, $to])
             ->count();
     }
 

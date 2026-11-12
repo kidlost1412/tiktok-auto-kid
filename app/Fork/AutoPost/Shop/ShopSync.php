@@ -207,6 +207,11 @@ final class ShopSync
             $auto->forceFill($changes)->save();
         });
 
+        try {
+            app(HubCartAttach::class)->run();   // Shop vừa đồng bộ → gắn ngay giỏ đã chọn ở Xưởng (ô còn trống)
+        } catch (Throwable) {
+        }
+
         return ['received' => count($products), 'missing' => $missing];
     }
 

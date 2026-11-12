@@ -317,12 +317,12 @@ final class AutoController extends Controller
             $videos = AutoVideo::query()
                 ->where('social_account_id', $a->id)
                 ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED, AutoVideo::POSTED, AutoVideo::FAILED])
-                ->whereRaw('COALESCE(scheduled_for, posted_at) >= ? AND COALESCE(scheduled_for, posted_at) < ?', [$start->utc(), $end->utc()])
+                ->whereRaw('COALESCE(scheduled_for, posted_at, updated_at) >= ? AND COALESCE(scheduled_for, posted_at, updated_at) < ?', [$start->utc(), $end->utc()])
                 ->with('post')
                 ->get();
 
             $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a): array {
-                $at = $v->scheduled_for ?? $v->posted_at;
+                $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
                 $postStatus = $v->post?->status;
                 $state = match (true) {
                     // Video đã hẹn giờ sẵn trên TikTok (posted_at là giờ hẹn, chưa tới): chưa đăng, chỉ là đã hẹn.
