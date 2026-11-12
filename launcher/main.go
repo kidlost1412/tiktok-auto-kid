@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"errors"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -29,8 +30,13 @@ var (
 	flagWatchPG   = flag.Int("watch-pg", 0, "(nội bộ) chờ PID launcher chết rồi dừng Postgres")
 	flagSendBreak = flag.Int("send-break", 0, "(nội bộ) gửi CTRL_BREAK tới PID")
 	flagUpdate    = flag.String("update", "", "cài gói cập nhật tiktok-auto-kid-<phiên bản>.zip (khi launcher chưa chạy) rồi thoát")
+	flagSplashDemo demoFlag
 	flagAfterSwap = flag.Int("after-swap", 0, "(nội bộ) chờ PID launcher cũ thoát (sau khi thay TikTokAuto.exe)")
 )
+
+func init() {
+	flag.Var(&flagSplashDemo, "splash-demo", "chỉ hiện màn hình chào với tiến độ mô phỏng (=loi: thẻ lỗi), không chạy dịch vụ")
+}
 
 // findRoot: thư mục của exe; nếu không có runtime/services.json thì tìm ở các thư mục cha.
 func findRoot(start string) (string, bool) {
@@ -56,6 +62,10 @@ func main() {
 	if *flagWatchPG > 0 {
 		r, _ := filepath.Abs(*flagRoot)
 		os.Exit(runPGWatchdog(uint32(*flagWatchPG), r))
+	}
+	setDPIAware()
+	if flagSplashDemo != "" {
+		os.Exit(runSplashDemo(string(flagSplashDemo)))
 	}
 	if *flagConsole || *flagCheck || *flagUpdate != "" {
 		attachConsole()
@@ -90,7 +100,11 @@ func main() {
 	if running, err := acquireSingleInstance(); err == nil && running {
 		// lần chạy thứ hai: app đã lên thì mở thẳng; chưa lên thì mở trang trạng thái
 		if PortInUse(urlPort(mustParseURL(cfg.AppURL))) || cfg.StatusPortOrDefault() == 0 {
-			openPath(cfg.AppURL)
+			if *flagAutostart || *flagNoBrowser {
+				openPath(cfg.AppURL)
+			} else {
+				quickSplashThenOpen(root, cfg.AppURL) // splash ngắn "Sẵn sàng!" rồi mở trình duyệt
+			}
 		} else {
 			openPath(fmt.Sprintf("http://127.0.0.1:%d/", cfg.StatusPortOrDefault()))
 		}
@@ -203,6 +217,8 @@ type App struct {
 
 	status     *StatusServer
 	restarting bool
+	splashOn   int32  // 1 = đang/sắp hiện màn hình chào: không bật hộp thoại lỗi (thẻ lỗi của splash thay thế)
+	onQuit     func() // gọi sau khi dừng xong (khay: systray.Quit); nil = os.Exit(0)
 	updater    *Updater
 }
 
@@ -254,19 +270,30 @@ func (a *App) restart() {
 }
 
 // start khởi động nền; khi xong tuỳ chọn mở trình duyệt và sao lưu hằng ngày.
+// Mở trình duyệt (lần chạy thường): hiện màn hình chào với tiến độ thật rồi mở app; không tạo được splash thì
+// quay về cách cũ (mở trang trạng thái ngay). "Chạy cùng Windows"/--no-browser/--console: im lặng, không splash.
 func (a *App) start(openBrowser bool) {
 	openBrowser = openBrowser && !*flagNoBrowser && !*flagConsole
+	useSplash := openBrowser && !splashDisabled()
+	var h *splashHolder
+	if useSplash {
+		h = a.startSplashAsync()
+	}
 	if port := a.cfg.StatusPortOrDefault(); port > 0 {
-		ss, err := StartStatusServer(port, NewStatusHandlerFull(a.sup, a.cfg, a.root, a.restart, writeControlToken(a.root, a.log), a.updater))
+		ss, err := StartStatusServer(port, NewStatusHandlerAll(a.sup, a.cfg, a.root, a.restart, writeControlToken(a.root, a.log), a.updater, a.requestQuit))
 		if err != nil {
 			a.log.Printf("Không mở được trang trạng thái cổng %d: %v", port, err)
 		} else {
 			a.status = ss
 			a.log.Printf("Trang trạng thái: %s", ss.URL)
-			if openBrowser {
+			if openBrowser && !useSplash {
 				openPath(ss.URL)
 			}
 		}
+	}
+	if h != nil {
+		go a.runWithSplash(h)
+		return
 	}
 	go func() {
 		if err := a.sup.Start(); err != nil {
@@ -278,6 +305,23 @@ func (a *App) start(openBrowser bool) {
 		}
 		a.maybeDailyBackup()
 	}()
+}
+
+// requestQuit: thoát êm theo yêu cầu từ ngoài (POST /api/quit, vd trình gỡ cài đặt).
+func (a *App) requestQuit() error {
+	if a.updater != nil && a.updater.Busy() {
+		return errors.New("đang cập nhật, chưa thoát được")
+	}
+	go func() {
+		time.Sleep(150 * time.Millisecond) // để phản hồi HTTP kịp gửi
+		a.shutdown()
+		if a.onQuit != nil {
+			a.onQuit()
+		} else {
+			os.Exit(0)
+		}
+	}()
+	return nil
 }
 
 // writeControlToken tạo token ngẫu nhiên mỗi lần chạy, lưu runtime/control.token cho app Laravel đọc

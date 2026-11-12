@@ -19,11 +19,27 @@ Script chạy `go vet`, `go test`, rồi tạo `dist\TikTokAuto.exe` (không có
 3. Chạy `first_run` theo thứ tự (bước có `only_if_missing` chỉ chạy khi đường dẫn đó chưa tồn tại; bước không có thì chạy mỗi lần, vd `migrate`).
 4. Khởi động từng dịch vụ theo `depends_on`, chờ health (tcp/http) xong mới tới dịch vụ sau; quá hạn (mặc định 90 giây, đổi bằng `health.timeout_sec`) thì báo lỗi.
 5. Giám sát: dịch vụ chết thì tự chạy lại, chờ 1s → 2s → 4s ... tối đa 60s (về 1s nếu chạy ổn định > 60s).
-6. Mở trình duyệt tới `app_url` (không mở khi chạy từ "Chạy cùng Windows"). Chạy lần 2 chỉ mở trình duyệt, không chạy thêm bản nữa.
+6. Màn hình chào (splash, WebView2) hiện tiến độ thật rồi mở trình duyệt tới `app_url` (xem mục "Màn hình chào"). Không mở/không splash khi chạy từ "Chạy cùng Windows". Chạy lần 2 chỉ hiện splash ngắn (~0,8 giây) rồi mở trình duyệt, không chạy thêm bản nữa.
 7. Menu khay: Mở TikTok Auto Kid, trạng thái từng dịch vụ, Khởi động lại, Mở thư mục log, Sao lưu dữ liệu ngay, Chạy cùng Windows (ghi `HKCU\...\Run`, chỉ người dùng hiện tại), Thoát.
 8. Thoát: dừng ngược thứ tự phụ thuộc. Mỗi dịch vụ: chạy lệnh `stop` nếu có, nếu không thì gửi CTRL_BREAK; chờ (`stop_timeout_sec`, mặc định 8s, có `stop` thì 30s); quá hạn thì kill cả cây tiến trình. Tiến trình con nằm trong Job Object: launcher bị tắt đột ngột thì tất cả bị tắt theo (Postgres sẽ tự phục hồi lần chạy sau).
 
 Khuyến nghị: dịch vụ Postgres nên khai báo `stop` (`pg_ctl stop -m fast`) để tắt sạch.
+
+## Màn hình chào (splash)
+
+- Cửa sổ không khung 760x460, bo góc, nền tím, logo có hiệu ứng, thanh tiến độ mượt (không bao giờ lùi), một dòng trạng thái: "Đang mở kho dữ liệu…" (postgres), "Đang bật máy chủ…" (php/web), "Đang đánh thức Xưởng Video…", "Sắp xong…", "Sẵn sàng!". Tiến độ tính có trọng số từ trạng thái thật của các dịch vụ (`splash.go`); phần "bò nhẹ" do trang HTML (`assets/splash.html`) làm để không bao giờ trông như đứng yên.
+- Lỗi khởi động (cổng bị chiếm, dịch vụ quá hạn health, bước chuẩn bị hỏng) => thẻ lỗi tiếng Việt với nút "Thử lại" (dừng sạch rồi chạy lại ngay trên splash), "Xem chi tiết" (mở trang trạng thái cổng 8009, có log) và "Đóng" (app vẫn chạy ở khay).
+- Không tạo được WebView2 (máy thiếu runtime...) => im lặng quay về cách cũ (mở trang trạng thái, báo lỗi bằng hộp thoại), không chặn khởi động. Đặt biến môi trường `TTA_NO_SPLASH=1` để tắt splash.
+- Khi khởi động không còn thông báo/hộp thoại từng dịch vụ; chỉ có cảnh báo khi một dịch vụ chính chết bất ngờ SAU khi đã khởi động xong (mỗi dịch vụ tối đa 1 lần/10 phút).
+- Xem trước khi app thật đang chạy: `TikTokAuto.exe -splash-demo` (mô phỏng thành công), `-splash-demo=loi` (thẻ lỗi, bấm Thử lại thì chạy tiếp thành công), `-splash-demo=nhanh` (splash của lần chạy thứ hai). Các chế độ này không chạy dịch vụ và không đụng khoá single-instance.
+- WebView2 dùng bản chỉnh nhẹ của `github.com/jchv/go-webview2` (thuần Go, không cgo) đặt ở `third_party/go-webview2` (cửa sổ popup ẩn khỏi taskbar, không Fatal khi lỗi). Dữ liệu WebView2 nằm ở `%LOCALAPPDATA%\TikTokAutoKid\WebView2`. Gỡ lỗi: đặt `TTA_SPLASH_DEBUG=<đường dẫn tệp>` để ghi log của thư viện.
+
+## API điều khiển (127.0.0.1:8009)
+
+Các endpoint POST cần header `X-TTA-Token` = nội dung `runtime/control.token` (token mới mỗi lần chạy) và chỉ nhận Host loopback:
+
+- `POST /api/restart?service=<tên>`: khởi động lại một dịch vụ tuỳ chọn.
+- `POST /api/quit`: thoát êm (dừng dịch vụ theo thứ tự ngược rồi thoát, gỡ biểu tượng khay); trả 202 ngay, 409 nếu đang cập nhật. Trình gỡ cài đặt dùng endpoint này.
 
 ## Định dạng `runtime/services.json`
 

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TikTok Auto Kid - Cài đặt</title>
+<style>
+/*CSS*/
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="logo" viewBox="0 0 96 96">
+      <rect x="9" y="11" width="80" height="80" rx="26" fill="#4A3428" opacity=".18"/>
+      <rect x="6" y="7" width="80" height="80" rx="26" fill="#FED7E2" stroke="#4A3428" stroke-width="3.5"/>
+      <ellipse cx="30" cy="58" rx="7" ry="5" fill="#F59ABD" opacity=".75"/><ellipse cx="62" cy="58" rx="7" ry="5" fill="#F59ABD" opacity=".75"/>
+      <path d="M33 36v7M59 36v7" stroke="#4A3428" stroke-width="5" stroke-linecap="round"/>
+      <path d="M38 55q8 9 16 0" fill="none" stroke="#4A3428" stroke-width="4" stroke-linecap="round"/>
+      <path d="M78 6l2.6 6.4 6.4 2.6-6.4 2.6L78 24l-2.6-6.4-6.4-2.6 6.4-2.6z" fill="#FFE9A8" stroke="#4A3428" stroke-width="2.4" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <div class="bg">
+    <i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="grid"></i>
+  </div>
+
+  <header class="titlebar" id="titlebar">
+    <div class="tb-brand"><svg class="tb-logo"><use href="#logo"/></svg><span>TikTok Auto Kid</span><em id="tbMode">Cài đặt</em></div>
+    <div class="tb-btns">
+      <button class="tb-btn" id="btnMin" aria-label="Thu nhỏ"><svg viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      <button class="tb-btn close" id="btnClose" aria-label="Đóng"><svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+    </div>
+  </header>
+
+  <main id="stage">
+
+    <!-- 0. Chào mừng -->
+    <section class="screen center" id="s-welcome">
+      <div class="hero rise" style="--i:0">
+        <div class="logo-wrap"><i class="ring"></i><i class="ring r2"></i><svg class="logo-big"><use href="#logo"/></svg></div>
+      </div>
+      <h1 class="hero-title rise" style="--i:1">TikTok Auto Kid</h1>
+      <p class="hero-sub rise" style="--i:2">Làm video, quản lý sản phẩm và đăng TikTok tự động ✨<br>Cài đặt chỉ mất vài phút, không cần quyền quản trị nha.</p>
+      <div class="pill rise" style="--i:3"><i></i><span id="verText">Phiên bản</span></div>
+      <div id="welcomeNew" class="rise" style="--i:4">
+        <button class="btn primary xl" id="btnStart">Bắt đầu cài đặt<svg viewBox="0 0 20 20"><path d="M4 10h11m-4-5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div id="welcomeOld" class="rise hidden" style="--i:4">
+        <div class="installed-note"><b>Đã cài sẵn</b><span id="oldInfo"></span></div>
+        <div class="row-center">
+          <button class="btn primary xl" id="btnRepair">Sửa chữa / cài lại</button>
+          <button class="btn ghost xl" id="btnUninstall">Gỡ cài đặt</button>
+        </div>
+        <button class="link" id="btnOther">Cài vào thư mục khác</button>
+      </div>
+    </section>
+
+    <!-- 1. Nơi cài app -->
+    <section class="screen" id="s-dir">
+      <div class="steps rise" style="--i:0"><span class="on"></span><span></span><span></span><b>Bước 1 / 3</b></div>
+      <h2 class="rise" style="--i:1">Cài ứng dụng ở đâu nè? 🌱</h2>
+      <p class="lead rise" style="--i:2">Ứng dụng cần khoảng <b>2 GB</b>. Chọn ổ đĩa hoặc thư mục bạn muốn.</p>
+      <div class="cards rise" style="--i:3" id="dirCards"></div>
+      <div class="pathrow rise" style="--i:4">
+        <div class="pathbox"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span id="dirPath"></span></div>
+        <button class="btn ghost" id="btnPickDir">Chọn thư mục khác…</button>
+      </div>
+      <div class="msgs rise" style="--i:5" id="dirMsg"></div>
+      <footer class="foot">
+        <button class="btn ghost" data-go="welcome">Quay lại</button>
+        <button class="btn primary" id="dirNext">Tiếp tục</button>
+      </footer>
+    </section>
+
+    <!-- 2. Nơi lưu dữ liệu -->
+    <section class="screen" id="s-data">
+      <div class="steps rise" style="--i:0"><span class="on"></span><span class="on"></span><span></span><b>Bước 2 / 3</b></div>
+      <h2 class="rise" style="--i:1">Lưu video và dữ liệu ở đâu?</h2>
+      <p class="lead rise" style="--i:2">Video làm ra khá nặng, nên để ổ còn trống nhiều <b>(khuyên từ 50 GB trở lên)</b>.</p>
+      <div class="cards rise" style="--i:3" id="dataCards"></div>
+      <div class="pathrow rise" style="--i:4">
+        <div class="pathbox"><svg viewBox="0 0 24 24"><path d="M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zm0 0v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span id="dataPath"></span></div>
+        <button class="btn ghost" id="btnPickData">Chọn thư mục khác…</button>
+      </div>
+      <div class="msgs rise" style="--i:5" id="dataMsg"></div>
+      <footer class="foot">
+        <button class="btn ghost" data-go="dir">Quay lại</button>
+        <button class="btn primary" id="dataNext">Tiếp tục</button>
+      </footer>
+    </section>
+
+    <!-- 3. Tuỳ chọn -->
+    <section class="screen" id="s-opts">
+      <div class="steps rise" style="--i:0"><span class="on"></span><span class="on"></span><span class="on"></span><b>Bước 3 / 3</b></div>
+      <h2 class="rise" style="--i:1">Tuỳ chọn cuối cùng</h2>
+      <p class="lead rise" style="--i:2">Bạn có thể đổi lại bất cứ lúc nào trong ứng dụng.</p>
+      <div class="toggles rise" style="--i:3">
+        <label class="toggle"><span class="ticon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 20h8M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          <span class="ttext"><b>Tạo lối tắt ngoài màn hình</b><small>Bấm đúp biểu tượng TikTok Auto Kid là mở ngay.</small></span>
+          <input type="checkbox" id="optDesktop" checked><i class="switch"></i></label>
+        <label class="toggle"><span class="ticon"><svg viewBox="0 0 24 24"><path d="M12 3v9m5.7-6.7a8 8 0 11-11.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          <span class="ttext"><b>Tự mở khi bật máy</b><small>Phù hợp nếu bạn muốn app chạy đăng bài đều đặn.</small></span>
+          <input type="checkbox" id="optAuto" checked><i class="switch"></i></label>
+      </div>
+      <div class="summary rise" style="--i:4">
+        <div><small>Ứng dụng</small><span id="sumDir"></span></div>
+        <div><small>Video &amp; dữ liệu</small><span id="sumData"></span></div>
+      </div>
+      <footer class="foot">
+        <button class="btn ghost" data-go="data">Quay lại</button>
+        <button class="btn primary xl" id="btnInstall">Cài đặt ngay<svg viewBox="0 0 20 20"><path d="M10 3v10m-4-4l4 4 4-4M4 17h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </footer>
+    </section>
+
+    <!-- 4. Tiến độ (cài + gỡ) -->
+    <section class="screen" id="s-progress">
+      <div class="prog-grid">
+        <div class="prog-main">
+          <div class="eyebrow rise" style="--i:0" id="progEyebrow">Đang cài đặt</div>
+          <h2 class="rise" style="--i:1" id="progStage">Chuẩn bị…</h2>
+          <p class="prog-msg rise" style="--i:2" id="progMsg">Đang khởi động trình cài đặt</p>
+          <div class="bigbar rise" style="--i:3"><div class="fill" id="barFill"><i></i></div></div>
+          <div class="pct rise" style="--i:3"><span id="pctNum">0</span><small>%</small></div>
+          <div class="warns" id="progWarns"></div>
+          <div class="prog-actions rise" style="--i:4">
+            <button class="link" id="btnDetail">Xem chi tiết<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="link muted" id="btnCancel">Huỷ</button>
+          </div>
+          <pre class="logbox" id="logBox"></pre>
+        </div>
+        <aside class="checklist rise" style="--i:3" id="checklist"></aside>
+      </div>
+
+      <div class="errcard hidden" id="errCard">
+        <div class="err-ico"><svg viewBox="0 0 24 24"><path d="M12 8v5m0 3.5v.01M10.3 4.6L3.2 17a2 2 0 001.7 3h14.2a2 2 0 001.7-3L13.7 4.6a2 2 0 00-3.4 0z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3 id="errTitle">Chưa cài xong</h3>
+        <p id="errMsg"></p>
+        <div class="row-center">
+          <button class="btn primary" id="btnRetry">Thử lại</button>
+          <button class="btn ghost" id="btnLog">Mở nhật ký</button>
+          <button class="btn ghost" id="btnErrBack">Quay lại</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Hoàn tất -->
+    <section class="screen center" id="s-done">
+      <canvas id="confetti"></canvas>
+      <div class="done-ring rise" style="--i:0"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" class="dc"/><path d="M24 41l11 11 21-23" class="dk"/></svg></div>
+      <h1 class="hero-title rise" style="--i:1" id="doneTitle">Cài đặt xong rồi! 🎉</h1>
+      <p class="hero-sub rise" style="--i:2" id="doneSub">TikTok Auto Kid đã sẵn sàng trên máy bạn.</p>
+      <div class="summary center-sum rise" style="--i:3" id="doneInfo"></div>
+      <div class="warns center" id="doneWarns"></div>
+      <div class="row-center rise" style="--i:4">
+        <button class="btn primary xl" id="btnOpenApp">Mở TikTok Auto Kid</button>
+        <button class="btn ghost xl" id="btnDone">Đóng</button>
+      </div>
+    </section>
+
+    <!-- G1. Gỡ cài đặt: chọn -->
+    <section class="screen" id="s-go">
+      <div class="eyebrow rise" style="--i:0">Gỡ cài đặt</div>
+      <h2 class="rise" style="--i:1">Bạn muốn gỡ như thế nào? 🥺</h2>
+      <p class="lead rise" style="--i:2" id="goLead">TikTok Auto Kid sẽ được tắt và gỡ khỏi máy.</p>
+      <div class="gocards rise" style="--i:3">
+        <button class="gocard sel" id="goKeep" type="button">
+          <i class="gc-ico keep"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i>
+          <b>Giữ lại dữ liệu</b>
+          <span>Gỡ ứng dụng nhưng giữ video, sản phẩm và bản sao lưu cơ sở dữ liệu. Cài lại sau này sẽ khôi phục được.</span>
+          <code id="goKeepPath"></code>
+          <i class="radio"></i>
+        </button>
+        <button class="gocard" id="goAll" type="button">
+          <i class="gc-ico all"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0l1 13h8l1-13M10 11v6m4-6v6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></i>
+          <b>Xoá sạch tất cả</b>
+          <span>Xoá luôn video, sản phẩm và cơ sở dữ liệu. Không thể khôi phục.</span>
+          <code id="goAllPath"></code>
+          <em id="goAllSize"></em>
+          <i class="radio"></i>
+        </button>
+      </div>
+      <label class="confirm hidden" id="goConfirmBox"><input type="checkbox" id="goConfirm"><i class="chk"></i><span>Tôi hiểu, dữ liệu sẽ mất vĩnh viễn</span></label>
+      <div class="msgs" id="goMsg"></div>
+      <footer class="foot">
+        <button class="btn ghost" id="goCancel">Huỷ</button>
+        <button class="btn danger" id="goRun">Gỡ cài đặt</button>
+      </footer>
+    </section>
+
+    <!-- G2. Gỡ xong -->
+    <section class="screen" id="s-godone">
+      <div class="done-ring small rise" style="--i:0"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" class="dc"/><path d="M24 41l11 11 21-23" class="dk"/></svg></div>
+      <h2 class="rise center-t" style="--i:1">Đã gỡ TikTok Auto Kid</h2>
+      <div class="godone-grid rise" style="--i:2">
+        <div class="glass"><h4>Đã xoá</h4><ul id="goRemoved"></ul></div>
+        <div class="glass"><h4>Lưu ý</h4><ul id="goNotes"></ul></div>
+      </div>
+      <div class="row-center rise" style="--i:3">
+        <button class="btn primary xl" id="btnGoClose">Đóng</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h3 id="mTitle"></h3>
+    <p id="mText"></p>
+    <div class="row-center"><button class="btn ghost" id="mNo">Ở lại</button><button class="btn danger" id="mYes">Thoát</button></div>
+  </div>
+</div>
+
+<script>
+/*JS*/
+</script>
+</body>
+</html>

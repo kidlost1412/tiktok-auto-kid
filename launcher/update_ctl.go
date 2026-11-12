@@ -684,6 +684,7 @@ func swapNewExe(self string, args []string, pid int) bool {
 		}
 	}
 	cmd := exec.Command(self, append([]string{fmt.Sprintf("--after-swap=%d", pid)}, keep...)...)
+	cmd.SysProcAttr = hiddenAttr() // không bao giờ hiện cửa sổ console
 	if err := cmd.Start(); err != nil {
 		// chạy lại thất bại: trả về bản cũ để người dùng vẫn mở được
 		os.Rename(self, newP)

@@ -189,6 +189,12 @@ func NewStatusHandlerCtl(sup *Supervisor, cfg *Config, root string, retry func()
 
 // NewStatusHandlerFull như NewStatusHandlerCtl, thêm API cập nhật (/api/update*) khi upd != nil.
 func NewStatusHandlerFull(sup *Supervisor, cfg *Config, root string, retry func(), token string, upd *Updater) http.Handler {
+	return NewStatusHandlerAll(sup, cfg, root, retry, token, upd, nil)
+}
+
+// NewStatusHandlerAll như NewStatusHandlerFull, thêm POST /api/quit (cùng cơ chế xác thực /api/restart):
+// quit() thực hiện thoát êm (dừng dịch vụ rồi thoát); trình gỡ cài đặt dùng endpoint này. quit == nil = tắt endpoint.
+func NewStatusHandlerAll(sup *Supervisor, cfg *Config, root string, retry func(), token string, upd *Updater, quit func() error) http.Handler {
 	mux := http.NewServeMux()
 	authed := func(r *http.Request) bool {
 		return token != "" && r.Method == http.MethodPost && loopbackHost(r.Host) &&
@@ -197,6 +203,21 @@ func NewStatusHandlerFull(sup *Supervisor, cfg *Config, root string, retry func(
 	if upd != nil {
 		registerUpdateRoutes(mux, upd, cfg.AppURL, authed)
 	}
+	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if !authed(r) || quit == nil {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, `{"ok":false,"error":"forbidden"}`)
+			return
+		}
+		if err := quit(); err != nil {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		fmt.Fprint(w, `{"ok":true}`)
+	})
 	mux.HandleFunc("/api/restart", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if !authed(r) {

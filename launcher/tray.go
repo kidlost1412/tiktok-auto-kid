@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/systray"
@@ -13,7 +14,11 @@ import (
 var iconData []byte
 
 func (a *App) runTray() {
+	a.onQuit = systray.Quit
 	a.sup.Notify = func(title, msg string) {
+		if atomic.LoadInt32(&a.splashOn) == 1 {
+			return // lỗi lúc khởi động đã hiện trên thẻ lỗi của màn hình chào
+		}
 		a.mu.Lock()
 		dup := a.lastMsg == msg
 		a.lastMsg = msg

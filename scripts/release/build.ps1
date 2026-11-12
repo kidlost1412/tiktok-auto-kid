@@ -11,11 +11,12 @@
      powershell -ExecutionPolicy Bypass -File scripts\release\build.ps1 -SkipVendor   # chay thu nhanh (khong co vendor)
  Script tu build launcher (go build -> launcher\dist\TikTokAuto.exe, KHONG chay test: chay test rieng truoc khi phat hanh).
  Goi chua TikTokAuto.exe (cai moi) va TikTokAuto.new.exe (cap nhat: launcher tu thay o lan mo ke tiep).
- Ngoai goi zip, script con chep CAI-DAT.bat va cai-dat.ps1 vao dist\ de dinh kem Release (CAI-DAT.bat tai rieng se tu tai cai-dat.ps1 cua ban moi nhat).
+ Ngoai goi zip, script con chep cai-dat.ps1 vao dist\ (trinh cai GUI va CAI-DAT.bat cu van tai cai-dat.ps1 qua releases/latest/download) va build trinh cai GUI
+ installer\build.bat -> dist\TikTokAutoKid-Setup.exe (neu co). CAI-DAT.bat khong con dinh kem Release (van nam trong goi zip).
 
  Dang len GitHub (repo cong khai trong .env: UPDATE_REPO=owner/tiktok-auto-kid):
      git tag v<ver> ; git push origin v<ver>
-     gh release create v<ver> dist\tiktok-auto-kid-<ver>.zip dist\tiktok-auto-kid-<ver>.zip.sha256 `
+     gh release create v<ver> dist\tiktok-auto-kid-<ver>.zip dist\tiktok-auto-kid-<ver>.zip.sha256 dist\TikTokAutoKid-Setup.exe dist\cai-dat.ps1 `
          --repo owner/tiktok-auto-kid --title "TikTok Auto Kid <ver>" --notes-file ghi-chu.md
  (ten file asset phai dung dinh dang tiktok-auto-kid-<ver>.zip va .zip.sha256; tag dang v<ver>; phan notes hien tren trang Cap nhat.)
 #>
@@ -130,10 +131,25 @@ try {
 $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
 [IO.File]::WriteAllText("$zipPath.sha256", "$hash  tiktok-auto-kid-$Version.zip`n")
 Remove-Item $stage -Recurse -Force
-Copy-Item (Join-Path $Root 'CAI-DAT.bat') (Join-Path $dist 'CAI-DAT.bat') -Force
 Copy-Item (Join-Path $Root 'scripts\install\cai-dat.ps1') (Join-Path $dist 'cai-dat.ps1') -Force
+
+# 9. Trinh cai GUI (installer\build.bat -> installer\dist\TikTokAutoKid-Setup.exe), dinh kem Release
+$setupExe = $null
+$ib = Join-Path $Root 'installer\build.bat'
+if (Test-Path $ib) {
+    try {
+        Push-Location (Join-Path $Root 'installer')
+        try { & cmd.exe /c 'build.bat'; if ($LASTEXITCODE -ne 0) { throw "build.bat tra ma $LASTEXITCODE" } } finally { Pop-Location }
+        $built = Join-Path $Root 'installer\dist\TikTokAutoKid-Setup.exe'
+        if (Test-Path $built) { Copy-Item $built (Join-Path $dist 'TikTokAutoKid-Setup.exe') -Force; $setupExe = 'dist\TikTokAutoKid-Setup.exe' }
+        else { Write-Warning 'installer\build.bat chay xong nhung khong thay installer\dist\TikTokAutoKid-Setup.exe.' }
+    } catch { Write-Warning "Khong build duoc trinh cai GUI: $($_.Exception.Message)" }
+} else { Write-Warning 'Khong co installer\build.bat: bo qua trinh cai GUI (TikTokAutoKid-Setup.exe).' }
 
 $mb = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
 Write-Host "Xong: $zipPath ($mb MB, $($files.Count) file)"
 Write-Host "sha256: $hash"
-Write-Host "Dang len: gh release create v$Version `"$zipPath`" `"$zipPath.sha256`" dist\CAI-DAT.bat dist\cai-dat.ps1 --repo kidlost1412/tiktok-auto-kid --title `"TikTok Auto Kid $Version`" --notes-file <ghi-chu.md>"
+$assets = "`"$zipPath`" `"$zipPath.sha256`""
+if ($setupExe) { $assets += " $setupExe" }
+$assets += ' dist\cai-dat.ps1'
+Write-Host "Dang len: gh release create v$Version $assets --repo kidlost1412/tiktok-auto-kid --title `"TikTok Auto Kid $Version`" --notes-file <ghi-chu.md>"

@@ -6,11 +6,11 @@ Luồng: **Xưởng Video** (làm video bằng AI) -> **Kho video** -> **Giỏ h
 
 ## Cài đặt
 
-1. Vào trang **Releases** của kho này, tải file **`CAI-DAT.bat`**.
-2. Bấm đúp để chạy, chọn thư mục cài (mặc định `%LOCALAPPDATA%\TikTok Auto Kid`, có thể đổi sang ổ khác như `D:\TikTok Auto Kid`).
+1. Vào trang **Releases** của kho này, tải file **`TikTokAutoKid-Setup.exe`** và bấm đúp để chạy. Nếu Windows SmartScreen chặn: bấm **Thêm thông tin** rồi **Vẫn chạy**.
+2. Chọn thư mục cài (mặc định `%LOCALAPPDATA%\TikTok Auto Kid`, có thể đổi sang ổ khác như `D:\TikTok Auto Kid`) và thư mục dữ liệu video.
 3. Chờ trình cài làm tự động: tải bản mới nhất (kiểm SHA256), cài Python 3.11, Node.js, ffmpeg, Claude Code CLI bằng winget nếu thiếu, dựng PHP/PostgreSQL/Caddy, tạo cơ sở dữ liệu, tạo lối tắt **TikTok Auto Kid** ở Desktop và Start Menu, rồi mở app tại http://localhost:8010.
 
-Cần: Windows 10 (64-bit, bản 1809 trở lên) hoặc Windows 11, Internet (lần đầu, khoảng 400 MB), khoảng 10 GB trống. Không cần quyền quản trị (Windows có thể tự hỏi nếu một gói bắt buộc). Máy chưa có winget (Windows 10 cũ) vẫn cài được: trình cài tự tải Python, Node.js, ffmpeg từ trang chính thức. Chạy lại `CAI-DAT.bat` bất cứ lúc nào để **sửa chữa**; nhật ký ở `runtime\logs\cai-dat.log`.
+Cần: Windows 10 (64-bit, bản 1809 trở lên) hoặc Windows 11, Internet (lần đầu, khoảng 400 MB), khoảng 10 GB trống. Không cần quyền quản trị (Windows có thể tự hỏi nếu một gói bắt buộc). Máy chưa có winget (Windows 10 cũ) vẫn cài được: trình cài tự tải Python, Node.js, ffmpeg từ trang chính thức. Chạy lại `TikTokAutoKid-Setup.exe` (hoặc `CAI-DAT.bat` trong thư mục cài) bất cứ lúc nào để **sửa chữa**; nhật ký ở `runtime\logs\cai-dat.log`.
 
 Việc làm tay một lần:
 - **Chrome**: `chrome://extensions` > bật Chế độ nhà phát triển > *Tải tiện ích đã giải nén* > chọn thư mục `extension\autotok` trong thư mục cài. Ghép nối ở app: Cài đặt > Kết nối Chrome (xem `extension\autotok\HUONG-DAN.md`).

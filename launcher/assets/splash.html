@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TikTok Auto Kid</title>
+<style>
+:root{--cream:#FFFAF0;--card:#fff;--pink:#FED7E2;--pinkline:#F59ABD;--mint:#C6F6D5;--mintline:#7ED39C;--coral:#FFE4E4;--coralline:#FF6B6B;--ink:#4A3428;--muted:#7F6452;--peach:#FEEBC8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--cream);color:var(--ink);cursor:default;
+  font-family:Nunito,"Segoe UI Variable Display","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none}
+body{position:relative;opacity:0;transition:opacity .4s ease}
+body.go{opacity:1}
+body.out{opacity:0;transform:scale(.985);transition:opacity .34s ease-in,transform .34s ease-in}
+
+.card{position:absolute;inset:14px 16px 16px 14px;background:var(--card);border:2px solid var(--ink);border-radius:22px;
+  box-shadow:2px 3px 0 rgba(91,58,41,.18);overflow:hidden}
+.card::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(60% 50% at 50% 0%,rgba(254,215,226,.55),rgba(254,215,226,0) 70%),
+  radial-gradient(50% 45% at 100% 100%,rgba(254,235,200,.6),rgba(254,235,200,0) 70%)}
+/* hạt/tim nhỏ trôi nhẹ */
+.fl{position:absolute;bottom:-24px;font-size:15px;font-style:normal;opacity:0;animation:rise 9s linear infinite;pointer-events:none}
+@keyframes rise{0%{transform:translateY(0) rotate(-8deg);opacity:0}12%{opacity:.75}85%{opacity:.6}100%{transform:translateY(-520px) rotate(10deg);opacity:0}}
+
+.stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:4px;transition:opacity .35s,filter .35s}
+.logo{position:relative;width:104px;height:104px;margin-bottom:20px;animation:bounce 2.6s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes bounce{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-9px) rotate(-3deg)}60%{transform:translateY(0) rotate(2deg)}80%{transform:translateY(-3px) rotate(-1deg)}}
+.logo svg{width:100%;height:100%;display:block;filter:drop-shadow(2px 4px 0 rgba(91,58,41,.2))}
+.spark{position:absolute;font-size:22px;line-height:1;animation:tw 2.4s ease-in-out infinite}
+.sp1{right:-16px;top:-10px}.sp2{left:-18px;bottom:6px;font-size:15px;animation-delay:1.1s}
+@keyframes tw{0%,100%{transform:scale(.7) rotate(0);opacity:.55}50%{transform:scale(1.15) rotate(14deg);opacity:1}}
+.logo.pop{animation:pop .6s cubic-bezier(.3,1.7,.5,1) 1}
+@keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.16) rotate(-4deg)}100%{transform:scale(1)}}
+
+h1{font-size:31px;font-weight:800;letter-spacing:.2px;line-height:1.1;color:var(--ink)}
+.sub{margin-top:6px;font-size:13.5px;font-weight:600;color:var(--muted)}
+
+.load{margin-top:30px;display:flex;flex-direction:column;align-items:center;width:100%;transition:opacity .3s}
+.bar{position:relative;width:340px;height:16px;border-radius:99px;background:var(--peach);border:2px solid var(--ink);overflow:hidden}
+.fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--pinkline);border-radius:99px;border-right:2px solid var(--ink)}
+.fill::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(-45deg,rgba(255,255,255,.28) 0 8px,transparent 8px 16px);
+  background-size:22.6px 100%;animation:stripe 1s linear infinite}
+@keyframes stripe{to{background-position:22.6px 0}}
+.status{position:relative;height:24px;width:100%;margin-top:16px;font-size:15.5px;font-weight:700;color:var(--ink);text-align:center}
+.status span{position:absolute;left:0;right:0;top:0;opacity:0;transform:translateY(7px);transition:opacity .38s ease,transform .38s ease}
+.status span.on{opacity:1;transform:none}
+.status span.off{opacity:0;transform:translateY(-7px)}
+.pct{margin-top:4px;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.ver{position:absolute;left:32px;bottom:26px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.brand{position:absolute;right:34px;bottom:26px;font-size:11.5px;font-weight:700;color:var(--muted)}
+
+/* thẻ lỗi */
+.err{position:absolute;left:50%;top:50%;width:500px;transform:translate(-50%,-46%) scale(.97);opacity:0;pointer-events:none;
+  padding:24px 28px 22px;border-radius:20px;text-align:center;background:var(--coral);border:2px solid var(--coralline);
+  box-shadow:2px 3px 0 rgba(91,58,41,.18);transition:opacity .4s ease,transform .4s cubic-bezier(.2,.9,.3,1.2)}
+.errmode .err{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+.errmode .stage{opacity:.18;filter:blur(2px)}
+.errmode .logo,.errmode .spark{animation-play-state:paused}
+.ico{width:48px;height:48px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--coralline);font-size:24px}
+.err h2{font-size:20px;font-weight:800;color:var(--ink)}
+.err p{margin-top:8px;font-size:14px;font-weight:600;line-height:1.5;color:var(--ink);max-height:86px;overflow:auto;word-break:break-word}
+.btns{margin-top:18px;display:flex;gap:10px;justify-content:center}
+button{font:inherit;font-size:14px;font-weight:800;cursor:pointer;color:var(--ink);background:var(--pink);border:2px solid var(--ink);border-radius:99px;
+  padding:8px 20px;min-height:38px;box-shadow:1px 2px 0 rgba(91,58,41,.18);transition:transform .12s,background .15s}
+button:hover{background:var(--peach);transform:translateY(-1px)}
+button:active{transform:translateY(1px);box-shadow:none}
+button.pri{background:var(--pinkline)}
+button.pri:hover{background:var(--pink)}
+button.ghost{background:#fff}
+button.ghost:hover{background:var(--peach)}
+.errmode .load{opacity:0}
+</style>
+</head>
+<body>
+<div class="card">
+  <i class="fl" style="left:8%;animation-delay:0s">💗</i><i class="fl" style="left:22%;animation-delay:3.2s;font-size:11px">✦</i>
+  <i class="fl" style="left:78%;animation-delay:1.6s">✨</i><i class="fl" style="left:91%;animation-delay:5s;font-size:12px">💗</i>
+  <i class="fl" style="left:62%;animation-delay:6.4s;font-size:11px">✦</i><i class="fl" style="left:38%;animation-delay:7.6s;font-size:12px">🌸</i>
+  <div class="stage">
+    <div class="logo" id="logo">
+      <span class="spark sp1">✨</span><span class="spark sp2">💗</span>
+      <svg viewBox="0 0 104 104" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="98" height="98" rx="27" fill="#2a2230" stroke="#4A3428" stroke-width="4"/>
+        <rect x="9" y="9" width="86" height="86" rx="22" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="2"/>
+        <g transform="translate(0,2)">
+          <path d="M27 29h50v15H59.5v33h-15V44H27z" transform="translate(5,-4)" fill="#fe2c55"/>
+          <path d="M27 29h50v15H59.5v33h-15V44H27z" transform="translate(-5,4)" fill="#25f4ee"/>
+          <path d="M27 29h50v15H59.5v33h-15V44H27z" fill="#fff"/>
+        </g>
+      </svg>
+    </div>
+    <h1>TikTok Auto Kid</h1>
+    <div class="sub">Tự động hoá kênh TikTok của bạn</div>
+    <div class="load">
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <div class="status" id="status"><span class="on" id="s0">🌱 Đang khởi động…</span><span id="s1"></span></div>
+      <div class="pct" id="pct">0%</div>
+    </div>
+  </div>
+  <div class="err" id="err">
+    <div class="ico">😿</div>
+    <h2>Chưa mở được TikTok Auto Kid</h2>
+    <p id="errmsg"></p>
+    <div class="btns">
+      <button class="pri" id="bRetry">Thử lại</button>
+      <button id="bDetail">Xem chi tiết</button>
+      <button class="ghost" id="bClose">Đóng</button>
+    </div>
+  </div>
+  <div class="ver">v{{VERSION}}</div>
+  <div class="brand">TikTok Auto Kid</div>
+</div>
+
+<script>
+(function(){
+  var fill=document.getElementById('fill'),pctEl=document.getElementById('pct'),logo=document.getElementById('logo');
+  var spans=[document.getElementById('s0'),document.getElementById('s1')],cur=0,curText='🌱 Đang khởi động…';
+  var shown=0,target=0,mode='load',fast=false,doneAt=0,last=0,finished=false;
+  function call(n){try{if(window[n])return window[n].apply(null,[].slice.call(arguments,1))}catch(e){}}
+
+  function emo(t){return t==='Sẵn sàng!'?'🎉 ':t==='Sắp xong…'?'✨ ':'🌱 '}
+  function setText(t){
+    if(!t)return; t=emo(t)+t; if(t===curText)return; curText=t;
+    var a=spans[cur],b=spans[1-cur];
+    b.textContent=t; b.className='on'; a.className='off'; cur=1-cur;
+    setTimeout(function(){ if(spans[1-cur]) spans[1-cur].className=''; },420);
+  }
+  function frame(ts){
+    var dt=Math.min(.1,(ts-(last||ts))/1000); last=ts;
+    if(mode==='load'||mode==='ready'){
+      var rate=mode==='ready'?(fast?9:4.5):2.6;
+      if(shown<target){
+        var step=(target-shown)*(1-Math.exp(-dt*rate))+dt*(mode==='ready'?(fast?55:30):1.2);
+        shown=Math.min(target,shown+step);
+      }else if(mode==='load'){
+        // nhích nhẹ để không bao giờ trông như đứng yên
+        var cap=Math.min(target+6,96);
+        if(shown<cap) shown+=dt*Math.max(.25,(cap-shown)*.12);
+      }
+      fill.style.width=shown.toFixed(2)+'%';
+      pctEl.textContent=Math.floor(shown)+'%';
+      if(mode==='ready'&&shown>=99.9&&!doneAt){
+        doneAt=ts; logo.classList.add('pop');
+        setTimeout(function(){document.body.classList.add('out')},fast?160:520);
+        setTimeout(function(){finished=true;call('ttaDone')},fast?160+300:520+380);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  window.splash={
+    start:function(){document.body.classList.add('go')},
+    set:function(p,t){
+      if(mode!=='load')return;
+      if(p>target)target=Math.min(p,99);
+      setText(t);
+    },
+    ready:function(f){
+      if(mode==='ready')return;
+      fast=!!f; mode='ready'; target=100; document.body.classList.remove('errmode');
+      setText('Sẵn sàng!');
+    },
+    fail:function(msg){
+      mode='error';
+      document.getElementById('errmsg').textContent=msg||'Đã có lỗi khi khởi động.';
+      document.body.classList.add('errmode');
+    },
+    reset:function(){
+      mode='load';shown=0;target=0;doneAt=0;
+      document.body.classList.remove('errmode','out');
+      document.body.classList.add('go');
+      fill.style.width='0%';pctEl.textContent='0%';
+      setText('Đang khởi động…');
+    }
+  };
+  document.getElementById('bRetry').onclick=function(){call('ttaRetry')};
+  document.getElementById('bDetail').onclick=function(){call('ttaDetails')};
+  document.getElementById('bClose').onclick=function(){call('ttaClose')};
+  document.addEventListener('mousedown',function(e){
+    if(e.button===0&&!(e.target.closest&&e.target.closest('button')))call('ttaDrag');
+  });
+  document.addEventListener('contextmenu',function(e){e.preventDefault()});
+})();
+</script>
+</body>
+</html>

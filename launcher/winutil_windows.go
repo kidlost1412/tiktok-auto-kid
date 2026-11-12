@@ -89,7 +89,7 @@ func sendCtrlBreak(pid int) {
 		return
 	}
 	c := exec.Command(self, "--send-break", strconv.Itoa(pid))
-	c.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS}
+	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.DETACHED_PROCESS}
 	if err := c.Start(); err != nil {
 		return
 	}

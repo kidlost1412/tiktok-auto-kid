@@ -95,6 +95,8 @@ type Supervisor struct {
 	phase     string // mô tả bước đang làm
 	steps     []stepState
 	wdOnce    sync.Once
+	started   bool                 // đã khởi động xong lần đầu (từ đây mới báo lỗi do dịch vụ chết bất ngờ)
+	lastCrash map[string]time.Time // chống báo lặp một dịch vụ
 }
 
 // stepState là trạng thái một bước first_run (cho trang trạng thái).
@@ -260,6 +262,7 @@ func (s *Supervisor) Start() error {
 	s.startDone = make(chan struct{})
 	quit, done := s.quit, s.startDone
 	s.lastErr, s.phase = "", "Đang kiểm tra"
+	s.started = false
 	s.steps = nil
 	for _, step := range s.cfg.FirstRun {
 		s.steps = append(s.steps, stepState{Name: stepName(step), State: "pending"})
@@ -324,6 +327,7 @@ func (s *Supervisor) Start() error {
 	}
 	s.mu.Lock()
 	s.phase = ""
+	s.started = true
 	s.mu.Unlock()
 	s.log.Printf("Tất cả dịch vụ đã sẵn sàng")
 	s.changed()
@@ -394,6 +398,7 @@ func (s *Supervisor) Stop() {
 	s.mu.Lock()
 	quit, done := s.quit, s.startDone
 	s.quit = nil
+	s.started = false
 	s.mu.Unlock()
 	if quit != nil {
 		close(quit)
@@ -551,6 +556,7 @@ func (s *Supervisor) runLoop(st *svcState) {
 			}
 			st.set(StatusError, fmt.Sprintf("thoát mã %d", code))
 			s.changed()
+			s.crashNotify(sv, code)
 			switch sv.Restart {
 			case "never":
 				return
@@ -575,6 +581,29 @@ func (s *Supervisor) runLoop(st *svcState) {
 			return
 		}
 	}
+}
+
+// crashNotify báo (một lần mỗi 10 phút cho mỗi dịch vụ) khi dịch vụ chính chết bất ngờ SAU khi đã khởi động xong.
+// Trong lúc khởi động không báo từng dịch vụ: lỗi khởi động hiện gọn trên màn hình chào / qua fail().
+func (s *Supervisor) crashNotify(sv Service, code int) {
+	if sv.Optional {
+		return
+	}
+	s.mu.Lock()
+	if !s.started || s.quit == nil {
+		s.mu.Unlock()
+		return
+	}
+	if s.lastCrash == nil {
+		s.lastCrash = map[string]time.Time{}
+	}
+	if t, ok := s.lastCrash[sv.Name]; ok && time.Since(t) < 10*time.Minute {
+		s.mu.Unlock()
+		return
+	}
+	s.lastCrash[sv.Name] = time.Now()
+	s.mu.Unlock()
+	s.notify(appTitle+" – Cảnh báo", fmt.Sprintf("Dịch vụ %s vừa dừng bất ngờ (mã %d). Chương trình đang tự chạy lại.", sv.Name, code))
 }
 
 func containsInt(a []int, v int) bool {

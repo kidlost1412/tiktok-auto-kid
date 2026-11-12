@@ -24,6 +24,9 @@
   Tạo lối tắt trong Startup để app tự mở khi đăng nhập Windows (mặc định hỏi; -KhongHoi thì tắt).
 .PARAMETER ThuMucDuLieu
   Thư mục dữ liệu của Xưởng Video (XUONG_DATA). Mặc định <thư mục cài>\du-lieu\xuong-video.
+.PARAMETER TienDo
+  Chế độ cho trình cài GUI: không hỏi gì (như -KhongHoi), in thêm dòng tiến độ ##TD / ##TD-CB / ##TD-LOI,
+  không mở trình duyệt, không khởi động app. Ghi <thư mục cài>\runtime\install.json khi xong.
 .PARAMETER BoQuaPhanMem
   Không cài Python/Node/ffmpeg/Claude bằng winget (tự cài tay).
 .PARAMETER Repo
@@ -37,11 +40,31 @@ param(
     [switch]$ChayCungWindows,
     [string]$ThuMucDuLieu,
     [switch]$BoQuaPhanMem,
+    [switch]$TienDo,
     [string]$Repo = 'kidlost1412/tiktok-auto-kid'
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
+try { $OutputEncoding = [Text.Encoding]::UTF8 } catch {}
+if ($TienDo) { $KhongHoi = [switch]$true }
+
+# -TienDo: in thêm các dòng máy đọc được (trình cài GUI phân tích):
+#   ##TD <0-100>|<chặng>|<thông điệp>   tiến độ (chặng: tai-app, phan-mem, du-lieu, loi-tat, khoi-dong, xong)
+#   ##TD-CB <thông điệp>                 cảnh báo
+#   ##TD-LOI <thông điệp>                lỗi
+$script:TdMax = 0
+function TD([int]$pct, [string]$chang, [string]$msg) {
+    if (-not $TienDo) { return }
+    if ($pct -lt $script:TdMax) { $pct = $script:TdMax }
+    if ($pct -gt 100) { $pct = 100 }
+    $script:TdMax = $pct
+    Write-Host ("##TD {0}|{1}|{2}" -f $pct, $chang, $msg)
+}
+trap {
+    if ($TienDo) { Write-Host ("##TD-LOI Lỗi không mong đợi: " + ($_.Exception.Message -replace '[\r\n]+', ' ')) }
+    break
+}
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 $script:LogFile = $null
@@ -71,8 +94,8 @@ function Tieu-De([string]$msg) {
     Ghi-Log ("== [{0}] {1}" -f $script:BuocSo, $msg)
 }
 function Ok([string]$msg) { Noi "  [OK] $msg" 'Green' }
-function Canh-Bao([string]$msg) { $script:SoCanhBao++; Noi "  [!] $msg" 'Yellow' }
-function Loi([string]$msg) { $script:SoLoi++; Noi "  [LỖI] $msg" 'Red' }
+function Canh-Bao([string]$msg) { $script:SoCanhBao++; Noi "  [!] $msg" 'Yellow'; if ($TienDo) { Write-Host "##TD-CB $msg" } }
+function Loi([string]$msg) { $script:SoLoi++; Noi "  [LỖI] $msg" 'Red'; if ($TienDo) { Write-Host "##TD-LOI $msg" } }
 function Thu-Khong([string]$msg) { Noi "  [THỬ KHÔNG] $msg" 'Magenta' }
 
 function Hoi-CoKhong([string]$cauHoi, [bool]$macDinh) {
@@ -325,12 +348,17 @@ if ($ThuKhong) { Write-Host '(Chế độ CHẠY THỬ: chỉ in các bước, k
 $wvChinh = [Environment]::OSVersion.Version
 if ($wvChinh.Major -lt 10 -or $wvChinh.Build -lt 17763 -or -not [Environment]::Is64BitOperatingSystem) {
     Write-Host "Windows này không được hỗ trợ (build $($wvChinh.Build), 64-bit: $([Environment]::Is64BitOperatingSystem)). Cần Windows 10 64-bit bản 1809 trở lên hoặc Windows 11." -ForegroundColor Red
+    if ($TienDo) { Write-Host "##TD-LOI Windows này không được hỗ trợ. Cần Windows 10 64-bit bản 1809 trở lên hoặc Windows 11." }
     exit 1
 }
+TD 0 'tai-app' 'Đang chuẩn bị cài đặt...'
 
 $root = Chon-ThuMuc
 $script:GocCai = $root
-if ($root -match '[^\u0000-\u007F]') { Write-Host "Cảnh báo: đường dẫn có ký tự ngoài ASCII; một số công cụ (Remotion, ffmpeg) có thể lỗi. Nên dùng đường dẫn không dấu." -ForegroundColor Yellow }
+if ($root -match '[^\u0000-\u007F]') {
+    Write-Host "Cảnh báo: đường dẫn có ký tự ngoài ASCII; một số công cụ (Remotion, ffmpeg) có thể lỗi. Nên dùng đường dẫn không dấu." -ForegroundColor Yellow
+    if ($TienDo) { Write-Host "##TD-CB Đường dẫn cài có ký tự có dấu; một số công cụ (Remotion, ffmpeg) có thể lỗi. Nên dùng đường dẫn không dấu." }
+}
 $script:LogFile = Join-Path $root 'runtime\logs\cai-dat.log'
 if (-not $ThuKhong) { New-Item -ItemType Directory -Force (Split-Path $script:LogFile) | Out-Null }
 Ghi-Log "Bắt đầu cài. Thư mục: $root; ThuKhong=$ThuKhong; Repo=$Repo"
@@ -341,11 +369,14 @@ Tieu-De 'Lấy bản phát hành'
 if (La-ThuMucCai $root) {
     Ok ("Đã có bản cài (phiên bản {0}) - bỏ qua tải, chuyển sang sửa chữa/hoàn tất cài đặt." -f (Get-Content (Join-Path $root 'VERSION') -Raw).Trim())
     Noi '  (Muốn lên bản mới: dùng nút Cập nhật trong app.)'
+    TD 25 'tai-app' 'Đã có sẵn ứng dụng, chuyển sang bước cài phần mềm.'
 }
 else {
     if ((Test-Path $root) -and @(Get-ChildItem $root -Force -ErrorAction SilentlyContinue).Count -gt 0) {
+        if ($TienDo) { Loi "Thư mục $root không trống và chưa có TikTok Auto Kid. Hãy chọn thư mục trống hoặc thư mục mới."; exit 1 }
         if (-not (Hoi-CoKhong "Thư mục $root không trống và chưa có TikTok Auto Kid. Vẫn cài vào đây?" $false)) { Noi 'Đã hủy.'; exit 1 }
     }
+    TD 2 'tai-app' 'Đang tìm bản mới nhất trên mạng...'
     Noi "  Hỏi GitHub bản mới nhất của $Repo ..."
     $asset = $null; $shaAsset = $null; $ver = '?'
     try {
@@ -362,6 +393,7 @@ else {
     if ($asset) {
         $mb = [math]::Round($asset.size / 1MB, 1)
         Noi "  Bản $ver : $($asset.name) ($mb MB)"
+        TD 5 'tai-app' "Đang tải ứng dụng ($mb MB)..."
         $tmpDir = Join-Path $env:TEMP 'tiktok-auto-kid-cai-dat'
         $zip = Join-Path $tmpDir $asset.name
         if ($ThuKhong) { Thu-Khong "Tải $($asset.browser_download_url) -> $zip"; Thu-Khong 'Kiểm SHA256 rồi giải nén vào thư mục cài.' }
@@ -374,19 +406,38 @@ else {
             if ($want -notmatch '^[0-9a-f]{64}$') { Loi 'File .sha256 không hợp lệ.'; exit 1 }
             for ($try = 1; $try -le 3; $try++) {
                 Noi "  Đang tải gói cài (lần $try)..."
-                & curl.exe -L --fail --retry 5 --retry-delay 3 -C - --progress-bar -o $zip $asset.browser_download_url
+                if ($TienDo) {
+                    # curl chạy ẩn; đọc kích thước file mỗi giây để báo tiến độ (5% -> 20%)
+                    $cp = Start-Process -FilePath 'curl.exe' -ArgumentList ('-sS -L --fail --retry 5 --retry-delay 3 -C - -o "' + $zip + '" "' + $asset.browser_download_url + '"') -PassThru -WindowStyle Hidden
+                    while (-not $cp.HasExited) {
+                        Start-Sleep -Milliseconds 1000
+                        if (Test-Path $zip) {
+                            $da = (Get-Item $zip).Length
+                            $tl = if ($asset.size -gt 0) { [math]::Min(1.0, $da / $asset.size) } else { 0 }
+                            TD ([int](5 + 15 * $tl)) 'tai-app' ("Đang tải ứng dụng: {0} / {1} MB" -f [math]::Round($da / 1MB), $mb)
+                        }
+                    }
+                    $cp.WaitForExit()
+                    $global:LASTEXITCODE = $cp.ExitCode
+                }
+                else { & curl.exe -L --fail --retry 5 --retry-delay 3 -C - --progress-bar -o $zip $asset.browser_download_url }
+                TD 21 'tai-app' 'Đang kiểm tra gói vừa tải...'
                 if ($LASTEXITCODE -eq 0 -and (Test-Path $zip) -and ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -eq $want)) { break }
                 if (Test-Path $zip) { Remove-Item $zip -Force }
                 if ($try -eq 3) { Loi 'Tải gói cài không thành công hoặc sai SHA256.'; exit 1 }
             }
             Ok 'Đã tải và kiểm SHA256 đúng.'
             Noi '  Đang giải nén...'
+            TD 22 'tai-app' 'Đang giải nén ứng dụng...'
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             New-Item -ItemType Directory -Force $root | Out-Null
             $rootFull = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
             $za = [IO.Compression.ZipFile]::OpenRead($zip)
             try {
+                $tongE = [math]::Max(1, $za.Entries.Count); $iE = 0
                 foreach ($e in $za.Entries) {
+                    $iE++
+                    if (($iE % 200) -eq 0) { TD ([int](22 + 3 * $iE / $tongE)) 'tai-app' 'Đang giải nén ứng dụng...' }
                     if (-not $e.Name) { continue }
                     $dest = [IO.Path]::GetFullPath((Join-Path $root $e.FullName))
                     if (-not $dest.StartsWith($rootFull, [StringComparison]::OrdinalIgnoreCase)) { throw "Đường dẫn không an toàn trong gói: $($e.FullName)" }
@@ -397,12 +448,14 @@ else {
             Remove-Item $zip, $shaFile -Force -ErrorAction SilentlyContinue
             if (-not (La-ThuMucCai $root)) { Loi 'Giải nén xong nhưng không thấy artisan/VERSION - gói hỏng?'; exit 1 }
             Ok "Đã giải nén vào $root"
+            TD 25 'tai-app' 'Đã tải xong ứng dụng.'
         }
     }
     elseif (-not $ThuKhong) { Loi "Bản phát hành mới nhất của $Repo không có file tiktok-auto-kid-<phiên bản>.zip."; exit 1 }
 }
 
 # ---------------------------------------------------------------- 2. phần mềm cần có
+TD 25 'phan-mem' 'Đang kiểm tra phần mềm cần có...'
 Tieu-De 'Cài phần mềm còn thiếu (winget)'
 function Them-Path-User([string]$dir) {
     # Thêm thư mục vào PATH của người dùng (bền vững) và của phiên này.
@@ -513,22 +566,26 @@ function Cai-Winget([string]$id, [string]$ten, [string[]]$them = @(), [string]$t
 if ($BoQuaPhanMem) { Noi '  Bỏ qua cài phần mềm (-BoQuaPhanMem).' }
 else {
     Cap-Nhat-Path
-    function Dam-Bao([string]$ten, [string]$id, [string[]]$them, [string]$truc, [scriptblock]$co) {
+    function Dam-Bao([string]$ten, [string]$id, [string[]]$them, [string]$truc, [scriptblock]$co, [int]$pct = 0, [string]$nhan = '') {
+        if ($pct) { TD $pct 'phan-mem' "Đang kiểm tra $nhan..." }
         if (& $co) { Ok "$ten đã có"; return }
+        if ($pct) { TD $pct 'phan-mem' "Đang cài $nhan (có thể mất vài phút)..." }
         Cai-Winget $id $ten $them $truc
         if ($ThuKhong) { return }
         if (& $co) { Ok "$ten đã sẵn sàng"; return }
         if (Co-Lenh 'winget') { Noi "  winget chưa cài được $ten - thử tải trực tiếp từ trang chính thức."; Cai-TrucTiep $truc; if (& $co) { Ok "$ten đã sẵn sàng"; return } }
         Canh-Bao "Chưa thấy $ten sau khi cài - mở cửa sổ mới và chạy lại CAI-DAT.bat (hoặc tự cài $ten)."
     }
-    Dam-Bao 'Visual C++ 2015-2022 (PHP/PostgreSQL cần; có thể hiện hộp thoại xin quyền quản trị)' 'Microsoft.VCRedist.2015+.x64' @() 'vcredist' { Co-VCRedist }
-    Dam-Bao 'Python 3.11' 'Python.Python.3.11' @('--scope', 'user') 'python' { [bool](Tim-Python) }
-    Dam-Bao 'Node.js LTS' 'OpenJS.NodeJS.LTS' @() 'node' { [bool](Tim-Node) }
-    Dam-Bao 'ffmpeg' 'Gyan.FFmpeg' @() 'ffmpeg' { Co-Lenh 'ffmpeg' }
+    Dam-Bao 'Visual C++ 2015-2022 (PHP/PostgreSQL cần; có thể hiện hộp thoại xin quyền quản trị)' 'Microsoft.VCRedist.2015+.x64' @() 'vcredist' { Co-VCRedist } 27 'thư viện Visual C++'
+    Dam-Bao 'Python 3.11' 'Python.Python.3.11' @('--scope', 'user') 'python' { [bool](Tim-Python) } 33 'Python'
+    Dam-Bao 'Node.js LTS' 'OpenJS.NodeJS.LTS' @() 'node' { [bool](Tim-Node) } 40 'Node.js'
+    Dam-Bao 'ffmpeg' 'Gyan.FFmpeg' @() 'ffmpeg' { Co-Lenh 'ffmpeg' } 46 'ffmpeg (xử lý video)'
+    TD 50 'phan-mem' 'Đang kiểm tra Claude Code...'
     if (Co-Lenh 'claude') { Ok 'Claude Code CLI đã có' }
     elseif ($ThuKhong) { Thu-Khong 'npm.cmd install -g @anthropic-ai/claude-code' }
     elseif (Co-Lenh 'npm.cmd') {
         Noi '  Đang cài Claude Code CLI (npm)...'
+        TD 50 'phan-mem' 'Đang cài Claude Code (có thể mất vài phút)...'
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         $o = (& npm.cmd install -g '@anthropic-ai/claude-code' --no-audit --no-fund 2>&1 | Out-String); $rc = $LASTEXITCODE
         $ErrorActionPreference = $old
@@ -538,6 +595,7 @@ else {
     }
     else { Canh-Bao 'Chưa có npm nên chưa cài được Claude Code CLI. Sau khi có Node.js, chạy lại CAI-DAT.bat.' }
 }
+TD 55 'phan-mem' 'Đã xong phần mềm cần có.'
 if (Tim-Antigravity) { Ok 'Google Antigravity đã có (dùng cho "Học cảnh")' }
 else {
     Canh-Bao 'Chưa có Google Antigravity. Chỉ cần cho tính năng "Học cảnh": hãy tự tải và cài từ https://antigravity.google rồi đăng nhập (khi học cảnh phải để ứng dụng đang mở).'
@@ -548,6 +606,14 @@ else {
 # ---------------------------------------------------------------- 3. setup.ps1
 Tieu-De 'Cài PHP, PostgreSQL, Caddy, Python venv, Remotion, cơ sở dữ liệu (setup.ps1)'
 $setup = Join-Path $root 'scripts\native\setup.ps1'
+TD 55 'du-lieu' 'Đang dựng cơ sở dữ liệu và công cụ nền...'
+# khóa -> thông điệp thân thiện cho các mốc ##SETUP của setup.ps1
+$script:TdSetup = @{
+    php = 'Đang cài PHP'; composer = 'Đang chuẩn bị công cụ PHP'; pg = 'Đang cài cơ sở dữ liệu (tải khoảng 300 MB)'
+    caddy = 'Đang cài máy chủ web'; venv = 'Đang tạo môi trường Python'; pip = 'Đang cài thư viện Python cho Xưởng Video'
+    remotion = 'Đang cài công cụ dựng video (Remotion)'; env = 'Đang tạo cấu hình'; deps = 'Đang cài thư viện ứng dụng'
+    db = 'Đang tạo cơ sở dữ liệu'; shortcut = 'Sắp xong phần dữ liệu'; xong = 'Đã xong phần dữ liệu'
+}
 if ($ThuKhong) {
     $them = ''; if ($ThuMucDuLieu) { $them = " -HubPath `"$ThuMucDuLieu`"" }
     Thu-Khong "powershell -File `"$setup`"$them"
@@ -558,9 +624,20 @@ elseif (-not (Test-Path $setup)) { Loi "Không thấy $setup"; exit 1 }
 else {
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $setup)
     if ($ThuMucDuLieu) { $a += @('-HubPath', $ThuMucDuLieu) }
+    if ($TienDo) { $a += '-TienDo' }
     Noi '  Lần đầu mất khoảng 5-15 phút (tải ~400 MB, tùy mạng). Đừng đóng cửa sổ.'
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & powershell.exe @a 2>&1 | ForEach-Object { $s = "$_"; Write-Host "  | $s" -ForegroundColor DarkGray; Ghi-Log "setup: $s" }
+    & powershell.exe @a 2>&1 | ForEach-Object {
+        $s = "$_"
+        if ($s -match '^##SETUP (\d+)\|([^|]*)\|(.*)$') {
+            $pc = 55 + [int]([int]$Matches[1] * 0.35)
+            $m = $script:TdSetup[$Matches[2]]; if (-not $m) { $m = 'Đang cài đặt' }
+            if ($Matches[3].Trim()) { $m = "$m ($($Matches[3].Trim()))" } else { $m = "$m..." }
+            TD $pc 'du-lieu' $m
+            Ghi-Log "setup: $s"
+        }
+        else { Write-Host "  | $s" -ForegroundColor DarkGray; Ghi-Log "setup: $s" }
+    }
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     if ($rc -ne 0) { Loi "setup.ps1 thất bại (mã $rc). Xem $script:LogFile; chạy lại CAI-DAT.bat sẽ tiếp tục từ chỗ dở."; exit 1 }
@@ -568,6 +645,7 @@ else {
 }
 
 # ---------------------------------------------------------------- 4. lối tắt
+TD 90 'loi-tat' 'Đang tạo lối tắt...'
 Tieu-De 'Tạo lối tắt'
 function Tao-LoiTat([string]$duongDan, [string]$exe, [string]$thuMucLam) {
     if ($ThuKhong) { Thu-Khong "Lối tắt: $duongDan -> $exe"; return }
@@ -593,8 +671,36 @@ else {
 }
 
 # ---------------------------------------------------------------- 5. chạy app
+TD 95 'loi-tat' 'Đã tạo lối tắt.'
+# install.json: nơi trình cài/launcher biết thư mục cài và thư mục dữ liệu (XUONG_DATA thật sự trong .env)
+function Ghi-InstallJson {
+    $duLieu = Doc-Env $root 'XUONG_DATA'
+    if (-not $duLieu) { $duLieu = Doc-Env $root 'FORK_HUB_PATH' }
+    if (-not $duLieu) { $duLieu = if ($ThuMucDuLieu) { $ThuMucDuLieu } else { Join-Path $root 'du-lieu\xuong-video' } }
+    if (-not [IO.Path]::IsPathRooted($duLieu)) { $duLieu = Join-Path $root $duLieu }
+    $duLieu = [IO.Path]::GetFullPath($duLieu.Replace('/', '\'))
+    $ver = ''
+    try { $ver = (Get-Content (Join-Path $root 'VERSION') -Raw -ErrorAction Stop).Trim() } catch {}
+    $lk = Join-Path ([Environment]::GetFolderPath('Startup')) 'TikTok Auto Kid.lnk'
+    $o = [ordered]@{
+        thu_muc           = $root
+        du_lieu           = $duLieu
+        phien_ban         = $ver
+        chay_cung_windows = [bool](Test-Path $lk)
+        luc_cai           = (Get-Date).ToString('o')
+    }
+    if ($ThuKhong) { Thu-Khong ("Ghi $root\runtime\install.json: " + ($o | ConvertTo-Json -Compress)); return }
+    try {
+        New-Item -ItemType Directory -Force (Join-Path $root 'runtime') | Out-Null
+        [IO.File]::WriteAllText((Join-Path $root 'runtime\install.json'), ($o | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+        Ok 'Đã ghi runtime\install.json'
+    } catch { Canh-Bao "Không ghi được install.json: $($_.Exception.Message)" }
+}
+TD 96 'khoi-dong' 'Đang hoàn tất...'
 Tieu-De 'Khởi động và mở app'
-if ($ThuKhong) { Thu-Khong "Chạy $exe, chờ http://127.0.0.1:8010/up (tối đa 4 phút), mở http://localhost:8010 trong trình duyệt." }
+Ghi-InstallJson
+if ($TienDo) { Noi '  (Chế độ -TienDo: không mở trình duyệt, không khởi động app; trình cài GUI sẽ làm.)' }
+elseif ($ThuKhong) { Thu-Khong "Chạy $exe, chờ http://127.0.0.1:8010/up (tối đa 4 phút), mở http://localhost:8010 trong trình duyệt." }
 else {
     if (Http-Ok 'http://127.0.0.1:8009/api/status' 3) { Ok 'TikTok Auto Kid đang chạy sẵn.' }
     elseif (Test-Path $exe) { Start-Process -FilePath $exe -WorkingDirectory $root; Noi '  Đã mở TikTok Auto Kid (biểu tượng ở khay hệ thống). Đang chờ dịch vụ sẵn sàng...' }
@@ -619,4 +725,6 @@ Write-Host ''
 Write-Host ("Nhật ký: " + $script:LogFile) -ForegroundColor DarkGray
 Write-Host 'Kiểm tra lại bất cứ lúc nào: scripts\install\cai-dat.ps1 -KiemTra' -ForegroundColor DarkGray
 Ghi-Log "Kết thúc. Cảnh báo=$script:SoCanhBao Lỗi=$script:SoLoi"
-if ($script:SoLoi -gt 0) { exit 1 } else { exit 0 }
+if ($script:SoLoi -gt 0) { exit 1 }
+TD 100 'xong' 'Cài đặt hoàn tất.'
+exit 0

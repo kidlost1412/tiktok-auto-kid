@@ -4,11 +4,13 @@
 .PARAMETER HubPath
   Thu muc DU LIEU cua Xuong Video (XUONG_DATA = FORK_HUB_PATH). Mac dinh <repo>\du-lieu\xuong-video.
   Ma Xuong Video nam trong <repo>\xuong-video; venv Python o runtime\xuong-venv. Khoa ket noi hub (FORK_HUB_KEY) doc tu config.json trong thu muc du lieu.
+.PARAMETER TienDo
+  In ra dong may doc duoc '##SETUP <pct 0-100>|<khoa>|<chi tiet>' de trinh cai GUI hien tien do (cai-dat.ps1 -TienDo dung).
 .PARAMETER SkipBuild
   Bo qua npm ci + npm run build (da build roi).
 Chay: powershell -ExecutionPolicy Bypass -File scripts\native\setup.ps1 [-HubPath "D:\Video\xuong-video"]
 #>
-param([string]$HubPath, [switch]$SkipBuild)
+param([string]$HubPath, [switch]$SkipBuild, [switch]$TienDo)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -16,6 +18,17 @@ $rt = Join-Path $Root 'runtime'
 $dl = Join-Path $rt '_dl'
 Set-Location $Root
 New-Item -ItemType Directory -Force $rt, $dl, (Join-Path $rt 'logs') | Out-Null
+
+function Mark([int]$pct, [string]$key, [string]$detail = '') {
+    if ($TienDo) { Write-Host ("##SETUP {0}|{1}|{2}" -f $pct, $key, $detail) }
+}
+function Get-RemoteSize([string]$url) {
+    try {
+        $h = (& curl.exe -sIL --max-time 20 $url 2>$null) | Where-Object { $_ -match '^(?i)content-length:\s*\d+' }
+        if ($h) { return [int64](($h | Select-Object -Last 1) -replace '[^0-9]', '') }
+    } catch {}
+    return 0
+}
 
 # --- Phien ban da ghim ---
 $PhpVer = '8.5.12-1'
@@ -30,7 +43,7 @@ $ComposerUrl = 'https://getcomposer.org/download/2.9.5/composer.phar'
 $ComposerSha = 'c86ce603fe836bf0861a38c93ac566c8f1e69ac44b2445d9b7a6a17ea2e9972a'
 $CacertUrl = 'https://curl.se/ca/cacert.pem'
 
-function Get-File([string]$url, [string]$out, [string]$sha, [string]$alt = '') {
+function Get-File([string]$url, [string]$out, [string]$sha, [string]$alt = '', [int]$p0 = 0, [int]$p1 = 0, [string]$key = '') {
     # Tai bang curl (tiep tuc khi dut mang, thu lai), kiem SHA256. File da co ma sai hash -> xoa tai lai.
     if (Test-Path $out) {
         if (-not $sha -or (Get-FileHash $out -Algorithm SHA256).Hash -ieq $sha) { return }
@@ -40,7 +53,24 @@ function Get-File([string]$url, [string]$out, [string]$sha, [string]$alt = '') {
     foreach ($u in $urls) {
         for ($try = 1; $try -le 2; $try++) {
             Write-Host "Tai $u"
-            & curl.exe -L --fail --retry 5 --retry-delay 3 -C - -o $out $u
+            if ($TienDo -and $key) {
+                # tai bang curl chay an, doc kich thuoc file moi giay de bao tien do
+                $tong = Get-RemoteSize $u
+                $cp = Start-Process -FilePath 'curl.exe' -ArgumentList ('-sS -L --fail --retry 5 --retry-delay 3 -C - -o "' + $out + '" "' + $u + '"') -PassThru -WindowStyle Hidden
+                while (-not $cp.HasExited) {
+                    Start-Sleep -Milliseconds 1000
+                    if (Test-Path $out) {
+                        $da = (Get-Item $out).Length
+                        $pc = $p0
+                        if ($tong -gt 0) { $pc = [int]($p0 + ($p1 - $p0) * [math]::Min(1.0, $da / $tong)) }
+                        $mbDa = [math]::Round($da / 1MB); $mbTong = [math]::Round($tong / 1MB)
+                        Mark $pc $key $(if ($tong -gt 0) { "$mbDa/$mbTong MB" } else { "$mbDa MB" })
+                    }
+                }
+                $cp.WaitForExit()
+                $global:LASTEXITCODE = $cp.ExitCode
+            }
+            else { & curl.exe -L --fail --retry 5 --retry-delay 3 -C - -o $out $u }
             if ($LASTEXITCODE -eq 0 -and (Test-Path $out)) {
                 if (-not $sha -or (Get-FileHash $out -Algorithm SHA256).Hash -ieq $sha) { return }
                 Write-Warning "Sai SHA256: $out - tai lai"
@@ -52,9 +82,10 @@ function Get-File([string]$url, [string]$out, [string]$sha, [string]$alt = '') {
 }
 
 # --- PHP ---
+Mark 2 'php'
 $php = Join-Path $rt 'php\php.exe'
 if (-not (Test-Path $php)) {
-    Get-File $PhpUrl (Join-Path $dl 'php.zip') $PhpSha $PhpUrlAlt
+    Get-File $PhpUrl (Join-Path $dl 'php.zip') $PhpSha $PhpUrlAlt 2 8 'php'
     Expand-Archive (Join-Path $dl 'php.zip') (Join-Path $rt 'php') -Force
     Remove-Item (Join-Path $dl 'php.zip') -Force -ErrorAction SilentlyContinue
 }
@@ -65,11 +96,13 @@ $cacertPath = (Join-Path $rt 'php\cacert.pem').Replace([string][char]92, '/')
 Add-Content (Join-Path $rt 'php\php.ini') ("`r`n[PHP]`r`nerror_log = `"" + (Join-Path $rt 'logs\php-errors.log') + "`"")
 
 # --- Composer ---
+Mark 9 'composer'
 if (-not (Test-Path (Join-Path $rt 'composer.phar'))) { Get-File $ComposerUrl (Join-Path $rt 'composer.phar') $ComposerSha }
 
 # --- PostgreSQL ---
+Mark 12 'pg'
 if (-not (Test-Path (Join-Path $rt 'pgsql\bin\postgres.exe'))) {
-    Get-File $PgUrl (Join-Path $dl 'pg.zip') $PgSha
+    Get-File $PgUrl (Join-Path $dl 'pg.zip') $PgSha '' 12 32 'pg'
     $tmp = Join-Path $dl 'pgx'
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
     Expand-Archive (Join-Path $dl 'pg.zip') $tmp -Force
@@ -83,13 +116,15 @@ if (-not (Test-Path (Join-Path $rt 'pgsql\bin\postgres.exe'))) {
 }
 
 # --- Caddy ---
+Mark 35 'caddy'
 if (-not (Test-Path (Join-Path $rt 'caddy\caddy.exe'))) {
-    Get-File $CaddyUrl (Join-Path $dl 'caddy.zip') $CaddySha
+    Get-File $CaddyUrl (Join-Path $dl 'caddy.zip') $CaddySha '' 35 40 'caddy'
     Expand-Archive (Join-Path $dl 'caddy.zip') (Join-Path $rt 'caddy') -Force
     Remove-Item (Join-Path $dl 'caddy.zip') -Force -ErrorAction SilentlyContinue
 }
 
 # --- Xuong Video: venv Python + thu muc du lieu (tao tu xuong-video\mau) + Remotion ---
+Mark 42 'venv'
 $envPath = Join-Path $Root '.env'
 function Get-EnvVal([string]$k) {
     if (-not (Test-Path $envPath)) { return '' }
@@ -113,6 +148,7 @@ if (-not (Test-Path $xvPy)) {
         Write-Host 'Tao venv Xuong Video (runtime\xuong-venv)...'
         & $sysPy[0] @($sysPy | Select-Object -Skip 1) -m venv (Join-Path $Root 'runtime\xuong-venv')
         if ($LASTEXITCODE -eq 0) {
+            Mark 48 'pip'
             & $xvPy -m pip install --no-compile --disable-pip-version-check -r (Join-Path $Root 'xuong-video\requirements.txt')
             if ($LASTEXITCODE -ne 0) { Write-Warning 'pip install cho Xuong Video loi - dich vu xuong-video co the khong chay.' }
         }
@@ -125,10 +161,12 @@ if (Test-Path $xvPy) {
 }
 $rem = Join-Path $Root 'xuong-video\remotion'
 if ((Test-Path (Join-Path $rem 'package-lock.json')) -and -not (Test-Path (Join-Path $rem 'node_modules')) -and (Get-Command npm -ErrorAction SilentlyContinue)) {
+    Mark 62 'remotion'
     Push-Location $rem; try { npm ci --no-audit --no-fund } finally { Pop-Location }
 }
 
 # --- .env ---
+Mark 75 'env'
 # Khoa ket noi hub: doc tu <hub>\config.json (trypost.khoa), khong in ra man hinh.
 function Get-HubKey([string]$hub) {
     $cfg = Join-Path $hub 'config.json'
@@ -179,6 +217,7 @@ if ((Get-Content $envPath -Raw) -notmatch '(?m)^UPDATE_REPO=\S') {
 }
 
 # --- Composer install ---
+Mark 80 'deps'
 $env:COMPOSER_HOME = Join-Path $rt 'composer-home'
 if (-not $isRelease) {
     & $php (Join-Path $rt 'composer.phar') install --no-interaction --prefer-dist --no-progress --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
@@ -202,9 +241,11 @@ $hubRa = ($hubEnv.Replace($bs, '/').TrimEnd('/') + '/ra').Replace('"', '')
 [IO.File]::WriteAllText((Join-Path $rt 'hub-root.caddy'), "(hub_ra_root) {`n`troot * `"$hubRa`"`n}`n", (New-Object Text.UTF8Encoding($false)))
 
 # --- services.json + CSDL ---
+Mark 88 'db'
 Copy-Item (Join-Path $PSScriptRoot 'services.json') (Join-Path $rt 'services.json') -Force
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'bootstrap.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'bootstrap CSDL loi' }
+Mark 97 'shortcut'
 # --- Loi tat TikTok Auto Kid tren Desktop (thay loi tat TikTok Auto cu neu co) ---
 try {
     $exe = Join-Path $Root 'TikTokAuto.exe'
@@ -218,4 +259,5 @@ try {
     }
 }
 catch { Write-Warning "Khong tao duoc loi tat: $_" }
+Mark 100 'xong'
 Write-Host 'Xong. Chay: scripts\native\start.ps1 (hoac TikTokAuto.exe), mo http://localhost:8010'
