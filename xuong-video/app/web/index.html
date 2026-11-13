@@ -745,10 +745,12 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
             <select id="hsModel" title="Model học cảnh" style="max-width:190px;height:32px"></select>
             <button class="btn ghost sm ic-only" id="btnHsDong" title="Thu gọn"><svg class="i"><use href="#i-x"/></svg></button></div>
         </div>
+        <div id="hocQuyen" class="note hidden" style="margin-top:10px"></div>
+        <div id="hocCanhBao" class="note" style="margin-top:6px"></div>
         <div id="hocLoi" class="note" style="margin-top:6px"></div>
         <div id="kdBox" class="hidden khung" style="margin-top:14px"></div>
         <ol class="note buoc-ds">
-          <li><b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
+          <li><b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Học cảnh chạy song song, không chặn làm video (đang làm video thì học nhường máy, chỉ 1 lô một lúc). Bấm Dừng là huỷ thật việc đang làm ở Antigravity trong vài giây; video đang dở sẽ học lại lần sau. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
             <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</li>
           <li><b>Chuẩn bị kho</b>: nạp cảnh đã mô tả vào kho và cho AI soát lại. Học cảnh xong hub tự chạy bước này; bấm tay khi anh làm tay bằng Antigravity hoặc tự sửa mô tả.</li>
           <li><b>Kiểm định dạng</b>: soát các bản mô tả, báo file hỏng / video thiếu mô tả và đề nghị sửa (giữ bản gốc). Dùng khi chuẩn bị kho báo lỗi.</li>
@@ -1549,14 +1551,26 @@ async function taiHoc() {
     if (j.trang_thai === 'xong' && HOC.xongBao !== j.bat_dau) { HOC.xongBao = j.bat_dau; taiKho(); }
   }
   $('#hocBox').classList.toggle('hidden', !hien);
-  const hb = $('#btnHoc'); hb.innerHTML = chay ? ic('stop', 'f') + 'Dừng học' : ic('cap') + 'Học cảnh'; hb.disabled = !!h.job_khac || (!chay && h.dang_chay_lo);
-  hb.title = h.dang_chay_lo ? 'Đang làm video — đợi xong' : '';
+  const dung = !!(j && j.dang_dung);
+  const hb = $('#btnHoc'); hb.innerHTML = dung ? ic('loader') + 'Đang dừng…' : chay ? ic('stop', 'f') + 'Dừng học' : ic('cap') + 'Học cảnh'; hb.disabled = !!h.job_khac || dung;
+  hb.title = dung ? 'Đang huỷ việc ở Antigravity, vài giây nữa là xong' : (h.dang_chay_lo && chay ? 'Học cảnh chạy song song với làm video (nhường máy: 1 lô một lúc)' : '');
+  if (dung) $('#hocText').textContent = 'Đang dừng… (huỷ việc đang làm ở Antigravity)';
+  const q = h.quyen, bq = $('#hocQuyen');
+  if (q && q.bat) {
+    bq.classList.remove('hidden');
+    bq.innerHTML = q.ok ? `<span class="pill g">${ic('check')} Antigravity tự duyệt (Turbo) cho kho này — học cảnh chạy không hỏi Accept</span>`
+      : `<div class="warnbox">${ic('alert')} Antigravity có thể hỏi "Accept" khi học cảnh. <button class="btn ghost sm" id="btnQuyen">Bật tự duyệt (Turbo) cho kho này</button>
+         <div style="margin-top:6px">Bấm 1 lần: hub tạo một "Project" riêng trong Antigravity, chỉ gồm thư mục kho video này, cho phép Antigravity tự đọc video và ghi file mô tả ở đó, tự chạy lệnh, không hỏi lại. Không đổi gì các Project/thư mục khác. Hub cũng tự làm việc này khi bấm Học cảnh.</div></div>`;
+    const bb = $('#btnQuyen'); if (bb) bb.onclick = async () => { const r = await api('/api/hoc-canh-quyen/' + $('#spSua').value, {}); toast(r.ok ? 'Đã bật tự duyệt — nếu Antigravity còn hỏi, đóng rồi mở lại Antigravity 1 lần' : (r.loi || 'Không bật được')); taiHoc(); };
+  } else bq.classList.add('hidden');
+  const cb = $('#hocCanhBao'); cb.innerHTML = j && j.canh_bao ? `<div class="warnbox">${ic('alert')} ${esc(j.canh_bao)}</div>` : '';
   if (!spCtHien()) return;                                          // rời trang chi tiết: ngừng hỏi, mở lại sẽ tự tải tiếp
-  if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
+  if (dung) HOC.t = setTimeout(taiHoc, 1000);
+  else if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
 }
 $('#btnHoc').onclick = async () => {
   const h = HOC.h || {}, chay = h.job && h.job.dang_chay, ma = $('#spSua').value;
-  if (chay) { await api('/api/hoc-canh-dung', {}); toast('Đang dừng — các video đang xem sẽ làm nốt…'); return taiHoc(); }
+  if (chay) { if (h.job.dang_dung) return; await api('/api/hoc-canh-dung', {}); toast('Đang dừng… (huỷ việc đang làm ở Antigravity, vài giây)'); return taiHoc(); }
   if (!h.agy || !h.agy.mo) { HOC.moTay = true; $('#hocSetup').classList.remove('hidden'); toast('Mở Antigravity trước rồi bấm Học cảnh'); return taiHoc(); }
   const r = await api('/api/hoc-canh/' + ma, {});
   if (!r.ok) { toast(r.loi || 'Không bắt đầu được'); if (r.can) HOC.moTay = true; return taiHoc(); }

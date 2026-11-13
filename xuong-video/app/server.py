@@ -633,16 +633,46 @@ def kiem_dinh(ma, sua):
 def hoc_canh_trang_thai(ma):
     import hoc_canh
     j = dict(hoc_canh.JOB)
+    try:
+        quyen = hoc_canh.trang_thai_quyen(hoc_canh.km._kho_cua(ma))
+    except Exception:
+        quyen = None
     return {"agy": hoc_canh.trang_thai_agy(), "model": hoc_canh.doc_model(),
             "models": [{"v": k, "t": t} for k, t in hoc_canh.MODELS.items()],
             "job": j if j.get("ma") == ma else None, "job_khac": bool(j.get("dang_chay") and j.get("ma") != ma),
-            "dang_chay_lo": bool(dang_chay())}
+            "dang_chay_lo": bool(dang_chay()), "quyen": quyen}
+
+
+def hoc_canh_quyen(ma):
+    """Bấm 'Bật tự duyệt': tạo Project riêng (chỉ thư mục kho này) có quyền Turbo trong cài đặt Antigravity."""
+    import hoc_canh
+    try:
+        kho = hoc_canh.km._kho_cua(ma)
+    except Exception:
+        return {"ok": False, "loi": "Sản phẩm này chưa có thư mục kho video."}
+    r = hoc_canh.thiet_lap_quyen(kho)
+    if r.get("ok"):
+        r["thu_muc"] = str(kho)
+    return r
+
+
+def _chuan_bi_kho_sau_hoc(ma):
+    """Học cảnh xong thì chuẩn bị kho; nếu hub đang làm video thì ĐỢI lô xong rồi mới chạy (tránh 2 việc nặng + Claude cùng lúc)."""
+    if not dang_chay():
+        return chuan_bi_kho(ma)
+
+    def doi():
+        for _ in range(2880):                                   # tối đa ~8 giờ, 10 giây một lần
+            time.sleep(10)
+            if not dang_chay():
+                chuan_bi_kho(ma)
+                return
+    threading.Thread(target=doi, daemon=True, name="chuan-bi-kho-sau-hoc").start()
+    return {"ok": True, "doi": True}
 
 
 def hoc_canh_bat_dau(ma):
     import hoc_canh
-    if dang_chay():
-        return {"ok": False, "loi": "Đang làm video, đợi xong rồi học cảnh."}
     k = KHO_JOB.get(ma)
     if k and k.poll() is None:
         return {"ok": False, "loi": "Đang chuẩn bị kho."}
@@ -650,7 +680,8 @@ def hoc_canh_bat_dau(ma):
         return {"ok": False, "loi": "Antigravity chưa mở — bấm Mở Antigravity.", "can": "mo"}
     if hoc_canh.JOB.get("dang_chay"):
         return {"ok": False, "loi": "Đang học rồi."}
-    return hoc_canh.bat_dau_nen(ma, khi_xong=lambda kq: chuan_bi_kho(ma))
+    # Học cảnh là làn riêng: KHÔNG chặn làm video (và ngược lại). Đang làm video thì học nhường máy: chỉ 1 lô một lúc.
+    return hoc_canh.bat_dau_nen(ma, khi_xong=lambda kq: _chuan_bi_kho_sau_hoc(ma), ban_san_xuat=dang_chay)
 
 
 _TQ = {"t": 0, "v": None}
@@ -877,12 +908,6 @@ def chay(sp, so, kho_them=None, giay=None):
     Lựa chọn được ghi vào hồ sơ sản phẩm (kho_them) — engine đọc từ đó, lần sau/tự động dùng lại."""
     if dang_chay():
         return {"ok": False, "loi": "Hub đang chạy một lô khác."}
-    try:
-        import hoc_canh
-        if hoc_canh.JOB.get("dang_chay"):
-            return {"ok": False, "loi": "Đang học cảnh cho kho, đợi học xong (hoặc bấm Dừng học) rồi làm video."}
-    except ImportError:
-        pass
     if not co_khoa_giong():                  # kiểm TRƯỚC khi chạy: thiếu khoá giọng thì lô hỏng giữa chừng, phí hạn mức Claude
         return {"ok": False, "loi": "Chưa có khoá ElevenLabs (giọng đọc). Vào tab Cài đặt → mục \"Khoá ElevenLabs\" dán khoá rồi Lưu, sau đó chạy lại."}
     from tu_dong import san_sang
@@ -1237,6 +1262,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(hoc_canh_bat_dau(u.path.split("/")[-1]))
         if u.path == "/api/hoc-canh-dung":
             import hoc_canh; return self._json(hoc_canh.dung())
+        if u.path.startswith("/api/hoc-canh-quyen/"):
+            return self._json(hoc_canh_quyen(u.path.split("/")[-1]))
         if u.path == "/api/agy-mo":
             import hoc_canh; return self._json(hoc_canh.mo_antigravity())
         if u.path == "/api/hoc-canh-model":
