@@ -75,8 +75,8 @@ const plateW = computed(() => Math.min(props.w - 14, plate.value.length * 6.4 + 
         </g>
         <rect :width="w" :height="h" rx="9" fill="none" stroke="#4a3868" stroke-opacity="0.55" stroke-width="2" />
         <rect class="ring" :x="-2" :y="-2" :width="w + 4" :height="h + 4" rx="11" />
-        <!-- biển tên -->
-        <g transform="translate(8 -2)">
+        <!-- biển tên (ở chân phòng để bong bóng lời nói không che) -->
+        <g :transform="`translate(8 ${h - 19})`">
             <rect :width="plateW" height="17" rx="8.5" fill="#4a3868" opacity="0.92" />
             <text :x="plateW / 2" y="12.2" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff" style="letter-spacing: 0.1px">{{ plate }}</text>
         </g>

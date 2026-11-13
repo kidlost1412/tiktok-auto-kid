@@ -125,3 +125,25 @@ test('postman works when a post is due within 30 minutes', function (): void {
     $none = NhaState::build($hub, ['posts_today' => 0, 'next' => null], $now);
     expect($none['line'])->toContain('hôm nay chưa có bài hẹn');
 });
+
+test('state exposes the event feed, batch reels and finished message', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response(nhaHub([
+        nhaEvent(900, 'he-thong', 'bat-dau-lo', ['ten' => 'Đạm cá', 'so_video' => 2]),
+        nhaEvent(500, 'kho', 'luu', ['video' => 'a-0', 'so' => 1, 'tong' => 2, 'diem' => 8, 'file' => 'a.mp4', 'ngay' => '2026-11-13']),
+        nhaEvent(400, 'giam-khao', 'diem', ['video' => 'a-1', 'diem' => 5, 'dat' => false, 'loi' => 'Chữ lệch', 'file' => 'b.mp4', 'secret' => 'x']),
+        nhaEvent(300, 'kho', 'luu', ['video' => 'a-1', 'so' => 2, 'tong' => 2, 'diem' => 5, 'file' => 'b.mp4', 'ngay' => '2026-11-13']),
+        nhaEvent(100, 'he-thong', 'ket-thuc-lo', ['so' => 2, 'tong' => 2, 'phut' => 34.5]),
+    ], false, ['xong' => 2, 'tong' => 2, 'het_han_muc' => null]))]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+
+    expect($j['lo'])->toBeInt()
+        ->and($j['reels'])->toHaveCount(2)
+        ->and($j['reels'][1])->toMatchArray(['so' => 2, 'file' => 'b.mp4', 'ngay' => '2026-11-13', 'diem' => 5])
+        ->and($j['events'])->toHaveCount(5)
+        ->and($j['events'][2]['loi'])->toBe('Chữ lệch')
+        ->and($j['events'][2])->not->toHaveKey('secret')
+        ->and($j['bang']['dong'])->toBe('Xong 2/2 · 34,5 phút')
+        ->and($j['hub']['url'])->toBe('http://127.0.0.1:8765')
+        ->and($j['app']['post_counts'])->toHaveKeys(['scheduled', 'posted']);
+});

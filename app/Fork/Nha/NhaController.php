@@ -28,7 +28,11 @@ final class NhaController extends Controller
     {
         $now = CarbonImmutable::now();
 
-        return response()->json(NhaState::build($this->hub(), $this->appFacts($now), $now))->header('Cache-Control', 'no-store');
+        $state = NhaState::build($this->hub(), $this->appFacts($now), $now);
+        // Địa chỉ hub để bấm cuộn phim mở video (trình duyệt gọi thẳng hub như khung Xưởng Video).
+        $state['hub']['url'] = rtrim((string) config('fork.xuong.url'), '/');
+
+        return response()->json($state)->header('Cache-Control', 'no-store');
     }
 
     /**
@@ -65,7 +69,7 @@ final class NhaController extends Controller
     /**
      * Số bài còn hẹn trong hôm nay, bài kế tiếp và tiện ích Chrome có đang kết nối không.
      *
-     * @return array{posts_today: int, next: array{at: string, minutes: int, channel: string}|null, chrome_online: bool|null}
+     * @return array{posts_today: int, next: array{at: string, minutes: int, channel: string}|null, chrome_online: bool|null, post_counts: array{scheduled: int, posted: int}}
      */
     private function appFacts(CarbonImmutable $now): array
     {
@@ -95,6 +99,16 @@ final class NhaController extends Controller
             // thiếu bảng/dữ liệu thì để trống, nhà vẫn hiện
         }
 
-        return ['posts_today' => $postsToday, 'next' => $next, 'chrome_online' => $chrome];
+        // Bộ đếm để trình duyệt so giữa hai lần hỏi: tăng = vừa có bài được hẹn / vừa đăng (Bưu tá ra hòm thư).
+        $held = 0;
+        $posted = 0;
+        try {
+            $held = AutoVideo::query()->where(fn ($q) => $q->where('status', AutoVideo::SCHEDULED)->orWhere(fn ($w) => $w->heldOnTikTok()))->count();
+            $posted = AutoVideo::query()->livePosted()->count();
+        } catch (Throwable) {
+            // bỏ qua
+        }
+
+        return ['posts_today' => $postsToday, 'next' => $next, 'chrome_online' => $chrome, 'post_counts' => ['scheduled' => $held, 'posted' => $posted]];
     }
 }

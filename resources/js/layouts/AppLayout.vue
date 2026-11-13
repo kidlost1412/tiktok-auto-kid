@@ -54,7 +54,7 @@ const active = (href: string) => path.value.startsWith(href);
             data-testid="app-header"
         >
             <div
-                class="mx-auto flex h-[62px] w-full max-w-[1880px] items-center gap-4 px-4 md:px-8"
+                class="mx-auto flex h-[62px] w-full max-w-[1880px] items-center gap-2 px-3 md:gap-4 md:px-8"
             >
                 <Link href="/nha" class="flex shrink-0 items-center gap-2.5">
                     <span
@@ -68,7 +68,7 @@ const active = (href: string) => path.value.startsWith(href);
                     >
                 </Link>
                 <nav
-                    class="flex items-center gap-0.5 overflow-x-auto rounded-xl border border-border bg-secondary/60 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    class="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-xl border border-border bg-secondary/60 p-1 [mask-image:linear-gradient(to_right,transparent,#000_8px,#000_calc(100%-20px),transparent)] [scrollbar-width:none] md:[mask-image:none] [&::-webkit-scrollbar]:hidden"
                     aria-label="Điều hướng chính"
                 >
                     <Link
@@ -78,7 +78,7 @@ const active = (href: string) => path.value.startsWith(href);
                         :aria-current="active(l.href) ? 'page' : undefined"
                         :class="
                             cn(
-                                'inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2.5 text-[15px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
+                                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] px-2.5 text-[15px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
                                 active(l.href) &&
                                     'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08),0_1px_1px_rgb(28_25_23/0.04)] dark:bg-accent dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_3px_rgb(0_0_0/0.5)]',
                             )
@@ -93,7 +93,7 @@ const active = (href: string) => path.value.startsWith(href);
                                 )
                             "
                         />
-                        {{ l.label }}
+                        <span :class="active(l.href) ? '' : 'max-md:sr-only'">{{ l.label }}</span>
                     </Link>
                 </nav>
                 <div
@@ -110,9 +110,10 @@ const active = (href: string) => path.value.startsWith(href);
                         :key="o.label"
                         type="button"
                         :aria-pressed="dark === o.v"
+                        :aria-label="o.label"
                         :class="
                             cn(
-                                'inline-flex h-9 items-center gap-1.5 rounded-[9px] px-3 text-sm font-medium transition-colors',
+                                'inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-sm font-medium transition-colors sm:px-3',
                                 dark === o.v
                                     ? 'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08)] dark:bg-accent'
                                     : 'text-muted-foreground hover:text-foreground',
@@ -124,7 +125,7 @@ const active = (href: string) => path.value.startsWith(href);
                             :is="o.icon"
                             :class="cn('size-4', dark === o.v && 'text-primary-text')"
                         />
-                        {{ o.label }}
+                        <span class="hidden sm:inline">{{ o.label }}</span>
                     </button>
                 </div>
             </div>

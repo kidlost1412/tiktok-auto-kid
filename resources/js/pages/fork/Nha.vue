@@ -6,7 +6,7 @@ import { IconHome } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import House from '@/components/fork/nha/House.vue';
-import { DICH, type NhaData } from '@/components/fork/nha/types';
+import { DICH, type NhaData, type NhaEvent } from '@/components/fork/nha/types';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const data = ref<NhaData | null>(null);
@@ -45,6 +45,51 @@ const chips = computed(() =>
         };
     }),
 );
+
+// ---- hoạt động gần đây: 8 sự kiện mới nhất của sổ sự kiện hub, mới nhất lên đầu
+const VAI_TEN: Record<string, string> = { 'bien-kich': 'Biên kịch', giong: 'Thu âm', 'dao-dien': 'Đạo diễn', dung: 'Thợ dựng', 'giam-khao': 'Giám khảo', kho: 'Thủ kho', 'he-thong': 'Xưởng' };
+const videoNo = (e: NhaEvent) => {
+    const m = /-(\d+)$/.exec(e.video ?? '');
+
+    return m ? Number(m[1]) + 1 : null;
+};
+const describe = (e: NhaEvent): string | null => {
+    const v = videoNo(e);
+    const vid = v ? ` video ${v}` : '';
+    switch (`${e.vai}|${e.loai}`) {
+        case 'he-thong|bat-dau-lo':
+            return `Bắt đầu lô ${e.ten ?? ''}${e.so_video ? ` · ${e.so_video} video` : ''}`.trim();
+        case 'bien-kich|xong':
+            return `Biên kịch viết xong ${e.so ?? ''} lời`;
+        case 'giong|xong':
+            return `Thu âm xong ${e.so ?? ''} giọng`;
+        case 'dao-dien|xong':
+            return `Đạo diễn xong bảng dựng${vid}`;
+        case 'dung|xong':
+            return e.buoc === 'chu' ? 'Thợ dựng xong lớp chữ' : `Thợ dựng dựng xong${vid}`;
+        case 'giam-khao|diem':
+            return e.diem == null ? `Giám khảo chưa chấm được${vid}` : `Giám khảo chấm${vid}: ${e.diem}/10 ${e.dat ? '✓' : '✗'}${!e.dat && e.loi ? ` · ${e.loi}` : ''}`;
+        case 'kho|luu':
+            return `Nhập kho video ${e.so ?? ''}/${e.tong ?? ''}`;
+        case 'he-thong|het-han-muc':
+            return 'Hết hạn mức Claude, xưởng nghỉ';
+        case 'he-thong|ket-thuc-lo':
+            return `Xong lô ${e.so ?? ''}/${e.tong ?? ''}${e.phut ? ` · ${String(e.phut).replace('.', ',')} phút` : ''}`;
+        default:
+            return e.loai === 'loi' ? `${VAI_TEN[e.vai] ?? 'Xưởng'} gặp lỗi${e.msg ? `: ${e.msg}` : ''}` : null;
+    }
+};
+const recent = computed(() => {
+    const out: { n: number; time: string; text: string; bad: boolean }[] = [];
+    for (const e of [...(data.value?.events ?? [])].reverse()) {
+        const text = describe(e);
+        if (text && out.length < 8) {
+            out.push({ n: e.n, time: (e.t ?? '').slice(11, 16), text, bad: e.loai === 'loi' || e.loai === 'het-han-muc' || (e.loai === 'diem' && e.dat === false) });
+        }
+    }
+
+    return out;
+});
 
 const go = (key: string) => {
     const href = DICH[key]?.href;
@@ -114,6 +159,17 @@ onBeforeUnmount(() => {
             <div class="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
                 <House :data="data" @go="go" />
             </div>
+
+            <section class="rounded-2xl border border-border bg-card px-4 py-3" aria-label="Hoạt động gần đây" data-testid="nha-recent">
+                <h2 class="mb-1.5 text-sm font-semibold text-muted-foreground">Hoạt động gần đây</h2>
+                <ol v-if="recent.length" class="flex flex-col gap-1">
+                    <li v-for="r in recent" :key="r.n" class="flex gap-2 text-[15px]" :class="r.bad ? 'text-destructive' : ''">
+                        <span class="w-11 shrink-0 text-muted-foreground tabular-nums">{{ r.time }}</span>
+                        <span class="min-w-0">{{ r.text }}</span>
+                    </li>
+                </ol>
+                <p v-else class="text-[15px] text-muted-foreground">Chưa có hoạt động nào gần đây.</p>
+            </section>
 
             <ul class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Các nhân vật trong xưởng">
                 <li v-for="c in chips" :key="c.key">

@@ -14,13 +14,37 @@ export interface VaiInfo {
     bubble: string | null;
 }
 
+/** Một sự kiện của sổ sự kiện hub (xem xuong-video/engine/su_kien.py). */
+export interface NhaEvent {
+    n: number;
+    t?: string;
+    vai: string;
+    loai: string;
+    video?: string;
+    msg?: string;
+    so?: number;
+    tong?: number;
+    diem?: number | null;
+    dat?: boolean | null;
+    file?: string;
+    ngay?: string;
+    loi?: string;
+    phut?: number;
+    ten?: string;
+    so_video?: number;
+}
+
 export interface NhaData {
     mode: 'down' | 'working' | 'idle' | 'limit';
     line: string;
     vai: Record<string, VaiInfo>;
     bang: { san_pham: string | null; tien_do: { xong: number; tong: number } | null; dong: string };
-    hub: { up: boolean; dang_chay: boolean };
-    app: { posts_today?: number; next?: { at: string; minutes: number; channel: string } | null; chrome_online?: boolean | null };
+    hub: { up: boolean; dang_chay: boolean; url?: string };
+    lo?: number | null;
+    reels?: { n: number; so: number; file: string; ngay: string; diem: number | null }[];
+    events?: NhaEvent[];
+    bay_gio?: number;
+    app: { posts_today?: number; next?: { at: string; minutes: number; channel: string } | null; chrome_online?: boolean | null; post_counts?: { scheduled: number; posted: number } };
 }
 
 /** Nơi mỗi nhân vật dẫn tới khi bấm. */

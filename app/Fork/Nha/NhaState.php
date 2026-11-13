@@ -58,6 +58,10 @@ final class NhaState
                 'bang' => ['san_pham' => null, 'tien_do' => null, 'dong' => 'Xưởng Video đang tắt. Mở lại ở trang Xưởng Video.'],
                 'hub' => ['up' => false, 'dang_chay' => false],
                 'app' => $app,
+                'lo' => null,
+                'reels' => [],
+                'events' => [],
+                'bay_gio' => (float) $now->getTimestamp(),
             ];
         }
 
@@ -151,10 +155,11 @@ final class NhaState
                 : 'hôm nay chưa có bài hẹn'),
         };
 
+        $phut = $finished && isset($lastEvent['phut']) ? ' · '.str_replace('.', ',', (string) $lastEvent['phut']).' phút' : '';
         $dong = match ($mode) {
             'limit' => 'Hết hạn mức Claude. Vào Xưởng Video > Cài đặt để đổi tài khoản rồi chạy tiếp.',
             'working' => (string) ($lastEvent['msg'] ?? 'Đang làm việc'),
-            default => $finished ? (string) ($lastEvent['msg'] ?? 'Đã xong lô') : ($tong > 0 && $xong >= $tong ? 'Lô gần nhất đã xong, xưởng đang nghỉ' : 'Chưa có lô nào đang chạy'),
+            default => $finished ? (isset($lastEvent['so'], $lastEvent['tong']) ? 'Xong '.(int) $lastEvent['so'].'/'.(int) $lastEvent['tong'].$phut : (string) ($lastEvent['msg'] ?? 'Đã xong lô')) : ($tong > 0 && $xong >= $tong ? 'Lô gần nhất đã xong, xưởng đang nghỉ' : 'Chưa có lô nào đang chạy'),
         };
 
         return [
@@ -168,7 +173,46 @@ final class NhaState
             ],
             'hub' => ['up' => true, 'dang_chay' => $running],
             'app' => $app,
+            'lo' => $batchStart['n'] ?? null,
+            'reels' => self::reels($cur),
+            'events' => self::compact($events),
+            'bay_gio' => $hubNow,
         ];
+    }
+
+    /** Trường sự kiện gửi cho trình duyệt (đủ để diễn hoạt cảnh và dòng "hoạt động gần đây"; không gửi gì khác). */
+    private const array EVENT_KEYS = ['n', 't', 'vai', 'loai', 'video', 'msg', 'so', 'tong', 'diem', 'dat', 'file', 'ngay', 'loi', 'phut', 'ten', 'so_video', 'lan', 'buoc'];
+
+    /**
+     * @param  list<array<string, mixed>>  $events
+     * @return list<array<string, mixed>>
+     */
+    private static function compact(array $events): array
+    {
+        $out = [];
+        foreach (array_slice($events, -60) as $e) {
+            $out[] = array_intersect_key($e, array_flip(self::EVENT_KEYS));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Video đã lưu trong lô hiện tại (kệ cuộn phim ở Kho hàng).
+     *
+     * @param  list<array<string, mixed>>  $cur
+     * @return list<array{n: mixed, so: int, file: string, ngay: string, diem: mixed}>
+     */
+    private static function reels(array $cur): array
+    {
+        $out = [];
+        foreach ($cur as $e) {
+            if (($e['loai'] ?? '') === 'luu') {
+                $out[] = ['n' => $e['n'] ?? 0, 'so' => (int) ($e['so'] ?? count($out) + 1), 'file' => (string) ($e['file'] ?? ''), 'ngay' => (string) ($e['ngay'] ?? ''), 'diem' => $e['diem'] ?? null];
+            }
+        }
+
+        return array_slice($out, -40);
     }
 
     /**

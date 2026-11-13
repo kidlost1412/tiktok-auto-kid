@@ -262,7 +262,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             for t, r in kq:
                 t["gk"] = r; t["lan"] = 1
                 log(f"  giám khảo {t['fname']}: {r.get('diem')}/10 {'ĐẠT' if r.get('dat') else 'CHƯA ĐẠT'} {'; '.join((r.get('loi') or [])[:2])}")
-                SK.ghi("giam-khao", "diem", "Chấm xong", video=f'{t["vname"]}-{t["j"]}', diem=r.get("diem"), dat=r.get("dat"))
+                SK.ghi("giam-khao", "diem", "Chấm xong", video=f'{t["vname"]}-{t["j"]}', diem=r.get("diem"), dat=r.get("dat"),
+                       file=t.get("fname"), loi=(r["loi"][0][:90] if r.get("loi") else None), lan=t.get("lan"))
             # Kid 10/11: KHÔNG dựng lại hàng loạt (50 video thành 100). Giám khảo chỉ chấm + ghi bài học cho lô sau.
             # Bật lại bằng config "dung_lai": true nếu cần.
             sua = [t for t, r in kq if not r.get("dat") and r.get("sua")] if CFG.get("dung_lai") else []
@@ -358,7 +359,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 f.write(" ".join(sg["shot"]["id"] for sg in (t["plan"].get("edl_segs") or [])) + "\n")
             made += 1
             log(f"  [{made}/{len(tasks)}] {t['fname']}  ({gk.get('diem')}/10)")
-            SK.ghi("kho", "luu", f"Đã lưu video {made}/{len(tasks)}", video=f'{t["vname"]}-{t["j"]}', so=made, tong=len(tasks), diem=gk.get("diem"))
+            SK.ghi("kho", "luu", f"Đã lưu video {made}/{len(tasks)}", video=f'{t["vname"]}-{t["j"]}', so=made, tong=len(tasks), diem=gk.get("diem"),
+                   file=t.get("fname"), ngay=day)
             if t.get("lam_lai_tu"):                       # bản anh không ưng → cất vào _ban-chua-dat (tự dọn sau 5 ngày)
                 cu = Path(t["lam_lai_tu"]); dich = cu.parent / "_ban-chua-dat"; dich.mkdir(exist_ok=True)
                 for duoi in (".mp4", ".jpg", ".json", ".txt"):
