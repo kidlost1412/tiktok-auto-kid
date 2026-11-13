@@ -215,9 +215,32 @@ final class RiengController extends Controller
         }
 
         RiengFolder::query()->create(['path' => $path, 'name' => filled($data['name'] ?? null) ? trim((string) $data['name']) : null]);
-        $r = app(RiengScanner::class)->scan();
+        set_time_limit(300);
+        $r = $this->scanSettled();
 
         return back()->with('flash.success', "Đã thêm thư mục. Tìm thấy {$r['new']} video mới".($r['waiting'] > 0 ? ", {$r['waiting']} video đang chờ ghi xong" : '').'.');
+    }
+
+    /**
+     * Video mới cần kích thước đứng yên `settle_seconds` mới được nhận, nên lần quét đầu luôn "chờ".
+     * Chờ đủ thời gian rồi quét lại một lần ngay trong yêu cầu này để người dùng không phải bấm lại.
+     *
+     * @return array{new: int, known: int, duplicate: int, waiting: int, gone: int, folders_missing: int}
+     */
+    private function scanSettled(): array
+    {
+        $scanner = app(RiengScanner::class);
+        $r = $scanner->scan();
+
+        if ($r['waiting'] > 0) {
+            sleep(max(0, (int) config('fork.auto.settle_seconds', 20)) + 1);
+            $again = $scanner->scan();
+            $again['new'] += $r['new'];
+            $again['duplicate'] = max($again['duplicate'], $r['duplicate']);
+            $r = $again;
+        }
+
+        return $r;
     }
 
     /** Mở hộp chọn thư mục gốc của Windows qua launcher (trình duyệt không trả được đường dẫn thật). */
@@ -275,7 +298,7 @@ final class RiengController extends Controller
     {
         $this->authorizeOwner($request);
         set_time_limit(300);
-        $r = app(RiengScanner::class)->scan();
+        $r = $this->scanSettled();
         Cache::forever('fork-rieng:last-scan', now()->toIso8601String());
 
         $parts = ["{$r['new']} video mới"];
