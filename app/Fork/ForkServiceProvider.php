@@ -17,6 +17,7 @@ final class ForkServiceProvider extends ServiceProvider
         $this->app->register(Notify\NotifyServiceProvider::class);
         $this->app->register(Update\UpdateServiceProvider::class);
         $this->app->register(Nha\NhaServiceProvider::class);
+        $this->app->register(Settings\SettingsServiceProvider::class);
     }
 
     public function boot(): void

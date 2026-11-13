@@ -45,10 +45,10 @@ test('one client and one profile with the extension are linked automatically', f
         ['dir' => 'Profile 2', 'name' => 'Kênh 1', 'has_extension' => true],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.chrome_profile_dir', 'Profile 2')
-            ->where('clients.0.profile_needs_choice', false));
+            ->where('chrome.clients.0.chrome_profile_dir', 'Profile 2')
+            ->where('chrome.clients.0.profile_needs_choice', false));
 
     expect($client->refresh()->chrome_profile_dir)->toBe('Profile 2');
 });
@@ -70,10 +70,10 @@ test('several candidates are not guessed and raise a warning', function () {
         ['dir' => 'Profile 2', 'name' => 'B', 'has_extension' => true],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.chrome_profile_dir', null)
-            ->where('clients.0.profile_needs_choice', true));
+            ->where('chrome.clients.0.chrome_profile_dir', null)
+            ->where('chrome.clients.0.profile_needs_choice', true));
 
     expect($client->refresh()->chrome_profile_dir)->toBeNull();
 });
@@ -83,10 +83,10 @@ test('two unassigned clients with one profile are not guessed and show no warnin
     profClient($this->account->id);
     reportProfiles([['dir' => 'Default', 'name' => 'A', 'has_extension' => true]]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.chrome_profile_dir', null)
-            ->where('clients.0.profile_needs_choice', false));
+            ->where('chrome.clients.0.chrome_profile_dir', null)
+            ->where('chrome.clients.0.profile_needs_choice', false));
 });
 
 test('a profile already used by another client is not a candidate', function () {
@@ -97,7 +97,7 @@ test('a profile already used by another client is not a candidate', function () 
         ['dir' => 'Profile 2', 'name' => 'B', 'has_extension' => true],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome');
+    $this->actingAs($this->owner)->get('/settings');
 
     expect($second->refresh()->chrome_profile_dir)->toBe('Profile 2');
 });
@@ -112,9 +112,9 @@ test('saving the same profile for two clients warns but keeps the value', functi
 
     expect($b->refresh()->chrome_profile_dir)->toBe('Default');
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients', fn ($clients) => collect($clients)->every(fn ($c) => ! empty($c['profile_conflict_with']))));
+            ->where('chrome.clients', fn ($clients) => collect($clients)->every(fn ($c) => ! empty($c['profile_conflict_with']))));
     expect($a->refresh()->chrome_profile_dir)->toBe('Default');
 });
 
@@ -131,11 +131,11 @@ test('edge profiles are reported with their browser and can be assigned', functi
     expect($client->chrome_profile_dir)->toBe('Profile 2')
         ->and($client->chrome_browser)->toBe('edge');
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.chrome_browser', 'edge')
-            ->where('profiles.1.browser', 'edge')
-            ->where('profiles.0.browser', 'chrome'));
+            ->where('chrome.clients.0.chrome_browser', 'edge')
+            ->where('chrome.profiles.1.browser', 'edge')
+            ->where('chrome.profiles.0.browser', 'chrome'));
 });
 
 test('a profile that uses this bundle extension folder wins over an older install elsewhere', function () {
@@ -145,7 +145,7 @@ test('a profile that uses this bundle extension folder wins over an older instal
         ['browser' => 'chrome', 'dir' => 'Profile 2', 'name' => 'Cũ', 'has_extension' => true, 'bundle_extension' => false],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome');
+    $this->actingAs($this->owner)->get('/settings');
 
     expect($client->refresh()->chrome_profile_dir)->toBe('Profile 1');
 });
@@ -158,7 +158,7 @@ test('the profile reporting the same TikTok username is chosen even with several
         ['browser' => 'edge', 'dir' => 'Default', 'name' => 'y', 'has_extension' => true, 'tiktok_username' => '@KENH_A'],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome');
+    $this->actingAs($this->owner)->get('/settings');
 
     expect($a->refresh()->chrome_profile_dir)->toBe('Default')
         ->and($a->chrome_browser)->toBe('edge')
@@ -174,7 +174,7 @@ test('the same profile directory in another browser is a different profile', fun
         ['browser' => 'edge', 'dir' => 'Default', 'name' => 'B', 'has_extension' => true],
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome');
+    $this->actingAs($this->owner)->get('/settings');
 
     expect($second->refresh()->chrome_browser)->toBe('edge');
 
@@ -203,20 +203,20 @@ test('in single-user mode the TikTok channel is created from the paired Chrome w
     config()->set('fork.single_user', true);
     profClient($this->account->id, ['tiktok_username' => 'nongduoctoancauofficial', 'tiktok_user_id' => '7311506061541475329']);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('accounts.0.username', 'nongduoctoancauofficial')
-            ->where('accounts.0.enabled', true)
-            ->where('accounts.0.chrome_only', true));
+            ->where('chrome.accounts.0.username', 'nongduoctoancauofficial')
+            ->where('chrome.accounts.0.enabled', true)
+            ->where('chrome.accounts.0.chrome_only', true));
 
     // Gọi lại không tạo thêm và không bật lại tài khoản đã tắt.
     $social = \App\Models\SocialAccount::query()->where('platform_user_id', '7311506061541475329')->firstOrFail();
     \App\Fork\Chrome\Models\ChromeAccount::query()->where('social_account_id', $social->id)->update(['enabled' => false]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->has('accounts', 1)
-            ->where('accounts.0.enabled', false));
+            ->has('chrome.accounts', 1)
+            ->where('chrome.accounts.0.enabled', false));
 });
 
 test('outside single-user and slim mode nothing is created automatically', function () {
@@ -224,12 +224,12 @@ test('outside single-user and slim mode nothing is created automatically', funct
     config()->set('fork.slim.enabled', false);
     profClient($this->account->id, ['tiktok_username' => 'abc', 'tiktok_user_id' => '123']);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
-        ->assertInertia(fn (AssertableInertia $page) => $page->has('accounts', 0));
+    $this->actingAs($this->owner)->get('/settings')
+        ->assertInertia(fn (AssertableInertia $page) => $page->has('chrome.accounts', 0));
 });
 
 test('the extension path points at this bundle', function () {
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('extensionPath', fn ($p) => str_ends_with(str_replace(chr(92), '/', (string) $p), 'extension/autotok')));
+            ->where('chrome.extensionPath', fn ($p) => str_ends_with(str_replace(chr(92), '/', (string) $p), 'extension/autotok')));
 });

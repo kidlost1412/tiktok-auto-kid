@@ -243,8 +243,8 @@ test('only the owner can send a test message and the page shows the state', func
 
     $this->actingAs($member)->post('/settings/chrome/telegram-test')->assertForbidden();
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
-        ->assertInertia(fn ($page) => $page->where('telegram.configured', true));
+    $this->actingAs($this->owner)->get('/settings')
+        ->assertInertia(fn ($page) => $page->where('chrome.telegram.configured', true));
 
     $this->actingAs($this->owner)->post('/settings/chrome/telegram-test')->assertSessionHas('flash.success');
     Http::assertSentCount(1);

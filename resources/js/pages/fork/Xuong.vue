@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // Trang "Xưởng Video": nhúng giao diện hub sản xuất (iframe trỏ thẳng cổng hub).
 // Hub báo đổi tab qua postMessage; app báo đổi giao diện sáng/tối cho hub. Hub tắt thì hiện thẻ "Bật lại".
-import { Head } from '@inertiajs/vue3';
-import { IconMovie, IconPower } from '@tabler/icons-vue';
+import { Head, Link } from '@inertiajs/vue3';
+import { IconChevronDown, IconHome2, IconMovie, IconPower } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import MiniScene from '@/components/fork/nha3d/MiniScene.vue';
+import NhatKyDaoDien from '@/components/fork/nha3d/NhatKyDaoDien.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 
@@ -134,6 +136,17 @@ onBeforeUnmount(() => {
     observer?.disconnect();
     window.clearInterval(timer);
 });
+
+// ---------------------------------------------------------------- thẻ "Xưởng nhỏ" thu nhỏ
+// Mặc định ĐÓNG (theo yêu cầu của chủ app). Cảnh 3D chỉ được dựng (tốn three.js) khi thẻ MỞ,
+// và bị dọn sạch (dispose) ngay khi đóng lại hoặc rời trang — không giữ một bản sống liên tục
+// qua các lần điều hướng vì AppLayout hiện không có vùng bọc riêng nào để gửi một thực thể
+// <KeepAlive> qua lại giữa Xưởng Video và Xưởng nhỏ mà không phải sửa khung dùng chung (đang có
+// agent khác chỉnh ở phần khác của khung) — lazy-mount-khi-mở là phương án đánh đổi chấp nhận
+// được cho lượt này: mở lại tốn khoảng 1 lần dựng three.js (dưới 1 giây), đổi lại không cõng
+// chi phí 3D khi chủ app chỉ ghé qua Xưởng Video mà không cần xem.
+const miniOpen = ref(false);
+const miniFailed = ref(false);
 </script>
 
 <template>
@@ -160,6 +173,52 @@ onBeforeUnmount(() => {
                 <p v-if="message" class="text-sm text-muted-foreground" role="status">{{ message }}</p>
             </div>
             <div v-else class="m-auto text-muted-foreground">Đang kiểm tra Xưởng Video…</div>
+
+            <!-- Thẻ "Xưởng nhỏ" thu nhỏ: nổi ở góc, không che hết khung hub, mặc định đóng. -->
+            <div class="pointer-events-none absolute top-3 right-3 z-20 flex w-[min(19rem,calc(100vw-1.5rem))] flex-col items-end gap-2">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    class="pointer-events-auto gap-1.5 shadow-md"
+                    data-testid="xuong-mini-toggle"
+                    @click="miniOpen = !miniOpen"
+                >
+                    <IconHome2 class="size-4" />
+                    Xưởng nhỏ
+                    <IconChevronDown :class="['size-3.5 transition-transform motion-reduce:transition-none', miniOpen && 'rotate-180']" />
+                </Button>
+
+                <div
+                    :class="['xuong-mini-panel pointer-events-auto w-full', miniOpen && 'is-open']"
+                    data-testid="xuong-mini-panel"
+                >
+                    <div class="xuong-mini-panel-inner">
+                        <div class="flex flex-col gap-2 rounded-xl border border-border bg-card/95 p-2.5 shadow-lg backdrop-blur-sm">
+                            <div class="h-36 overflow-hidden rounded-lg bg-secondary/40">
+                                <MiniScene v-if="miniOpen && !miniFailed" @fail="miniFailed = true" />
+                                <div v-else class="grid h-full place-items-center text-xs text-muted-foreground">
+                                    {{ miniFailed ? 'Không dựng được cảnh 3D nhỏ này.' : '' }}
+                                </div>
+                            </div>
+                            <div>
+                                <p class="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                    Nhật ký đang làm gì
+                                </p>
+                                <NhatKyDaoDien :active="miniOpen" class="max-h-28" />
+                            </div>
+                            <Link
+                                href="/nha"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border py-1.5 text-[13px] font-medium hover:bg-secondary"
+                                data-testid="xuong-mini-ve-xuong"
+                            >
+                                <IconHome2 class="size-3.5" />
+                                Về xưởng nhỏ
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </AppLayout>
 </template>

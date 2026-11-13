@@ -834,3 +834,51 @@ html {
         animation: motion-sound-wave 0.9s ease-in-out infinite;
     }
 }
+
+/*
+ * Chuyển trang/chuyển tab mượt: app.ts bật lớp này trên #app khi một lượt điều hướng Inertia
+ * bắt đầu (router.on('start')) và tắt khi xong (router.on('finish')); không chặn tương tác,
+ * không gây giật/nhoáng khi đổi trang hoặc đổi tab trong trang (mọi tab đều đi qua Inertia).
+ */
+#app {
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+#app.nav-fade {
+    opacity: 0.35;
+    transform: translateY(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #app,
+    #app.nav-fade {
+        transition: none;
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/*
+ * Bảng thu/mở mượt (thẻ "Xưởng nhỏ" nhúng + nhật ký ở trang Xưởng Video): chiều cao co giãn
+ * bằng grid-template-rows (0fr ↔ 1fr) thay vì "nhảy" tức thì; nội dung bên trong vẫn nằm trong
+ * một khối overflow-hidden để không tràn ra ngoài khi đang co.
+ */
+.xuong-mini-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s ease;
+}
+
+.xuong-mini-panel.is-open {
+    grid-template-rows: 1fr;
+}
+
+.xuong-mini-panel > .xuong-mini-panel-inner {
+    overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .xuong-mini-panel {
+        transition: none;
+    }
+}

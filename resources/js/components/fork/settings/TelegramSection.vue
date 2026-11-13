@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Cài đặt Telegram ngay trong app: 3 bước nối bot, bật/tắt từng loại tin, giờ yên tĩnh, xem trước và gửi tin mẫu.
 // Chữ viết thẳng bằng tiếng Việt (không qua lang/en).
-import { Head, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import {
     IconBellRinging,
     IconBrandTelegram,
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import SettingsLayout from '@/layouts/SettingsLayout.vue';
 
 interface TypeRow {
     key: string;
@@ -139,13 +138,7 @@ const stepDone = {
 </script>
 
 <template>
-    <Head title="Telegram" />
-
-    <SettingsLayout
-        title="Thông báo Telegram"
-        description="Nhận tin ngay trên điện thoại khi bài lên, bài lỗi, mất kết nối, và tổng kết mỗi ngày. Làm 3 bước dưới đây, không cần sửa file."
-    >
-        <div class="flex flex-col gap-5" data-testid="fork-telegram-page">
+    <div class="flex flex-col gap-5" data-testid="fork-telegram-page">
             <div class="grid items-start gap-5 xl:grid-cols-2">
                 <SettingsSection
                     title="Nối bot Telegram"
@@ -385,5 +378,4 @@ const stepDone = {
                 </div>
             </SettingsSection>
         </div>
-    </SettingsLayout>
 </template>

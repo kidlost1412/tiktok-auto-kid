@@ -65,9 +65,11 @@ test('the token is stored encrypted, masked in the page and env is only a fallba
     expect(AutoSetting::read('telegram.bot_token'))->not->toContain('AAHdqTcv')->not->toContain('123456789');
     expect(TelegramSettings::maskedToken())->not->toContain('AAHdqTcv')->toEndWith('saw0');
 
-    $res = $this->actingAs($this->owner)->get('/settings/telegram')->assertOk();
+    $this->actingAs($this->owner)->get('/settings/telegram')->assertRedirect('/settings#telegram');
+
+    $res = $this->actingAs($this->owner)->get('/settings')->assertOk();
     expect($res->getContent())->not->toContain('AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0');
-    $res->assertInertia(fn ($p) => $p->component('settings/fork/Telegram')->where('has_token', true)->where('configured', true)->where('bot.link', 'https://t.me/bot_test')->has('previews', 10)->has('types', 9));
+    $res->assertInertia(fn ($p) => $p->component('fork/Settings')->where('telegram.has_token', true)->where('telegram.configured', true)->where('telegram.bot.link', 'https://t.me/bot_test')->has('telegram.previews', 10)->has('telegram.types', 9));
 
     TelegramSettings::clear();
     expect(TelegramSettings::token())->toStartWith('999999:');
@@ -100,7 +102,7 @@ test('getUpdates picks the latest private chat and the owner confirms it', funct
     ]])]);
 
     $this->actingAs($this->owner)->post('/settings/telegram/detect-chat')->assertSessionHas('flash.success');
-    $this->actingAs($this->owner)->get('/settings/telegram')->assertInertia(fn ($p) => $p->where('candidate.id', '2200123')->where('candidate.name', 'Minh Nguyễn'));
+    $this->actingAs($this->owner)->get('/settings')->assertInertia(fn ($p) => $p->where('telegram.candidate.id', '2200123')->where('telegram.candidate.name', 'Minh Nguyễn'));
 
     $this->actingAs($this->owner)->put('/settings/telegram/chat', ['chat_id' => 'abc'])->assertSessionHas('flash.error');
     $this->actingAs($this->owner)->put('/settings/telegram/chat', ['chat_id' => '2200123'])->assertSessionHas('flash.success');
@@ -248,8 +250,14 @@ test('sample messages and the test message are owner only and sent unconditional
     expect(TelegramSettings::hasToken())->toBeFalse();
 });
 
-test('the health strip chips link to their settings pages', function () {
+test('the health strip chips link to the merged settings page and the hub', function () {
     $src = file_get_contents(base_path('resources/js/components/fork/auto/HealthStrip.vue'));
 
-    expect($src)->toContain("href: '/settings/telegram'")->toContain("href: '/settings/chrome'")->toContain("href: '/xuong'")->toContain("href: '/auto#kenh'");
+    expect($src)->toContain("href: '/settings#telegram'")->toContain("href: '/xuong'");
+});
+
+test('the channel card chrome badge links to the merged settings page', function () {
+    $src = file_get_contents(base_path('resources/js/components/fork/auto/ChannelCard.vue'));
+
+    expect($src)->toContain("'/settings#chrome'");
 });

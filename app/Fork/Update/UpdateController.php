@@ -7,14 +7,27 @@ namespace App\Fork\Update;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /** Cài đặt → Cập nhật. Mọi việc nặng do launcher làm; trang này chỉ hiển thị và gửi lệnh (kèm token của launcher). */
 final class UpdateController extends Controller
 {
-    public function index(Request $request): Response
+    /**
+     * Trang riêng cũ (`/settings/cap-nhat`) giờ chỉ chuyển hướng sang trang Cài đặt hợp nhất.
+     */
+    public function index(Request $request): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+
+        return redirect()->to('/settings#cap-nhat');
+    }
+
+    /**
+     * Dữ liệu cho mục "Cập nhật" trong trang Cài đặt hợp nhất.
+     *
+     * @return array<string, mixed>
+     */
+    public function props(Request $request): array
     {
         $this->authorizeOwner($request);
 
@@ -33,7 +46,7 @@ final class UpdateController extends Controller
 
         $latest = is_array($status['latest'] ?? null) ? $status['latest'] : null;
 
-        return Inertia::render('settings/fork/CapNhat', [
+        return [
             'configured' => $configured,
             'repo' => $configured ? (string) config('fork-update.repo') : null,
             'launcher_ok' => $status !== null,
@@ -60,7 +73,7 @@ final class UpdateController extends Controller
                 'percent' => (int) ($status['percent'] ?? 0),
                 'error' => (string) ($status['error'] ?? ''),
             ],
-        ]);
+        ];
     }
 
     public function check(Request $request): RedirectResponse

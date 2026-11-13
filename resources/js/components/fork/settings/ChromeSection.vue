@@ -2,7 +2,7 @@
 // Trang riêng của bản Việt hoá: ghép nối tiện ích Chrome (TikTok Auto Kid) để đăng TikTok.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en) để không
 // làm lệch bộ khoá dịch của các ngôn ngữ khác.
-import { Head, Link, router, usePoll } from '@inertiajs/vue3';
+import { Link, router, usePoll } from '@inertiajs/vue3';
 import {
     IconBrandChrome,
     IconBrandTelegram,
@@ -27,7 +27,6 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import dayjs from '@/dayjs';
-import SettingsLayout from '@/layouts/SettingsLayout.vue';
 
 interface Pair {
     code: string;
@@ -483,13 +482,7 @@ const chromeOnlyCandidates = computed(() => {
 </script>
 
 <template>
-    <Head title="Kết nối Chrome" />
-
-    <SettingsLayout
-        title="Kết nối Chrome"
-        description="Ghép nối tiện ích Chrome để đăng TikTok bằng tài khoản của bạn, xem Chrome nào đang kết nối và bài nào vừa được giao."
-    >
-        <div class="flex flex-col gap-5" data-testid="fork-chrome-page">
+    <div class="flex flex-col gap-5" data-testid="fork-chrome-page">
             <!-- Ô số liệu nhanh -->
             <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
                 <div
@@ -1127,5 +1120,4 @@ const chromeOnlyCandidates = computed(() => {
                 </div>
             </SettingsSection>
         </div>
-    </SettingsLayout>
 </template>

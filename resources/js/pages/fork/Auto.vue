@@ -208,7 +208,7 @@ const analyses = computed(() => [
 
         <KpiStrip :accounts="accounts" :lich="lich" :stock="stock" />
 
-        <HealthStrip :hub="hub" :health="health" :accounts="accounts" />
+        <HealthStrip :hub="hub" :health="health" />
 
         <!-- Cảnh báo cần xử lý -->
         <div class="flex flex-col gap-3 empty:hidden">
@@ -265,6 +265,7 @@ const analyses = computed(() => [
                     :account="a"
                     :avatar-url="a.avatar_url"
                     :today="lich.channels[a.id]?.today"
+                    :chrome="health.channels.find((c) => c.id === a.id)"
                     :blocked-count="
                         (lich.channels[a.id]?.blocked ?? []).reduce(
                             (s, g) => s + g.count,
@@ -280,7 +281,7 @@ const analyses = computed(() => [
                 description="Kết nối tài khoản TikTok và bật đăng qua Chrome để app bắt đầu tự động đăng."
             >
                 <Button as-child size="sm">
-                    <Link href="/settings/chrome">Kết nối Chrome →</Link>
+                    <Link href="/settings#chrome">Kết nối Chrome →</Link>
                 </Button>
             </EmptyState>
         </section>

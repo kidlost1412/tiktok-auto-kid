@@ -21,8 +21,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Inertia\Inertia;
-use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -33,7 +31,22 @@ final class ChromeSettingsController extends Controller
 {
     private const string PROFILE_DIR_RE = '/^(Default|Profile \d+|[A-Za-z0-9 _.\-]{1,64})$/';
 
-    public function index(Request $request): Response
+    /**
+     * Trang riêng cũ (`/settings/chrome`) giờ chỉ chuyển hướng sang trang Cài đặt hợp nhất.
+     */
+    public function index(Request $request): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+
+        return redirect()->to('/settings#chrome');
+    }
+
+    /**
+     * Dữ liệu cho mục "Kết nối Chrome" trong trang Cài đặt hợp nhất.
+     *
+     * @return array<string, mixed>
+     */
+    public function props(Request $request): array
     {
         $accountId = $this->authorizeOwner($request);
 
@@ -43,19 +56,19 @@ final class ChromeSettingsController extends Controller
         // Chỉ có một Chrome chưa chọn profile và một profile ứng viên thì khỏi bắt chọn.
         ChromeProfiles::autoAssign($accountId);
 
-        return Inertia::render('settings/fork/Chrome', [
-            'pair' => fn (): ?array => $this->currentPair($accountId),
-            'clients' => fn (): array => $this->clients($accountId),
-            'accounts' => fn (): array => $this->accounts($accountId),
-            'jobs' => fn (): array => $this->jobList($accountId),
-            'profiles' => fn (): array => ChromeProfiles::reported(),
-            'telegram' => fn (): array => ['configured' => Telegram::configured()],
-            'backgroundMode' => fn (): array => $this->backgroundMode(),
+        return [
+            'pair' => $this->currentPair($accountId),
+            'clients' => $this->clients($accountId),
+            'accounts' => $this->accounts($accountId),
+            'jobs' => $this->jobList($accountId),
+            'profiles' => ChromeProfiles::reported(),
+            'telegram' => ['configured' => Telegram::configured()],
+            'backgroundMode' => $this->backgroundMode(),
             'extensionPath' => $this->extensionPath(),
             'latestExtension' => $this->latestExtensionVersion(),
             'serverUrl' => rtrim((string) config('app.url'), '/'),
             'hasWorkspace' => (bool) $request->user()?->current_workspace_id,
-        ]);
+        ];
     }
 
     public function jobs(Request $request): JsonResponse

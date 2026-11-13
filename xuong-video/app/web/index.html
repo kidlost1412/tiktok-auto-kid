@@ -170,6 +170,8 @@ input.pick{background:var(--panel);cursor:default}
 .btn.dz:hover:not(:disabled){background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 30%,var(--line2))}
 .btn.ic-only{width:32px;padding:0}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.gapChev{transition:transform .15s}
+.gapToggle[aria-expanded="true"] .gapChev{transform:rotate(90deg)}
 .tg{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;user-select:none}
 input.sw{-webkit-appearance:none;appearance:none;width:36px;height:20px;margin:0;border:0;border-radius:999px;background:var(--line2);position:relative;cursor:pointer;flex:none;transition:background-color .2s}
 input.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .2s}
@@ -600,13 +602,16 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   </div>
   <div class="card mt">
     <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
-      <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div></div>
-    <div class="tbl-wrap tall"><table class="tbl lo" id="loBang"></table></div>
+      <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
+      <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+    <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
   </div>
   <div class="card mt">
     <div class="ch"><span class="chip g"><svg class="i"><use href="#i-bot"/></svg></span>
       <div class="t"><h2>Tự động giữ kho video</h2><p class="sub">Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.</p></div>
-      <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw"> Bật tự động</label></div></div>
+      <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw"> Bật tự động</label>
+        <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+    <div class="hidden" id="tdBody">
     <p class="help">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
       App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
       <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã ✅ và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự ✅) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
@@ -616,6 +621,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <span class="note" id="tdTrangThai"></span>
       <div class="row" style="gap:10px"><span class="inl">Kiểm mỗi <input type="number" id="tdPhut" min="5" value="15"> phút</span>
         <button class="btn go" id="btnLuuTd"><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
+    </div>
     </div>
   </div>
   <div class="card mt">
@@ -945,6 +951,23 @@ const $ = s => document.querySelector(s);
 const api = (u, b) => fetch(u, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}).then(r => r.json());
 const toast = t => { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 2600); };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+// ---------- Mục gấp/mở (đóng theo mặc định, nhớ lựa chọn của anh trong máy này)
+function gapInit() {
+  document.querySelectorAll('.gapToggle').forEach(btn => {
+    const key = 'gap.' + btn.dataset.gapKey, body = $('#' + btn.dataset.gapKey);
+    if (!body) return;
+    let mo = false;
+    try { mo = localStorage.getItem(key) === '1'; } catch {}
+    const ve = o => { body.classList.toggle('hidden', !o); btn.setAttribute('aria-expanded', o ? 'true' : 'false'); };
+    ve(mo);
+    btn.addEventListener('click', () => {
+      mo = !mo;
+      ve(mo);
+      try { localStorage.setItem(key, mo ? '1' : '0'); } catch {}
+    });
+  });
+}
+gapInit();
 // ---------- ẢNH SẢN PHẨM
 const ic = (n, c = '') => `<svg class="i${c ? ' ' + c : ''}"><use href="#i-${n}"/></svg>`;   // biểu tượng SVG (sprite đầu <body>)
 const rong = (icon, tieu, mo) => `<div class="empty"><div class="ei">${ic(icon)}</div><b>${tieu}</b>${mo ? `<span>${mo}</span>` : ''}</div>`;

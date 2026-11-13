@@ -116,24 +116,38 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
 </script>
 
 <template>
-    <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4" data-testid="fork-auto-kpi">
+    <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="fork-auto-kpi">
         <div
-            v-for="c in cards"
+            v-for="(c, i) in cards"
             :key="c.key"
-            :class="cn(cardCls, 'relative flex flex-col gap-3 overflow-hidden p-5')"
+            :class="
+                cn(
+                    cardCls,
+                    'relative flex flex-col gap-2 overflow-hidden p-4',
+                    i === 0 && 'ring-1 ring-primary/15',
+                )
+            "
             :data-testid="`fork-auto-kpi-${c.key}`"
         >
-            <div class="flex items-center gap-3">
-                <span :class="cn('flex size-[34px] shrink-0 items-center justify-center rounded-[10px]', toneClasses[c.tone].chip)">
-                    <component :is="c.icon" class="size-[18px]" />
+            <div class="flex items-center gap-2.5">
+                <span :class="cn('flex size-[28px] shrink-0 items-center justify-center rounded-[9px]', toneClasses[c.tone].chip)">
+                    <component :is="c.icon" class="size-4" />
                 </span>
-                <div class="text-sm font-medium text-muted-foreground">{{ c.label }}</div>
+                <div class="text-[13px] font-medium text-muted-foreground">{{ c.label }}</div>
             </div>
-            <div class="flex items-baseline gap-2">
-                <span class="font-heading text-[32px] leading-none font-[650] tracking-[-0.025em] tabular-nums">{{ c.value }}</span>
-                <span v-if="c.unit" class="text-sm text-muted-foreground">{{ c.unit }}</span>
+            <div class="flex items-baseline gap-1.5">
+                <span
+                    :class="
+                        cn(
+                            'font-heading leading-none font-[650] tracking-[-0.025em] tabular-nums',
+                            i === 0 ? 'text-[36px]' : 'text-[26px]',
+                        )
+                    "
+                    >{{ c.value }}</span
+                >
+                <span v-if="c.unit" class="text-[13px] text-muted-foreground">{{ c.unit }}</span>
             </div>
-            <div class="text-[13px] leading-snug text-muted-foreground">{{ c.hint }}</div>
+            <div class="text-[12.5px] leading-snug text-muted-foreground">{{ c.hint }}</div>
         </div>
     </div>
 </template>

@@ -111,22 +111,22 @@ test('keepalive result is stored and an error is surfaced on the settings page',
     $this->postJson('/api/fork/chrome/keepalive-result', ['client_id' => 999999, 'ok' => true], keepAliveHeaders())->assertNotFound();
     $this->postJson('/api/fork/chrome/keepalive-result', ['client_id' => $client->id, 'ok' => true], \array_merge(['X-Fork-Launcher-Secret' => 'sai']))->assertForbidden();
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.keep_alive', true)
-            ->where('clients.0.keepalive.state', 'failed')
-            ->where('clients.0.keepalive.message', 'Không tìm thấy trình duyệt chrome trên máy.'));
+            ->where('chrome.clients.0.keep_alive', true)
+            ->where('chrome.clients.0.keepalive.state', 'failed')
+            ->where('chrome.clients.0.keepalive.message', 'Không tìm thấy trình duyệt chrome trên máy.'));
 });
 
 test('a check-in after a launch clears the error and shows running', function () {
     $client = keepAliveClient(['keepalive_error' => 'cũ', 'keepalive_failures' => 2, 'keepalive_last_start_at' => now()->subMinutes(2)]);
     $client->update(['last_seen_at' => now()]);
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('clients.0.keepalive.state', 'running')
-            ->where('clients.0.keepalive.message', null));
+            ->where('chrome.clients.0.keepalive.state', 'running')
+            ->where('chrome.clients.0.keepalive.message', null));
 
     expect($client->fresh()->keepalive_failures)->toBe(0);
 });
@@ -162,10 +162,10 @@ test('background mode read by the launcher is exposed to the page', function () 
         'browser_settings' => ['chrome' => ['background_mode' => false], 'edge' => ['background_mode' => null]],
     ], keepAliveHeaders())->assertOk();
 
-    $this->actingAs($this->owner)->get('/settings/chrome')
+    $this->actingAs($this->owner)->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('backgroundMode.chrome', false)
-            ->where('backgroundMode.edge', null));
+            ->where('chrome.backgroundMode.chrome', false)
+            ->where('chrome.backgroundMode.edge', null));
 });
 
 test('chrome-launcher.ps1 dry-run prints the background launch without starting anything', function () {

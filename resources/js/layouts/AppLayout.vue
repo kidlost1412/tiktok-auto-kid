@@ -2,14 +2,12 @@
 // Khung chung của app: thanh trên cùng (Tự động đăng / Kết nối Chrome) + nội dung + thông báo.
 import { Link, usePage } from '@inertiajs/vue3';
 import {
-    IconBrandChrome,
-    IconBrandTelegram,
     IconBrandTiktok,
-    IconCloudDownload,
     IconHome,
     IconMoon,
     IconMovie,
     IconRobot,
+    IconSettings,
     IconSun,
 } from '@tabler/icons-vue';
 import { computed, ref, type Component } from 'vue';
@@ -29,9 +27,7 @@ const links = [
     { href: '/nha', label: 'Xưởng nhỏ', icon: IconHome },
     { href: '/auto', label: 'Tự động đăng', icon: IconRobot },
     { href: '/xuong', label: 'Xưởng Video', icon: IconMovie },
-    { href: '/settings/chrome', label: 'Kết nối Chrome', icon: IconBrandChrome },
-    { href: '/settings/telegram', label: 'Telegram', icon: IconBrandTelegram },
-    { href: '/settings/cap-nhat', label: 'Cập nhật', icon: IconCloudDownload },
+    { href: '/settings', label: 'Cài đặt', icon: IconSettings },
 ];
 const dark = ref(document.documentElement.classList.contains('dark'));
 const setTheme = (isDark: boolean) => {

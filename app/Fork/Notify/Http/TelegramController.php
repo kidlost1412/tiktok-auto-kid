@@ -12,8 +12,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Inertia\Inertia;
-use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /** Cài đặt Telegram ngay trong app: token (mã hoá trong DB), chat id, bật/tắt từng loại tin, tin mẫu. */
@@ -21,14 +19,29 @@ final class TelegramController extends Controller
 {
     private const string CANDIDATE = 'fork:telegram:candidate';
 
-    public function index(Request $request): Response
+    /**
+     * Trang riêng cũ (`/settings/telegram`) giờ chỉ chuyển hướng sang trang Cài đặt hợp nhất.
+     */
+    public function index(Request $request): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+
+        return redirect()->to('/settings#telegram');
+    }
+
+    /**
+     * Dữ liệu cho mục "Telegram" trong trang Cài đặt hợp nhất.
+     *
+     * @return array<string, mixed>
+     */
+    public function props(Request $request): array
     {
         $this->authorizeOwner($request);
 
         $bot = TelegramSettings::botUsername();
         $toggles = TelegramSettings::toggles();
 
-        return Inertia::render('settings/fork/Telegram', [
+        return [
             'configured' => TelegramSettings::configured(),
             'has_token' => TelegramSettings::hasToken(),
             'token_masked' => TelegramSettings::maskedToken(),
@@ -43,7 +56,7 @@ final class TelegramController extends Controller
             'previews' => collect(Messages::samples())->map(fn (array $s, string $id): array => [
                 'id' => $id, 'label' => $s['label'], 'html' => $s['message']->text,
             ])->values()->all(),
-        ]);
+        ];
     }
 
     public function saveToken(Request $request): RedirectResponse

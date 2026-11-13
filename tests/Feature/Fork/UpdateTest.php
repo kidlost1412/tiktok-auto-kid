@@ -52,17 +52,19 @@ test('page shows current and latest version, notes and rollback from the launche
     Http::swap(new Factory);
     Http::fake(['127.0.0.1:8009/api/update/status' => Http::response(launcherStatus())]);
 
-    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertOk()->assertInertia(fn ($p) => $p
-        ->component('settings/fork/CapNhat')
-        ->where('configured', true)
-        ->where('launcher_ok', true)
-        ->where('current', '1.0.0')
-        ->where('latest.version', '1.1.0')
-        ->where('update_available', true)
-        ->where('can_rollback', true)
-        ->where('rollback_version', '0.9.0')
-        ->where('latest.page_url', 'https://github.com/owner/tiktok-auto-kid/releases/tag/v1.1.0')
-        ->where('job.busy', false));
+    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertRedirect('/settings#cap-nhat');
+
+    $this->actingAs($this->owner)->get('/settings')->assertOk()->assertInertia(fn ($p) => $p
+        ->component('fork/Settings')
+        ->where('update.configured', true)
+        ->where('update.launcher_ok', true)
+        ->where('update.current', '1.0.0')
+        ->where('update.latest.version', '1.1.0')
+        ->where('update.update_available', true)
+        ->where('update.can_rollback', true)
+        ->where('update.rollback_version', '0.9.0')
+        ->where('update.latest.page_url', 'https://github.com/owner/tiktok-auto-kid/releases/tag/v1.1.0')
+        ->where('update.job.busy', false));
 });
 
 test('page refreshes a stale check through the launcher with the control token', function () {
@@ -72,7 +74,7 @@ test('page refreshes a stale check through the launcher with the control token',
         '127.0.0.1:8009/api/update/check' => Http::response(launcherStatus()),
     ]);
 
-    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertInertia(fn ($p) => $p->where('latest.version', '1.1.0'));
+    $this->actingAs($this->owner)->get('/settings')->assertInertia(fn ($p) => $p->where('update.latest.version', '1.1.0'));
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/api/update/check') && $r->header('X-TTA-Token') === ['secret-token']);
 });
 
@@ -82,7 +84,7 @@ test('placeholder repo means not configured and never calls the launcher to inst
     Http::swap(new Factory);
     Http::fake(['127.0.0.1:8009/*' => Http::response(launcherStatus(['configured' => false, 'latest' => null, 'update_available' => false]))]);
 
-    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertInertia(fn ($p) => $p->where('configured', false)->where('repo', null));
+    $this->actingAs($this->owner)->get('/settings')->assertInertia(fn ($p) => $p->where('update.configured', false)->where('update.repo', null));
     $this->actingAs($this->owner)->post('/settings/cap-nhat/install')->assertSessionHas('flash.error');
     Http::assertNotSent(fn (Request $r) => str_ends_with($r->url(), '/api/update'));
 });
@@ -91,7 +93,7 @@ test('page copes with the launcher being down', function () {
     Http::swap(new Factory);
     Http::fake(['127.0.0.1:8009/*' => fn () => throw new Illuminate\Http\Client\ConnectionException('down')]);
 
-    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertOk()->assertInertia(fn ($p) => $p->where('launcher_ok', false)->where('job', null));
+    $this->actingAs($this->owner)->get('/settings')->assertOk()->assertInertia(fn ($p) => $p->where('update.launcher_ok', false)->where('update.job', null));
     $this->actingAs($this->owner)->post('/settings/cap-nhat/install')->assertSessionHas('flash.error');
 });
 
@@ -139,5 +141,5 @@ test('non-github release links are dropped from the page props', function () {
     $s['latest']['page_url'] = 'https://evil.example.com/x';
     Http::fake(['127.0.0.1:8009/api/update/status' => Http::response($s)]);
 
-    $this->actingAs($this->owner)->get('/settings/cap-nhat')->assertInertia(fn ($p) => $p->where('latest.page_url', null));
+    $this->actingAs($this->owner)->get('/settings')->assertInertia(fn ($p) => $p->where('update.latest.page_url', null));
 });

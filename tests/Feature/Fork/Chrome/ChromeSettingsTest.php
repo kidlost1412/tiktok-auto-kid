@@ -40,17 +40,23 @@ beforeEach(function () {
     $this->owner->update(['current_workspace_id' => $this->workspace->id]);
 });
 
-test('the account owner sees the chrome page', function () {
+test('the old chrome settings url redirects to the merged settings page', function () {
     $this->actingAs($this->owner)
         ->get('/settings/chrome')
+        ->assertRedirect('/settings#chrome');
+});
+
+test('the account owner sees the chrome section on the merged settings page', function () {
+    $this->actingAs($this->owner)
+        ->get('/settings')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('settings/fork/Chrome')
-            ->where('pair', null)
-            ->has('clients', 0)
-            ->has('accounts', 0)
-            ->has('jobs', 0)
-            ->has('profiles', 0));
+            ->component('fork/Settings')
+            ->where('chrome.pair', null)
+            ->has('chrome.clients', 0)
+            ->has('chrome.accounts', 0)
+            ->has('chrome.jobs', 0)
+            ->has('chrome.profiles', 0));
 });
 
 test('members who are not the owner cannot use the chrome page', function () {
@@ -74,10 +80,10 @@ test('creating a pair code stores a 6 digit code for the account and shows it', 
         ->and($pair['code'])->toMatch('/^\d{6}$/');
 
     $this->actingAs($this->owner)
-        ->get('/settings/chrome')
+        ->get('/settings')
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('pair.code', $pair['code'])
-            ->where('pair.valid_s', fn ($s) => $s > 0 && $s <= 300));
+            ->where('chrome.pair.code', $pair['code'])
+            ->where('chrome.pair.valid_s', fn ($s) => $s > 0 && $s <= 300));
 });
 
 test('profile dir is validated and saved', function () {

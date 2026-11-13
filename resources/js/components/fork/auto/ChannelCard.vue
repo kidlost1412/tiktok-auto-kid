@@ -10,8 +10,9 @@ import {
 } from '@tabler/icons-vue';
 import { computed, reactive, ref } from 'vue';
 
-import type { AccountRow, LichChannel } from '@/components/fork/auto/types';
+import type { AccountRow, HealthChannel, LichChannel } from '@/components/fork/auto/types';
 import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
+import dayjs from '@/dayjs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,8 +25,28 @@ const props = defineProps<{
     account: AccountRow;
     avatarUrl: string | null;
     today: LichChannel['today'] | undefined;
+    chrome?: HealthChannel;
     blockedCount: number;
 }>();
+
+const chromeStatus = computed(() => {
+    const c = props.chrome;
+
+    if (!c || !c.chrome_enabled) {
+        return { text: 'Chrome: chưa bật', tone: 'danger' as const };
+    }
+
+    if (c.chrome_online) {
+        return { text: 'Chrome: đang kết nối', tone: 'success' as const };
+    }
+
+    return {
+        text: c.chrome_last_seen
+            ? `Chrome: mất kết nối từ ${dayjs(c.chrome_last_seen).format('HH:mm DD/MM')}`
+            : 'Chrome: chưa thấy tiện ích',
+        tone: 'warn' as const,
+    };
+});
 
 const busy = ref(false);
 const opts = {
@@ -172,23 +193,16 @@ const recOpen = ref(false);
             </div>
         </div>
 
-        <div
-            v-if="
-                !account.chrome_enabled ||
-                account.paused_reason ||
-                blockedCount > 0
-            "
-            class="flex flex-wrap gap-1.5"
-        >
-            <span
-                v-if="!account.chrome_enabled"
+        <div class="flex flex-wrap gap-1.5">
+            <Link
+                :href="'/settings#chrome'"
                 :class="
                     cn(
-                        'rounded-full px-3 py-1 text-sm font-medium',
-                        toneClasses.danger.chip,
+                        'rounded-full px-3 py-1 text-sm font-medium hover:underline',
+                        toneClasses[chromeStatus.tone].chip,
                     )
                 "
-                >Chưa bật đăng qua Chrome</span
+                >{{ chromeStatus.text }}</Link
             >
             <span
                 v-if="account.paused_reason"

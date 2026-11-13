@@ -2,7 +2,7 @@
 // Cài đặt → Cập nhật: xem bản đang dùng / bản mới, ghi chú phát hành, cập nhật một chạm, quay lại bản trước.
 // Việc tải/cài do launcher (TikTokAuto.exe) làm; trong lúc cập nhật app tạm dừng nên trang tự hỏi thẳng launcher.
 // Chữ viết thẳng bằng tiếng Việt (không qua lang/en).
-import { Head, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import {
     IconArrowBackUp,
     IconCloudDownload,
@@ -18,7 +18,6 @@ import SettingsSection from '@/components/settings/SettingsSection.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import SettingsLayout from '@/layouts/SettingsLayout.vue';
 
 interface Job {
     state: string;
@@ -242,13 +241,7 @@ const blocks = computed<Block[]>(() => {
 </script>
 
 <template>
-    <Head title="Cập nhật" />
-
-    <SettingsLayout
-        title="Cập nhật"
-        description="Cập nhật TikTok Auto Kid lên bản mới chỉ với một cú nhấp. Dữ liệu được sao lưu trước, lỗi thì tự quay về bản cũ."
-    >
-        <div class="grid items-start gap-5 xl:grid-cols-2" data-testid="fork-update-page">
+    <div class="grid items-start gap-5 xl:grid-cols-2" data-testid="fork-update-page">
             <div class="flex min-w-0 flex-col gap-5">
                 <SettingsSection
                     title="Phiên bản"
@@ -488,5 +481,4 @@ const blocks = computed<Block[]>(() => {
                 </div>
             </SettingsSection>
         </div>
-    </SettingsLayout>
 </template>
