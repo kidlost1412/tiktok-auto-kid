@@ -295,7 +295,8 @@ func (a *App) checkPath(kind, path string) PathCheck {
 			return r
 		}
 		if es, err := os.ReadDir(p); err == nil && len(es) > 0 {
-			if !isOurInstall(p) {
+			// Chỉ có "runtime" (nhật ký của lần cài trước bị dừng) thì vẫn coi là thư mục trống.
+			if !isOurInstall(p) && !onlyRuntime(es) {
 				r.Error = "Thư mục này đã có tệp khác và chưa phải bản cài TikTok Auto Kid."
 				r.Suggest = filepath.Join(p, appName)
 				return r
@@ -319,6 +320,15 @@ func defaultName(kind string) string {
 		return appName
 	}
 	return appName + " Data"
+}
+
+func onlyRuntime(es []os.DirEntry) bool {
+	for _, e := range es {
+		if !strings.EqualFold(e.Name(), "runtime") {
+			return false
+		}
+	}
+	return true
 }
 
 func isOurInstall(dir string) bool {

@@ -360,6 +360,8 @@ if ($root -match '[^\u0000-\u007F]') {
     if ($TienDo) { Write-Host "##TD-CB Đường dẫn cài có ký tự có dấu; một số công cụ (Remotion, ffmpeg) có thể lỗi. Nên dùng đường dẫn không dấu." }
 }
 $script:LogFile = Join-Path $root 'runtime\logs\cai-dat.log'
+# Xét "thư mục có tệp lạ" TRƯỚC khi tạo runtime\logs, nếu không chính file nhật ký làm thư mục mới thành "không trống".
+$coTepLa = (-not (La-ThuMucCai $root)) -and (Test-Path $root) -and @(Get-ChildItem $root -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'runtime' }).Count -gt 0
 if (-not $ThuKhong) { New-Item -ItemType Directory -Force (Split-Path $script:LogFile) | Out-Null }
 Ghi-Log "Bắt đầu cài. Thư mục: $root; ThuKhong=$ThuKhong; Repo=$Repo"
 Noi "Thư mục cài: $root"
@@ -372,7 +374,7 @@ if (La-ThuMucCai $root) {
     TD 25 'tai-app' 'Đã có sẵn ứng dụng, chuyển sang bước cài phần mềm.'
 }
 else {
-    if ((Test-Path $root) -and @(Get-ChildItem $root -Force -ErrorAction SilentlyContinue).Count -gt 0) {
+    if ($coTepLa) {
         if ($TienDo) { Loi "Thư mục $root không trống và chưa có TikTok Auto Kid. Hãy chọn thư mục trống hoặc thư mục mới."; exit 1 }
         if (-not (Hoi-CoKhong "Thư mục $root không trống và chưa có TikTok Auto Kid. Vẫn cài vào đây?" $false)) { Noi 'Đã hủy.'; exit 1 }
     }
