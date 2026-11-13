@@ -32,6 +32,8 @@ export interface NhaEvent {
     phut?: number;
     ten?: string;
     so_video?: number;
+    lan?: number;
+    buoc?: string;
 }
 
 export interface NhaData {

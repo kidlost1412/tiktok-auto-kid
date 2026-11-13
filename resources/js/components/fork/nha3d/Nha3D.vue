@@ -1,0 +1,94 @@
+<script setup lang="ts">
+// Khung ngôi nhà 3D: tải three.js lười (chỉ khi mở trang này), không có WebGL hoặc dựng lỗi thì báo `fallback`
+// để trang quay về ngôi nhà 2D.
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
+import type { NhaData } from '../nha/types';
+import './nha3d.css';
+import type { NhaWorld } from './index';
+
+const props = defineProps<{
+    data: NhaData | null;
+    hour?: number | null;
+    debug?: boolean;
+}>();
+const emit = defineEmits<{ go: [key: string]; fallback: [] }>();
+
+const host = ref<HTMLDivElement | null>(null);
+const ready = ref(false);
+let world: NhaWorld | null = null;
+let gone = false;
+
+const fail = (err: unknown) => {
+    console.error('[Xưởng nhỏ 3D] chuyển về bản 2D:', err);
+    world?.dispose();
+    world = null;
+    if (!gone) {
+        emit('fallback');
+    }
+};
+
+onMounted(async () => {
+    try {
+        const mod = await import('./index');
+        if (gone || !host.value) {
+            return;
+        }
+        if (!mod.webglOk()) {
+            throw new Error('Trình duyệt không hỗ trợ WebGL');
+        }
+        world = mod.createNhaWorld({
+            host: host.value,
+            reduced:
+                window.matchMedia?.('(prefers-reduced-motion: reduce)')
+                    .matches ?? false,
+            hour: props.hour ?? null,
+            debug: props.debug,
+            onGo: (k) => emit('go', k),
+            onOpen: (url) =>
+                url
+                    ? window.open(url, '_blank', 'noopener')
+                    : emit('go', 'giamkhao'),
+            onFail: fail,
+        });
+        if (props.data) {
+            world.update(props.data);
+        }
+        ready.value = true;
+    } catch (err) {
+        fail(err);
+    }
+});
+
+watch(
+    () => props.data,
+    (d) => {
+        if (d) {
+            world?.update(d);
+        }
+    },
+);
+
+onBeforeUnmount(() => {
+    gone = true;
+    world?.dispose();
+    world = null;
+});
+</script>
+
+<template>
+    <div
+        ref="host"
+        class="n3-host h-full"
+        role="img"
+        aria-label="Xưởng nhỏ 3D: ngôi nhà và các nhân vật đang làm việc"
+        data-testid="nha-3d"
+    >
+        <div
+            v-if="!ready"
+            class="absolute inset-0 grid place-items-center text-[15px] font-semibold text-[#4a3868]"
+        >
+            Đang dựng ngôi nhà…
+        </div>
+    </div>
+</template>
