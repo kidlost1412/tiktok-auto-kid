@@ -503,11 +503,11 @@ const chromeOnlyCandidates = computed(() => {
                 </span>
                 <div class="min-w-0">
                     <b
-                        class="block text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                        class="block text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
                         >{{ s.value }}</b
                     >
                     <span
-                        class="mt-1.5 block truncate text-[13px] text-muted-foreground"
+                        class="mt-1.5 block truncate text-[0.8125rem] text-muted-foreground"
                         >{{ s.label }}</span
                     >
                 </div>
@@ -541,7 +541,7 @@ const chromeOnlyCandidates = computed(() => {
                 >
                     <div class="min-w-0">
                         <p
-                            class="text-[13px] font-medium text-muted-foreground"
+                            class="text-[0.8125rem] font-medium text-muted-foreground"
                         >
                             Địa chỉ máy chủ (nhập vào tiện ích)
                         </p>
@@ -566,7 +566,7 @@ const chromeOnlyCandidates = computed(() => {
                     </div>
                     <div class="min-w-0">
                         <p
-                            class="text-[13px] font-medium text-muted-foreground"
+                            class="text-[0.8125rem] font-medium text-muted-foreground"
                         >
                             Phiên bản tiện ích TikTok Auto Kid
                         </p>
@@ -728,7 +728,7 @@ const chromeOnlyCandidates = computed(() => {
                             <IconBrandChrome />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[15px] font-semibold">
+                            <p class="text-[0.9375rem] font-semibold">
                                 {{ client.label }}
                             </p>
                             <p class="text-sm text-muted-foreground">
@@ -1034,7 +1034,7 @@ const chromeOnlyCandidates = computed(() => {
                         class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 text-sm transition-colors hover:bg-accent/60"
                     >
                         <div class="min-w-0 flex-1">
-                            <p class="text-[15px] font-semibold">
+                            <p class="text-[0.9375rem] font-semibold">
                                 {{ account.display_name || account.username }}
                             </p>
                             <p class="text-sm text-muted-foreground">
@@ -1128,7 +1128,7 @@ const chromeOnlyCandidates = computed(() => {
 
             <p
                 v-if="jobs.length"
-                class="-mt-2 flex items-center gap-1.5 text-[13px] text-muted-foreground"
+                class="-mt-2 flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground"
             >
                 <IconCalendarCheck
                     class="size-4 shrink-0 text-amber-700 dark:text-amber-300"
@@ -1154,7 +1154,7 @@ const chromeOnlyCandidates = computed(() => {
                                     'Chú thích',
                                 ]"
                                 :key="h"
-                                class="sticky top-0 border-b border-border bg-muted px-4 py-2.5 text-left text-[13px] font-medium whitespace-nowrap text-muted-foreground"
+                                class="sticky top-0 border-b border-border bg-muted px-4 py-2.5 text-left text-[0.8125rem] font-medium whitespace-nowrap text-muted-foreground"
                             >
                                 {{ h }}
                             </th>

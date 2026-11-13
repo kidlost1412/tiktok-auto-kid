@@ -53,16 +53,16 @@ const pct = (n: number) =>
 
         <div class="min-w-0">
             <div class="flex min-w-0 items-center gap-2">
-                <span class="truncate text-[13.5px] font-medium">{{
+                <span class="truncate text-[0.8438rem] font-medium">{{
                     productName
                 }}</span>
                 <span
                     v-if="video.quy_cach"
-                    class="shrink-0 text-[12px] text-muted-foreground"
+                    class="shrink-0 text-[0.75rem] text-muted-foreground"
                     >{{ video.quy_cach }}</span
                 >
             </div>
-            <div class="truncate text-[12px] text-muted-foreground">
+            <div class="truncate text-[0.75rem] text-muted-foreground">
                 {{ dayjs(video.posted_at).format('HH:mm DD/MM')
                 }}<template v-if="video.channel">
                     · {{ video.channel }}</template
@@ -75,7 +75,7 @@ const pct = (n: number) =>
                 <span
                     v-for="t in [video.goc, video.giong].filter(Boolean)"
                     :key="String(t)"
-                    class="truncate rounded bg-muted px-1.5 text-[11.5px] leading-5 text-muted-foreground"
+                    class="truncate rounded bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
                     >{{ t }}</span
                 >
             </div>
@@ -86,19 +86,19 @@ const pct = (n: number) =>
             <span
                 v-for="t in [video.goc, video.giong].filter(Boolean)"
                 :key="String(t)"
-                class="max-w-full truncate rounded bg-muted px-1.5 text-[11.5px] leading-5 text-muted-foreground"
+                class="max-w-full truncate rounded bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
                 >{{ t }}</span
             >
             <span
                 v-if="!video.goc && !video.giong"
-                class="text-[12px] text-muted-foreground"
+                class="text-[0.75rem] text-muted-foreground"
                 >—</span
             >
         </div>
 
         <!-- Lượt xem -->
         <div v-if="video.has_metrics" class="min-w-0 text-right lg:text-left">
-            <div class="text-[14px] font-semibold tabular-nums">
+            <div class="text-[0.875rem] font-semibold tabular-nums">
                 {{ fmtNum(video.views) }}
             </div>
             <div
@@ -112,35 +112,35 @@ const pct = (n: number) =>
         </div>
         <div
             v-else
-            class="text-right text-[12px] text-muted-foreground lg:col-span-6 lg:text-left"
+            class="text-right text-[0.75rem] text-muted-foreground lg:col-span-6 lg:text-left"
         >
             Chưa có số liệu (tiện ích thu mỗi giờ)
         </div>
 
         <template v-if="video.has_metrics">
             <span
-                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                class="hidden items-center justify-end gap-1 text-[0.8125rem] text-muted-foreground tabular-nums lg:flex"
                 title="Tim"
                 ><IconHeart class="size-3.5" />{{
                     fmtCompact(video.likes)
                 }}</span
             >
             <span
-                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                class="hidden items-center justify-end gap-1 text-[0.8125rem] text-muted-foreground tabular-nums lg:flex"
                 title="Bình luận"
                 ><IconMessageCircle class="size-3.5" />{{
                     fmtCompact(video.comments)
                 }}</span
             >
             <span
-                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                class="hidden items-center justify-end gap-1 text-[0.8125rem] text-muted-foreground tabular-nums lg:flex"
                 title="Chia sẻ"
                 ><IconShare3 class="size-3.5" />{{
                     fmtCompact(video.shares)
                 }}</span
             >
             <span
-                class="hidden text-right text-[13px] tabular-nums lg:block"
+                class="hidden text-right text-[0.8125rem] tabular-nums lg:block"
                 title="Tỉ lệ tương tác = (tim + bình luận + chia sẻ) / lượt xem"
                 >{{
                     video.engagement > 0
@@ -149,7 +149,7 @@ const pct = (n: number) =>
                 }}</span
             >
             <span
-                class="hidden text-right text-[11.5px] leading-tight text-muted-foreground tabular-nums lg:block"
+                class="hidden text-right text-[0.7188rem] leading-tight text-muted-foreground tabular-nums lg:block"
             >
                 <span class="block"
                     >24h

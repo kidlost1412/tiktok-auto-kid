@@ -76,7 +76,7 @@ const tone = (l: Level): Tone => healthTone[l];
             :data-testid="`fork-health-chip-${c.key}`"
             :class="
                 cn(
-                    'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition hover:bg-accent/50',
+                    'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition hover:bg-accent/50',
                 )
             "
         >

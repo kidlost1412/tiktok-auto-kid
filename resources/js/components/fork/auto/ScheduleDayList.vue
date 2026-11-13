@@ -99,8 +99,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
             "
         >
             <IconCalendarOff class="size-7 text-muted-foreground/60" />
-            <div class="text-[13.5px] font-medium">Chưa có giờ đăng nào</div>
-            <p class="max-w-xs text-[12.5px] text-muted-foreground">
+            <div class="text-[0.8438rem] font-medium">Chưa có giờ đăng nào</div>
+            <p class="max-w-xs text-[0.7812rem] text-muted-foreground">
                 Kênh đang tắt, đã đủ hạn mức hoặc ngoài khung giờ. Nới khung giờ
                 bằng nút “Chỉnh” ở thẻ kênh.
             </p>
@@ -112,7 +112,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
             type="button"
             :class="
                 cn(
-                    'flex items-center gap-3 rounded-lg text-left text-[13px] transition-colors hover:bg-accent/50',
+                    'flex items-center gap-3 rounded-lg text-left text-[0.8125rem] transition-colors hover:bg-accent/50',
                     compact ? 'mx-2 px-2 py-1.5' : 'mx-3 px-2 py-2',
                 )
             "
@@ -147,7 +147,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     }}</span
                 >
             </span>
-            <span class="ml-auto shrink-0 text-[12.5px] text-primary-text">{{
+            <span class="ml-auto shrink-0 text-[0.7812rem] text-primary-text">{{
                 showDone ? 'Ẩn' : 'Xem'
             }}</span>
         </button>
@@ -172,7 +172,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     <span
                         :class="
                             cn(
-                                'text-right text-[12px] font-semibold text-primary-text tabular-nums',
+                                'text-right text-[0.75rem] font-semibold text-primary-text tabular-nums',
                                 timeW,
                             )
                         "
@@ -180,7 +180,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     >
                     <span class="size-2 rounded-full bg-primary" />
                     <span class="h-px flex-1 bg-primary/40" />
-                    <span class="text-[12px] font-medium text-primary-text"
+                    <span class="text-[0.75rem] font-medium text-primary-text"
                         >Bây giờ</span
                     >
                 </li>
@@ -191,8 +191,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             cn(
                                 'grid items-center gap-3 rounded-lg px-2 text-muted-foreground',
                                 compact
-                                    ? 'mx-2 grid-cols-[40px_minmax(0,1fr)] py-1 text-[12.5px]'
-                                    : 'mx-3 grid-cols-[52px_minmax(0,1fr)] py-2 text-[13px]',
+                                    ? 'mx-2 grid-cols-[40px_minmax(0,1fr)] py-1 text-[0.7812rem]'
+                                    : 'mx-3 grid-cols-[52px_minmax(0,1fr)] py-2 text-[0.8125rem]',
                             )
                         "
                     >
@@ -245,7 +245,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             :class="
                                 cn(
                                     'text-right font-semibold tabular-nums',
-                                    compact ? 'text-[13.5px]' : 'text-[15px]',
+                                    compact ? 'text-[0.8438rem]' : 'text-[0.9375rem]',
                                     e.state === 'projected' &&
                                         'font-medium text-muted-foreground',
                                     e.state === 'posted' &&
@@ -273,8 +273,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                         cn(
                                             'truncate font-medium',
                                             compact
-                                                ? 'text-[13px]'
-                                                : 'text-[14px]',
+                                                ? 'text-[0.8125rem]'
+                                                : 'text-[0.875rem]',
                                         )
                                     "
                                     >{{
@@ -283,7 +283,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 >
                                 <span
                                     v-if="multi"
-                                    class="shrink-0 text-[12px] text-muted-foreground"
+                                    class="shrink-0 text-[0.75rem] text-muted-foreground"
                                     >@{{ e.username }}</span
                                 >
                             </div>
@@ -291,7 +291,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-if="e.error"
                                 :class="
                                     cn(
-                                        'truncate text-[12px]',
+                                        'truncate text-[0.75rem]',
                                         toneClasses.danger.text,
                                     )
                                 "
@@ -301,14 +301,14 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             </p>
                             <p
                                 v-else-if="e.caption"
-                                class="truncate text-[12px] text-muted-foreground"
+                                class="truncate text-[0.75rem] text-muted-foreground"
                                 :title="e.caption"
                             >
                                 {{ e.caption }}
                             </p>
                             <div
                                 v-if="!compact && e.cart_name"
-                                class="mt-0.5 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground/90"
+                                class="mt-0.5 flex min-w-0 items-center gap-1 text-[0.75rem] text-muted-foreground/90"
                             >
                                 <IconShoppingCart class="size-3.5 shrink-0" />
                                 <span class="truncate">{{ e.cart_name }}</span>
@@ -326,7 +326,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-if="isLate(e)"
                                 :class="
                                     cn(
-                                        'rounded-full px-2 py-0.5 text-[11.5px] font-medium',
+                                        'rounded-full px-2 py-0.5 text-[0.7188rem] font-medium',
                                         toneClasses.warn.chip,
                                     )
                                 "
@@ -366,13 +366,13 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 <StatusChip
                                     v-else
                                     :status="e.state"
-                                    class="h-5 gap-1 px-1.5 text-[11.5px] [&_svg]:size-3"
+                                    class="h-5 gap-1 px-1.5 text-[0.7188rem] [&_svg]:size-3"
                                 />
                             </template>
                             <template v-else>
                                 <StatusChip
                                     :status="e.state"
-                                    class="h-6 px-2 text-[12px] max-sm:hidden"
+                                    class="h-6 px-2 text-[0.75rem] max-sm:hidden"
                                 />
                                 <span
                                     :class="
@@ -412,7 +412,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                 <span
                     :class="
                         cn(
-                            'text-right text-[12px] font-semibold text-primary-text tabular-nums',
+                            'text-right text-[0.75rem] font-semibold text-primary-text tabular-nums',
                             timeW,
                         )
                     "
@@ -420,7 +420,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                 >
                 <span class="size-2 rounded-full bg-primary" />
                 <span class="h-px flex-1 bg-primary/40" />
-                <span class="text-[12px] font-medium text-primary-text"
+                <span class="text-[0.75rem] font-medium text-primary-text"
                     >Bây giờ · hết bài trong ngày</span
                 >
             </li>

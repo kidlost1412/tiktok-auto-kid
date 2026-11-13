@@ -281,11 +281,11 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                     >
                         <div class="flex items-baseline justify-between px-1">
                             <h2
-                                class="font-heading text-[15px] font-semibold tracking-[-0.01em]"
+                                class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
                             >
                                 Kênh TikTok
                             </h2>
-                            <span class="text-[12.5px] text-muted-foreground"
+                            <span class="text-[0.7812rem] text-muted-foreground"
                                 >{{ channelsOn.length }}/{{
                                     accounts.length
                                 }}
@@ -321,13 +321,13 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                 >
                     <div class="flex flex-wrap items-baseline gap-x-3">
                         <h2
-                            class="font-heading text-[15px] font-semibold tracking-[-0.01em]"
+                            class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
                         >
                             Kho theo sản phẩm
                         </h2>
                         <span
                             v-if="stockRows.length"
-                            class="text-[12.5px] text-muted-foreground tabular-nums"
+                            class="text-[0.7812rem] text-muted-foreground tabular-nums"
                         >
                             {{ stockRows.length }} sản phẩm ·
                             {{ fmtNum(stockSum.new) }} chờ xếp ·
@@ -335,7 +335,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                         </span>
                     </div>
                     <div
-                        class="flex items-center gap-4 text-[12px] text-muted-foreground"
+                        class="flex items-center gap-4 text-[0.75rem] text-muted-foreground"
                     >
                         <span class="hidden items-center gap-1.5 sm:inline-flex"
                             ><i class="h-1.5 w-3 rounded-full bg-primary" />Chờ
@@ -348,7 +348,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                         >
                         <Link
                             href="/auto/kho"
-                            class="text-[12.5px] font-medium text-primary-text hover:underline"
+                            class="text-[0.7812rem] font-medium text-primary-text hover:underline"
                             >Kho video →</Link
                         >
                     </div>
@@ -368,7 +368,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                         <ProductThumb :src="p.image" class="size-9" />
                         <div class="min-w-0 flex-1">
                             <div
-                                class="flex items-baseline justify-between gap-2 text-[13px]"
+                                class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                             >
                                 <span class="truncate font-medium">{{
                                     p.short_name
@@ -398,7 +398,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                                 />
                             </div>
                             <div
-                                class="mt-0.5 truncate text-[11.5px] text-muted-foreground/90 tabular-nums"
+                                class="mt-0.5 truncate text-[0.7188rem] text-muted-foreground/90 tabular-nums"
                             >
                                 {{ fmtNum(p.counts.posted) }} đã đăng<template
                                     v-if="p.counts.failed"
@@ -414,7 +414,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                 </ul>
                 <p
                     v-else
-                    class="px-4 py-5 text-center text-[13px] text-muted-foreground"
+                    class="px-4 py-5 text-center text-[0.8125rem] text-muted-foreground"
                 >
                     Chưa có sản phẩm nào. App sẽ đọc từ Xưởng Video ở lần quét
                     tới.
@@ -425,7 +425,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                 >
                     <button
                         type="button"
-                        class="text-[12.5px] font-medium text-primary-text hover:underline"
+                        class="text-[0.7812rem] font-medium text-primary-text hover:underline"
                         @click="showAllStock = !showAllStock"
                     >
                         {{

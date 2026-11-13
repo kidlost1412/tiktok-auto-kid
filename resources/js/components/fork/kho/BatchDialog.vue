@@ -583,8 +583,8 @@ const areaCls =
                                                 >
                                                     <img :src="coverUrlOf(it.id)!" alt="Ảnh bìa" class="size-full object-cover" />
                                                 </button>
-                                                <span v-else class="flex aspect-[3/4] w-12 items-center justify-center rounded-md border border-dashed text-center text-[10px] leading-tight text-muted-foreground">Chưa có bìa</span>
-                                                <span class="text-[10px] text-muted-foreground">Bìa</span>
+                                                <span v-else class="flex aspect-[3/4] w-12 items-center justify-center rounded-md border border-dashed text-center text-[0.625rem] leading-tight text-muted-foreground">Chưa có bìa</span>
+                                                <span class="text-[0.625rem] text-muted-foreground">Bìa</span>
                                             </div>
                                         </div>
 

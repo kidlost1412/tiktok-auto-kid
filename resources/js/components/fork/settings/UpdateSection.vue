@@ -272,11 +272,11 @@ const blocks = computed<Block[]>(() => {
                     >
                         <span class="fk-chip is-green"><IconPackage /></span>
                         <div class="min-w-0">
-                            <p class="text-[13px] text-muted-foreground">
+                            <p class="text-[0.8125rem] text-muted-foreground">
                                 Đang dùng
                             </p>
                             <p
-                                class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
                                 data-testid="fork-update-current"
                             >
                                 v{{ current }}
@@ -288,11 +288,11 @@ const blocks = computed<Block[]>(() => {
                     >
                         <span class="fk-chip"><IconSparkles /></span>
                         <div class="min-w-0">
-                            <p class="text-[13px] text-muted-foreground">
+                            <p class="text-[0.8125rem] text-muted-foreground">
                                 Bản mới nhất
                             </p>
                             <p
-                                class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
                                 data-testid="fork-update-latest"
                             >
                                 <template v-if="latest"
@@ -302,7 +302,7 @@ const blocks = computed<Block[]>(() => {
                             </p>
                             <p
                                 v-if="checked_at"
-                                class="mt-1 text-[13px] text-muted-foreground"
+                                class="mt-1 text-[0.8125rem] text-muted-foreground"
                             >
                                 Kiểm tra lúc {{ when(checked_at) }}
                             </p>
@@ -385,7 +385,7 @@ const blocks = computed<Block[]>(() => {
                             :style="{ width: `${Math.max(3, live.percent)}%` }"
                         />
                     </div>
-                    <p class="mt-2 text-[13px] text-muted-foreground">
+                    <p class="mt-2 text-[0.8125rem] text-muted-foreground">
                         Ứng dụng tạm dừng trong lúc cập nhật. Đừng tắt máy hay
                         thoát TikTok Auto Kid; trang sẽ tự tải lại khi xong.
                     </p>
@@ -418,10 +418,10 @@ const blocks = computed<Block[]>(() => {
                 >
                     <li class="flex items-center gap-3 px-4 py-3.5">
                         <div class="min-w-0 flex-1">
-                            <div class="text-[15px] font-medium">
+                            <div class="text-[0.9375rem] font-medium">
                                 Tự kiểm tra bản mới mỗi ngày
                             </div>
-                            <div class="text-[13px] text-muted-foreground">
+                            <div class="text-[0.8125rem] text-muted-foreground">
                                 Khi có bản mới, menu ở khay hệ thống sẽ báo và
                                 gửi tin Telegram (nếu đã nối Telegram). Không tự
                                 cài.
@@ -440,10 +440,10 @@ const blocks = computed<Block[]>(() => {
                         class="flex items-center gap-3 px-4 py-3.5"
                     >
                         <div class="min-w-0 flex-1">
-                            <div class="text-[15px] font-medium">
+                            <div class="text-[0.9375rem] font-medium">
                                 Quay lại bản trước (v{{ rollback_version }})
                             </div>
-                            <div class="text-[13px] text-muted-foreground">
+                            <div class="text-[0.8125rem] text-muted-foreground">
                                 Dữ liệu giữ nguyên, chỉ đổi mã chương trình.
                                 Dùng khi bản mới có lỗi.
                             </div>

@@ -441,7 +441,7 @@ const description = computed(
         <template #actions>
             <span
                 id="hub"
-                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-full border bg-card px-3 text-[12.5px] font-medium text-muted-foreground shadow-xs"
+                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-full border bg-card px-3 text-[0.7812rem] font-medium text-muted-foreground shadow-xs"
                 data-testid="fork-kho-hub-status"
             >
                 <span
@@ -643,7 +643,7 @@ const description = computed(
         <section aria-live="polite">
             <p
                 v-if="autoNote && !loading"
-                class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-[13px] text-muted-foreground"
+                class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-[0.8125rem] text-muted-foreground"
                 data-testid="fork-kho-auto-note"
             >
                 <IconVideoOff class="size-4 shrink-0" />
@@ -673,7 +673,7 @@ const description = computed(
                 >
                     <h3
                         v-if="grouped"
-                        class="flex items-baseline gap-2 text-[15px] font-semibold"
+                        class="flex items-baseline gap-2 text-[0.9375rem] font-semibold"
                     >
                         {{ g.label }}
                         <span class="text-xs font-normal text-muted-foreground"

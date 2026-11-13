@@ -231,7 +231,7 @@ const done = computed(() => stage.value === 'account');
         aria-live="polite"
     >
         <div class="flex items-start justify-between gap-3">
-            <p class="text-[15px] font-semibold">
+            <p class="text-[0.9375rem] font-semibold">
                 {{
                     done
                         ? 'Kết nối xong'

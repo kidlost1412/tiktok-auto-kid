@@ -88,7 +88,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).p
         >
         <span
             v-if="duration"
-            class="pointer-events-none absolute right-0.5 bottom-0.5 rounded bg-black/70 px-1 text-[10px] leading-4 font-medium text-white tabular-nums"
+            class="pointer-events-none absolute right-0.5 bottom-0.5 rounded bg-black/70 px-1 text-[0.625rem] leading-4 font-medium text-white tabular-nums"
             >{{ fmt(duration) }}</span
         >
     </button>

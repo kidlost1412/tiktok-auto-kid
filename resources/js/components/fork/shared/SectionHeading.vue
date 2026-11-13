@@ -38,7 +38,7 @@ withDefaults(
                 </h2>
                 <p
                     v-if="description"
-                    class="mt-0.5 text-[13px] leading-relaxed text-muted-foreground"
+                    class="mt-0.5 text-[0.8125rem] leading-relaxed text-muted-foreground"
                 >
                     {{ description }}
                 </p>

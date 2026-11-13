@@ -50,7 +50,7 @@ const active = (href: string) => path.value.startsWith(href);
             data-testid="app-header"
         >
             <div
-                class="mx-auto flex h-[62px] w-full max-w-[1880px] items-center gap-2 px-3 md:gap-4 md:px-8"
+                class="flex h-[62px] w-full items-center gap-2 px-3 md:gap-4 md:px-6"
             >
                 <Link href="/nha" class="flex shrink-0 items-center gap-2.5">
                     <span
@@ -59,7 +59,7 @@ const active = (href: string) => path.value.startsWith(href);
                         <IconBrandTiktok class="size-[18px]" />
                     </span>
                     <span
-                        class="hidden text-[17px] font-semibold tracking-[-0.015em] whitespace-nowrap sm:inline"
+                        class="hidden text-[1.0625rem] font-semibold tracking-[-0.015em] whitespace-nowrap sm:inline"
                         >TikTok Auto Kid</span
                     >
                 </Link>
@@ -74,7 +74,7 @@ const active = (href: string) => path.value.startsWith(href);
                         :aria-current="active(l.href) ? 'page' : undefined"
                         :class="
                             cn(
-                                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] px-2.5 text-[15px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
+                                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] px-2.5 text-[0.9375rem] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
                                 active(l.href) &&
                                     'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08),0_1px_1px_rgb(28_25_23/0.04)] dark:bg-accent dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_3px_rgb(0_0_0/0.5)]',
                             )
@@ -127,7 +127,7 @@ const active = (href: string) => path.value.startsWith(href);
             </div>
         </header>
         <main
-            :class="cn('flex min-w-0 flex-1 flex-col', !fullWidth && 'mx-auto w-full max-w-[1880px]')"
+            :class="cn('flex min-w-0 flex-1 flex-col', !fullWidth && 'w-full')"
             data-testid="app-layout-content"
         >
             <slot />

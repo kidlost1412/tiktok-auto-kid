@@ -133,21 +133,21 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
                 <span :class="cn('flex size-[28px] shrink-0 items-center justify-center rounded-[9px]', toneClasses[c.tone].chip)">
                     <component :is="c.icon" class="size-4" />
                 </span>
-                <div class="text-[13px] font-medium text-muted-foreground">{{ c.label }}</div>
+                <div class="text-[0.8125rem] font-medium text-muted-foreground">{{ c.label }}</div>
             </div>
             <div class="flex items-baseline gap-1.5">
                 <span
                     :class="
                         cn(
                             'font-heading leading-none font-[650] tracking-[-0.025em] tabular-nums',
-                            i === 0 ? 'text-[36px]' : 'text-[26px]',
+                            i === 0 ? 'text-[2.25rem]' : 'text-[1.625rem]',
                         )
                     "
                     >{{ c.value }}</span
                 >
-                <span v-if="c.unit" class="text-[13px] text-muted-foreground">{{ c.unit }}</span>
+                <span v-if="c.unit" class="text-[0.8125rem] text-muted-foreground">{{ c.unit }}</span>
             </div>
-            <div class="text-[12.5px] leading-snug text-muted-foreground">{{ c.hint }}</div>
+            <div class="text-[0.7812rem] leading-snug text-muted-foreground">{{ c.hint }}</div>
         </div>
     </div>
 </template>

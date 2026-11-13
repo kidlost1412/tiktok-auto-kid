@@ -74,11 +74,11 @@ const bestHours = computed(() =>
         >
             <div>
                 <h2
-                    class="font-heading text-[16px] font-semibold tracking-[-0.01em]"
+                    class="font-heading text-[1rem] font-semibold tracking-[-0.01em]"
                 >
                     So sánh hiệu quả
                 </h2>
-                <p class="text-[12.5px] text-muted-foreground">
+                <p class="text-[0.7812rem] text-muted-foreground">
                     Nhóm nào có
                     {{
                         metric === 'avg_views'
@@ -88,7 +88,7 @@ const bestHours = computed(() =>
                     cao hơn thì nên làm nhiều hơn.
                 </p>
             </div>
-            <div class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[12.5px]">
+            <div class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[0.7812rem]">
                 <button
                     v-for="m in [
                         { k: 'avg_views', t: 'View TB / bài' },
@@ -122,7 +122,7 @@ const bestHours = computed(() =>
                 :aria-selected="dim === d.key"
                 :class="
                     cn(
-                        'relative shrink-0 px-2.5 pt-1 pb-2.5 text-[13px] font-medium transition-colors',
+                        'relative shrink-0 px-2.5 pt-1 pb-2.5 text-[0.8125rem] font-medium transition-colors',
                         dim === d.key
                             ? 'text-foreground'
                             : 'text-muted-foreground hover:text-foreground',

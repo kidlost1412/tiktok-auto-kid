@@ -991,7 +991,7 @@ const barVisible = computed(
             data-testid="fork-rieng-folders"
         >
             <span
-                class="flex items-center gap-1.5 pr-1 text-[13px] font-semibold text-muted-foreground"
+                class="flex items-center gap-1.5 pr-1 text-[0.8125rem] font-semibold text-muted-foreground"
                 :title="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của bạn.`"
             >
                 <IconFolder class="size-4" /> Thư mục

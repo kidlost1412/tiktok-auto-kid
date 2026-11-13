@@ -238,7 +238,7 @@ const statLine = computed(() => {
 
                 <!-- Thông tin -->
                 <div
-                    class="flex min-w-0 flex-col gap-4 p-5 text-[15px] sm:max-h-[92vh] sm:overflow-y-auto sm:p-6 [&_dl]:text-[15px]"
+                    class="flex min-w-0 flex-col gap-4 p-5 text-[0.9375rem] sm:max-h-[92vh] sm:overflow-y-auto sm:p-6 [&_dl]:text-[0.9375rem]"
                 >
                     <div class="flex items-start gap-3 pr-8">
                         <ProductThumb

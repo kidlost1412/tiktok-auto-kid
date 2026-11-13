@@ -50,7 +50,7 @@ const active = (i: (typeof items)[number]) =>
 
     <AppLayout title="Tự động đăng" :icon="IconRobot" full-width>
         <div
-            class="mx-auto flex w-full max-w-[1880px] flex-col px-4 pb-20 sm:px-8"
+            class="flex w-full flex-col px-4 pb-20 sm:px-6"
             :data-testid="testid"
         >
             <header class="flex flex-col gap-5 pt-6">
@@ -59,7 +59,7 @@ const active = (i: (typeof items)[number]) =>
                 >
                     <div class="min-w-[min(100%,20rem)] flex-1 basis-0">
                         <h1
-                            class="font-heading text-[22px] leading-tight font-[650] tracking-[-0.022em]"
+                            class="font-heading text-[1.375rem] leading-tight font-[650] tracking-[-0.022em]"
                         >
                             {{ title }}
                         </h1>

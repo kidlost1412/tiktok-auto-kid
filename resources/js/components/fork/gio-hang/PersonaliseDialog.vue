@@ -426,7 +426,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                         class="size-full object-cover"
                                     />
                                     <span
-                                        class="absolute top-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white"
+                                        class="absolute top-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[0.6875rem] font-medium text-white"
                                     >
                                         {{
                                             coverMode === 'fixed'

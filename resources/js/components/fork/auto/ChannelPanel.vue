@@ -88,8 +88,8 @@ const summary = computed(() => {
                 />
             </div>
             <div class="min-w-0 flex-1">
-                <div class="truncate text-[15px] font-semibold tracking-tight">{{ name }}</div>
-                <div class="truncate text-[12.5px] text-muted-foreground">{{ account.display_name ?? summary }}</div>
+                <div class="truncate text-[0.9375rem] font-semibold tracking-tight">{{ name }}</div>
+                <div class="truncate text-[0.7812rem] text-muted-foreground">{{ account.display_name ?? summary }}</div>
             </div>
             <Switch
                 :model-value="account.enabled"
@@ -100,7 +100,7 @@ const summary = computed(() => {
         </div>
 
         <div>
-            <div class="mb-1.5 flex items-baseline justify-between text-[13px]">
+            <div class="mb-1.5 flex items-baseline justify-between text-[0.8125rem]">
                 <span class="text-muted-foreground">Hôm nay</span>
                 <span class="tabular-nums"
                     ><b class="font-semibold">{{ posted }}</b><span class="text-muted-foreground"> đã đăng · {{ planned }}/{{ cap }} đã hẹn</span></span
@@ -112,7 +112,7 @@ const summary = computed(() => {
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-1.5 text-[12.5px] empty:hidden">
+        <div class="flex flex-wrap gap-1.5 text-[0.7812rem] empty:hidden">
             <Link
                 v-if="chrome.tone !== 'success'"
                 href="/settings#chrome"
@@ -141,7 +141,7 @@ const summary = computed(() => {
             </Button>
             <Link
                 :href="`/auto/gio-hang?kenh=${account.id}`"
-                class="ml-auto inline-flex items-center gap-1 text-[13px] font-medium text-primary-text hover:underline"
+                class="ml-auto inline-flex items-center gap-1 text-[0.8125rem] font-medium text-primary-text hover:underline"
                 :data-testid="`fork-auto-cart-${account.id}`"
             >
                 <IconShoppingCart class="size-4" />

@@ -15,7 +15,7 @@ const steps = [
 
 <template>
     <ol
-        class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]"
+        class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem]"
         aria-label="Các bước đăng video riêng"
         data-testid="fork-rieng-steps"
     >
@@ -37,7 +37,7 @@ const steps = [
                 <span
                     :class="
                         cn(
-                            'flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tabular-nums',
+                            'flex size-5 shrink-0 items-center justify-center rounded-full border text-[0.6875rem] font-semibold tabular-nums',
                             current === i + 1
                                 ? 'border-primary bg-primary text-primary-foreground'
                                 : 'bg-muted',

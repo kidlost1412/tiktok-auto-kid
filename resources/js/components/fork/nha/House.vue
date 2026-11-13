@@ -262,7 +262,7 @@ const flowers = [
         </svg>
         <div
             v-if="tip"
-            class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover px-3 py-1.5 text-center text-[13px] leading-tight whitespace-nowrap text-popover-foreground shadow-lg"
+            class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover px-3 py-1.5 text-center text-[0.8125rem] leading-tight whitespace-nowrap text-popover-foreground shadow-lg"
             :style="{ left: tip.left, top: tip.top }"
             role="tooltip"
         >

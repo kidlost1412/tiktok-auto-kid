@@ -103,11 +103,11 @@ const pct = (n: number, d: Day) =>
         >
             <div class="min-w-0">
                 <h2
-                    class="font-heading text-[15px] font-semibold tracking-[-0.01em]"
+                    class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
                 >
                     Lịch đăng
                 </h2>
-                <p class="text-[12.5px] text-muted-foreground">
+                <p class="text-[0.7812rem] text-muted-foreground">
                     Bấm một dòng để xem video. Nét đứt là giờ dự kiến, chưa hẹn
                     lên TikTok.
                 </p>
@@ -116,7 +116,7 @@ const pct = (n: number, d: Day) =>
                 <!-- Chú thích chấm trạng thái (kiểu 3 cột) -->
                 <div
                     v-if="wide"
-                    class="flex items-center gap-3 text-[12px] text-muted-foreground"
+                    class="flex items-center gap-3 text-[0.75rem] text-muted-foreground"
                     aria-hidden="true"
                 >
                     <span class="inline-flex items-center gap-1.5"
@@ -162,7 +162,7 @@ const pct = (n: number, d: Day) =>
                 :key="n.id"
                 :class="
                     cn(
-                        'rounded-lg border px-3.5 py-2 text-[13px]',
+                        'rounded-lg border px-3.5 py-2 text-[0.8125rem]',
                         toneClasses.warn.box,
                     )
                 "
@@ -197,7 +197,7 @@ const pct = (n: number, d: Day) =>
                             <span
                                 :class="
                                     cn(
-                                        'text-[13.5px] font-semibold',
+                                        'text-[0.8438rem] font-semibold',
                                         d.isToday
                                             ? 'text-primary-text'
                                             : 'text-foreground',
@@ -206,16 +206,16 @@ const pct = (n: number, d: Day) =>
                                 >{{ d.label }}</span
                             >
                             <span
-                                class="text-[12.5px] text-muted-foreground tabular-nums"
+                                class="text-[0.7812rem] text-muted-foreground tabular-nums"
                                 >{{ d.date }}</span
                             >
                         </span>
                         <span class="flex items-baseline gap-1">
                             <span
-                                class="font-heading text-[20px] leading-none font-[650] tracking-tight tabular-nums"
+                                class="font-heading text-[1.25rem] leading-none font-[650] tracking-tight tabular-nums"
                                 >{{ d.real + d.planned }}</span
                             >
-                            <span class="text-[12px] text-muted-foreground"
+                            <span class="text-[0.75rem] text-muted-foreground"
                                 >bài</span
                             >
                         </span>
@@ -237,7 +237,7 @@ const pct = (n: number, d: Day) =>
                         />
                     </div>
                     <div
-                        class="mt-1.5 flex flex-wrap gap-x-2.5 text-[12px] text-muted-foreground tabular-nums"
+                        class="mt-1.5 flex flex-wrap gap-x-2.5 text-[0.75rem] text-muted-foreground tabular-nums"
                     >
                         <span v-if="d.posted">{{ d.posted }} đã đăng</span>
                         <span v-if="d.real - d.posted - d.failed"
@@ -294,7 +294,7 @@ const pct = (n: number, d: Day) =>
                         aria-hidden="true"
                     />
                     <span
-                        class="flex items-baseline justify-between gap-2 text-[13px]"
+                        class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                     >
                         <span
                             :class="
@@ -313,10 +313,10 @@ const pct = (n: number, d: Day) =>
                     </span>
                     <span class="flex items-baseline gap-1">
                         <span
-                            class="font-heading text-[22px] leading-none font-[650] tracking-tight tabular-nums"
+                            class="font-heading text-[1.375rem] leading-none font-[650] tracking-tight tabular-nums"
                             >{{ d.real + d.planned }}</span
                         >
-                        <span class="text-[12.5px] text-muted-foreground"
+                        <span class="text-[0.7812rem] text-muted-foreground"
                             >bài<template v-if="d.planned">
                                 · {{ d.planned }} dự kiến</template
                             ></span

@@ -10,12 +10,12 @@ defineProps<{
 <template>
     <AppLayout>
         <div
-            class="mx-auto flex w-full max-w-[1880px] flex-col gap-5 px-4 pt-6 pb-20 md:px-8"
+            class="flex w-full flex-col gap-5 px-4 pt-6 pb-20 md:px-6"
             data-testid="settings-page"
         >
             <header v-if="title" class="mb-1">
                 <h1
-                    class="text-[22px] leading-tight font-semibold tracking-[-0.022em] text-foreground"
+                    class="text-[1.375rem] leading-tight font-semibold tracking-[-0.022em] text-foreground"
                     data-testid="header-title"
                 >
                     {{ title }}

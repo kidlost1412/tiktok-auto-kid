@@ -527,7 +527,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                             :aria-selected="c.id === selected"
                             :class="
                                 cn(
-                                    'flex h-10 items-center gap-2.5 rounded-full border py-1 pr-4 pl-1 text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                    'flex h-10 items-center gap-2.5 rounded-full border py-1 pr-4 pl-1 text-[0.8438rem] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                                     c.id === selected
                                         ? 'border-primary bg-primary/[0.07] text-foreground dark:bg-primary/15'
                                         : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
@@ -538,7 +538,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                             <span
                                 :class="
                                     cn(
-                                        'flex size-8 items-center justify-center rounded-full text-[13px] font-semibold',
+                                        'flex size-8 items-center justify-center rounded-full text-[0.8125rem] font-semibold',
                                         c.id === selected
                                             ? 'bg-primary text-primary-foreground'
                                             : 'bg-muted text-muted-foreground',
@@ -556,7 +556,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
 
                     <div class="flex flex-wrap items-center gap-3">
                         <div
-                            class="text-right text-[12.5px] leading-snug"
+                            class="text-right text-[0.7812rem] leading-snug"
                             data-testid="fork-gio-hang-synced-at"
                         >
                             <div class="font-medium tabular-nums">
@@ -607,7 +607,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                 >
                     <template v-if="syncProgress">
                         <div
-                            class="flex items-center justify-between text-[13px] font-medium"
+                            class="flex items-center justify-between text-[0.8125rem] font-medium"
                             data-testid="fork-gio-hang-sync-progress"
                         >
                             <span>Đã lấy {{ syncProgressText }} sản phẩm…</span>
@@ -623,7 +623,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                             :model-value="syncPercent"
                         />
                     </template>
-                    <p v-else class="text-[13px] text-muted-foreground">
+                    <p v-else class="text-[0.8125rem] text-muted-foreground">
                         Đang chờ tiện ích Chrome lấy sản phẩm từ shop — Chrome
                         cần đang mở và đã đăng nhập TikTok, thường mất vài giây.
                         Trang tự cập nhật; quá {{ sync_ttl_minutes }} phút thì
@@ -634,7 +634,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                     v-else-if="syncState === 'error' || syncState === 'expired'"
                     :class="
                         cn(
-                            'border-t px-5 py-3 text-[13px]',
+                            'border-t px-5 py-3 text-[0.8125rem]',
                             syncState === 'error'
                                 ? toneClasses.danger.box
                                 : toneClasses.warn.box,
@@ -696,12 +696,12 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                     <span :class="cn('size-2.5 rounded-full', t.dot)" />
                     <div class="min-w-0">
                         <div
-                            class="font-heading text-[22px] leading-tight font-[650] tracking-[-0.02em] tabular-nums"
+                            class="font-heading text-[1.375rem] leading-tight font-[650] tracking-[-0.02em] tabular-nums"
                         >
                             {{ t.value }}
                         </div>
                         <div
-                            class="truncate text-[12.5px] text-muted-foreground"
+                            class="truncate text-[0.7812rem] text-muted-foreground"
                         >
                             {{ t.label }}
                         </div>
@@ -731,7 +731,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                             :disabled="f.key !== 'all' && !f.count"
                             :class="
                                 cn(
-                                    'flex h-8 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-colors disabled:opacity-40',
+                                    'flex h-8 items-center gap-2 rounded-lg px-3 text-[0.8125rem] font-medium transition-colors disabled:opacity-40',
                                     filter === f.key
                                         ? 'bg-foreground text-background'
                                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -759,7 +759,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                     </div>
                     <span
                         v-if="channel"
-                        class="text-[12.5px] text-muted-foreground"
+                        class="text-[0.7812rem] text-muted-foreground"
                         >Giỏ hàng của
                         <b class="font-medium text-foreground"
                             >@{{ channel.username }}</b
@@ -768,7 +768,7 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                 </header>
 
                 <div
-                    class="hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:gap-x-5"
+                    class="hidden border-b bg-muted/40 px-5 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:gap-x-5"
                     aria-hidden="true"
                 >
                     <span class="pl-5">Sản phẩm</span>
@@ -823,14 +823,14 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                 </EmptyState>
                 <p
                     v-else
-                    class="px-5 py-10 text-center text-[13px] text-muted-foreground"
+                    class="px-5 py-10 text-center text-[0.8125rem] text-muted-foreground"
                 >
                     Không có sản phẩm nào ở mục này.
                 </p>
 
                 <p
                     v-if="sample_hidden"
-                    class="border-t px-5 py-3 text-[12.5px] text-muted-foreground"
+                    class="border-t px-5 py-3 text-[0.7812rem] text-muted-foreground"
                     data-testid="fork-gio-hang-sample-hidden"
                 >
                     Sản phẩm ví dụ đã được ẩn vì đã có sản phẩm thật.

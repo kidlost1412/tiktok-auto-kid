@@ -443,12 +443,12 @@ const stepDone = {
                         class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60"
                     >
                         <div class="min-w-0 flex-1">
-                            <div class="text-[15px] font-medium">
+                            <div class="text-[0.9375rem] font-medium">
                                 {{ t.label }}
                             </div>
                             <div
                                 v-if="t.urgent"
-                                class="text-[13px] text-muted-foreground"
+                                class="text-[0.8125rem] text-muted-foreground"
                             >
                                 Khẩn cấp: luôn gửi ngay, kể cả giờ yên tĩnh
                             </div>
@@ -489,7 +489,7 @@ const stepDone = {
                                 "
                             />
                         </div>
-                        <p class="mt-1 text-[13px] text-muted-foreground">
+                        <p class="mt-1 text-[0.8125rem] text-muted-foreground">
                             Trong khoảng này chỉ gửi tin khẩn cấp; tin còn lại
                             gửi bù sau khi hết giờ yên tĩnh.
                         </p>

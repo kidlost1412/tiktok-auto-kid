@@ -405,7 +405,7 @@ const onCalKey = (e: KeyboardEvent) => {
                             v-for="w in weekdays"
                             :key="w"
                             role="columnheader"
-                            class="pb-1 text-center text-[11px] font-medium text-muted-foreground"
+                            class="pb-1 text-center text-[0.6875rem] font-medium text-muted-foreground"
                             >{{ w }}</span
                         >
                         <button

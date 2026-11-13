@@ -347,12 +347,12 @@ watch(
 
 const seg = (on: boolean) =>
     cn(
-        'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors',
+        'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[0.8125rem] font-medium transition-colors',
         on
             ? 'bg-card text-foreground shadow-xs dark:bg-white/10'
             : 'text-muted-foreground hover:text-foreground',
     );
-const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
+const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
 </script>
 
 <template>
@@ -541,19 +541,19 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                         :title="t.hint"
                     >
                         <span
-                            class="text-[12px] font-medium tracking-[0.02em] text-muted-foreground uppercase"
+                            class="text-[0.75rem] font-medium tracking-[0.02em] text-muted-foreground uppercase"
                             >{{ t.label }}</span
                         >
                         <Skeleton v-if="loading" class="mt-1 h-8 w-28" />
                         <span
                             v-else
-                            class="font-heading text-[30px] leading-tight font-[650] tracking-[-0.03em] tabular-nums"
+                            class="font-heading text-[1.875rem] leading-tight font-[650] tracking-[-0.03em] tabular-nums"
                             >{{ t.format(kpis[t.key].value) }}</span
                         >
                         <span
                             :class="
                                 cn(
-                                    'flex items-center gap-1 text-[12.5px] tabular-nums',
+                                    'flex items-center gap-1 text-[0.7812rem] tabular-nums',
                                     deltaCls(kpis[t.key]),
                                 )
                             "
@@ -607,19 +607,19 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                         :data-testid="`fork-so-lieu-kpi-${t.key}`"
                     >
                         <span
-                            class="truncate text-[12px] text-muted-foreground"
+                            class="truncate text-[0.75rem] text-muted-foreground"
                             >{{ t.label }}</span
                         >
                         <span class="flex items-baseline gap-2">
                             <span
-                                class="text-[17px] font-semibold tabular-nums"
+                                class="text-[1.0625rem] font-semibold tabular-nums"
                                 >{{ t.format(kpis[t.key].value) }}</span
                             >
                             <span
                                 v-if="kpis[t.key].delta_pct !== null"
                                 :class="
                                     cn(
-                                        'text-[12px] tabular-nums',
+                                        'text-[0.75rem] tabular-nums',
                                         deltaCls(kpis[t.key]),
                                     )
                                 "
@@ -642,14 +642,14 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                         >
                             <div>
                                 <h2 :class="h2">Lượt xem theo ngày</h2>
-                                <p class="text-[12.5px] text-muted-foreground">
+                                <p class="text-[0.7812rem] text-muted-foreground">
                                     Tổng lượt xem của các bài đăng trong ngày đó
                                     (số liệu mới nhất).
                                 </p>
                             </div>
                             <div
                                 v-if="bestDay"
-                                class="text-right text-[12.5px] text-muted-foreground"
+                                class="text-right text-[0.7812rem] text-muted-foreground"
                             >
                                 Ngày tốt nhất
                                 <div
@@ -689,7 +689,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                             >
                                 <h2 :class="h2">Video nổi bật</h2>
                                 <div
-                                    class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[12.5px]"
+                                    class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[0.7812rem]"
                                 >
                                     <button
                                         v-for="m in [
@@ -725,7 +725,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                         "
                                     >
                                         <span
-                                            class="text-center text-[13px] font-semibold text-muted-foreground tabular-nums"
+                                            class="text-center text-[0.8125rem] font-semibold text-muted-foreground tabular-nums"
                                             >{{ i + 1 }}</span
                                         >
                                         <CoverThumb
@@ -735,13 +735,13 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                         />
                                         <span class="min-w-0">
                                             <span
-                                                class="block truncate text-[13.5px] font-medium"
+                                                class="block truncate text-[0.8438rem] font-medium"
                                                 >{{
                                                     productName(v.product_code)
                                                 }}</span
                                             >
                                             <span
-                                                class="block truncate text-[12px] text-muted-foreground"
+                                                class="block truncate text-[0.75rem] text-muted-foreground"
                                                 >{{
                                                     dayjs(v.posted_at).format(
                                                         'HH:mm DD/MM',
@@ -770,7 +770,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                         </span>
                                         <span class="flex items-center gap-2">
                                             <span
-                                                class="text-[14px] font-semibold tabular-nums"
+                                                class="text-[0.875rem] font-semibold tabular-nums"
                                                 >{{ fmtCompact(v.views) }}</span
                                             >
                                             <a
@@ -804,14 +804,14 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                             <template v-if="followers">
                                 <div class="flex items-baseline gap-3">
                                     <span
-                                        class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                                         >{{ fmtNum(followers.current) }}</span
                                     >
                                     <span
                                         v-if="followers.change !== null"
                                         :class="
                                             cn(
-                                                'text-[13px] font-medium tabular-nums',
+                                                'text-[0.8125rem] font-medium tabular-nums',
                                                 followers.change >= 0
                                                     ? toneClasses.success.text
                                                     : toneClasses.danger.text,
@@ -831,13 +831,13 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                 />
                                 <p
                                     v-else
-                                    class="mt-auto text-[12.5px] text-muted-foreground"
+                                    class="mt-auto text-[0.7812rem] text-muted-foreground"
                                 >
                                     Mới có một ngày số liệu — biểu đồ hiện khi
                                     có thêm ngày.
                                 </p>
                             </template>
-                            <p v-else class="text-[13px] text-muted-foreground">
+                            <p v-else class="text-[0.8125rem] text-muted-foreground">
                                 Chưa có số liệu người theo dõi. Tiện ích đọc từ
                                 TikTok Studio mỗi giờ.
                             </p>
@@ -859,7 +859,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                 <div>
                                     <h2 :class="h2">Bình luận</h2>
                                     <p
-                                        class="text-[12.5px] text-muted-foreground"
+                                        class="text-[0.7812rem] text-muted-foreground"
                                     >
                                         {{ fmtNum(comments.counts.total) }} bình
                                         luận đã thu ·
@@ -889,7 +889,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                                 o.k === 'mua' &&
                                                 comments.counts.buy_24h
                                             "
-                                            class="rounded-full bg-amber-500 px-1.5 text-[11.5px] leading-5 font-semibold text-amber-950"
+                                            class="rounded-full bg-amber-500 px-1.5 text-[0.7188rem] leading-5 font-semibold text-amber-950"
                                             >{{ comments.counts.buy_24h }}</span
                                         >
                                     </button>
@@ -898,7 +898,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
 
                             <p
                                 v-if="!comments.rows.length"
-                                class="px-5 py-8 text-center text-[13px] text-muted-foreground"
+                                class="px-5 py-8 text-center text-[0.8125rem] text-muted-foreground"
                             >
                                 {{
                                     filters.cm === 'mua'
@@ -915,7 +915,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                     :key="c.id"
                                     :class="
                                         cn(
-                                            'flex gap-3 px-5 py-3.5 text-[13.5px]',
+                                            'flex gap-3 px-5 py-3.5 text-[0.8438rem]',
                                             c.buy &&
                                                 'bg-amber-50/60 dark:bg-amber-950/15',
                                         )
@@ -923,7 +923,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                     :data-testid="`fork-so-lieu-comment-${c.id}`"
                                 >
                                     <span
-                                        class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[12.5px] font-semibold text-muted-foreground"
+                                        class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[0.7812rem] font-semibold text-muted-foreground"
                                         aria-hidden="true"
                                         >{{
                                             [
@@ -946,7 +946,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                                 v-if="c.buy"
                                                 :class="
                                                     cn(
-                                                        'rounded-full px-2 text-[11.5px] leading-5 font-medium',
+                                                        'rounded-full px-2 text-[0.7188rem] leading-5 font-medium',
                                                         toneClasses.warn.chip,
                                                     )
                                                 "
@@ -954,7 +954,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                                 >Hỏi mua</span
                                             >
                                             <span
-                                                class="text-[12px] text-muted-foreground"
+                                                class="text-[0.75rem] text-muted-foreground"
                                                 >{{
                                                     c.at
                                                         ? dayjs(c.at).format(
@@ -972,7 +972,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                                             {{ c.text }}
                                         </p>
                                         <div
-                                            class="mt-1 flex flex-wrap items-center gap-x-3 text-[12px] text-muted-foreground"
+                                            class="mt-1 flex flex-wrap items-center gap-x-3 text-[0.75rem] text-muted-foreground"
                                         >
                                             <button
                                                 v-if="c.video_id"
@@ -1030,7 +1030,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                 >
                     <div>
                         <h2 :class="h2">Video đã đăng</h2>
-                        <p class="text-[12.5px] text-muted-foreground">
+                        <p class="text-[0.7812rem] text-muted-foreground">
                             {{
                                 videos_total > videos.length
                                     ? `Hiển thị ${videos.length} / ${videos_total} video trong khoảng đã chọn.`
@@ -1054,7 +1054,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                 <div
                     :class="
                         cn(
-                            'hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:gap-x-4',
+                            'hidden border-b bg-muted/40 px-5 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:gap-x-4',
                             videoGridCls,
                         )
                     "
@@ -1116,7 +1116,7 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                 </ul>
                 <footer
                     v-if="pageCount > 1"
-                    class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[13px] text-muted-foreground"
+                    class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[0.8125rem] text-muted-foreground"
                     data-testid="fork-so-lieu-videos-pager"
                 >
                     <span class="tabular-nums"

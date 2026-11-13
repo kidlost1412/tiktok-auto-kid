@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
     >
         <div
             v-if="!ready"
-            class="absolute inset-0 grid place-items-center text-[15px] font-semibold text-[#4a3868]"
+            class="absolute inset-0 grid place-items-center text-[0.9375rem] font-semibold text-[#4a3868]"
         >
             Đang dựng ngôi nhà…
         </div>

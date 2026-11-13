@@ -134,7 +134,7 @@ const labelCls = 'font-medium text-foreground';
                     <p v-if="windowBad" :class="cn('col-span-2 -mt-2 text-xs', toneClasses.danger.text)">Giờ kết thúc phải sau giờ bắt đầu.</p>
                 </div>
 
-                <p :class="cn('rounded-xl border px-4 py-3 text-[13px] leading-relaxed', toneClasses.info.box)" data-testid="fork-auto-ahead-hint">
+                <p :class="cn('rounded-xl border px-4 py-3 text-[0.8125rem] leading-relaxed', toneClasses.info.box)" data-testid="fork-auto-ahead-hint">
                     Có video là app hẹn sẵn lên TikTok cho <b>{{ draft.schedule_ahead_days }} ngày tới</b> — tắt máy vẫn đăng đúng giờ.
                 </p>
 
@@ -147,12 +147,12 @@ const labelCls = 'font-medium text-foreground';
                         </NativeSelect>
                     </label>
                     <template v-if="rec?.hours?.length">
-                        <div class="text-[13px] text-muted-foreground">Giờ có lượt xem cao ({{ rec.videos }} bài, {{ rec.days }} ngày):</div>
+                        <div class="text-[0.8125rem] text-muted-foreground">Giờ có lượt xem cao ({{ rec.videos }} bài, {{ rec.days }} ngày):</div>
                         <ul class="flex flex-wrap gap-1.5">
                             <li
                                 v-for="h in rec.hours"
                                 :key="h.hour"
-                                class="rounded-lg border bg-background px-2.5 py-1 text-[13px] tabular-nums"
+                                class="rounded-lg border bg-background px-2.5 py-1 text-[0.8125rem] tabular-nums"
                                 :title="`${fmtNum(h.avg_views)} lượt xem trung bình, ${h.samples} bài`"
                             >
                                 <b>{{ h.hour }}h</b>
@@ -165,8 +165,8 @@ const labelCls = 'font-medium text-foreground';
                             <Button size="sm" variant="outline" :disabled="busy" @click="applyHours">Dùng các giờ này</Button>
                         </div>
                     </template>
-                    <p v-else class="text-[13px] text-muted-foreground">{{ rec?.reason ?? 'Chưa đủ số liệu — app sẽ đề xuất giờ sau vài ngày đăng.' }}</p>
-                    <p v-if="account.mode === 'optimized' && account.preferred_hours.length" class="text-[13px] text-muted-foreground">
+                    <p v-else class="text-[0.8125rem] text-muted-foreground">{{ rec?.reason ?? 'Chưa đủ số liệu — app sẽ đề xuất giờ sau vài ngày đăng.' }}</p>
+                    <p v-if="account.mode === 'optimized' && account.preferred_hours.length" class="text-[0.8125rem] text-muted-foreground">
                         Đang ưu tiên: {{ account.preferred_hours.map((h) => `${h}h`).join(', ') }}
                     </p>
                 </div>

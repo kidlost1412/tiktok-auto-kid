@@ -254,7 +254,7 @@ onBeforeUnmount(() => {
                             {{ greeting }}!
                         </h1>
                         <p
-                            class="line-clamp-2 text-xs leading-snug font-medium text-[#5a4a78] sm:text-[13px] md:text-[15px]"
+                            class="line-clamp-2 text-xs leading-snug font-medium text-[#5a4a78] sm:text-[0.8125rem] md:text-[0.9375rem]"
                             role="status"
                             data-testid="nha-line"
                         >
@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
                     </div>
                     <span
                         v-if="demo"
-                        class="self-start rounded-full bg-amber-300/90 px-2.5 py-0.5 text-[11px] font-bold text-amber-950 shadow sm:px-3 sm:py-1 sm:text-xs"
+                        class="self-start rounded-full bg-amber-300/90 px-2.5 py-0.5 text-[0.6875rem] font-bold text-amber-950 shadow sm:px-3 sm:py-1 sm:text-xs"
                         >Xem thử · dữ liệu giả</span
                     >
                 </div>
@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
                         <li
                             v-for="r in recent"
                             :key="r.n"
-                            class="flex gap-2 text-[15px]"
+                            class="flex gap-2 text-[0.9375rem]"
                             :class="r.bad ? 'text-destructive' : ''"
                         >
                             <span
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
                             <span class="min-w-0">{{ r.text }}</span>
                         </li>
                     </ol>
-                    <p v-else class="text-[15px] text-muted-foreground">
+                    <p v-else class="text-[0.9375rem] text-muted-foreground">
                         Chưa có hoạt động nào gần đây.
                     </p>
                 </section>
@@ -342,7 +342,7 @@ onBeforeUnmount(() => {
                             >
                             <span class="min-w-0 flex-1">
                                 <span
-                                    class="flex items-center gap-2 text-[15px] font-semibold"
+                                    class="flex items-center gap-2 text-[0.9375rem] font-semibold"
                                 >
                                     {{ c.ten }}
                                     <span

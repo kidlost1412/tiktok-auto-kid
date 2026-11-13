@@ -361,7 +361,7 @@ const status = computed(() => {
                         <div
                             :class="
                                 cn(
-                                    'text-[13px] font-semibold',
+                                    'text-[0.8125rem] font-semibold',
                                     mini && 'max-2xl:hidden',
                                 )
                             "
@@ -369,7 +369,7 @@ const status = computed(() => {
                             Khu Tự Trị
                         </div>
                         <div
-                            class="truncate text-[11.5px] text-muted-foreground"
+                            class="truncate text-[0.7188rem] text-muted-foreground"
                             data-testid="xuong-mini-status"
                         >
                             Đạo diễn {{ status.text }}
@@ -379,7 +379,7 @@ const status = computed(() => {
                         type="button"
                         :class="
                             cn(
-                                'flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium transition-colors',
+                                'flex h-7 items-center gap-1 rounded-md px-2 text-[0.75rem] font-medium transition-colors',
                                 diaryOpen
                                     ? 'bg-secondary text-foreground'
                                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -453,7 +453,7 @@ const status = computed(() => {
                         </div>
                     </div>
                     <p
-                        class="shrink-0 px-3 pt-1.5 pb-2 text-[11px] text-muted-foreground 2xl:px-4"
+                        class="shrink-0 px-3 pt-1.5 pb-2 text-[0.6875rem] text-muted-foreground 2xl:px-4"
                     >
                         Bấm vào một Đạo diễn để trò chuyện.
                     </p>

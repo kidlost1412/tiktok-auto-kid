@@ -256,7 +256,7 @@ const system = computed<Sys[]>(() => {
 });
 
 const label =
-    'text-[12px] font-medium tracking-[0.02em] text-muted-foreground uppercase';
+    'text-[0.75rem] font-medium tracking-[0.02em] text-muted-foreground uppercase';
 </script>
 
 <template>
@@ -306,7 +306,7 @@ const label =
                     />
                 </svg>
                 <span
-                    class="absolute inset-0 flex items-center justify-center text-[13px] font-semibold tabular-nums"
+                    class="absolute inset-0 flex items-center justify-center text-[0.8125rem] font-semibold tabular-nums"
                 >
                     {{
                         today.cap
@@ -319,15 +319,15 @@ const label =
                 <div :class="label">Hôm nay đã đăng</div>
                 <div class="mt-1 flex items-baseline gap-1 whitespace-nowrap">
                     <span
-                        class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                         >{{ today.posted }}</span
                     >
-                    <span class="text-[15px] text-muted-foreground tabular-nums"
+                    <span class="text-[0.9375rem] text-muted-foreground tabular-nums"
                         >/ {{ today.cap }} bài</span
                     >
                 </div>
                 <div
-                    class="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-muted-foreground tabular-nums"
+                    class="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.7812rem] text-muted-foreground tabular-nums"
                 >
                     <span class="inline-flex items-center gap-1.5"
                         ><i class="size-2 rounded-full bg-primary/35" />{{
@@ -366,13 +366,13 @@ const label =
                     <div :class="label">Bài kế tiếp · {{ nextDay }}</div>
                     <div class="mt-1 flex items-baseline gap-2">
                         <span
-                            class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                            class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                             >{{ dayjs(next.at).format('HH:mm') }}</span
                         >
                         <span
                             :class="
                                 cn(
-                                    'truncate text-[13px] font-medium',
+                                    'truncate text-[0.8125rem] font-medium',
                                     toneClasses.info.text,
                                 )
                             "
@@ -380,7 +380,7 @@ const label =
                         >
                     </div>
                     <div
-                        class="mt-2 truncate text-[13px] text-muted-foreground"
+                        class="mt-2 truncate text-[0.8125rem] text-muted-foreground"
                     >
                         <span class="font-medium text-foreground">{{
                             next.product_label ?? next.product_code ?? '—'
@@ -391,7 +391,7 @@ const label =
                     </div>
                     <div
                         v-if="next.caption"
-                        class="mt-0.5 truncate text-[12px] text-muted-foreground/90"
+                        class="mt-0.5 truncate text-[0.75rem] text-muted-foreground/90"
                         :title="next.caption"
                     >
                         {{ next.caption }}
@@ -401,11 +401,11 @@ const label =
             <div v-else class="min-w-0">
                 <div :class="label">Bài kế tiếp</div>
                 <div
-                    class="mt-1.5 font-heading text-[20px] font-semibold tracking-tight text-muted-foreground"
+                    class="mt-1.5 font-heading text-[1.25rem] font-semibold tracking-tight text-muted-foreground"
                 >
                     Chưa có bài hẹn
                 </div>
-                <div class="mt-1 text-[13px] text-muted-foreground">
+                <div class="mt-1 text-[0.8125rem] text-muted-foreground">
                     Bấm “Xếp lịch ngay” khi kho có video.
                 </div>
             </div>
@@ -430,17 +430,17 @@ const label =
             </div>
             <div class="mt-1 flex items-baseline gap-1.5">
                 <span
-                    class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                    class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                     >{{
                         fmtNum(stock.new_total + (stock.scheduled_total ?? 0))
                     }}</span
                 >
-                <span class="text-[15px] text-muted-foreground">video</span>
+                <span class="text-[0.9375rem] text-muted-foreground">video</span>
             </div>
             <div
                 :class="
                     cn(
-                        'mt-2 text-[12.5px] tabular-nums',
+                        'mt-2 text-[0.7812rem] tabular-nums',
                         stock.low
                             ? toneClasses.warn.text
                             : 'text-muted-foreground',
@@ -453,7 +453,7 @@ const label =
                 >
                 <template v-else>Chưa kênh nào bật đăng</template>
             </div>
-            <div class="text-[12.5px] text-muted-foreground tabular-nums">
+            <div class="text-[0.7812rem] text-muted-foreground tabular-nums">
                 {{ fmtNum(stock.new_total) }} chờ xếp ·
                 {{ fmtNum(stock.scheduled_total ?? 0) }} đã hẹn
             </div>
@@ -475,19 +475,19 @@ const label =
                 </div>
                 <div class="mt-1 flex items-baseline gap-1.5 whitespace-nowrap">
                     <span
-                        class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                         >{{
                             trend.byViews
                                 ? fmtCompact(trend.views)
                                 : fmtNum(trend.posts)
                         }}</span
                     >
-                    <span class="text-[15px] text-muted-foreground">{{
+                    <span class="text-[0.9375rem] text-muted-foreground">{{
                         trend.byViews ? 'lượt xem' : 'bài'
                     }}</span>
                 </div>
                 <div
-                    class="mt-2 text-[12.5px] text-muted-foreground tabular-nums"
+                    class="mt-2 text-[0.7812rem] text-muted-foreground tabular-nums"
                 >
                     <template v-if="trend.byViews"
                         >{{ fmtNum(trend.posts) }} bài đã đăng</template
@@ -528,7 +528,7 @@ const label =
                 :key="s.key"
                 :href="s.href"
                 :data-testid="`fork-health-chip-${s.key}`"
-                class="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1 text-[13px] transition-colors hover:bg-accent/50"
+                class="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1 text-[0.8125rem] transition-colors hover:bg-accent/50"
             >
                 <span
                     :class="

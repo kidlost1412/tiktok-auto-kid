@@ -141,25 +141,25 @@ const nameLen = computed(() => [...props.name].length);
             <div class="min-w-0">
                 <div class="flex min-w-0 items-center gap-1.5">
                     <span
-                        class="truncate text-[14px] font-semibold"
+                        class="truncate text-[0.875rem] font-semibold"
                         :title="row.hub_name"
                         >{{ row.hub_name }}</span
                     >
                     <span
                         v-if="row.is_sample"
-                        class="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground"
+                        class="shrink-0 rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
                         data-testid="fork-gio-hang-sample-note"
                         >ví dụ</span
                     >
                     <span
                         v-if="!row.enabled"
-                        class="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground"
+                        class="shrink-0 rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
                         >hub tắt</span
                     >
                     <span
                         :class="
                             cn(
-                                'inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11.5px] font-medium',
+                                'inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[0.7188rem] font-medium',
                                 chipCls,
                             )
                         "
@@ -167,7 +167,7 @@ const nameLen = computed(() => [...props.name].length);
                         >{{ stateText }}</span
                     >
                 </div>
-                <div class="truncate text-[12.5px] text-muted-foreground">
+                <div class="truncate text-[0.7812rem] text-muted-foreground">
                     <template v-if="row.quy_cach_name"
                         >{{ row.quy_cach_name }} ·
                     </template>
@@ -195,13 +195,13 @@ const nameLen = computed(() => [...props.name].length);
             <ProductThumb :src="card.image" class="size-10 rounded-lg" />
             <div class="min-w-0 flex-1">
                 <div
-                    class="truncate text-[13.5px] font-medium"
+                    class="truncate text-[0.8438rem] font-medium"
                     :title="card.title"
                 >
                     {{ card.title }}
                 </div>
                 <div
-                    class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] tabular-nums"
+                    class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.75rem] tabular-nums"
                 >
                     <span class="font-semibold">{{ card.price ?? '—' }}</span>
                     <span v-if="card.missing" :class="toneClasses.danger.text"
@@ -229,7 +229,7 @@ const nameLen = computed(() => [...props.name].length);
             type="button"
             :class="
                 cn(
-                    'flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                    'flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[0.8438rem] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                     state === 'need'
                         ? 'border-amber-400 bg-background/70 text-amber-800 hover:bg-amber-100/60 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/30'
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
@@ -245,7 +245,7 @@ const nameLen = computed(() => [...props.name].length);
         <label v-if="card" class="relative block min-w-0">
             <span class="sr-only">Tên giỏ hiện trên video</span>
             <input
-                class="h-9 w-full rounded-lg border bg-background pr-14 pl-3 text-[13.5px] font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                class="h-9 w-full rounded-lg border bg-background pr-14 pl-3 text-[0.8438rem] font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                 :maxlength="nameMax"
                 placeholder="Tên giỏ hiện trên video"
                 :value="name"
@@ -260,7 +260,7 @@ const nameLen = computed(() => [...props.name].length);
             <span
                 :class="
                     cn(
-                        'pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11.5px] tabular-nums',
+                        'pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[0.7188rem] tabular-nums',
                         nameLen >= nameMax
                             ? cn('font-semibold', toneClasses.warn.text)
                             : 'text-muted-foreground',
@@ -269,7 +269,7 @@ const nameLen = computed(() => [...props.name].length);
                 >{{ nameLen }}/{{ nameMax }}</span
             >
         </label>
-        <div v-else class="hidden text-[12.5px] text-muted-foreground lg:block">
+        <div v-else class="hidden text-[0.7812rem] text-muted-foreground lg:block">
             Chọn sản phẩm trước
         </div>
 
@@ -292,7 +292,7 @@ const nameLen = computed(() => [...props.name].length);
                 />
                 <IconPhoto v-else class="size-4" />
             </span>
-            <span class="min-w-0 text-[12.5px] leading-snug">
+            <span class="min-w-0 text-[0.7812rem] leading-snug">
                 <span
                     class="block truncate"
                     :class="
@@ -374,7 +374,7 @@ const nameLen = computed(() => [...props.name].length);
             v-if="row.link?.paused_reason || row.link?.problem"
             :class="
                 cn(
-                    'flex items-start gap-2 rounded-lg border px-3 py-2 text-[12.5px] lg:col-span-5',
+                    'flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.7812rem] lg:col-span-5',
                     row.link?.paused_reason
                         ? toneClasses.danger.box
                         : toneClasses.warn.box,

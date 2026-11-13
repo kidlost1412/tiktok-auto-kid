@@ -86,13 +86,13 @@ const when = (iso: string | null) => {
             class="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3"
         >
             <h2
-                class="font-heading text-[15px] font-semibold tracking-[-0.01em]"
+                class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
             >
                 Vừa đăng
             </h2>
             <Link
                 href="/auto/so-lieu"
-                class="text-[12.5px] font-medium text-primary-text hover:underline"
+                class="text-[0.7812rem] font-medium text-primary-text hover:underline"
                 >Số liệu →</Link
             >
         </header>
@@ -114,7 +114,7 @@ const when = (iso: string | null) => {
                     "
                 />
                 <div class="min-w-0 flex-1">
-                    <div class="truncate text-[13px] font-medium">
+                    <div class="truncate text-[0.8125rem] font-medium">
                         {{ productName(f.product_code) }}
                         <span class="font-normal text-muted-foreground"
                             >· {{ when(f.at) }}</span
@@ -122,13 +122,13 @@ const when = (iso: string | null) => {
                     </div>
                     <p
                         v-if="f.error"
-                        class="line-clamp-2 text-[12.5px] text-red-700 dark:text-red-300"
+                        class="line-clamp-2 text-[0.7812rem] text-red-700 dark:text-red-300"
                     >
                         {{ f.error }}
                     </p>
                     <p
                         v-if="!f.can_retry && f.retry_note"
-                        class="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground"
+                        class="mt-0.5 line-clamp-2 text-[0.75rem] text-muted-foreground"
                     >
                         {{ f.retry_note }}
                     </p>
@@ -137,7 +137,7 @@ const when = (iso: string | null) => {
                     v-if="f.can_retry"
                     size="sm"
                     variant="outline"
-                    class="h-7 shrink-0 px-2 text-[12.5px]"
+                    class="h-7 shrink-0 px-2 text-[0.7812rem]"
                     :disabled="retrying !== null"
                     :data-testid="`fork-auto-retry-${f.id}`"
                     @click="retry(f.id)"
@@ -150,7 +150,7 @@ const when = (iso: string | null) => {
                     v-else-if="f.can_confirm_retry"
                     size="sm"
                     variant="outline"
-                    class="h-7 shrink-0 px-2 text-[12.5px]"
+                    class="h-7 shrink-0 px-2 text-[0.7812rem]"
                     :disabled="retrying !== null"
                     :data-testid="`fork-auto-confirm-retry-${f.id}`"
                     @click="confirming = f"
@@ -208,7 +208,7 @@ const when = (iso: string | null) => {
 
         <p
             v-if="!recent.length"
-            class="px-4 py-8 text-center text-[13px] text-muted-foreground"
+            class="px-4 py-8 text-center text-[0.8125rem] text-muted-foreground"
         >
             Chưa có bài nào lên TikTok.
         </p>
@@ -230,15 +230,15 @@ const when = (iso: string | null) => {
                         class="h-[50px] w-[28px] rounded"
                     />
                     <div class="min-w-0 flex-1">
-                        <div class="truncate text-[13px] font-medium">
+                        <div class="truncate text-[0.8125rem] font-medium">
                             {{ productName(r.product_code) }}
                         </div>
-                        <div class="truncate text-[12px] text-muted-foreground">
+                        <div class="truncate text-[0.75rem] text-muted-foreground">
                             {{ when(r.posted_at) }} · @{{ r.username }}
                         </div>
                     </div>
                     <span
-                        class="flex shrink-0 items-center gap-1 text-[12.5px] tabular-nums"
+                        class="flex shrink-0 items-center gap-1 text-[0.7812rem] tabular-nums"
                         :class="
                             r.views === null
                                 ? 'text-muted-foreground/60'

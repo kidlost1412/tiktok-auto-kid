@@ -87,7 +87,7 @@ const hatch =
                             />
                         </div>
                         <span
-                            class="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-0.5 bg-gradient-to-t from-black/60 to-transparent px-1.5 pt-4 pb-1 text-[11px] font-semibold text-white"
+                            class="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-0.5 bg-gradient-to-t from-black/60 to-transparent px-1.5 pt-4 pb-1 text-[0.6875rem] font-semibold text-white"
                         >
                             <IconPlayerPlay class="size-3" />
                             {{ t.views }}
@@ -112,7 +112,7 @@ const hatch =
                             hatch,
                         ]"
                     >
-                        <span class="text-[9px] text-muted-foreground"
+                        <span class="text-[0.5625rem] text-muted-foreground"
                             >bị cắt</span
                         >
                     </div>
@@ -125,7 +125,7 @@ const hatch =
                         class="pointer-events-none absolute inset-x-0 top-[12.5%] h-3/4 border-2 border-dashed border-primary"
                     />
                     <span
-                        class="absolute top-[12.5%] left-0 m-1 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground"
+                        class="absolute top-[12.5%] left-0 m-1 rounded bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
                         >3:4</span
                     >
                     <div
@@ -134,7 +134,7 @@ const hatch =
                             hatch,
                         ]"
                     >
-                        <span class="text-[9px] text-muted-foreground"
+                        <span class="text-[0.5625rem] text-muted-foreground"
                             >bị cắt</span
                         >
                     </div>

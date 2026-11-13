@@ -28,7 +28,7 @@ const props = defineProps<{
             <component :is="icon" class="size-6" stroke-width="1.5" />
         </span>
         <div class="flex max-w-md flex-col gap-1">
-            <p class="text-[15px] font-semibold">{{ title }}</p>
+            <p class="text-[0.9375rem] font-semibold">{{ title }}</p>
             <p
                 v-if="description"
                 class="text-sm text-balance text-muted-foreground"
