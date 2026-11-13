@@ -459,7 +459,7 @@ const areaCls =
                         </div>
 
                         <!-- Chọn sản phẩm: ảnh + tên (danh sách có thể cuộn) -->
-                        <div class="-mt-2 grid max-h-56 gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Sản phẩm gắn giỏ hàng" data-testid="fork-rieng-product">
+                        <div class="-mt-1 grid max-h-64 shrink-0 auto-rows-min gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Sản phẩm gắn giỏ hàng" data-testid="fork-rieng-product">
                             <button
                                 v-for="o in account?.products ?? []"
                                 :key="optionKey(o)"
