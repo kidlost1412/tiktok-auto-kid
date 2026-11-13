@@ -138,8 +138,9 @@ export class House {
         const D = Z_FRONT - (Z_BACK - 0.3);
         const zc = (Z_FRONT + Z_BACK - 0.3) / 2;
         // móng
-        b.add(S.box(XR1 - XL0 + 1.5, F1, D + 0.4), C.lavMid, {
-            y: F1 / 2,
+        // mặt trên móng thấp hơn mặt sàn 3cm (nằm dưới ván sàn) để hai mặt không trùng nhau gây nhấp nháy
+        b.add(S.box(XR1 - XL0 + 1.5, F1 - 0.03, D + 0.4), C.lavMid, {
+            y: (F1 - 0.03) / 2,
             z: zc + 0.1,
         });
         b.add(S.box(XR1 - XL0 + 1.6, 0.08, 0.12), C.trim, {
@@ -479,6 +480,7 @@ export class House {
             });
             const mesh = wb.build(this.kit, { cast: true, material: mat });
             // tam giác đùn ra theo trục x: đặt lại cho đúng mép
+            mesh.position.x += side * 0.006; // không trùng mặt tường vỏ nhà
             this.group.add(mesh);
             this.fadeWalls.push({
                 mesh,

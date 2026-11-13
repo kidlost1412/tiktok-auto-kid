@@ -10,8 +10,11 @@ import type { Cat } from './cat';
 import type { AnimName, Expr } from './chibi';
 import type { Effects } from './effects';
 import type { House, Reel } from './house';
-import { F1, F2, GATHER, MEET, room, SEATS } from './layout';
+import { F1, F2, GATHER, MEET, room, SEATS, Z_FRONT, Z_ROOM } from './layout';
+import type { NavGraph } from './nav';
+import type { Pond } from './pond';
 import { pick, rand } from './util';
+import type { Weather } from './weather';
 import type { Wings } from './wings';
 import type { World } from './world';
 
@@ -83,6 +86,15 @@ export class Director {
     private kidCatAt = 6;
     /** Nhân vật của chủ xưởng (khi đi dạo). */
     kid: Actor | null = null;
+    /** Tên + cách xưng hô với chủ xưởng (từ "Nhân vật của tôi"). */
+    player = { ten: 'Kid', anh: 'anh' };
+    /** Ao (nhảy/rơi xuống) và thời tiết — gắn từ ngoài vào. */
+    pond: Pond | null = null;
+    weather: Weather | null = null;
+    nav: NavGraph | null = null;
+    /** Tình cảm với sếp (−5 giận … +5 quý), nhạt dần theo thời gian. */
+    private rel = new Map<string, number>();
+    private avoidCool = new Map<Actor, number>();
     readonly board: Talker;
     data: NhaData | null = null;
     log: string[] = [];
@@ -194,7 +206,7 @@ export class Director {
                         },
                         { k: 'expr', e: 'surprise', d: 1.5 },
                         { k: 'stand' },
-                        { k: 'home', gait: 'run' },
+                        { k: 'home', gait: 'sprint' },
                     );
                 }
             } else if (
@@ -298,6 +310,15 @@ export class Director {
                 ),
             );
         }
+        for (const [k, v] of this.rel) {
+            const nv =
+                v > 0 ? Math.max(0, v - dt / 50) : Math.min(0, v + dt / 50);
+            if (nv === 0) {
+                this.rel.delete(k);
+            } else {
+                this.rel.set(k, nv);
+            }
+        }
         this.noticeKid(dt);
         this.catBump();
         // Cú thỉnh thoảng nói
@@ -314,7 +335,7 @@ export class Director {
         return this.queue.length;
     }
 
-    private release = (a: Actor): Step => ({
+    release = (a: Actor): Step => ({
         k: 'do',
         fn: () => {
             a.inScene = false;
@@ -1027,7 +1048,7 @@ export class Director {
 
     // ------------------------------------------------------------------ giờ nghỉ: ăn, cà phê, chơi, ngủ trưa
     /** Đánh dấu một chuỗi việc là "đi chơi": có việc thật là bỏ ngay (và dọn đồ chơi đang bật). */
-    private fun(a: Actor, steps: Step[], cleanup?: () => void): Step[] {
+    fun(a: Actor, steps: Step[], cleanup?: () => void): Step[] {
         return [
             {
                 k: 'do',
@@ -1051,7 +1072,7 @@ export class Director {
     }
 
     /** Đi tới một chỗ ngồi/nằm (sofa, ghế ăn, giường, võng). */
-    private seat(node: string, anim?: AnimName, d = 8): Step[] {
+    seat(node: string, anim?: AnimName, d = 8): Step[] {
         const s = SEATS[node];
         const out: Step[] = [{ k: 'go', to: node }];
         if (s?.lie) {
@@ -1069,13 +1090,137 @@ export class Director {
         return out;
     }
 
+    relOf(a: Actor) {
+        return this.rel.get(a.key) ?? 0;
+    }
+
+    relAdd(a: Actor, d: number) {
+        this.rel.set(a.key, Math.max(-5, Math.min(5, this.relOf(a) + d)));
+    }
+
+    /** Đang diễn việc thật (giao giấy, chấm điểm…)? Khi đó sếp không chen ngang được. */
+    onDuty(a: Actor) {
+        return a.inScene && !a.leisure;
+    }
+
+    /** Kéo một người ra khỏi trò chơi đang dở để tương tác với sếp (việc thật thì không). */
+    grab(a: Actor): boolean {
+        if (this.onDuty(a)) {
+            return false;
+        }
+        this.cleanups.get(a)?.();
+        this.cleanups.delete(a);
+        this.leaveLine(a);
+        a.interrupt();
+        a.inScene = true;
+        a.leisure = true;
+
+        return true;
+    }
+
+    /** Việc dọn dẹp khi `a` bị gọi đi làm giữa chừng (tắt TV, cất bóng…). */
+    setCleanup(a: Actor, fn: () => void) {
+        this.cleanups.set(a, fn);
+    }
+
+    /** Gọi cả nhà ăn cơm (sếp hô). */
+    callMeal() {
+        const cook = [this.A.chuquay, this.A.thukho, this.A.bienkich].find(
+            (a) => this.freeIdle(a),
+        );
+        if (!cook) {
+            return false;
+        }
+        this.enqueue(this.mealScene(cook));
+
+        return true;
+    }
+
+    /** Ai rảnh (không có việc thật)? */
+    get freeActors() {
+        return Object.values(this.A).filter(
+            (a) => a.base !== 'working' && !this.onDuty(a),
+        );
+    }
+
+    /** Lưu trạng thái điều phối (khi rời trang). */
+    snapshot() {
+        const byKey = <T>(m: Map<Actor, T>) =>
+            [...m.entries()].map(([a, v]) => [a.key, v] as [string, T]);
+
+        return {
+            rel: [...this.rel.entries()],
+            workT: byKey(this.workT),
+            greetCool: byKey(this.greetCool),
+            pairCool: [...this.pairCool.entries()],
+            goodAt: this.goodAt,
+            badAt: this.badAt,
+            sanpham: this.sanpham,
+            mealKey: this.mealKey,
+            kidCatAt: this.kidCatAt,
+            catCool: this.catCool,
+            planT: this.planT,
+            owlChat: this.owlChat,
+            tv: this.wings.state.tv,
+        };
+    }
+
+    restore(s: Partial<ReturnType<Director['snapshot']>>) {
+        const A = this.A;
+        const toActor = <T>(arr: [string, T][] | undefined, m: Map<Actor, T>) =>
+            (arr ?? []).forEach(([k, v]) => A[k] && m.set(A[k], v));
+        this.rel = new Map(s.rel ?? []);
+        toActor(s.workT, this.workT);
+        toActor(s.greetCool, this.greetCool);
+        this.pairCool = new Map(s.pairCool ?? []);
+        this.goodAt = s.goodAt ?? this.goodAt;
+        this.badAt = s.badAt ?? this.badAt;
+        this.sanpham = s.sanpham ?? '';
+        this.mealKey = s.mealKey ?? '';
+        this.kidCatAt = s.kidCatAt ?? this.kidCatAt;
+        this.catCool = s.catCool ?? this.catCool;
+        this.planT = s.planT ?? this.planT;
+        this.owlChat = s.owlChat ?? this.owlChat;
+    }
+
+    /** Quay lại trang sau ít phút: ai đang chơi/nghỉ dở thì làm nốt rồi mới về chỗ. */
+    resume(a: Actor, snap: ReturnType<Actor['snapshot']>, tv: boolean) {
+        if (snap.atHome || !this.motion) {
+            return;
+        }
+        a.inScene = true;
+        a.leisure = true;
+        const steps: Step[] = [];
+        if (snap.anim === 'game' && tv) {
+            this.wings.state.tv = true;
+            this.cleanups.set(a, () => (this.wings.state.tv = false));
+        }
+        if (snap.anim && snap.animLeft > 1.5) {
+            steps.push({
+                k: 'anim',
+                a: snap.anim,
+                d: Math.min(snap.animLeft, 25),
+            });
+        } else if (snap.seated || snap.lying) {
+            steps.push({
+                k: 'anim',
+                a: snap.lying ? 'lie' : 'sitIdle',
+                d: rand(3, 8),
+            });
+        } else {
+            steps.push({ k: 'wait', d: rand(0.5, 2) });
+        }
+        steps.push({ k: 'stand' }, this.release(a));
+        a.push(...steps);
+    }
+
     /** Đang mệt? (làm liên tục khá lâu) */
     tired(a: Actor) {
         return (this.workT.get(a) ?? 0) > 360;
     }
 
     /** Một câu hợp ngữ cảnh cho `a` trong tình huống `situation`. */
-    private line(
+    line(
         a: Actor,
         situation: string,
         extra: {
@@ -1091,13 +1236,22 @@ export class Director {
                   ? 'vui'
                   : null;
 
+        const r = this.relOf(a);
+
         return lineFor(a.key, {
             situation,
             hour: this.hourNow,
             mood,
+            rel: r >= 3 ? 'than' : r <= -3 ? 'gian' : null,
             tired: this.tired(a),
             with: extra.with ?? null,
-            vars: { sanpham: this.sanpham || 'hàng mới', ...extra.vars },
+            vars: {
+                sanpham: this.sanpham || 'hàng mới',
+                sep: this.player.ten,
+                anh: this.player.anh,
+                Anh: this.player.anh === 'chị' ? 'Chị' : 'Anh',
+                ...extra.vars,
+            },
         });
     }
 
@@ -1110,7 +1264,100 @@ export class Director {
     }
 
     /** Các trò chơi/nghỉ ngơi một mình theo tính cách và giờ giấc. */
+    /** Ngoài trời (vườn) — trời mưa thì không ra. */
+    private outdoorNode(id: string) {
+        const p = this.nav?.has(id) ? this.nav.pos(id) : null;
+
+        return !!p && p.y < 0.2 && p.z > Z_FRONT + 0.2;
+    }
+
+    get raining() {
+        return !!this.weather?.raining;
+    }
+
     private leisureFor(a: Actor): Step[] | null {
+        const steps = this.leisurePick(a);
+        if (
+            steps &&
+            this.raining &&
+            steps.some(
+                (s) =>
+                    (s.k === 'go' && this.outdoorNode(s.to)) ||
+                    (s.k === 'goto' && s.p.z > Z_FRONT),
+            )
+        ) {
+            return this.fun(a, [
+                { k: 'face', rot: 0 },
+                { k: 'say', text: noi('mua_ngam') },
+                { k: 'anim', a: 'stretch', d: 2 },
+                { k: 'anim', a: 'yawn', d: 1.6, expr: 'sleepy' },
+            ]);
+        }
+
+        return steps;
+    }
+
+    /** Vài trò "như người thật" ai cũng có thể làm khi rảnh. */
+    private everyday(a: Actor): Step[] | null {
+        const r = Math.random();
+        const garden = pick([
+            'lawnL1',
+            'lawnL2',
+            'lawnL3',
+            'lawnR1',
+            'lawnR2',
+            'lawnR3',
+            'gp1',
+            'gp2',
+        ]);
+        if (r < 0.22 && this.nav?.has(garden)) {
+            // ra bãi cỏ lăn vài vòng rồi cười khoái chí
+            return this.fun(a, [
+                { k: 'go', to: garden },
+                { k: 'say', text: noi('lan_co_mot_minh') },
+                { k: 'anim', a: 'roll', d: 3.2, expr: 'joy' },
+                { k: 'anim', a: 'getup', d: 0.9 },
+                { k: 'anim', a: 'laugh', d: 1.8, expr: 'joy' },
+                { k: 'anim', a: 'stretch', d: 1.4 },
+            ]);
+        }
+        const pond = this.pond;
+        const h = this.hourNow;
+        if (r < 0.32 && pond && h >= 9 && h < 18 && pond.busy.size === 0) {
+            // nóng quá nhảy ao cho mát
+            const edge = pond.edgeFor(a.pos);
+            return this.fun(a, [
+                { k: 'goto', p: edge },
+                { k: 'face', at: new THREE.Vector3(9.2, 0, 9.0) },
+                { k: 'say', text: noi('nhay_ao') },
+                { k: 'anim', a: 'jump', d: 0.9, expr: 'joy' },
+                { k: 'do', fn: () => pond.plunge(a, { how: 'jump' }) },
+                {
+                    k: 'until',
+                    fn: () => !a.driver && !pond.busy.has(a),
+                    max: 16,
+                },
+                { k: 'anim', a: 'laugh', d: 1.6, expr: 'joy' },
+            ]);
+        }
+        if (r < 0.5) {
+            return this.fun(a, [
+                { k: 'anim', a: 'stretch', d: 2.2 },
+                { k: 'anim', a: 'yawn', d: 1.6, expr: 'sleepy' },
+                { k: 'anim', a: 'jump', d: 1.8, expr: 'joy' },
+            ]);
+        }
+
+        return null;
+    }
+
+    private leisurePick(a: Actor): Step[] | null {
+        if (Math.random() < 0.3) {
+            const e = this.everyday(a);
+            if (e) {
+                return e;
+            }
+        }
         const h = this.hourNow;
         const W = this.wings;
         const napTime = h >= 13 && h < 14.5;
@@ -1483,7 +1730,52 @@ export class Director {
         };
     }
 
-    private later(d: number, fn: () => void) {
+    /** Bắt đầu mưa: ai đang ở ngoài vườn (đang chơi/rảnh) thì che đầu chạy vào nhà; mèo cũng chạy. */
+    onRain(start: boolean) {
+        if (!start) {
+            const a = pick(Object.values(this.A));
+            if (a && !this.onDuty(a)) {
+                a.say(noi('het_mua'), 2.6, 'chat');
+            }
+
+            return;
+        }
+        let spoke = 0;
+        for (const a of Object.values(this.A)) {
+            const out = a.pos.y < 0.2 && a.pos.z > Z_ROOM + 0.3;
+            if (!out || a.driver) {
+                continue;
+            }
+            if (this.onDuty(a)) {
+                continue; // đang giao hàng/việc thật: cầm ô đi tiếp
+            }
+            this.cleanups.get(a)?.();
+            this.cleanups.delete(a);
+            this.leaveLine(a);
+            a.interrupt();
+            a.inScene = false;
+            a.leisure = false;
+            a.push(
+                ...(spoke++ < 2
+                    ? ([
+                          { k: 'say', text: noi('mua_chay'), prio: 'reply' },
+                      ] as Step[])
+                    : []),
+                { k: 'stand' },
+                { k: 'home', gait: 'cover' },
+            );
+        }
+        if (this.cat.pos.z > Z_ROOM + 0.3) {
+            this.cat.visit('sanh.mid', 30);
+            this.cat.say(
+                lineFor('meo', { situation: 'meo_mua', hour: this.hourNow }),
+                2.6,
+                'reply',
+            );
+        }
+    }
+
+    later(d: number, fn: () => void) {
         this.timers.push({ at: this.now() + d, fn });
     }
 
@@ -1708,7 +2000,40 @@ export class Director {
                 continue;
             }
             const busy = a.base === 'working' && a.atHome;
+            const r = this.relOf(a);
+            if (r <= -3) {
+                // còn giận sếp: lảng đi, lẩm bẩm
+                if (
+                    (this.avoidCool.get(a) ?? -99) < now &&
+                    a.say(this.line(a, 'ne_sep'), undefined, 'greet')
+                ) {
+                    this.avoidCool.set(a, now + rand(25, 40));
+                    this.greetCool.set(a, now + rand(30, 50));
+                    a.setExpr('annoyed', 2.5);
+                    if (!busy && !a.seated && !a.lying && !this.onDuty(a)) {
+                        a.shove(
+                            new THREE.Vector3(
+                                a.pos.x - k.pos.x,
+                                0,
+                                a.pos.z - k.pos.z,
+                            ),
+                            1.1,
+                            0.9,
+                            'walk',
+                        );
+                    }
+                }
+                continue;
+            }
             if (a.say(this.line(a, 'chao_sep'), undefined, 'greet')) {
+                if (r >= 3) {
+                    this.fx.hearts(
+                        a
+                            .anchor(new THREE.Vector3())
+                            .add(new THREE.Vector3(0, -0.3, 0)),
+                        2,
+                    );
+                }
                 this.greetCool.set(a, now + rand(70, 120));
                 if (!busy && a.key !== 'thodung') {
                     a.react(null, k.pos, 1.4, 'joy');

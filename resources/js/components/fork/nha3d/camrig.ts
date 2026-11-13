@@ -75,6 +75,40 @@ export class CamRig {
         this.controls = c;
     }
 
+    /** Hướng nhìn ngang của camera (để phím WASD đi theo hướng màn hình ở cả hai chế độ). */
+    get viewYaw() {
+        return this.mode === 'overview'
+            ? this.controls.getAzimuthalAngle()
+            : this.yaw;
+    }
+
+    snapshot() {
+        const r = (v: THREE.Vector3) => v.toArray().map((x) => +x.toFixed(3));
+
+        return {
+            yaw: this.yaw,
+            pitch: this.pitch,
+            dist: this.dist,
+            ov: this.touched
+                ? { p: r(this.camera.position), t: r(this.controls.target) }
+                : null,
+        };
+    }
+
+    /** Khôi phục góc nhìn (gọi sau setMode). */
+    restore(s: ReturnType<CamRig['snapshot']>) {
+        this.yaw = s.yaw;
+        this.pitch = s.pitch;
+        this.dist = s.dist;
+        this.seeded = false;
+        if (s.ov && this.mode === 'overview') {
+            this.camera.position.fromArray(s.ov.p);
+            this.controls.target.fromArray(s.ov.t);
+            this.touched = true;
+            this.controls.update();
+        }
+    }
+
     /** Tâm đang nhìn (để làm mờ tường đầu hồi…). */
     get target() {
         return this.mode === 'overview' ? this.controls.target : this.look;
@@ -84,6 +118,9 @@ export class CamRig {
         this.mode = m;
         this.controls.enabled = m === 'overview';
         this.camera.fov = m === 'overview' ? OV_FOV : WALK_FOV;
+        // near/far vừa đủ để độ sâu chính xác (tránh nhấp nháy mặt phẳng sát nhau)
+        this.camera.near = m === 'overview' ? 2 : 0.25;
+        this.camera.far = m === 'overview' ? 260 : 160;
         this.camera.updateProjectionMatrix();
         if (m === 'overview') {
             this.touched = false;
@@ -237,7 +274,11 @@ export class CamRig {
         this.from.target.copy(this.controls.target);
     }
 
+    /** Khi sếp đang nói chuyện với ai: xoay camera chéo sang để thấy cả hai (người dùng kéo chuột là thôi). */
+    yawTo: number | null = null;
+
     drag(dx: number, dy: number) {
+        this.yawTo = null;
         this.yaw -= dx * 0.006;
         this.pitch = clamp(this.pitch + dy * 0.004, 0.05, 0.85);
     }
@@ -268,6 +309,14 @@ export class CamRig {
             return;
         }
         // đi theo sau lưng Kid, ngang tầm mắt
+        if (this.yawTo !== null) {
+            let d = this.yawTo - this.yaw;
+            d = Math.atan2(Math.sin(d), Math.cos(d));
+            this.yaw += d * (this.motion ? Math.min(1, dt * 3) : 1);
+            if (Math.abs(d) < 0.01) {
+                this.yawTo = null;
+            }
+        }
         const tgt = new THREE.Vector3(focus.x, focus.y + 1.55, focus.z);
         const dir = new THREE.Vector3(
             Math.sin(this.yaw) * Math.cos(this.pitch),

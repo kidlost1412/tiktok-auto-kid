@@ -3,7 +3,20 @@ import * as THREE from 'three';
 
 import { C, FONT, Kit, rand, Shapes } from './util';
 
-type Kind = 'heart' | 'z' | 'zero' | 'one' | 'star' | 'note' | 'smoke' | 'puff';
+type Kind =
+    | 'heart'
+    | 'z'
+    | 'zero'
+    | 'one'
+    | 'star'
+    | 'note'
+    | 'smoke'
+    | 'puff'
+    | 'anger'
+    | 'drop'
+    | 'cloud'
+    | 'ball'
+    | 'sweat';
 
 interface P {
     obj: THREE.Object3D;
@@ -24,6 +37,17 @@ interface P {
         speed: number;
     };
     kind: string;
+    /** Bám theo một điểm (vd. sao quay quanh đầu). */
+    follow?: {
+        get: () => THREE.Vector3;
+        r: number;
+        w: number;
+        ph: number;
+        y: number;
+    };
+    /** Mây mưa: thời điểm rơi giọt kế tiếp. */
+    rainAt?: number;
+    onDone?: () => void;
 }
 
 export class Effects {
@@ -111,6 +135,82 @@ export class Effects {
             g.fillRect(0, 0, s, s);
         });
         this.tex.set('puff', this.tex.get('smoke')!);
+        // 💢 dấu giận (bốn góc cong đỏ)
+        draw('anger', (g, s) => {
+            g.strokeStyle = '#ff3b5c';
+            g.lineWidth = s * 0.11;
+            g.lineCap = 'round';
+            const c = s / 2;
+            const o = s * 0.1;
+            const r = s * 0.24;
+            for (const [sx, sy] of [
+                [-1, -1],
+                [1, -1],
+                [1, 1],
+                [-1, 1],
+            ]) {
+                g.beginPath();
+                g.moveTo(c + sx * o, c + sy * (o + r));
+                g.quadraticCurveTo(
+                    c + sx * o,
+                    c + sy * o,
+                    c + sx * (o + r),
+                    c + sy * o,
+                );
+                g.stroke();
+            }
+        });
+        draw('drop', (g, s) => {
+            g.fillStyle = '#6fb8ff';
+            g.beginPath();
+            g.moveTo(s / 2, s * 0.12);
+            g.quadraticCurveTo(s * 0.8, s * 0.55, s / 2, s * 0.86);
+            g.quadraticCurveTo(s * 0.2, s * 0.55, s / 2, s * 0.12);
+            g.fill();
+        });
+        draw('sweat', (g, s) => {
+            g.fillStyle = '#9fd8ff';
+            g.strokeStyle = '#ffffff';
+            g.lineWidth = 4;
+            g.beginPath();
+            g.moveTo(s / 2, s * 0.1);
+            g.quadraticCurveTo(s * 0.85, s * 0.6, s / 2, s * 0.9);
+            g.quadraticCurveTo(s * 0.15, s * 0.6, s / 2, s * 0.1);
+            g.stroke();
+            g.fill();
+        });
+        draw('cloud', (g, s) => {
+            g.fillStyle = '#8f97b8';
+            for (const [x, y, r] of [
+                [0.3, 0.58, 0.2],
+                [0.5, 0.45, 0.26],
+                [0.7, 0.58, 0.2],
+                [0.5, 0.64, 0.2],
+            ]) {
+                g.beginPath();
+                g.arc(x * s, y * s, r * s, 0, Math.PI * 2);
+                g.fill();
+            }
+        });
+        draw('ball', (g, s) => {
+            g.fillStyle = '#ffffff';
+            g.strokeStyle = '#b9b3cc';
+            g.lineWidth = 4;
+            g.beginPath();
+            for (let i = 0; i < 9; i++) {
+                const a = (i / 9) * Math.PI * 2;
+                const r = s * (0.36 + (i % 2) * 0.06);
+                g.lineTo(s / 2 + Math.cos(a) * r, s / 2 + Math.sin(a) * r);
+            }
+            g.closePath();
+            g.fill();
+            g.stroke();
+            g.beginPath();
+            g.moveTo(s * 0.35, s * 0.4);
+            g.lineTo(s * 0.6, s * 0.55);
+            g.lineTo(s * 0.45, s * 0.68);
+            g.stroke();
+        });
         for (const c of [
             C.pink,
             C.yellow,
@@ -237,6 +337,86 @@ export class Effects {
         }
     }
 
+    /** Sao quay vòng quanh đầu (bị cốc đầu). */
+    dizzy(get: () => THREE.Vector3, d = 2.6) {
+        if (!this.enabled) {
+            return;
+        }
+        for (let i = 0; i < 4; i++) {
+            this.sprite('star', get(), 0.16, {
+                max: d,
+                fade: 0.25,
+                follow: {
+                    get,
+                    r: 0.32,
+                    w: 6,
+                    ph: (i / 4) * Math.PI * 2,
+                    y: 0.05,
+                },
+            });
+        }
+    }
+
+    /** Đám mây mưa nhỏ lơ lửng trên đầu (bị mắng, dỗi). */
+    rainCloud(get: () => THREE.Vector3, d = 4.5) {
+        if (!this.enabled) {
+            return;
+        }
+        this.sprite('cloud', get(), 0.62, {
+            max: d,
+            fade: 0.2,
+            follow: { get, r: 0, w: 0, ph: 0, y: 0.25 },
+            rainAt: 0,
+        });
+    }
+
+    /** Dấu giận 💢 bật lên cạnh đầu. */
+    anger(pos: THREE.Vector3) {
+        if (!this.enabled) {
+            return;
+        }
+        this.sprite(
+            'anger',
+            pos.clone().add(new THREE.Vector3(0.25, 0.1, 0)),
+            0.1,
+            {
+                max: 1.4,
+                grow: 0.5,
+                fade: 0.4,
+            },
+        );
+    }
+
+    /** Giọt mồ hôi (ngại, toát mồ hôi). */
+    sweat(pos: THREE.Vector3) {
+        if (!this.enabled) {
+            return;
+        }
+        this.sprite(
+            'sweat',
+            pos.clone().add(new THREE.Vector3(-0.3, 0, 0)),
+            0.2,
+            {
+                vel: new THREE.Vector3(0, -0.25, 0),
+                max: 1.3,
+            },
+        );
+    }
+
+    /** Ném bóng giấy theo đường cong; trúng thì gọi `onHit`. */
+    ball(a: THREE.Vector3, b: THREE.Vector3, dur: number, onHit?: () => void) {
+        const c = a.clone().lerp(b, 0.5);
+        c.y += 0.9;
+        const p = this.sprite('ball', a.clone(), 0.2, {
+            path: { a: a.clone(), b: b.clone(), c, t: 0, speed: 1 / dur },
+            kind: 'ball',
+            onDone: onHit,
+        });
+        if (!this.enabled) {
+            p.path!.speed = 1 / 0.01;
+        }
+    }
+
     smoke(pos: THREE.Vector3) {
         if (!this.enabled) {
             return;
@@ -300,6 +480,124 @@ export class Effects {
                     grow: 0.6,
                 },
             );
+        }
+    }
+
+    /** Bụi dưới chân khi chạy nước rút / ngã. */
+    dust(pos: THREE.Vector3, n = 2) {
+        if (!this.enabled || this.live.length > 260) {
+            return;
+        }
+        for (let i = 0; i < n; i++) {
+            const sp = this.sprite(
+                'puff',
+                pos
+                    .clone()
+                    .add(
+                        new THREE.Vector3(
+                            rand(-0.12, 0.12),
+                            0.04,
+                            rand(-0.12, 0.12),
+                        ),
+                    ),
+                0.16,
+                {
+                    vel: new THREE.Vector3(
+                        rand(-0.35, 0.35),
+                        rand(0.15, 0.4),
+                        rand(-0.35, 0.35),
+                    ),
+                    max: 0.55,
+                    grow: 0.9,
+                    fade: 0.6,
+                },
+            );
+            sp.mat.color.setHex(0xe8d6b8);
+        }
+    }
+
+    /** Một giọt nước rơi (người ướt sũng nhỏ nước). */
+    drop(pos: THREE.Vector3, vx = 0, vz = 0) {
+        if (!this.enabled || this.live.length > 300) {
+            return;
+        }
+        this.sprite('drop', pos.clone(), 0.08, {
+            vel: new THREE.Vector3(vx, rand(-0.3, 0.1), vz),
+            gravity: 6,
+            max: 0.5,
+            fade: 0.3,
+        });
+    }
+
+    /** Nước mắt văng hai bên (khóc nức nở). */
+    tears(pos: THREE.Vector3, rot: number) {
+        if (!this.enabled) {
+            return;
+        }
+        const rx = Math.cos(rot);
+        const rz = -Math.sin(rot);
+        for (const sd of [-1, 1]) {
+            this.sprite(
+                'drop',
+                pos
+                    .clone()
+                    .add(new THREE.Vector3(rx * sd * 0.16, 0, rz * sd * 0.16)),
+                0.075,
+                {
+                    vel: new THREE.Vector3(rx * sd * 0.9, 1.1, rz * sd * 0.9),
+                    gravity: 6,
+                    max: 0.55,
+                    fade: 0.3,
+                },
+            );
+        }
+    }
+
+    /** Té nước tung toé (rơi xuống ao). */
+    splash(pos: THREE.Vector3, n = 22) {
+        if (!this.enabled) {
+            return;
+        }
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + rand(-0.2, 0.2);
+            const sp = rand(1.0, 2.2);
+            this.sprite(
+                'drop',
+                pos.clone().add(new THREE.Vector3(0, 0.05, 0)),
+                rand(0.09, 0.15),
+                {
+                    vel: new THREE.Vector3(
+                        Math.cos(a) * sp,
+                        rand(2.2, 4.2),
+                        Math.sin(a) * sp,
+                    ),
+                    gravity: 9,
+                    max: 0.9,
+                    fade: 0.3,
+                },
+            );
+        }
+        for (let i = 0; i < 4; i++) {
+            const pf = this.sprite(
+                'puff',
+                pos
+                    .clone()
+                    .add(
+                        new THREE.Vector3(
+                            rand(-0.3, 0.3),
+                            0.1,
+                            rand(-0.3, 0.3),
+                        ),
+                    ),
+                0.4,
+                {
+                    vel: new THREE.Vector3(0, rand(0.3, 0.6), 0),
+                    max: 0.7,
+                    grow: 1.2,
+                    fade: 0.6,
+                },
+            );
+            pf.mat.color.setHex(0xdff3ff);
         }
     }
 
@@ -467,6 +765,46 @@ export class Effects {
                 if (q.t >= 1) {
                     done = true;
                 }
+            } else if (p.follow) {
+                const f = p.follow;
+                const c = f.get();
+                const a = f.ph + p.life * f.w;
+                p.obj.position.set(
+                    c.x + Math.cos(a) * f.r,
+                    c.y + f.y + Math.sin(a * 2) * 0.03,
+                    c.z + Math.sin(a) * f.r,
+                );
+                if (
+                    p.rainAt !== undefined &&
+                    p.life >= p.rainAt &&
+                    p.life < p.max - 0.6
+                ) {
+                    p.rainAt = p.life + 0.18;
+                    this.sprite(
+                        'drop',
+                        p.obj.position
+                            .clone()
+                            .add(
+                                new THREE.Vector3(
+                                    rand(-0.2, 0.2),
+                                    -0.12,
+                                    rand(-0.08, 0.08),
+                                ),
+                            ),
+                        0.1,
+                        {
+                            vel: new THREE.Vector3(0, -1.6, 0),
+                            max: 0.45,
+                            fade: 0.3,
+                        },
+                    );
+                }
+                const fadeStart = p.max * (1 - Math.max(0.25, p.fade));
+                p.mat.opacity =
+                    p.life > fadeStart
+                        ? 1 - (p.life - fadeStart) / (p.max - fadeStart)
+                        : 1;
+                done = p.life >= p.max;
             } else {
                 p.vel.y -= p.gravity * dt;
                 if (p.kind === 'confetti') {
@@ -494,6 +832,7 @@ export class Effects {
                 done = p.life >= p.max;
             }
             if (done) {
+                p.onDone?.();
                 this.group.remove(p.obj);
                 if (p.kind !== 'confetti') {
                     p.mat.dispose();

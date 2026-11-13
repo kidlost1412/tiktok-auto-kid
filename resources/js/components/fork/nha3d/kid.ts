@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 
 import type { Actor } from './actor';
+import type { AnimName } from './chibi';
 import {
     BAY_CX,
     F1,
@@ -24,6 +25,7 @@ import {
     Z_ROOM,
 } from './layout';
 import type { NavGraph } from './nav';
+import { AGENT_R, inPond, type NavGrid, PAIR_D } from './navgrid';
 
 interface Rect {
     x0: number;
@@ -97,7 +99,20 @@ const buildRects = (desks: Record<string, THREE.Vector3>): Rect[] => {
     return out;
 };
 
+/** Một bước trong "kịch bản" tự động của Kid (vd. đi cùng ra quầy cà phê). Bấm phím di chuyển là huỷ. */
+export type KidStep =
+    | { k: 'go'; p: THREE.Vector3 }
+    | { k: 'face'; p: THREE.Vector3 | (() => THREE.Vector3) }
+    | { k: 'anim'; a: AnimName; d: number }
+    | { k: 'wait'; d: number }
+    | { k: 'do'; fn: () => void };
+
 export class KidControl {
+    /** Kịch bản tự động đang chạy. */
+    script: KidStep[] = [];
+    private scriptT = 0;
+    private scriptStarted = false;
+    private nav: NavGraph | null = null;
     readonly keys = new Set<string>();
     /** Điểm đến khi bấm xuống sàn. */
     target: THREE.Vector3 | null = null;
@@ -106,6 +121,13 @@ export class KidControl {
     private rects: Rect[];
     private stuck = 0;
     private last = new THREE.Vector3();
+    /** Lưới va chạm chung với mọi người (có sau vài khung hình đầu). */
+    grid: NavGrid | null = null;
+    /** Những người khác (Kid không đi xuyên qua họ). */
+    others: Actor[] = [];
+    /** Cứ cố đi vào hồ thì… rơi tõm. */
+    onPond: (() => void) | null = null;
+    private pondPush = 0;
 
     constructor(
         readonly actor: Actor,
@@ -117,6 +139,26 @@ export class KidControl {
 
     /** Bấm xuống sàn: tìm đường theo lối đi (qua cửa, vòng hiên) rồi tới đúng chỗ bấm. */
     goTo(p: THREE.Vector3, nav: NavGraph) {
+        this.nav = nav;
+        const g = this.grid;
+        if (g) {
+            const a = this.actor.pos;
+            const s = g.nearestFree(0, a.x, a.z) ?? { x: a.x, z: a.z };
+            const e = g.nearestFree(0, p.x, p.z);
+            const path = e ? g.findPath(0, s.x, s.z, e.x, e.z) : null;
+            if (path) {
+                this.way = path
+                    .slice(0, -1)
+                    .map((q) => new THREE.Vector3(q.x, groundY(q.x, q.z), q.z));
+                this.target = new THREE.Vector3(
+                    e!.x,
+                    groundY(e!.x, e!.z),
+                    e!.z,
+                );
+
+                return;
+            }
+        }
         const ok = (id: string) =>
             !id.endsWith('.seat') && nav.pos(id).y < 2 && !id.startsWith('st.');
         const ids = nav.path(
@@ -134,6 +176,101 @@ export class KidControl {
         this.target = p.clone();
     }
 
+    /** Chạy một chuỗi bước tự động (huỷ chuỗi cũ). */
+    run(steps: KidStep[], nav: NavGraph) {
+        this.nav = nav;
+        this.script = steps;
+        this.scriptStarted = false;
+        this.scriptT = 0;
+    }
+
+    private runScript(dt: number) {
+        const s = this.script[0];
+        if (!s) {
+            return;
+        }
+        const first = !this.scriptStarted;
+        this.scriptStarted = true;
+        this.scriptT += dt;
+        let done = false;
+        switch (s.k) {
+            case 'go':
+                if (first && this.nav) {
+                    this.goTo(s.p, this.nav);
+                }
+                done = !this.target;
+                break;
+            case 'face': {
+                const p = typeof s.p === 'function' ? s.p() : s.p;
+                this.actor.faceTo(p);
+                done = this.scriptT > 0.3;
+                break;
+            }
+            case 'anim':
+                if (first) {
+                    this.actor.act(s.a, s.d);
+                }
+                done = this.scriptT >= s.d;
+                break;
+            case 'wait':
+                done = this.scriptT >= s.d;
+                break;
+            case 'do':
+                s.fn();
+                done = true;
+                break;
+        }
+        if (done) {
+            this.script.shift();
+            this.scriptStarted = false;
+            this.scriptT = 0;
+        }
+    }
+
+    /** Giữ một điểm trong vùng đi được (dùng cho người bị đá văng). */
+    clampPos(p: THREE.Vector3) {
+        if (this.grid && this.grid.clearance(0, p.x, p.z) < AGENT_R) {
+            const q = this.grid.nearestFree(0, p.x, p.z);
+            if (q) {
+                p.x = q.x;
+                p.z = q.z;
+            }
+
+            return;
+        }
+        this.collide(p);
+    }
+
+    /** Không đi xuyên người: chạm ai thì bị đẩy ra theo mép (vẫn giữ trong vùng đi được). */
+    private avoidPeople(p: THREE.Vector3) {
+        for (const o of this.others) {
+            if (
+                o === this.actor ||
+                o.lying ||
+                o.driver ||
+                Math.abs(o.pos.y - p.y) > 0.6
+            ) {
+                continue;
+            }
+            const dx = p.x - o.pos.x;
+            const dz = p.z - o.pos.z;
+            const d = Math.hypot(dx, dz);
+            const min = o.seated ? PAIR_D * 0.75 : PAIR_D;
+            if (d < min && d > 1e-4) {
+                const k = (min - d) / d;
+                const q = this.grid!.slide(
+                    0,
+                    p.x,
+                    p.z,
+                    p.x + dx * k,
+                    p.z + dz * k,
+                );
+                p.x = q.x;
+                p.z = q.z;
+            }
+        }
+    }
+
     get moving() {
         return (this.actor.manual?.speed ?? 0) > 0.1;
     }
@@ -142,6 +279,14 @@ export class KidControl {
     update(dt: number, yaw: number) {
         const a = this.actor;
         const m = a.manual!;
+        if (a.driver) {
+            // đang bị điều khiển riêng (rơi xuống ao…): bỏ phím
+            m.speed = 0;
+            this.target = null;
+            this.way = [];
+
+            return;
+        }
         let ix = 0;
         let iz = 0;
         const k = this.keys;
@@ -163,6 +308,7 @@ export class KidControl {
         if (ix || iz) {
             this.target = null;
             this.way = [];
+            this.script = [];
             // tiến = hướng camera nhìn; phải = vuông góc
             const fx = -Math.sin(yaw);
             const fz = -Math.cos(yaw);
@@ -174,12 +320,15 @@ export class KidControl {
             vx /= l;
             vz /= l;
             speed = k.has('ShiftLeft') || k.has('ShiftRight') ? RUN : WALK;
-        } else if (this.target) {
+        } else if (this.script.length && !this.target) {
+            this.runScript(dt);
+        }
+        if (!(ix || iz) && this.target) {
             const goal = this.way[0] ?? this.target;
             const dx = goal.x - a.pos.x;
             const dz = goal.z - a.pos.z;
             const d = Math.hypot(dx, dz);
-            if (this.way.length && d < 0.4) {
+            if (this.way.length && d < 0.22) {
                 this.way.shift();
             } else if (d < 0.15) {
                 this.target = null;
@@ -198,9 +347,32 @@ export class KidControl {
         if (m.speed > 0.02) {
             this.last.copy(a.pos);
             const s = speed > 0 ? m.speed : 0;
-            a.pos.x += vx * s * dt;
-            a.pos.z += vz * s * dt;
-            this.collide(a.pos);
+            const tx = a.pos.x + vx * s * dt;
+            const tz = a.pos.z + vz * s * dt;
+            if (this.grid) {
+                const q = this.grid.slide(0, a.pos.x, a.pos.z, tx, tz);
+                // cố đi vào hồ (bị bờ chặn) một lúc → rơi tõm
+                if (
+                    s > 0.5 &&
+                    (q.x !== tx || q.z !== tz) &&
+                    inPond(tx, tz, 1.12)
+                ) {
+                    this.pondPush += dt;
+                    if (this.pondPush > 0.35 && this.onPond) {
+                        this.pondPush = 0;
+                        this.onPond();
+                    }
+                } else {
+                    this.pondPush = Math.max(0, this.pondPush - dt);
+                }
+                a.pos.x = q.x;
+                a.pos.z = q.z;
+                this.avoidPeople(a.pos);
+            } else {
+                a.pos.x = tx;
+                a.pos.z = tz;
+                this.collide(a.pos);
+            }
             a.pos.y = groundY(a.pos.x, a.pos.z);
             // kẹt (đi vào tường): bỏ điểm đến
             if (this.target && this.last.distanceTo(a.pos) < s * dt * 0.2) {

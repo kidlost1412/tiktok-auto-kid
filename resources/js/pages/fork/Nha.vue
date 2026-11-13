@@ -11,6 +11,7 @@ import { DICH, type NhaData, type NhaEvent } from '@/components/fork/nha/types';
 import Nha3D from '@/components/fork/nha3d/Nha3D.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
+const props = defineProps<{ avatar?: Record<string, unknown> | null }>();
 const data = ref<NhaData | null>(null);
 const failed = ref(false);
 const use2d = ref(false);
@@ -231,6 +232,7 @@ onBeforeUnmount(() => {
                     :data="data"
                     :hour="hour"
                     :debug="debug"
+                    :avatar="props.avatar ?? null"
                     @go="go"
                     @fallback="use2d = true"
                 />

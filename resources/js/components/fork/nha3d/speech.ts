@@ -90,6 +90,23 @@ export class Speech {
         return true;
     }
 
+    /** Lưu nhịp nói (để quay lại trang không bị cả xưởng nói dồn một lúc). */
+    snapshot() {
+        return {
+            who: [...this.who.entries()],
+            nextChat: this.nextChat,
+            nextGreet: this.nextGreet,
+            recent: [...this.recent.entries()],
+        };
+    }
+
+    restore(s: ReturnType<Speech['snapshot']>) {
+        this.who = new Map(s.who);
+        this.nextChat = s.nextChat;
+        this.nextGreet = s.nextGreet;
+        this.recent = new Map(s.recent);
+    }
+
     /** Bong bóng hiện 3–5 giây tuỳ độ dài câu (có chút ngẫu nhiên cho tự nhiên). */
     static dur(text: string) {
         return Math.min(

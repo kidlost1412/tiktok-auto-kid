@@ -11,6 +11,7 @@ const props = defineProps<{
     data: NhaData | null;
     hour?: number | null;
     debug?: boolean;
+    avatar?: Record<string, unknown> | null;
 }>();
 const emit = defineEmits<{ go: [key: string]; fallback: [] }>();
 
@@ -44,6 +45,7 @@ onMounted(async () => {
                     .matches ?? false,
             hour: props.hour ?? null,
             debug: props.debug,
+            avatar: props.avatar ?? null,
             onGo: (k) => emit('go', k),
             onOpen: (url) =>
                 url

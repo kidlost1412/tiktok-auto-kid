@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,7 +22,24 @@ final class NhaController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('fork/Nha');
+        return Inertia::render('fork/Nha', ['avatar' => Avatar::read()]);
+    }
+
+    /** Ngoại hình nhân vật do chủ app tự đặt (hiện chỉ nhân vật chính). */
+    public function avatar(string $who): JsonResponse
+    {
+        abort_unless(in_array($who, Avatar::WHO, true), 404);
+
+        return response()->json(['ok' => true, 'avatar' => Avatar::read($who)])->header('Cache-Control', 'no-store');
+    }
+
+    public function saveAvatar(Request $request, string $who): JsonResponse
+    {
+        abort_unless(in_array($who, Avatar::WHO, true), 404);
+        abort_unless($request->user()?->isAccountOwner(), 403);
+        $data = $request->validate(Avatar::rules());
+
+        return response()->json(['ok' => true, 'avatar' => Avatar::write($who, $data)]);
     }
 
     public function state(): JsonResponse

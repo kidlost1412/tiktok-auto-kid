@@ -123,7 +123,8 @@ export class World {
             }
             ground.add(S.cyl(1, 1, 0.02, 18), i % 2 ? C.grassDark : 0xb8e49c, {
                 x,
-                y: 0.005,
+                // mỗi mảng cao khác nhau vài mm: chồng lên nhau không bị nhấp nháy
+                y: 0.004 + i * 0.0016,
                 z,
                 sx: rand(0.6, 1.6),
                 sz: rand(0.4, 1.0),
@@ -144,7 +145,7 @@ export class World {
                     j % 3 ? C.stone : C.stoneDark,
                     {
                         x,
-                        y: 0.03,
+                        y: 0.03 + ((k * 7 + j) % 5) * 0.004,
                         z,
                         sx: rand(0.3, 0.4),
                         sz: rand(0.26, 0.34),
@@ -1139,7 +1140,8 @@ export class World {
     }
 
     /** Ánh sáng/bầu trời theo giờ (0..24, lẻ). */
-    setHour(h: number) {
+    /** `ov`: độ u ám 0..1 (nhiều mây / mưa) — trời xám, nắng yếu. */
+    setHour(h: number, ov = 0) {
         // 0 = ngày, 1 = đêm; chạng vạng 17.5-19.5, rạng đông 5-6.5
         const night =
             h >= 19.5 || h < 5
@@ -1167,6 +1169,12 @@ export class World {
         const bot = new THREE.Color(0xfff3e0)
             .lerp(new THREE.Color(0xffd29a), d)
             .lerp(new THREE.Color(0x4a3a86), n);
+        if (ov > 0) {
+            const k = ov * (1 - n * 0.5);
+            top.lerp(new THREE.Color(0x8a93a8), k * 0.75);
+            mid.lerp(new THREE.Color(0xadb3c2), k * 0.7);
+            bot.lerp(new THREE.Color(0xc8cad3), k * 0.6);
+        }
         const g = this.skyTex.canvas.getContext('2d')!;
         const gr = g.createLinearGradient(0, 0, 0, 256);
         gr.addColorStop(0, `#${top.getHexString()}`);
@@ -1190,16 +1198,18 @@ export class World {
             .set(0xfff1dc)
             .lerp(new THREE.Color(0xffb37a), d)
             .lerp(new THREE.Color(0x9fb0ff), n);
-        this.sun.intensity = lerp(2.3, 0.55, n) * (1 - d * 0.15);
+        this.sun.intensity =
+            lerp(2.3, 0.55, n) * (1 - d * 0.15) * (1 - ov * 0.62);
         this.hemi.color
             .set(0xe3f1ff)
             .lerp(new THREE.Color(0xffd8c0), d)
             .lerp(new THREE.Color(0x7d78c8), n);
         this.hemi.groundColor.set(0xbfdc9f).lerp(new THREE.Color(0x3c3f6a), n);
-        this.hemi.intensity = lerp(1.25, 0.75, n);
+        this.hemi.intensity = lerp(1.25, 0.75, n) * (1 - ov * 0.12);
+        this.hemi.color.lerp(new THREE.Color(0xc9d0dc), ov * 0.5);
         this.amb.intensity = lerp(0.3, 0.35, n);
         this.starMat.opacity = n;
-        this.sunDisc.visible = n < 0.6;
+        this.sunDisc.visible = n < 0.6 && ov < 0.6;
         this.moonDisc.visible = n >= 0.6;
         const bx = n >= 0.6 ? 26 : lerp(-34, 34, dayT);
         const by = n >= 0.6 ? 26 : 10 + elev * 16;
@@ -1207,7 +1217,7 @@ export class World {
         this.moonDisc.position.set(bx, by, -34);
         this.halo.position.set(bx, by, -35);
         this.haloMat.color.set(n >= 0.6 ? 0xc8d0ff : 0xfff0c0);
-        this.haloMat.opacity = n >= 0.6 ? 0.55 : 0.9;
+        this.haloMat.opacity = (n >= 0.6 ? 0.55 : 0.9) * (1 - ov * 0.85);
         (this.sunDisc.material as THREE.MeshBasicMaterial).color
             .set(0xffd36a)
             .lerp(new THREE.Color(0xff9a6a), d);
@@ -1220,6 +1230,7 @@ export class World {
                 (c.children[0] as THREE.Mesh).material as THREE.MeshToonMaterial
             ).color
                 .set(0xffffff)
+                .lerp(new THREE.Color(0x9a9fb0), ov * 0.75)
                 .lerp(new THREE.Color(0x6a62a8), n * 0.8),
         );
         this.waterMat.color

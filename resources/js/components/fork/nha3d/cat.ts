@@ -2,7 +2,7 @@
 // hoặc nhảy lên bàn cuộn tròn ngủ cạnh họ, đuổi bướm, phơi nắng. Bấm vào thì "Meo~" + tim.
 import * as THREE from 'three';
 
-import type { Speech } from './speech';
+import type { Prio, Speech } from './speech';
 
 import type { Actor, Talker } from './actor';
 import type { Effects } from './effects';
@@ -313,8 +313,8 @@ export class Cat implements Talker {
         });
     }
 
-    say(text: string, d = 2.2) {
-        if (this.speech && !this.speech.allow('meo', text, 'chat')) {
+    say(text: string, d = 2.2, prio: Prio = 'chat') {
+        if (this.speech && !this.speech.allow('meo', text, prio)) {
             return;
         }
         this.sayText = text;
@@ -348,6 +348,96 @@ export class Cat implements Talker {
             4,
         );
         this.hopT = 0.5;
+    }
+
+    /** Đang được ai bế (ngồi trên vai). */
+    rider: Actor | null = null;
+    private happyUntil = 0;
+    private eatUntil = 0;
+    private swatT = 0;
+
+    /** Kid bế mèo lên vai. */
+    ride(a: Actor) {
+        this.rider = a;
+        this.task = null;
+        this.tasks = [];
+        this.onDesk = null;
+        this.happyUntil = this.now() + 3;
+    }
+
+    /** Thả mèo xuống trước mặt người bế. */
+    drop() {
+        const a = this.rider;
+        if (!a) {
+            return;
+        }
+        this.rider = null;
+        this.pos.set(
+            a.pos.x + Math.sin(a.rot) * 0.55,
+            a.pos.y,
+            a.pos.z + Math.cos(a.rot) * 0.55,
+        );
+        this.visualY = this.pos.y;
+        this.nodeId = this.nav.nearest(this.pos);
+        this.tasks = [{ kind: 'sit', d: 2.5 }];
+        this.hopT = 0.5;
+        this.fx.puff(this.pos);
+    }
+
+    /** Được vuốt ve: ngồi yên, nheo mắt, gừ gừ, tim bay. */
+    petted(by: THREE.Vector3, d = 4) {
+        if (this.rider) {
+            this.happyUntil = this.now() + d;
+            this.fx.hearts(this.anchor(new THREE.Vector3()), 3);
+
+            return;
+        }
+        this.task = null;
+        this.onDesk = null;
+        this.tasks = [{ kind: 'sit', d }];
+        this.targetRot = Math.atan2(by.x - this.pos.x, by.z - this.pos.z);
+        this.happyUntil = this.now() + d;
+        this.heartAt = 0;
+    }
+
+    /** Ăn bát cá trước mặt. */
+    eat(d = 5) {
+        this.task = null;
+        this.onDesk = null;
+        this.tasks = [{ kind: 'sit', d }];
+        this.eatUntil = this.now() + d;
+    }
+
+    /** Bị trêu: tát một phát rồi lùi lại. */
+    swat(at: THREE.Vector3) {
+        if (this.rider) {
+            this.drop();
+        }
+        this.task = null;
+        this.tasks = [{ kind: 'sit', d: 1.6 }];
+        this.targetRot = Math.atan2(at.x - this.pos.x, at.z - this.pos.z);
+        this.swatT = 0.6;
+        this.hopT = 0.5;
+    }
+
+    snapshot() {
+        return {
+            x: +this.pos.x.toFixed(3),
+            y: +this.pos.y.toFixed(3),
+            z: +this.pos.z.toFixed(3),
+            rot: +this.rot.toFixed(3),
+            riding: !!this.rider,
+        };
+    }
+
+    restore(s: ReturnType<Cat['snapshot']>) {
+        this.pos.set(s.x, s.y, s.z);
+        this.visualY = s.y;
+        this.rot = this.targetRot = s.rot;
+        this.nodeId = this.nav.nearest(this.pos);
+        this.task = null;
+        this.tasks = [{ kind: 'sit', d: 3 }];
+        this.onDesk = null;
     }
 
     /** Gọi mèo tới một chỗ (vd. tụ họp ở Sảnh) rồi ngồi đó một lúc. */
@@ -477,7 +567,9 @@ export class Cat implements Talker {
     update(dt: number) {
         const now = this.now();
         this.t += dt;
-        if (!this.motion) {
+        if (this.rider) {
+            this.mode = 'sit';
+        } else if (!this.motion) {
             this.mode = 'curl';
         } else {
             if (!this.task) {
@@ -501,6 +593,27 @@ export class Cat implements Talker {
         if (this.hopT > 0) {
             this.hopT -= dt;
             hop = Math.sin((this.hopT / 0.5) * Math.PI) * 0.25;
+        }
+        if (this.rider) {
+            // ngồi trên vai người bế
+            const r = this.rider;
+            this.rider.ch.head.getWorldPosition(this.pos);
+            // vai phải của người bế (nhìn từ sau lưng), hơi lùi ra sau
+            const side = 0.5;
+            this.pos.y -= 0.18;
+            this.pos.x += -Math.cos(r.rot) * side - Math.sin(r.rot) * 0.08;
+            this.pos.z += Math.sin(r.rot) * side - Math.cos(r.rot) * 0.08;
+            this.visualY = this.pos.y;
+            this.rot = this.targetRot = r.rot;
+            this.root.rotation.y = this.rot;
+        }
+        this.shadow.visible = !this.rider;
+        if (now < this.happyUntil && now > this.heartAt) {
+            this.heartAt = now + 1.4;
+            this.fx.hearts(this.anchor(new THREE.Vector3()), 1);
+        }
+        if (this.swatT > 0) {
+            this.swatT -= dt;
         }
         this.root.position.set(this.pos.x, this.visualY + hop, this.pos.z);
         this.shadow.position.set(
@@ -726,10 +839,20 @@ export class Cat implements Talker {
                     (0.25 + i * 0.08);
             }
         });
+        const now = this.now();
+        if (this.swatT > 0 && this.legs[0]) {
+            this.legs[0].rotation.x = -1.6 + Math.sin(this.swatT * 30) * 0.6;
+        }
+        if (now < this.eatUntil) {
+            this.head.rotation.x = 0.75 + Math.abs(Math.sin(t * 7)) * 0.15;
+        }
         this.drawFace(
             m === 'curl'
                 ? 'closed'
-                : m === 'rub' || this.hopT > 0
+                : m === 'rub' ||
+                    this.hopT > 0 ||
+                    now < this.happyUntil ||
+                    now < this.eatUntil
                   ? 'happy'
                   : 'open',
         );

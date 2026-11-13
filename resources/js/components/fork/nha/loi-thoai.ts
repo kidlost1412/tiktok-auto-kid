@@ -1,5 +1,7 @@
 // Lời thoại của từng nhân vật theo tình huống, dễ sửa tại một chỗ. Mỗi tình huống 3-6 câu, chọn ngẫu nhiên.
 // Chỗ có {diem}, {loi}... sẽ được thay bằng số liệu thật. Giữ vui, hơi tinh nghịch, không chửi thề.
+import { TUONG_TAC } from './loi-tuong-tac';
+
 export const LOI_THOAI: Record<string, string[]> = {
     // Biên kịch: nhà thơ mơ mộng
     bienkich_giao: [
@@ -416,7 +418,7 @@ export const noi = (
 
 // ---------------------------------------------------------------------------------------------
 // Lời thoại theo NGỮ CẢNH: giờ trong ngày (sang/trua/chieu/toi/dem), tâm trạng (vui/buon), sức (met),
-// đang gặp ai (voi_<ai>), cùng các biến {sanpham} {diem} {so} {gio} {ten}.
+// đang gặp ai (voi_<ai>), cùng các biến {sanpham} {diem} {so} {gio} {ten}; tên chủ xưởng {sep}, xưng hô {anh}/{Anh} (anh/chị).
 // Khoá: <ai>_<tình huống>[_<biến thể>] hoặc <tình huống>[_<biến thể>] (dùng chung).
 export const NGU_CANH: Record<string, string[]> = {
     // ---- lúc rảnh, theo giờ
@@ -649,8 +651,10 @@ export const NGU_CANH: Record<string, string[]> = {
     // ---- chào sếp (Kid đi dạo trong xưởng)
     chao_sep: [
         'Chào sếp!',
+        'Chào sếp {sep}!',
         'Sếp tới chơi hả?',
-        'A, sếp kìa!',
+        'A, {anh} {sep} tới kìa!',
+        '{Anh} {sep} ơi, hôm nay vui không?',
         'Sếp khoẻ không?',
     ],
     chao_sep_sang: ['Chào buổi sáng sếp!', 'Sếp dậy sớm ghê!'],
@@ -785,6 +789,8 @@ export interface LineCtx {
     situation: string;
     hour?: number;
     mood?: 'vui' | 'buon' | null;
+    /** Tình cảm với sếp: thân (hay được khen) / giận (hay bị cốc). */
+    rel?: 'than' | 'gian' | null;
     tired?: boolean;
     /** Đang nói với ai (khoá nhân vật). */
     with?: string | null;
@@ -792,7 +798,7 @@ export interface LineCtx {
 }
 
 const lastBy: Record<string, string> = {};
-const pool = (k: string) => NGU_CANH[k] ?? LOI_THOAI[k] ?? [];
+const pool = (k: string) => NGU_CANH[k] ?? TUONG_TAC[k] ?? LOI_THOAI[k] ?? [];
 
 /**
  * Chọn một câu cho nhân vật `who` theo ngữ cảnh (chỉ dùng mẫu câu soạn sẵn).
@@ -803,6 +809,8 @@ export const lineFor = (who: string, c: LineCtx): string => {
     const h = c.hour ?? new Date().getHours() + new Date().getMinutes() / 60;
     const s = c.situation;
     const variants = [
+        c.rel ?? null,
+        c.rel ?? null,
         c.tired ? 'met' : null,
         c.mood ?? null,
         TOD(h),

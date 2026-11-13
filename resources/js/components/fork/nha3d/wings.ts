@@ -253,6 +253,7 @@ export class Wings {
                 opacity: 1,
             });
             const mesh = wb.build(this.h.kit, { cast: true, material: mat });
+            mesh.position.x += side * 0.006; // không trùng mặt tường vỏ nhà
             this.h.group.add(mesh);
             this.h.fadeWalls.push({
                 mesh,
