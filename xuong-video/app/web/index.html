@@ -458,6 +458,8 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 .pm-cu .tt{flex:1 1 200px;color:var(--ink2);font-size:13.5px}
 .pm-cu pre{flex-basis:100%;margin:4px 0 0;max-height:300px;overflow:auto;font:400 12.5px/1.6 var(--mono)}
 @media (max-width:900px){.pm-wrap{grid-template-columns:minmax(0,1fr)}.pm-list{position:static;max-height:none}}
+@keyframes mucSang{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}30%{box-shadow:0 0 0 4px rgba(139,92,246,.55)}}
+.muc-sang{animation:mucSang 1.6s ease 2;border-radius:14px}
 </style>
 </head>
 <body>
@@ -869,7 +871,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
         <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
       <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
     </div>
-    <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
+    <div class="card" id="cdGiong"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
       <div class="t"><h2>Giọng đọc</h2><p class="sub">Chọn giọng ElevenLabs cho video</p></div></div>
       <label>Đang dùng</label>
       <div id="gdDs"><div class="note">Đang tải…</div></div>
@@ -1070,7 +1072,7 @@ $('#tmChon').onclick = () => { $('#tmModal').classList.remove('on'); if (TM.cb &
 let ST = {}, VIDS = [], CUR = null;
 
 // ---------- PROMPT AI (đề bài gửi AI: một bộ dùng chung cho mọi sản phẩm)
-const PM = {ds: [], cur: null, goc: '', cho: null, xt: 0};
+const PM = {ds: [], cur: null, goc: '', cho: null, xt: 0, muon: null};
 const PM_RE = /\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g;
 const pmRole = () => PM.ds.find(x => x.ten === PM.cur);
 const pmDirty = () => !!PM.cur && $('#pmText').value !== PM.goc;
@@ -1124,6 +1126,7 @@ async function taiPm() {
   const ds = await api('/api/prompt'); if (!Array.isArray(ds)) return;
   const dangGo = pmDirty();
   PM.ds = ds; if (!PM.cur || !pmRole()) PM.cur = ds[0].ten;
+  if (PM.muon && !dangGo && ds.some(x => x.ten === PM.muon)) PM.cur = PM.muon; PM.muon = null;
   pmVeDs(); if (!dangGo) pmNap();
   const sel = $('#pmSp');
   if (!sel.options.length) {
@@ -1196,6 +1199,15 @@ const CHA = /^http:\/\/(localhost|127\.0\.0\.1):8010$/;          // chỉ nghe l
 function moTab(ten, bao = true) {
   const b = document.querySelector(`nav button[data-tab="${TAB_MA[ten] || ten}"]`);
   if (b) { b._bao = bao; b.click(); }
+}
+// mở thẳng một mục trong tab: ?tab=prompt-ai&muc=bien-kich | ?tab=cai-dat&muc=giong
+function moMuc(tab, muc) {
+  muc = String(muc || ''); if (!/^[a-z0-9-]{1,40}$/.test(muc)) return;
+  if (tab === 'prompt-ai') { PM.muon = muc; if (PM.ds.some(x => x.ten === muc)) { PM.muon = null; pmChon(muc); } }
+  if (tab === 'cai-dat' && muc === 'giong') {
+    const c = $('#cdGiong'); if (!c) return;
+    setTimeout(() => { c.scrollIntoView({behavior: 'smooth', block: 'start'}); c.classList.remove('muc-sang'); void c.offsetWidth; c.classList.add('muc-sang'); }, 250);
+  }
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   const ten = TAB_TEN[b.dataset.tab] || b.dataset.tab;
@@ -1857,13 +1869,13 @@ capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); setInterval(taiLo, 600
 (() => {
   const h = location.hash.replace(/^#(tab=)?/, '');
   const t = new URLSearchParams(location.search).get('tab') || h;
-  if (t && (TAB_MA[t] || TAB_TEN[t])) moTab(t, false);
+  if (t && (TAB_MA[t] || TAB_TEN[t])) { moTab(t, false); moMuc(TAB_TEN[t] || t, new URLSearchParams(location.search).get('muc')); }
 })();
 window.addEventListener('hashchange', () => { const t = location.hash.replace(/^#(tab=)?/, ''); if (TAB_MA[t] || TAB_TEN[t]) moTab(t, false); });
 // trang cha (TikTok Auto Kid) điều khiển: {type:'xuong-video:set-tab', tab} | {type:'xuong-video:theme', theme:'dark'|'light'}
 window.addEventListener('message', e => {
   if (!CHA.test(e.origin) || !e.data || typeof e.data !== 'object') return;
-  if (e.data.type === 'xuong-video:set-tab') moTab(String(e.data.tab), false);
+  if (e.data.type === 'xuong-video:set-tab') { moTab(String(e.data.tab), false); moMuc(TAB_TEN[e.data.tab] || String(e.data.tab), e.data.muc); }
   if (e.data.type === 'xuong-video:theme' && /^(dark|light)$/.test(e.data.theme)) window.__xvApplyTheme(e.data.theme);
 });
 if (window.parent !== window) window.parent.postMessage({type: 'xuong-video:san-sang', tab: TAB_TEN[document.querySelector('nav button.on')?.dataset.tab] || 'san-xuat'}, '*');

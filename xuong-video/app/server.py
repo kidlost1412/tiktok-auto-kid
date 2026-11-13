@@ -1048,6 +1048,29 @@ class H(BaseHTTPRequestHandler):
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
+        if u.path == "/api/su-kien":           # trang "Xưởng nhỏ": sự kiện sản xuất mới + trạng thái hiện tại (chỉ đọc)
+            sys.path.insert(0, str(CODE / "engine"))
+            import su_kien
+            try:
+                sau = int(q.get("sau", ["0"])[0] or 0)
+            except ValueError:
+                sau = 0
+            try:
+                toi_da = max(1, min(1500, int(q.get("max", ["300"])[0] or 300)))
+            except ValueError:
+                toi_da = 300
+            lines = nhat_ky_lo(); td = tien_do(lines); chay = bool(dang_chay())
+            ma_sp, ten_sp = RUN.get("san_pham"), None
+            try:
+                k = LS / "dang-chay.lock"
+                if not ma_sp and k.exists():
+                    cot = k.read_text().split(None, 1); ma_sp = cot[1].strip() if len(cot) > 1 else None
+                if ma_sp:
+                    ten_sp = next((p.get("ten_ngan") or p.get("ten") for p in san_pham_ds() if p.get("ma") == ma_sp), None)
+            except Exception:
+                pass
+            return self._json({"ok": True, "dang_chay": chay, "tien_do": td, "san_pham": {"ma": ma_sp, "ten": ten_sp or ma_sp},
+                               "su_kien": su_kien.doc(sau, toi_da), "bay_gio": time.time()})
         if u.path == "/api/tai-khoan-ds":
             return self._json(tai_khoan_ds("moi" in parse_qs(u.query)))
         if u.path == "/api/tai-khoan":

@@ -15,15 +15,18 @@ use Throwable;
 /** Trang "Xưởng Video": nhúng giao diện hub (iframe) kèm kiểm tra sống/chết và nút "Bật lại". */
 final class XuongController extends Controller
 {
-    public const array TABS = ['san-xuat', 'kho', 'san-pham', 'gu', 'cai-dat'];
+    public const array TABS = ['san-xuat', 'kho', 'san-pham', 'gu', 'prompt-ai', 'cai-dat'];
 
     public function index(Request $request): Response
     {
         $tab = (string) $request->query('tab', '');
+        $muc = (string) $request->query('muc', '');
 
         return Inertia::render('fork/Xuong', [
             'url' => rtrim((string) config('fork.xuong.url'), '/'),
             'tab' => in_array($tab, self::TABS, true) ? $tab : null,
+            // Mục trong tab (vd. prompt-ai > bien-kich, cai-dat > giong); chỉ nhận chữ thường/số/gạch ngang.
+            'muc' => preg_match('/^[a-z0-9-]{1,40}$/', $muc) === 1 ? $muc : null,
         ]);
     }
 

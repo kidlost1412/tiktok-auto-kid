@@ -16,7 +16,7 @@ test('flag off does not create or log in an owner', function () {
 test('flag on auto-logs the owner in on loopback', function () {
     config()->set('fork.single_user', true);
 
-    $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])->get('/')->assertRedirect('/auto');
+    $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])->get('/')->assertRedirect('/nha');
     $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])->get('/auto')->assertOk();
 
     $this->assertAuthenticated();

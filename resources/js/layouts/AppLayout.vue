@@ -6,6 +6,7 @@ import {
     IconBrandTelegram,
     IconBrandTiktok,
     IconCloudDownload,
+    IconHome,
     IconMoon,
     IconMovie,
     IconRobot,
@@ -25,6 +26,7 @@ defineProps<{
 const page = usePage();
 const path = computed(() => page.url.split('?')[0]);
 const links = [
+    { href: '/nha', label: 'Xưởng nhỏ', icon: IconHome },
     { href: '/auto', label: 'Tự động đăng', icon: IconRobot },
     { href: '/xuong', label: 'Xưởng Video', icon: IconMovie },
     { href: '/settings/chrome', label: 'Kết nối Chrome', icon: IconBrandChrome },
@@ -54,7 +56,7 @@ const active = (href: string) => path.value.startsWith(href);
             <div
                 class="mx-auto flex h-[62px] w-full max-w-[1880px] items-center gap-4 px-4 md:px-8"
             >
-                <Link href="/auto" class="flex shrink-0 items-center gap-2.5">
+                <Link href="/nha" class="flex shrink-0 items-center gap-2.5">
                     <span
                         class="grid size-[34px] place-items-center rounded-[10px] bg-linear-to-br from-violet-500 to-violet-700 text-white shadow-[0_6px_14px_-4px_rgb(109_40_217/0.5),inset_0_1px_0_rgb(255_255_255/0.25)]"
                     >
@@ -76,7 +78,7 @@ const active = (href: string) => path.value.startsWith(href);
                         :aria-current="active(l.href) ? 'page' : undefined"
                         :class="
                             cn(
-                                'inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[15px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
+                                'inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2.5 text-[15px] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
                                 active(l.href) &&
                                     'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08),0_1px_1px_rgb(28_25_23/0.04)] dark:bg-accent dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_3px_rgb(0_0_0/0.5)]',
                             )

@@ -1,0 +1,127 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Fork\Nha\NhaState;
+use App\Models\Account;
+use App\Models\User;
+use App\Models\Workspace;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia;
+
+beforeEach(function (): void {
+    config()->set('trypost.self_hosted', true);
+    config()->set('fork.xuong.url', 'http://127.0.0.1:8765');
+
+    $account = Account::factory()->create();
+    $this->owner = User::factory()->create(['account_id' => $account->id]);
+    $account->update(['owner_id' => $this->owner->id]);
+    $ws = Workspace::factory()->create(['account_id' => $account->id, 'user_id' => $this->owner->id]);
+    $this->owner->update(['current_workspace_id' => $ws->id]);
+});
+
+/** Sự kiện giả: cách bay_gio `$ago` giây. */
+function nhaEvent(int $ago, string $vai, string $loai, array $extra = []): array
+{
+    return array_merge(['n' => (int) ((1_800_000_000 - $ago) * 1_000_000), 'vai' => $vai, 'loai' => $loai], $extra);
+}
+
+function nhaHub(array $events, bool $running = true, array $tienDo = ['xong' => 6, 'tong' => 10, 'het_han_muc' => null]): array
+{
+    return ['ok' => true, 'dang_chay' => $running, 'tien_do' => $tienDo, 'san_pham' => ['ma' => 'dam-ca', 'ten' => 'Đạm cá'], 'su_kien' => $events, 'bay_gio' => 1_800_000_000.0];
+}
+
+test('/ redirects to the house and the page renders', function (): void {
+    $this->get('/')->assertRedirect('/nha');
+    $this->get('/login')->assertRedirect('/nha');
+
+    $this->actingAs($this->owner)->get('/nha')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p->component('fork/Nha'));
+});
+
+test('xuong page passes a validated muc', function (): void {
+    $this->actingAs($this->owner)->get('/xuong?tab=prompt-ai&muc=bien-kich')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('tab', 'prompt-ai')->where('muc', 'bien-kich'));
+    $this->actingAs($this->owner)->get('/xuong?tab=cai-dat&muc=../x')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('tab', 'cai-dat')->where('muc', null));
+});
+
+test('state maps hub events to working roles with real data', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response(nhaHub([
+        nhaEvent(300, 'he-thong', 'bat-dau-lo', ['ten' => 'Đạm cá', 'so_video' => 10]),
+        nhaEvent(200, 'bien-kich', 'bat-dau', ['so' => 5]),
+        nhaEvent(190, 'bien-kich', 'xong', ['so' => 5]),
+        nhaEvent(100, 'giam-khao', 'bat-dau', ['video' => 'a']),
+        nhaEvent(90, 'giam-khao', 'diem', ['video' => 'a', 'diem' => 8]),
+        nhaEvent(80, 'giam-khao', 'bat-dau', ['video' => 'b']),
+        nhaEvent(70, 'dung', 'bat-dau', ['video' => 'c']),
+    ]))]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+
+    expect($j['mode'])->toBe('working')
+        ->and($j['line'])->toBe('Xưởng đang làm 10 video Đạm cá · 6/10')
+        ->and($j['vai']['bienkich']['state'])->toBe('idle')
+        ->and($j['vai']['giamkhao'])->toBe(['state' => 'working', 'bubble' => 'Đang chấm 1/10 · 8 điểm'])
+        ->and($j['vai']['thodung']['bubble'])->toBe('Đang dựng 1 video…')
+        ->and($j['bang']['san_pham'])->toBe('Đạm cá')
+        ->and($j['bang']['tien_do'])->toBe(['xong' => 6, 'tong' => 10]);
+});
+
+test('state shows writer bubble and ignores stale starts', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response(nhaHub([
+        nhaEvent(5000, 'he-thong', 'bat-dau-lo', ['ten' => 'Đạm cá', 'so_video' => 10]),
+        nhaEvent(4000, 'dao-dien', 'bat-dau', ['video' => 'x']),
+        nhaEvent(30, 'bien-kich', 'bat-dau', ['so' => 5]),
+    ]))]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->json();
+    expect($j['vai']['bienkich'])->toBe(['state' => 'working', 'bubble' => 'Đang viết 5 lời…'])
+        ->and($j['vai']['daodien']['state'])->toBe('idle');
+});
+
+test('state reports the quota limit with everyone sleepy', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response(nhaHub([
+        nhaEvent(400, 'he-thong', 'bat-dau-lo', ['ten' => 'Đạm cá', 'so_video' => 10]),
+        nhaEvent(60, 'he-thong', 'het-han-muc', ['msg' => 'Hết hạn mức Claude']),
+    ], false))]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->json();
+    expect($j['mode'])->toBe('limit')
+        ->and($j['vai']['bienkich']['state'])->toBe('sleep')
+        ->and($j['bang']['dong'])->toContain('hạn mức');
+});
+
+test('state falls back to the status endpoint for an older hub', function (): void {
+    Http::fake([
+        '127.0.0.1:8765/api/su-kien*' => Http::response('nope', 404),
+        '127.0.0.1:8765/api/trang-thai' => Http::response(['dang_chay' => false, 'tien_do' => ['xong' => 8, 'tong' => 8]]),
+    ]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+    expect($j['mode'])->toBe('idle')->and($j['hub']['up'])->toBeTrue()->and($j['line'])->toStartWith('Xưởng đang nghỉ');
+});
+
+test('state shows a sleeping house when the hub is down', function (): void {
+    Http::fake(['127.0.0.1:8765/*' => fn () => throw new RuntimeException('refused')]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+    expect($j['mode'])->toBe('down')
+        ->and($j['hub']['up'])->toBeFalse()
+        ->and($j['line'])->toStartWith('Xưởng đang tắt')
+        ->and(collect($j['vai'])->pluck('state')->unique()->all())->toContain('sleep');
+});
+
+test('postman works when a post is due within 30 minutes', function (): void {
+    $now = CarbonImmutable::parse('2026-11-13 04:00:00', 'UTC');
+    $hub = ['up' => true, 'dang_chay' => false, 'tien_do' => [], 'su_kien' => []];
+
+    $soon = NhaState::build($hub, ['posts_today' => 3, 'next' => ['at' => $now->addMinutes(20)->toIso8601String(), 'minutes' => 20, 'channel' => '@kenh']], $now);
+    expect($soon['vai']['buuta']['state'])->toBe('working')->and($soon['vai']['buuta']['bubble'])->toContain('@kenh');
+
+    $later = NhaState::build($hub, ['posts_today' => 3, 'next' => ['at' => $now->addHours(3)->toIso8601String(), 'minutes' => 180, 'channel' => '@kenh']], $now);
+    expect($later['vai']['buuta']['state'])->toBe('idle')->and($later['line'])->toContain('3 bài hẹn hôm nay');
+
+    $none = NhaState::build($hub, ['posts_today' => 0, 'next' => null], $now);
+    expect($none['line'])->toContain('hôm nay chưa có bài hẹn');
+});

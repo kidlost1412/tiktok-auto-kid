@@ -3,14 +3,14 @@
 // Hub báo đổi tab qua postMessage; app báo đổi giao diện sáng/tối cho hub. Hub tắt thì hiện thẻ "Bật lại".
 import { Head } from '@inertiajs/vue3';
 import { IconMovie, IconPower } from '@tabler/icons-vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 
-const props = defineProps<{ url: string; tab: string | null }>();
+const props = defineProps<{ url: string; tab: string | null; muc?: string | null }>();
 
-const TABS = ['san-xuat', 'kho', 'san-pham', 'gu', 'cai-dat'];
+const TABS = ['san-xuat', 'kho', 'san-pham', 'gu', 'prompt-ai', 'cai-dat'];
 const initialTab = ref(props.tab ?? '');
 const up = ref<boolean | null>(null); // null = chưa kiểm tra
 const restarting = ref(false);
@@ -38,6 +38,9 @@ const buildSrc = () => {
     const q = new URLSearchParams({ nhung: '1', theme: dark.value ? 'dark' : 'light' });
     if (initialTab.value) {
         q.set('tab', initialTab.value);
+        if (props.muc) {
+            q.set('muc', props.muc);
+        }
     }
     const bg = bgHex();
     if (bg) {
@@ -48,6 +51,16 @@ const buildSrc = () => {
 };
 
 const post = (data: Record<string, string>) => frame.value?.contentWindow?.postMessage(data, hubOrigin.value);
+
+// Đang ở sẵn trang Xưởng mà bấm một nơi khác (vd. từ Xưởng nhỏ): bảo hub đổi tab/mục, không nạp lại khung.
+watch(
+    () => [props.tab, props.muc],
+    ([tab, muc]) => {
+        if (tab && TABS.includes(tab)) {
+            post({ type: 'xuong-video:set-tab', tab, muc: muc ?? '' });
+        }
+    },
+);
 
 const onMessage = (e: MessageEvent) => {
     if (e.origin !== hubOrigin.value || typeof e.data !== 'object' || e.data === null) {
