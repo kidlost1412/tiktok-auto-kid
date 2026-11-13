@@ -10,7 +10,7 @@ import {
     IconExternalLink,
     IconFilterOff,
 } from '@tabler/icons-vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
@@ -282,6 +282,67 @@ const rankMax = computed(() => Math.max(1, ...props.top.map((v) => v.views)));
 
 const maxViews = computed(() =>
     Math.max(1, ...props.videos.map((v) => v.views)),
+);
+
+// Bảng video: phân trang phía trình duyệt + bấm tiêu đề cột để sắp xếp trong số bài đang tải.
+const videoGridCls =
+    'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]';
+const pageSize = 15;
+const page = ref(1);
+type SortKey =
+    | 'posted_at'
+    | 'views'
+    | 'likes'
+    | 'comments'
+    | 'shares'
+    | 'engagement';
+const sortKey = ref<SortKey | null>(null);
+const sortDesc = ref(true);
+
+const toggleSort = (k: SortKey) => {
+    if (sortKey.value === k) {
+        sortDesc.value = !sortDesc.value;
+    } else {
+        sortKey.value = k;
+        sortDesc.value = true;
+    }
+
+    page.value = 1;
+};
+const sortMark = (k: SortKey) =>
+    sortKey.value === k ? (sortDesc.value ? ' ↓' : ' ↑') : '';
+
+const sortedVideos = computed(() => {
+    const k = sortKey.value;
+
+    if (!k) {
+        return props.videos;
+    }
+
+    const dir = sortDesc.value ? -1 : 1;
+
+    return [...props.videos].sort((a, b) =>
+        k === 'posted_at'
+            ? dir * a.posted_at.localeCompare(b.posted_at)
+            : dir * ((a[k] as number) - (b[k] as number)),
+    );
+});
+const pageCount = computed(() =>
+    Math.max(1, Math.ceil(sortedVideos.value.length / pageSize)),
+);
+const pagedVideos = computed(() =>
+    sortedVideos.value.slice(
+        (page.value - 1) * pageSize,
+        page.value * pageSize,
+    ),
+);
+
+watch(
+    () => props.videos,
+    () => {
+        page.value = 1;
+        sortKey.value = null;
+    },
 );
 
 const seg = (on: boolean) =>
@@ -570,345 +631,394 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                 </div>
             </section>
 
-            <!-- Lượt xem theo ngày + người theo dõi -->
+            <!-- Lượt xem + so sánh (trái) · người theo dõi + bình luận (phải) -->
             <div
-                class="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]"
+                class="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_400px]"
             >
-                <section :class="cn(cardCls, 'flex flex-col gap-4 p-5')">
-                    <header
-                        class="flex flex-wrap items-start justify-between gap-2"
-                    >
-                        <div>
-                            <h2 :class="h2">Lượt xem theo ngày</h2>
-                            <p class="text-[12.5px] text-muted-foreground">
-                                Tổng lượt xem của các bài đăng trong ngày đó (số
-                                liệu mới nhất).
-                            </p>
-                        </div>
-                        <div
-                            v-if="bestDay"
-                            class="text-right text-[12.5px] text-muted-foreground"
+                <div class="flex min-w-0 flex-col gap-6">
+                    <section :class="cn(cardCls, 'flex flex-col gap-4 p-5')">
+                        <header
+                            class="flex flex-wrap items-start justify-between gap-2"
                         >
-                            Ngày tốt nhất
-                            <div
-                                class="font-medium text-foreground tabular-nums"
-                            >
-                                {{ dayjs(bestDay.date).format('DD/MM') }} ·
-                                {{ fmtNum(bestDay.views) }} lượt xem
+                            <div>
+                                <h2 :class="h2">Lượt xem theo ngày</h2>
+                                <p class="text-[12.5px] text-muted-foreground">
+                                    Tổng lượt xem của các bài đăng trong ngày đó
+                                    (số liệu mới nhất).
+                                </p>
                             </div>
-                        </div>
-                    </header>
-                    <Skeleton v-if="loading" class="h-48 w-full" />
-                    <BarChart
-                        v-else
-                        :points="dailyPoints"
-                        unit="lượt xem"
-                        height="h-48"
-                    />
-                </section>
-
-                <section
-                    :class="cn(cardCls, 'flex flex-col gap-3 p-5')"
-                    data-testid="fork-so-lieu-followers"
-                >
-                    <h2 :class="h2">Người theo dõi</h2>
-                    <template v-if="followers">
-                        <div class="flex items-baseline gap-3">
-                            <span
-                                class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
-                                >{{ fmtNum(followers.current) }}</span
+                            <div
+                                v-if="bestDay"
+                                class="text-right text-[12.5px] text-muted-foreground"
                             >
-                            <span
-                                v-if="followers.change !== null"
-                                :class="
-                                    cn(
-                                        'text-[13px] font-medium tabular-nums',
-                                        followers.change >= 0
-                                            ? toneClasses.success.text
-                                            : toneClasses.danger.text,
-                                    )
-                                "
-                                >{{ followers.change >= 0 ? '+' : ''
-                                }}{{ fmtNum(followers.change) }} trong kỳ</span
-                            >
-                        </div>
-                        <BarChart
-                            v-if="followers.series.length > 1"
-                            :points="followerPoints"
-                            unit="người theo dõi mới"
-                            height="h-32"
-                            class="mt-auto"
-                        />
-                        <p
-                            v-else
-                            class="mt-auto text-[12.5px] text-muted-foreground"
-                        >
-                            Mới có một ngày số liệu — biểu đồ hiện khi có thêm
-                            ngày.
-                        </p>
-                    </template>
-                    <p v-else class="text-[13px] text-muted-foreground">
-                        Chưa có số liệu người theo dõi. Tiện ích đọc từ TikTok
-                        Studio mỗi giờ.
-                    </p>
-                </section>
-            </div>
-
-            <!-- So sánh + top video -->
-            <div
-                class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-            >
-                <Skeleton v-if="loading" class="h-72 w-full rounded-[14px]" />
-                <BreakdownCard v-else :breakdowns="breakdowns" />
-
-                <section
-                    v-if="top.length"
-                    :class="cn(cardCls, 'flex flex-col overflow-hidden')"
-                    data-testid="fork-so-lieu-ranking"
-                >
-                    <header
-                        class="flex items-center justify-between gap-3 border-b px-5 py-4"
-                    >
-                        <h2 :class="h2">Video nổi bật</h2>
-                        <div
-                            class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[12.5px]"
-                        >
-                            <button
-                                v-for="m in [
-                                    { k: 'top', t: 'Nhiều view nhất' },
-                                    { k: 'bottom', t: 'Ít view nhất' },
-                                ] as const"
-                                :key="m.k"
-                                type="button"
-                                :class="
-                                    cn(
-                                        'rounded-md px-2.5 py-1 font-medium transition',
-                                        rankMode === m.k
-                                            ? 'bg-card text-foreground shadow-xs'
-                                            : 'text-muted-foreground hover:text-foreground',
-                                    )
-                                "
-                                @click="rankMode = m.k"
-                            >
-                                {{ m.t }}
-                            </button>
-                        </div>
-                    </header>
-                    <ol class="flex flex-col p-2">
-                        <li v-for="(v, i) in rankList" :key="v.id">
-                            <button
-                                type="button"
-                                class="grid w-full grid-cols-[20px_32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
-                                @click="
-                                    openVideo(
-                                        rankList.map((x) => x.id),
-                                        v.id,
-                                    )
-                                "
-                            >
-                                <span
-                                    class="text-center text-[13px] font-semibold text-muted-foreground tabular-nums"
-                                    >{{ i + 1 }}</span
+                                Ngày tốt nhất
+                                <div
+                                    class="font-medium text-foreground tabular-nums"
                                 >
-                                <CoverThumb
-                                    :id="v.id"
-                                    :fallback="v.product_image"
-                                    class="h-14 w-8 rounded-md"
-                                />
-                                <span class="min-w-0">
-                                    <span
-                                        class="block truncate text-[13.5px] font-medium"
-                                        >{{ productName(v.product_code) }}</span
-                                    >
-                                    <span
-                                        class="block truncate text-[12px] text-muted-foreground"
-                                        >{{
-                                            dayjs(v.posted_at).format(
-                                                'HH:mm DD/MM',
+                                    {{ dayjs(bestDay.date).format('DD/MM') }} ·
+                                    {{ fmtNum(bestDay.views) }} lượt xem
+                                </div>
+                            </div>
+                        </header>
+                        <Skeleton v-if="loading" class="h-40 w-full" />
+                        <BarChart
+                            v-else
+                            :points="dailyPoints"
+                            unit="lượt xem"
+                            height="h-40"
+                        />
+                    </section>
+
+                    <!-- So sánh + top video -->
+                    <div class="grid items-stretch gap-6 2xl:grid-cols-2">
+                        <Skeleton
+                            v-if="loading"
+                            class="h-72 w-full rounded-[14px]"
+                        />
+                        <BreakdownCard v-else :breakdowns="breakdowns" />
+
+                        <section
+                            v-if="top.length"
+                            :class="
+                                cn(cardCls, 'flex flex-col overflow-hidden')
+                            "
+                            data-testid="fork-so-lieu-ranking"
+                        >
+                            <header
+                                class="flex items-center justify-between gap-3 border-b px-5 py-4"
+                            >
+                                <h2 :class="h2">Video nổi bật</h2>
+                                <div
+                                    class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[12.5px]"
+                                >
+                                    <button
+                                        v-for="m in [
+                                            { k: 'top', t: 'Nhiều view nhất' },
+                                            { k: 'bottom', t: 'Ít view nhất' },
+                                        ] as const"
+                                        :key="m.k"
+                                        type="button"
+                                        :class="
+                                            cn(
+                                                'rounded-md px-2.5 py-1 font-medium transition',
+                                                rankMode === m.k
+                                                    ? 'bg-card text-foreground shadow-xs'
+                                                    : 'text-muted-foreground hover:text-foreground',
                                             )
-                                        }}<template v-if="v.channel">
-                                            · {{ v.channel }}</template
-                                        ></span
+                                        "
+                                        @click="rankMode = m.k"
                                     >
-                                    <span
-                                        class="mt-1 block h-1 overflow-hidden rounded-full bg-muted"
+                                        {{ m.t }}
+                                    </button>
+                                </div>
+                            </header>
+                            <ol class="flex flex-col p-2">
+                                <li v-for="(v, i) in rankList" :key="v.id">
+                                    <button
+                                        type="button"
+                                        class="grid w-full grid-cols-[20px_32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                                        @click="
+                                            openVideo(
+                                                rankList.map((x) => x.id),
+                                                v.id,
+                                            )
+                                        "
                                     >
                                         <span
-                                            :class="
-                                                cn(
-                                                    'block h-full rounded-full',
-                                                    rankMode === 'top'
-                                                        ? 'bg-primary'
-                                                        : 'bg-muted-foreground/40',
-                                                )
-                                            "
-                                            :style="{
-                                                width: `${Math.max(2, (v.views / rankMax) * 100)}%`,
-                                            }"
+                                            class="text-center text-[13px] font-semibold text-muted-foreground tabular-nums"
+                                            >{{ i + 1 }}</span
+                                        >
+                                        <CoverThumb
+                                            :id="v.id"
+                                            :fallback="v.product_image"
+                                            class="h-14 w-8 rounded-md"
                                         />
-                                    </span>
-                                </span>
-                                <span class="flex items-center gap-2">
+                                        <span class="min-w-0">
+                                            <span
+                                                class="block truncate text-[13.5px] font-medium"
+                                                >{{
+                                                    productName(v.product_code)
+                                                }}</span
+                                            >
+                                            <span
+                                                class="block truncate text-[12px] text-muted-foreground"
+                                                >{{
+                                                    dayjs(v.posted_at).format(
+                                                        'HH:mm DD/MM',
+                                                    )
+                                                }}<template v-if="v.channel">
+                                                    · {{ v.channel }}</template
+                                                ></span
+                                            >
+                                            <span
+                                                class="mt-1 block h-1 overflow-hidden rounded-full bg-muted"
+                                            >
+                                                <span
+                                                    :class="
+                                                        cn(
+                                                            'block h-full rounded-full',
+                                                            rankMode === 'top'
+                                                                ? 'bg-primary'
+                                                                : 'bg-muted-foreground/40',
+                                                        )
+                                                    "
+                                                    :style="{
+                                                        width: `${Math.max(2, (v.views / rankMax) * 100)}%`,
+                                                    }"
+                                                />
+                                            </span>
+                                        </span>
+                                        <span class="flex items-center gap-2">
+                                            <span
+                                                class="text-[14px] font-semibold tabular-nums"
+                                                >{{ fmtCompact(v.views) }}</span
+                                            >
+                                            <a
+                                                v-if="v.link"
+                                                :href="v.link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                title="Mở trên TikTok"
+                                                aria-label="Mở trên TikTok"
+                                                @click.stop
+                                                ><IconExternalLink
+                                                    class="size-4"
+                                            /></a>
+                                        </span>
+                                    </button>
+                                </li>
+                            </ol>
+                        </section>
+                    </div>
+                </div>
+                <div class="relative min-w-0 xl:min-h-[520px]">
+                    <div class="flex flex-col gap-6 xl:absolute xl:inset-0">
+                        <section
+                            :class="
+                                cn(cardCls, 'flex shrink-0 flex-col gap-3 p-5')
+                            "
+                            data-testid="fork-so-lieu-followers"
+                        >
+                            <h2 :class="h2">Người theo dõi</h2>
+                            <template v-if="followers">
+                                <div class="flex items-baseline gap-3">
                                     <span
-                                        class="text-[14px] font-semibold tabular-nums"
-                                        >{{ fmtCompact(v.views) }}</span
+                                        class="font-heading text-[30px] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                                        >{{ fmtNum(followers.current) }}</span
                                     >
-                                    <a
-                                        v-if="v.link"
-                                        :href="v.link"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                                        title="Mở trên TikTok"
-                                        aria-label="Mở trên TikTok"
-                                        @click.stop
-                                        ><IconExternalLink class="size-4"
-                                    /></a>
-                                </span>
-                            </button>
-                        </li>
-                    </ol>
-                </section>
-            </div>
+                                    <span
+                                        v-if="followers.change !== null"
+                                        :class="
+                                            cn(
+                                                'text-[13px] font-medium tabular-nums',
+                                                followers.change >= 0
+                                                    ? toneClasses.success.text
+                                                    : toneClasses.danger.text,
+                                            )
+                                        "
+                                        >{{ followers.change >= 0 ? '+' : ''
+                                        }}{{ fmtNum(followers.change) }} trong
+                                        kỳ</span
+                                    >
+                                </div>
+                                <BarChart
+                                    v-if="followers.series.length > 1"
+                                    :points="followerPoints"
+                                    unit="người theo dõi mới"
+                                    height="h-24"
+                                    class="mt-auto"
+                                />
+                                <p
+                                    v-else
+                                    class="mt-auto text-[12.5px] text-muted-foreground"
+                                >
+                                    Mới có một ngày số liệu — biểu đồ hiện khi
+                                    có thêm ngày.
+                                </p>
+                            </template>
+                            <p v-else class="text-[13px] text-muted-foreground">
+                                Chưa có số liệu người theo dõi. Tiện ích đọc từ
+                                TikTok Studio mỗi giờ.
+                            </p>
+                        </section>
 
-            <!-- Bình luận -->
-            <section
-                :class="cn(cardCls, 'flex flex-col overflow-hidden')"
-                data-testid="fork-so-lieu-comments"
-            >
-                <header
-                    class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"
-                >
-                    <div>
-                        <h2 :class="h2">Bình luận</h2>
-                        <p class="text-[12.5px] text-muted-foreground">
-                            {{ fmtNum(comments.counts.total) }} bình luận đã thu
-                            · {{ fmtNum(comments.counts.buy) }} hỏi mua / hỏi
-                            giá ({{ comments.counts.buy_24h }}
-                            trong 24 giờ qua)
-                        </p>
-                    </div>
-                    <div class="flex gap-0.5 rounded-lg bg-muted p-1">
-                        <button
-                            v-for="o in [
-                                { k: 'all', t: 'Tất cả' },
-                                { k: 'mua', t: 'Hỏi mua' },
-                            ] as const"
-                            :key="o.k"
-                            type="button"
-                            :class="seg(filters.cm === o.k)"
-                            @click="setComments(o.k)"
+                        <!-- Bình luận -->
+                        <section
+                            :class="
+                                cn(
+                                    cardCls,
+                                    'flex min-h-72 flex-col overflow-hidden xl:min-h-0 xl:flex-1',
+                                )
+                            "
+                            data-testid="fork-so-lieu-comments"
                         >
-                            {{ o.t }}
-                            <span
-                                v-if="o.k === 'mua' && comments.counts.buy_24h"
-                                class="rounded-full bg-amber-500 px-1.5 text-[11.5px] leading-5 font-semibold text-amber-950"
-                                >{{ comments.counts.buy_24h }}</span
+                            <header
+                                class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4"
                             >
-                        </button>
-                    </div>
-                </header>
+                                <div>
+                                    <h2 :class="h2">Bình luận</h2>
+                                    <p
+                                        class="text-[12.5px] text-muted-foreground"
+                                    >
+                                        {{ fmtNum(comments.counts.total) }} bình
+                                        luận đã thu ·
+                                        {{ fmtNum(comments.counts.buy) }} hỏi
+                                        mua / hỏi giá ({{
+                                            comments.counts.buy_24h
+                                        }}
+                                        trong 24 giờ qua)
+                                    </p>
+                                </div>
+                                <div
+                                    class="flex gap-0.5 rounded-lg bg-muted p-1"
+                                >
+                                    <button
+                                        v-for="o in [
+                                            { k: 'all', t: 'Tất cả' },
+                                            { k: 'mua', t: 'Hỏi mua' },
+                                        ] as const"
+                                        :key="o.k"
+                                        type="button"
+                                        :class="seg(filters.cm === o.k)"
+                                        @click="setComments(o.k)"
+                                    >
+                                        {{ o.t }}
+                                        <span
+                                            v-if="
+                                                o.k === 'mua' &&
+                                                comments.counts.buy_24h
+                                            "
+                                            class="rounded-full bg-amber-500 px-1.5 text-[11.5px] leading-5 font-semibold text-amber-950"
+                                            >{{ comments.counts.buy_24h }}</span
+                                        >
+                                    </button>
+                                </div>
+                            </header>
 
-                <p
-                    v-if="!comments.rows.length"
-                    class="px-5 py-10 text-center text-[13px] text-muted-foreground"
-                >
-                    {{
-                        filters.cm === 'mua'
-                            ? 'Chưa có bình luận hỏi mua nào.'
-                            : 'Chưa thu được bình luận nào. Tiện ích thu bình luận mới mỗi giờ.'
-                    }}
-                </p>
-                <ul v-else class="grid divide-y xl:grid-cols-2 xl:divide-y-0">
-                    <li
-                        v-for="(c, i) in comments.rows"
-                        :key="c.id"
-                        :class="
-                            cn(
-                                'flex gap-3 px-5 py-3.5 text-[13.5px]',
-                                'xl:border-b',
-                                i % 2 === 0 && 'xl:border-r',
-                                c.buy && 'bg-amber-50/60 dark:bg-amber-950/15',
-                            )
-                        "
-                        :data-testid="`fork-so-lieu-comment-${c.id}`"
-                    >
-                        <span
-                            class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[12.5px] font-semibold text-muted-foreground"
-                            aria-hidden="true"
-                            >{{
-                                [
-                                    ...(c.author || c.handle || '?'),
-                                ][0]?.toUpperCase()
-                            }}</span
-                        >
-                        <div class="min-w-0 flex-1">
-                            <div
-                                class="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                            <p
+                                v-if="!comments.rows.length"
+                                class="px-5 py-8 text-center text-[13px] text-muted-foreground"
                             >
-                                <span class="font-medium">{{
-                                    c.author || c.handle || 'Ẩn danh'
-                                }}</span>
-                                <span
-                                    v-if="c.buy"
+                                {{
+                                    filters.cm === 'mua'
+                                        ? 'Chưa có bình luận hỏi mua nào.'
+                                        : 'Chưa thu được bình luận nào. Tiện ích thu bình luận mới mỗi giờ.'
+                                }}
+                            </p>
+                            <ul
+                                v-else
+                                class="flex max-h-96 min-h-0 flex-1 flex-col divide-y overflow-y-auto xl:max-h-none"
+                            >
+                                <li
+                                    v-for="c in comments.rows"
+                                    :key="c.id"
                                     :class="
                                         cn(
-                                            'rounded-full px-2 text-[11.5px] leading-5 font-medium',
-                                            toneClasses.warn.chip,
+                                            'flex gap-3 px-5 py-3.5 text-[13.5px]',
+                                            c.buy &&
+                                                'bg-amber-50/60 dark:bg-amber-950/15',
                                         )
                                     "
-                                    :title="c.keywords ?? ''"
-                                    >Hỏi mua</span
+                                    :data-testid="`fork-so-lieu-comment-${c.id}`"
                                 >
-                                <span class="text-[12px] text-muted-foreground"
-                                    >{{
-                                        c.at
-                                            ? dayjs(c.at).format('HH:mm DD/MM')
-                                            : ''
-                                    }}<template v-if="c.channel">
-                                        · {{ c.channel }}</template
-                                    ></span
-                                >
-                            </div>
-                            <p class="mt-0.5 break-words whitespace-pre-line">
-                                {{ c.text }}
-                            </p>
-                            <div
-                                class="mt-1 flex flex-wrap items-center gap-x-3 text-[12px] text-muted-foreground"
-                            >
-                                <button
-                                    v-if="c.video_id"
-                                    type="button"
-                                    class="truncate hover:text-foreground hover:underline"
-                                    @click="openVideo([c.video_id], c.video_id)"
-                                >
-                                    {{
-                                        c.video_label
-                                            ? `Video: ${c.video_label}`
-                                            : 'Xem video'
-                                    }}
-                                </button>
-                                <span v-else-if="c.video_label" class="truncate"
-                                    >Video: {{ c.video_label }}</span
-                                >
-                                <a
-                                    v-if="c.link"
-                                    :href="c.link"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1 font-medium text-primary-text hover:underline"
-                                    >Trả lời trên TikTok
-                                    <IconExternalLink class="size-3.5"
-                                /></a>
-                                <span class="ml-auto tabular-nums"
-                                    >{{ c.likes }} tim · {{ c.replies }} trả
-                                    lời</span
-                                >
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </section>
+                                    <span
+                                        class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[12.5px] font-semibold text-muted-foreground"
+                                        aria-hidden="true"
+                                        >{{
+                                            [
+                                                ...(c.author ||
+                                                    c.handle ||
+                                                    '?'),
+                                            ][0]?.toUpperCase()
+                                        }}</span
+                                    >
+                                    <div class="min-w-0 flex-1">
+                                        <div
+                                            class="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                                        >
+                                            <span class="font-medium">{{
+                                                c.author ||
+                                                c.handle ||
+                                                'Ẩn danh'
+                                            }}</span>
+                                            <span
+                                                v-if="c.buy"
+                                                :class="
+                                                    cn(
+                                                        'rounded-full px-2 text-[11.5px] leading-5 font-medium',
+                                                        toneClasses.warn.chip,
+                                                    )
+                                                "
+                                                :title="c.keywords ?? ''"
+                                                >Hỏi mua</span
+                                            >
+                                            <span
+                                                class="text-[12px] text-muted-foreground"
+                                                >{{
+                                                    c.at
+                                                        ? dayjs(c.at).format(
+                                                              'HH:mm DD/MM',
+                                                          )
+                                                        : ''
+                                                }}<template v-if="c.channel">
+                                                    · {{ c.channel }}</template
+                                                ></span
+                                            >
+                                        </div>
+                                        <p
+                                            class="mt-0.5 break-words whitespace-pre-line"
+                                        >
+                                            {{ c.text }}
+                                        </p>
+                                        <div
+                                            class="mt-1 flex flex-wrap items-center gap-x-3 text-[12px] text-muted-foreground"
+                                        >
+                                            <button
+                                                v-if="c.video_id"
+                                                type="button"
+                                                class="truncate hover:text-foreground hover:underline"
+                                                @click="
+                                                    openVideo(
+                                                        [c.video_id],
+                                                        c.video_id,
+                                                    )
+                                                "
+                                            >
+                                                {{
+                                                    c.video_label
+                                                        ? `Video: ${c.video_label}`
+                                                        : 'Xem video'
+                                                }}
+                                            </button>
+                                            <span
+                                                v-else-if="c.video_label"
+                                                class="truncate"
+                                                >Video:
+                                                {{ c.video_label }}</span
+                                            >
+                                            <a
+                                                v-if="c.link"
+                                                :href="c.link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-1 font-medium text-primary-text hover:underline"
+                                                >Trả lời trên TikTok
+                                                <IconExternalLink
+                                                    class="size-3.5"
+                                            /></a>
+                                            <span class="ml-auto tabular-nums"
+                                                >{{ c.likes }} tim ·
+                                                {{ c.replies }} trả lời</span
+                                            >
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            </div>
 
             <!-- Video đã đăng -->
             <section
@@ -942,17 +1052,45 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                     </NativeSelect>
                 </header>
                 <div
-                    class="hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[36px_minmax(0,1.7fr)_minmax(120px,1fr)_repeat(3,60px)_84px_96px_28px] lg:gap-x-4"
-                    aria-hidden="true"
+                    :class="
+                        cn(
+                            'hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:gap-x-4',
+                            videoGridCls,
+                        )
+                    "
+                    data-testid="fork-so-lieu-videos-head"
                 >
                     <span />
-                    <span>Video</span>
-                    <span>Lượt xem</span>
-                    <span class="text-right">Tim</span>
-                    <span class="text-right">B.luận</span>
-                    <span class="text-right">Chia sẻ</span>
-                    <span class="text-right">Tương tác</span>
-                    <span class="text-right">Sau 24h/72h</span>
+                    <button
+                        type="button"
+                        class="text-left uppercase hover:text-foreground"
+                        @click="toggleSort('posted_at')"
+                    >
+                        Video{{ sortMark('posted_at') }}
+                    </button>
+                    <span>Góc · giọng</span>
+                    <button
+                        type="button"
+                        class="text-left uppercase hover:text-foreground"
+                        @click="toggleSort('views')"
+                    >
+                        Lượt xem{{ sortMark('views') }}
+                    </button>
+                    <button
+                        v-for="c in [
+                            { k: 'likes', t: 'Tim' },
+                            { k: 'comments', t: 'B.luận' },
+                            { k: 'shares', t: 'Chia sẻ' },
+                            { k: 'engagement', t: 'Tương tác' },
+                        ] as const"
+                        :key="c.k"
+                        type="button"
+                        class="text-right uppercase hover:text-foreground"
+                        @click="toggleSort(c.k)"
+                    >
+                        {{ c.t }}{{ sortMark(c.k) }}
+                    </button>
+                    <span class="text-right">24h / 72h</span>
                     <span />
                 </div>
                 <div v-if="loading" class="flex flex-col divide-y">
@@ -961,20 +1099,60 @@ const h2 = 'font-heading text-[16px] font-semibold tracking-[-0.01em]';
                         :key="i"
                         class="flex items-center gap-4 px-5 py-3"
                     >
-                        <Skeleton class="h-16 w-9" />
+                        <Skeleton class="h-12 w-7" />
                         <Skeleton class="h-4 flex-1" />
                     </div>
                 </div>
                 <ul v-else class="flex flex-col divide-y">
                     <VideoStatRow
-                        v-for="v in videos"
+                        v-for="v in pagedVideos"
                         :key="v.id"
                         :video="v"
                         :product-name="productName(v.product_code)"
-                        :ids="videos.map((x) => x.id)"
+                        :ids="sortedVideos.map((x) => x.id)"
                         :max-views="maxViews"
+                        :grid-cls="videoGridCls"
                     />
                 </ul>
+                <footer
+                    v-if="pageCount > 1"
+                    class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[13px] text-muted-foreground"
+                    data-testid="fork-so-lieu-videos-pager"
+                >
+                    <span class="tabular-nums"
+                        >{{ (page - 1) * pageSize + 1 }}–{{
+                            Math.min(page * pageSize, sortedVideos.length)
+                        }}
+                        / {{ sortedVideos.length }} video</span
+                    >
+                    <div class="flex items-center gap-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-8"
+                            :disabled="page <= 1"
+                            @click="page--"
+                            >Trước</Button
+                        >
+                        <Button
+                            v-for="n in pageCount"
+                            :key="n"
+                            :variant="n === page ? 'default' : 'ghost'"
+                            size="sm"
+                            class="h-8 min-w-8 tabular-nums"
+                            @click="page = n"
+                            >{{ n }}</Button
+                        >
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-8"
+                            :disabled="page >= pageCount"
+                            @click="page++"
+                            >Sau</Button
+                        >
+                    </div>
+                </footer>
             </section>
         </template>
     </AutoShell>

@@ -113,6 +113,9 @@ main{max-width:1880px;margin:0 auto;padding:26px 32px 80px}
 .ph .act{display:flex;gap:8px;flex-wrap:wrap}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-sm);padding:22px 24px;min-width:0}
 .mt{margin-top:20px}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+.col>.card.mt{margin-top:0}
+.g2e.top{align-items:start}
 .grid{display:grid;gap:20px}
 .g2{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
 .g2e{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -587,40 +590,42 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       </div>
       <div id="trangThai"></div>
     </div>
-    <div class="card">
-      <div class="ch"><span class="chip b"><svg class="i"><use href="#i-chart"/></svg></span>
-        <div class="t"><h2>Hôm nay <span class="note" id="stMoc"></span></h2><p class="sub" id="stUsd"></p></div>
-        <div class="act"><button class="btn ghost sm" id="btnDemLai"><svg class="i"><use href="#i-undo"/></svg>Đếm lại từ bây giờ</button></div></div>
-      <div class="stat">
-        <div style="--acc:#8B5CF6"><i class="si"><svg class="i"><use href="#i-video"/></svg></i><b id="stVideo">–</b><span>video đã làm</span></div>
-        <div style="--acc:#3B82F6"><i class="si"><svg class="i"><use href="#i-zap"/></svg></i><b id="stLuot">–</b><span>lượt gọi AI</span></div>
-        <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-coins"/></svg></i><b id="stToken">–</b><span>token đã dùng</span></div>
-        <div style="--acc:#10B981"><i class="si"><svg class="i"><use href="#i-mic"/></svg></i><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+    <div class="col">
+      <div class="card">
+        <div class="ch"><span class="chip b"><svg class="i"><use href="#i-chart"/></svg></span>
+          <div class="t"><h2>Hôm nay <span class="note" id="stMoc"></span></h2><p class="sub" id="stUsd"></p></div>
+          <div class="act"><button class="btn ghost sm" id="btnDemLai"><svg class="i"><use href="#i-undo"/></svg>Đếm lại từ bây giờ</button></div></div>
+        <div class="stat">
+          <div style="--acc:#8B5CF6"><i class="si"><svg class="i"><use href="#i-video"/></svg></i><b id="stVideo">–</b><span>video đã làm</span></div>
+          <div style="--acc:#3B82F6"><i class="si"><svg class="i"><use href="#i-zap"/></svg></i><b id="stLuot">–</b><span>lượt gọi AI</span></div>
+          <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-coins"/></svg></i><b id="stToken">–</b><span>token đã dùng</span></div>
+          <div style="--acc:#10B981"><i class="si"><svg class="i"><use href="#i-mic"/></svg></i><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+        </div>
+        <div id="tkBox"></div>
       </div>
-      <div id="tkBox"></div>
+    <div class="card mt">
+      <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
+        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
+        <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+      <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
     </div>
-  </div>
-  <div class="card mt">
-    <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
-      <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
-      <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
-    <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
-  </div>
-  <div class="card mt">
-    <div class="ch"><span class="chip g"><svg class="i"><use href="#i-bot"/></svg></span>
-      <div class="t"><h2>Tự động giữ kho video</h2><p class="sub">Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.</p></div>
-      <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw"> Bật tự động</label>
-        <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
-    <div class="hidden" id="tdBody">
-    <p class="help">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
-      App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
-      <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã ✅ và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự ✅) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
-      <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
-    <div class="tbl-wrap" style="margin-top:16px"><table class="tbl td" id="tdBang"></table></div>
-    <div class="foot-row">
-      <span class="note" id="tdTrangThai"></span>
-      <div class="row" style="gap:10px"><span class="inl">Kiểm mỗi <input type="number" id="tdPhut" min="5" value="15"> phút</span>
-        <button class="btn go" id="btnLuuTd"><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
+    <div class="card mt">
+      <div class="ch"><span class="chip g"><svg class="i"><use href="#i-bot"/></svg></span>
+        <div class="t"><h2>Tự động giữ kho video</h2><p class="sub">Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.</p></div>
+        <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw"> Bật tự động</label>
+          <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+      <div class="hidden" id="tdBody">
+      <p class="help">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
+        App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
+        <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã ✅ và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự ✅) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
+        <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
+      <div class="tbl-wrap" style="margin-top:16px"><table class="tbl td" id="tdBang"></table></div>
+      <div class="foot-row">
+        <span class="note" id="tdTrangThai"></span>
+        <div class="row" style="gap:10px"><span class="inl">Kiểm mỗi <input type="number" id="tdPhut" min="5" value="15"> phút</span>
+          <button class="btn go" id="btnLuuTd"><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
+      </div>
+      </div>
     </div>
     </div>
   </div>
@@ -805,10 +810,10 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-heart"/></svg></span>
       <div class="t"><h2>Sổ gu của anh</h2><p class="sub">Biên kịch, đạo diễn và giám khảo đều đọc trước khi làm.</p></div>
       <div class="act"><button class="btn go" id="btnLuuGu"><svg class="i"><use href="#i-save"/></svg>Lưu</button></div></div>
-      <textarea id="soGu" style="min-height:440px" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
+      <textarea id="soGu" style="min-height:max(440px,calc(100vh - 280px))" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
     <div class="card"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-book"/></svg></span>
       <div class="t"><h2>Bài học giám khảo tự ghi</h2><p class="sub">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn tránh lặp lại.</p></div></div>
-      <div class="cap" id="baiHoc" style="min-height:440px;max-height:640px;overflow:auto"></div></div>
+      <div class="cap" id="baiHoc" style="min-height:max(440px,calc(100vh - 280px));max-height:calc(100vh - 200px);overflow:auto"></div></div>
   </div>
 </section>
 
@@ -851,7 +856,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 <!-- CÀI ĐẶT -->
 <section id="cd" class="hidden">
   <div class="ph"><div><h1>Cài đặt</h1><p>Tài khoản AI, khoá giọng đọc, nhạc và ổ đĩa của xưởng.</p></div></div>
-  <div class="grid g2e">
+  <div class="grid g2e top">
     <div class="card" style="grid-column:1/-1">
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-key"/></svg></span>
         <div class="t"><h2>Tài khoản Claude</h2><p class="sub">Hub tự chuyển sang tài khoản còn dư hạn mức.</p></div>
@@ -860,17 +865,6 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
         Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
         tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi cả 3 đều hết.</p>
-    </div>
-    <div class="card"><div class="ch"><span class="chip b"><svg class="i"><use href="#i-link"/></svg></span>
-      <div class="t"><h2>Kết nối app TikTok Auto Kid</h2><p class="sub">Kết nối tự động, không cần nhập gì.</p></div></div>
-      <div class="kpath"><svg class="i"><use href="#i-pin"/></svg>Cổng nội bộ: <b id="tpDiaChi">…</b></div>
-      <p class="note">App chỉ lấy video anh đã bấm ✅ Ưng và chưa đăng. Đăng xong / lỗi đăng sẽ hiện ngay trong Kho video.</p>
-    </div>
-    <div class="card"><div class="ch"><span class="chip n"><svg class="i"><use href="#i-drive"/></svg></span>
-      <div class="t"><h2>Ổ đĩa</h2><p class="sub">Dung lượng video thành phẩm theo ngày</p></div></div>
-      <div id="oDia" class="note">Đang tính…</div>
-      <p class="note">Hub tự dọn file tạm (bản dựng dở, giọng cũ hơn 7 ngày, bản giám khảo chưa đạt cũ hơn 5 ngày) sau mỗi lô và mỗi lần mở app.
-        Video thành phẩm KHÔNG bao giờ tự xoá — ngày nào đã đăng xong anh tự chép ra ổ khác hoặc xoá.</p>
     </div>
     <div class="card" style="grid-column:1/-1"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-music"/></svg></span>
       <div class="t"><h2>Nhạc &amp; âm thanh</h2><p class="sub">Kho mặc định + thư mục nhạc / SFX của anh</p></div></div>
@@ -885,36 +879,51 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <p class="note">Hub chọn nhạc/âm thanh từ kho mặc định + mọi thư mục đang bật. Nhạc của anh không có nhãn nên coi là "chung" (hợp mọi kiểu video), chỉ dùng bài dài từ 40 giây.
         SFX được xếp nhóm theo tên thư mục con hoặc tên file (whoosh, impact, click, ding, coin…); file không đoán được thì bỏ qua. Hỗ trợ mp3, wav, m4a, ogg, flac.</p>
     </div>
-    <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
-      <div class="t"><h2>Khoá ElevenLabs (giọng đọc)</h2><p class="sub">Bắt buộc để làm video</p></div></div>
-      <div class="note" id="kgTrangThai">Đang kiểm…</div>
-      <div class="row nowrap" style="margin-top:12px;gap:8px"><input type="password" id="kgKhoa" placeholder="Dán khoá API ElevenLabs vào đây" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
-        <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
-      <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
-    </div>
-    <div class="card" id="cdGiong"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
-      <div class="t"><h2>Giọng đọc</h2><p class="sub">Chọn giọng ElevenLabs cho video</p></div></div>
-      <label>Đang dùng</label>
-      <div id="gdDs"><div class="note">Đang tải…</div></div>
-      <p class="note">Mỗi video chọn ngẫu nhiên 1 giọng trong danh sách đang dùng. Muốn chỉ 1 giọng thì để lại 1.</p>
-      <hr class="sep">
-      <button class="btn ghost" id="btnGdTk"><svg class="i"><use href="#i-mic"/></svg>Chọn từ tài khoản ElevenLabs</button>
-      <div class="gd-ls hidden" id="gdTk"></div>
-      <div style="margin-top:18px"><label for="gdId">Thêm bằng Voice ID</label>
-        <div class="row nowrap" style="gap:8px"><input type="text" id="gdId" placeholder="Dán Voice ID (giọng trong Voice Library)" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
-          <button class="btn go" id="btnGdId"><svg class="i"><use href="#i-plus"/></svg>Thêm</button></div>
-        <div id="gdLoi"></div>
-        <p class="note" style="margin:6px 0 0">Giọng lấy từ Thư viện giọng (Voice Library) phải được thêm vào "My Voices" trên elevenlabs.io trước thì mới dùng được.</p></div>
-      <audio id="gdAudio" class="hidden" preload="none"></audio>
-    </div>
-    <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
-      <div class="t"><h2>Chất lượng AI</h2><p class="sub">Model, mức suy nghĩ và số đạo diễn mỗi lời đọc</p></div></div>
-      <div class="grid g2e" style="gap:16px">
-        <div><label for="cdModel">Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
-        <div><label for="cdEffort">Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
-        <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
+    <div class="col">
+      <div class="card"><div class="ch"><span class="chip b"><svg class="i"><use href="#i-link"/></svg></span>
+        <div class="t"><h2>Kết nối app TikTok Auto Kid</h2><p class="sub">Kết nối tự động, không cần nhập gì.</p></div></div>
+        <div class="kpath"><svg class="i"><use href="#i-pin"/></svg>Cổng nội bộ: <b id="tpDiaChi">…</b></div>
+        <p class="note">App chỉ lấy video anh đã bấm ✅ Ưng và chưa đăng. Đăng xong / lỗi đăng sẽ hiện ngay trong Kho video.</p>
       </div>
-      <div class="row" style="margin-top:18px"><button class="btn go" id="btnLuuCd"><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
+      <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
+        <div class="t"><h2>Khoá ElevenLabs (giọng đọc)</h2><p class="sub">Bắt buộc để làm video</p></div></div>
+        <div class="note" id="kgTrangThai">Đang kiểm…</div>
+        <div class="row nowrap" style="margin-top:12px;gap:8px"><input type="password" id="kgKhoa" placeholder="Dán khoá API ElevenLabs vào đây" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
+          <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
+        <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
+      </div>
+      <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
+        <div class="t"><h2>Chất lượng AI</h2><p class="sub">Model, mức suy nghĩ và số đạo diễn mỗi lời đọc</p></div></div>
+        <div class="grid g2e" style="gap:16px">
+          <div><label for="cdModel">Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
+          <div><label for="cdEffort">Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
+          <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
+        </div>
+        <div class="row" style="margin-top:18px"><button class="btn go" id="btnLuuCd"><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="cdGiong"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
+        <div class="t"><h2>Giọng đọc</h2><p class="sub">Chọn giọng ElevenLabs cho video</p></div></div>
+        <label>Đang dùng</label>
+        <div id="gdDs"><div class="note">Đang tải…</div></div>
+        <p class="note">Mỗi video chọn ngẫu nhiên 1 giọng trong danh sách đang dùng. Muốn chỉ 1 giọng thì để lại 1.</p>
+        <hr class="sep">
+        <button class="btn ghost" id="btnGdTk"><svg class="i"><use href="#i-mic"/></svg>Chọn từ tài khoản ElevenLabs</button>
+        <div class="gd-ls hidden" id="gdTk"></div>
+        <div style="margin-top:18px"><label for="gdId">Thêm bằng Voice ID</label>
+          <div class="row nowrap" style="gap:8px"><input type="text" id="gdId" placeholder="Dán Voice ID (giọng trong Voice Library)" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
+            <button class="btn go" id="btnGdId"><svg class="i"><use href="#i-plus"/></svg>Thêm</button></div>
+          <div id="gdLoi"></div>
+          <p class="note" style="margin:6px 0 0">Giọng lấy từ Thư viện giọng (Voice Library) phải được thêm vào "My Voices" trên elevenlabs.io trước thì mới dùng được.</p></div>
+        <audio id="gdAudio" class="hidden" preload="none"></audio>
+      </div>
+      <div class="card"><div class="ch"><span class="chip n"><svg class="i"><use href="#i-drive"/></svg></span>
+        <div class="t"><h2>Ổ đĩa</h2><p class="sub">Dung lượng video thành phẩm theo ngày</p></div></div>
+        <div id="oDia" class="note">Đang tính…</div>
+        <p class="note">Hub tự dọn file tạm (bản dựng dở, giọng cũ hơn 7 ngày, bản giám khảo chưa đạt cũ hơn 5 ngày) sau mỗi lô và mỗi lần mở app.
+          Video thành phẩm KHÔNG bao giờ tự xoá — ngày nào đã đăng xong anh tự chép ra ổ khác hoặc xoá.</p>
+      </div>
     </div>
   </div>
 </section>

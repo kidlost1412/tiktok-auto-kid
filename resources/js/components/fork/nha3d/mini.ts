@@ -460,6 +460,18 @@ export const createMiniXuongScene = (o: MiniSceneOptions): MiniScene => {
         H = Math.max(1, host.clientHeight);
         renderer.setSize(W, H, false);
         camera.aspect = W / Math.max(1, H);
+        // Cảnh dựng cho khung ngang (~1.8:1). Khung vuông/đứng (cột phải màn rộng) thì nới góc dọc để giữ đủ bề ngang sân khấu.
+        const BASE_ASPECT = 1.3;
+        camera.fov =
+            camera.aspect >= BASE_ASPECT
+                ? 36
+                : (2 *
+                      Math.atan(
+                          (Math.tan((18 * Math.PI) / 180) * BASE_ASPECT) /
+                              camera.aspect,
+                      ) *
+                      180) /
+                  Math.PI;
         camera.updateProjectionMatrix();
         if (!motion) {
             draw();

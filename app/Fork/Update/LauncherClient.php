@@ -46,7 +46,7 @@ final class LauncherClient
         return $r->successful() && is_array($r->json()) ? $r->json() : null;
     }
 
-    /** @return array{ok: bool, error: ?string, data: ?array} */
+    /** @return array{ok: bool, error: ?string, data: ?array, status?: int} */
     public static function post(string $path, array $body = [], int $timeout = 30): array
     {
         $file = (string) config('fork-update.token_file');
@@ -64,10 +64,10 @@ final class LauncherClient
         }
 
         if (! $r->successful()) {
-            return ['ok' => false, 'error' => (string) ($r->json('error') ?: 'Launcher từ chối yêu cầu.'), 'data' => null];
+            return ['ok' => false, 'error' => (string) ($r->json('error') ?: 'Launcher từ chối yêu cầu.'), 'data' => null, 'status' => $r->status()];
         }
 
-        return ['ok' => true, 'error' => null, 'data' => $r->json()];
+        return ['ok' => true, 'error' => null, 'data' => $r->json(), 'status' => $r->status()];
     }
 
     private static function url(string $path): string

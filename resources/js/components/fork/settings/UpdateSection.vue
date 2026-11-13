@@ -169,18 +169,15 @@ const rollback = (): void => {
 
 const setAuto = (v: boolean): void =>
     run('prefs', (done) =>
-        router.patch(
-            '/settings/cap-nhat/prefs',
-            { auto_check: v },
-            opts(done),
-        ),
+        router.patch('/settings/cap-nhat/prefs', { auto_check: v }, opts(done)),
     );
 
 const when = (iso: string): string => {
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('vi-VN');
 };
-const mb = (n: number): string => (n > 0 ? `${(n / 1048576).toFixed(0)} MB` : '');
+const mb = (n: number): string =>
+    n > 0 ? `${(n / 1048576).toFixed(0)} MB` : '';
 
 // ---- Markdown rút gọn, dựng bằng nút Vue (không dùng v-html) nên không thể chèn HTML/script ----
 type Inline = { t: 'text' | 'b' | 'code' | 'a'; v: string; href?: string };
@@ -241,231 +238,277 @@ const blocks = computed<Block[]>(() => {
 </script>
 
 <template>
-    <div class="grid items-start gap-5 xl:grid-cols-2" data-testid="fork-update-page">
-            <div class="flex min-w-0 flex-col gap-5">
-                <SettingsSection
-                    title="Phiên bản"
-                    description="Bản đang chạy trên máy và bản mới nhất trên kho phát hành."
-                    :icon="IconCloudDownload"
-                >
-                    <template #actions>
-                        <Button
-                            variant="outline"
-                            :disabled="busy === 'check' || working || !configured"
-                            data-testid="fork-update-check"
-                            @click="check"
-                        >
-                            <Spinner v-if="busy === 'check'" class="size-4" />
-                            <IconRefresh v-else class="size-4" />
-                            Kiểm tra lại
-                        </Button>
-                    </template>
+    <div
+        class="grid items-stretch gap-5"
+        :class="
+            latest && blocks.length
+                ? 'xl:grid-cols-2'
+                : 'mx-auto w-full max-w-[1100px]'
+        "
+        data-testid="fork-update-page"
+    >
+        <div class="flex min-w-0 flex-col gap-5">
+            <SettingsSection
+                title="Phiên bản"
+                description="Bản đang chạy trên máy và bản mới nhất trên kho phát hành."
+                :icon="IconCloudDownload"
+            >
+                <template #actions>
+                    <Button
+                        variant="outline"
+                        :disabled="busy === 'check' || working || !configured"
+                        data-testid="fork-update-check"
+                        @click="check"
+                    >
+                        <Spinner v-if="busy === 'check'" class="size-4" />
+                        <IconRefresh v-else class="size-4" />
+                        Kiểm tra lại
+                    </Button>
+                </template>
 
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4">
-                            <span class="fk-chip is-green"><IconPackage /></span>
-                            <div class="min-w-0">
-                                <p class="text-[13px] text-muted-foreground">Đang dùng</p>
-                                <p class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums" data-testid="fork-update-current">
-                                    v{{ current }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4">
-                            <span class="fk-chip"><IconSparkles /></span>
-                            <div class="min-w-0">
-                                <p class="text-[13px] text-muted-foreground">Bản mới nhất</p>
-                                <p class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums" data-testid="fork-update-latest">
-                                    <template v-if="latest">v{{ latest.version }}</template>
-                                    <template v-else>—</template>
-                                </p>
-                                <p v-if="checked_at" class="mt-1 text-[13px] text-muted-foreground">
-                                    Kiểm tra lúc {{ when(checked_at) }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div
-                        v-if="!configured"
-                        class="rounded-xl border border-dashed border-border-strong p-4 text-sm text-muted-foreground"
-                        data-testid="fork-update-unconfigured"
+                        class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4"
                     >
-                        Chưa có kho cập nhật. Đặt
-                        <code>UPDATE_REPO=chu-kho/ten-kho</code> trong file
-                        <code>.env</code> (kho GitHub công khai có các bản phát hành) rồi khởi động lại ứng dụng.
-                    </div>
-                    <div
-                        v-else-if="!launcher_ok"
-                        class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
-                        data-testid="fork-update-no-launcher"
-                    >
-                        Không liên lạc được launcher. Cập nhật chỉ hoạt động khi ứng dụng được mở bằng
-                        <code>TikTokAuto.exe</code>.
-                    </div>
-                    <div
-                        v-else-if="check_error && !latest"
-                        class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
-                    >
-                        {{ check_error }}
-                    </div>
-                    <div
-                        v-else-if="update_available && latest"
-                        class="flex flex-wrap items-center gap-3 rounded-xl border border-success-text/30 bg-success-subtle p-4 text-sm"
-                        data-testid="fork-update-available"
-                    >
-                        <span class="fk-pill is-green">Có bản mới</span>
-                        <span>
-                            Bản {{ latest.version }}<template v-if="mb(latest.size)"> ({{ mb(latest.size) }})</template>
-                            đã sẵn sàng.
-                        </span>
-                        <Button
-                            class="ml-auto"
-                            :disabled="busy === 'install' || working"
-                            data-testid="fork-update-install"
-                            @click="install"
-                        >
-                            <Spinner v-if="busy === 'install'" class="size-4" />
-                            <IconCloudDownload v-else class="size-4" />
-                            Cập nhật ngay
-                        </Button>
-                    </div>
-                    <div
-                        v-else-if="latest"
-                        class="flex items-center gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
-                        data-testid="fork-update-uptodate"
-                    >
-                        <span class="fk-pill is-green">Mới nhất</span>
-                        Bạn đang dùng bản mới nhất.
-                    </div>
-
-                    <div
-                        v-if="working && live"
-                        class="rounded-xl border border-primary-strong/25 bg-primary-subtle p-4"
-                        data-testid="fork-update-progress"
-                    >
-                        <div class="flex items-center gap-2 text-sm font-semibold">
-                            <Spinner class="size-4" />
-                            {{ live.message || 'Đang xử lý…' }}
-                        </div>
-                        <div class="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
-                            <div
-                                class="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-700 transition-all"
-                                :style="{ width: `${Math.max(3, live.percent)}%` }"
-                            />
-                        </div>
-                        <p class="mt-2 text-[13px] text-muted-foreground">
-                            Ứng dụng tạm dừng trong lúc cập nhật. Đừng tắt máy hay thoát TikTok Auto Kid; trang sẽ tự tải lại khi xong.
-                        </p>
-                    </div>
-                    <div
-                        v-else-if="failed && live"
-                        class="rounded-xl border border-destructive/40 bg-critical-subtle p-4 text-sm text-destructive-text"
-                        data-testid="fork-update-error"
-                    >
-                        <strong>Cập nhật thất bại.</strong> {{ live.error }}
-                    </div>
-                    <div
-                        v-if="launcher_pending"
-                        class="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground"
-                    >
-                        Chương trình khởi chạy (launcher) mới sẽ được áp dụng ở lần mở TikTok Auto Kid tiếp theo
-                        (thoát từ khay hệ thống rồi mở lại).
-                    </div>
-                </SettingsSection>
-
-                <SettingsSection
-                    title="Tuỳ chọn"
-                    description="Kiểm tra bản mới tự động và quay lại bản trước khi cần."
-                    :icon="IconSettings"
-                    tone="neutral"
-                >
-                    <ul class="divide-y divide-border overflow-hidden rounded-xl border border-border">
-                        <li class="flex items-center gap-3 px-4 py-3.5">
-                            <div class="min-w-0 flex-1">
-                                <div class="text-[15px] font-medium">Tự kiểm tra bản mới mỗi ngày</div>
-                                <div class="text-[13px] text-muted-foreground">
-                                    Khi có bản mới, menu ở khay hệ thống sẽ báo và gửi tin Telegram (nếu đã nối Telegram). Không tự cài.
-                                </div>
-                            </div>
-                            <Switch
-                                :model-value="auto_check"
-                                aria-label="Tự kiểm tra bản mới mỗi ngày"
-                                :disabled="!launcher_ok || busy === 'prefs'"
-                                data-testid="fork-update-auto"
-                                @update:model-value="(v: boolean) => setAuto(v)"
-                            />
-                        </li>
-                        <li v-if="can_rollback" class="flex items-center gap-3 px-4 py-3.5">
-                            <div class="min-w-0 flex-1">
-                                <div class="text-[15px] font-medium">Quay lại bản trước (v{{ rollback_version }})</div>
-                                <div class="text-[13px] text-muted-foreground">
-                                    Dữ liệu giữ nguyên, chỉ đổi mã chương trình. Dùng khi bản mới có lỗi.
-                                </div>
-                            </div>
-                            <Button
-                                variant="outline"
-                                :disabled="busy === 'rollback' || working"
-                                data-testid="fork-update-rollback"
-                                @click="rollback"
+                        <span class="fk-chip is-green"><IconPackage /></span>
+                        <div class="min-w-0">
+                            <p class="text-[13px] text-muted-foreground">
+                                Đang dùng
+                            </p>
+                            <p
+                                class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                data-testid="fork-update-current"
                             >
-                                <Spinner v-if="busy === 'rollback'" class="size-4" />
-                                <IconArrowBackUp v-else class="size-4" />
-                                Quay lại bản trước
-                            </Button>
-                        </li>
-                    </ul>
-                </SettingsSection>
-            </div>
+                                v{{ current }}
+                            </p>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4"
+                    >
+                        <span class="fk-chip"><IconSparkles /></span>
+                        <div class="min-w-0">
+                            <p class="text-[13px] text-muted-foreground">
+                                Bản mới nhất
+                            </p>
+                            <p
+                                class="mt-0.5 text-[26px] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                data-testid="fork-update-latest"
+                            >
+                                <template v-if="latest"
+                                    >v{{ latest.version }}</template
+                                >
+                                <template v-else>—</template>
+                            </p>
+                            <p
+                                v-if="checked_at"
+                                class="mt-1 text-[13px] text-muted-foreground"
+                            >
+                                Kiểm tra lúc {{ when(checked_at) }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    v-if="!configured"
+                    class="rounded-xl border border-dashed border-border-strong p-4 text-sm text-muted-foreground"
+                    data-testid="fork-update-unconfigured"
+                >
+                    Chưa có kho cập nhật. Đặt
+                    <code>UPDATE_REPO=chu-kho/ten-kho</code> trong file
+                    <code>.env</code> (kho GitHub công khai có các bản phát
+                    hành) rồi khởi động lại ứng dụng.
+                </div>
+                <div
+                    v-else-if="!launcher_ok"
+                    class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                    data-testid="fork-update-no-launcher"
+                >
+                    Không liên lạc được launcher. Cập nhật chỉ hoạt động khi ứng
+                    dụng được mở bằng
+                    <code>TikTokAuto.exe</code>.
+                </div>
+                <div
+                    v-else-if="check_error && !latest"
+                    class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                >
+                    {{ check_error }}
+                </div>
+                <div
+                    v-else-if="update_available && latest"
+                    class="flex flex-wrap items-center gap-3 rounded-xl border border-success-text/30 bg-success-subtle p-4 text-sm"
+                    data-testid="fork-update-available"
+                >
+                    <span class="fk-pill is-green">Có bản mới</span>
+                    <span>
+                        Bản {{ latest.version
+                        }}<template v-if="mb(latest.size)">
+                            ({{ mb(latest.size) }})</template
+                        >
+                        đã sẵn sàng.
+                    </span>
+                    <Button
+                        class="ml-auto"
+                        :disabled="busy === 'install' || working"
+                        data-testid="fork-update-install"
+                        @click="install"
+                    >
+                        <Spinner v-if="busy === 'install'" class="size-4" />
+                        <IconCloudDownload v-else class="size-4" />
+                        Cập nhật ngay
+                    </Button>
+                </div>
+                <div
+                    v-else-if="latest"
+                    class="flex items-center gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
+                    data-testid="fork-update-uptodate"
+                >
+                    <span class="fk-pill is-green">Mới nhất</span>
+                    Bạn đang dùng bản mới nhất.
+                </div>
+
+                <div
+                    v-if="working && live"
+                    class="rounded-xl border border-primary-strong/25 bg-primary-subtle p-4"
+                    data-testid="fork-update-progress"
+                >
+                    <div class="flex items-center gap-2 text-sm font-semibold">
+                        <Spinner class="size-4" />
+                        {{ live.message || 'Đang xử lý…' }}
+                    </div>
+                    <div
+                        class="mt-3 h-2 overflow-hidden rounded-full bg-secondary"
+                    >
+                        <div
+                            class="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-700 transition-all"
+                            :style="{ width: `${Math.max(3, live.percent)}%` }"
+                        />
+                    </div>
+                    <p class="mt-2 text-[13px] text-muted-foreground">
+                        Ứng dụng tạm dừng trong lúc cập nhật. Đừng tắt máy hay
+                        thoát TikTok Auto Kid; trang sẽ tự tải lại khi xong.
+                    </p>
+                </div>
+                <div
+                    v-else-if="failed && live"
+                    class="rounded-xl border border-destructive/40 bg-critical-subtle p-4 text-sm text-destructive-text"
+                    data-testid="fork-update-error"
+                >
+                    <strong>Cập nhật thất bại.</strong> {{ live.error }}
+                </div>
+                <div
+                    v-if="launcher_pending"
+                    class="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground"
+                >
+                    Chương trình khởi chạy (launcher) mới sẽ được áp dụng ở lần
+                    mở TikTok Auto Kid tiếp theo (thoát từ khay hệ thống rồi mở
+                    lại).
+                </div>
+            </SettingsSection>
 
             <SettingsSection
-                v-if="latest && blocks.length"
-                :title="`Có gì mới trong bản ${latest.version}`"
-                description="Ghi chú phát hành do kho cập nhật cung cấp."
-                :icon="IconSparkles"
-                tone="amber"
+                title="Tuỳ chọn"
+                description="Kiểm tra bản mới tự động và quay lại bản trước khi cần."
+                :icon="IconSettings"
+                tone="neutral"
             >
-                <template v-if="latest.page_url" #actions>
-                    <a
-                        :href="latest.page_url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex items-center gap-1 text-sm font-medium text-primary-text hover:underline"
+                <ul
+                    class="divide-y divide-border overflow-hidden rounded-xl border border-border"
+                >
+                    <li class="flex items-center gap-3 px-4 py-3.5">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-[15px] font-medium">
+                                Tự kiểm tra bản mới mỗi ngày
+                            </div>
+                            <div class="text-[13px] text-muted-foreground">
+                                Khi có bản mới, menu ở khay hệ thống sẽ báo và
+                                gửi tin Telegram (nếu đã nối Telegram). Không tự
+                                cài.
+                            </div>
+                        </div>
+                        <Switch
+                            :model-value="auto_check"
+                            aria-label="Tự kiểm tra bản mới mỗi ngày"
+                            :disabled="!launcher_ok || busy === 'prefs'"
+                            data-testid="fork-update-auto"
+                            @update:model-value="(v: boolean) => setAuto(v)"
+                        />
+                    </li>
+                    <li
+                        v-if="can_rollback"
+                        class="flex items-center gap-3 px-4 py-3.5"
                     >
-                        <IconExternalLink class="size-4" />
-                        Xem trên GitHub
-                    </a>
-                </template>
-                <div class="flex flex-col gap-3 rounded-xl border border-border bg-muted p-5 text-sm leading-relaxed" data-testid="fork-update-notes">
-                    <template v-for="(b, i) in blocks" :key="i">
-                        <component
-                            :is="`h${Math.min(6, b.level + 2)}`"
-                            v-if="b.k === 'h'"
-                            class="font-semibold"
+                        <div class="min-w-0 flex-1">
+                            <div class="text-[15px] font-medium">
+                                Quay lại bản trước (v{{ rollback_version }})
+                            </div>
+                            <div class="text-[13px] text-muted-foreground">
+                                Dữ liệu giữ nguyên, chỉ đổi mã chương trình.
+                                Dùng khi bản mới có lỗi.
+                            </div>
+                        </div>
+                        <Button
+                            variant="outline"
+                            :disabled="busy === 'rollback' || working"
+                            data-testid="fork-update-rollback"
+                            @click="rollback"
                         >
-                            <template v-for="(p, j) in b.parts" :key="j">{{ p.v }}</template>
-                        </component>
-                        <ul v-else-if="b.k === 'ul'" class="list-disc space-y-1 pl-5">
-                            <li v-for="(it, j) in b.items" :key="j">
-                                <template v-for="(p, n) in it" :key="n">
-                                    <strong v-if="p.t === 'b'">{{ p.v }}</strong>
-                                    <code v-else-if="p.t === 'code'">{{ p.v }}</code>
-                                    <a
-                                        v-else-if="p.t === 'a'"
-                                        :href="p.href"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="text-primary-text hover:underline"
-                                        >{{ p.v }}</a
-                                    >
-                                    <template v-else>{{ p.v }}</template>
-                                </template>
-                            </li>
-                        </ul>
-                        <p v-else>
-                            <template v-for="(p, n) in b.parts" :key="n">
+                            <Spinner
+                                v-if="busy === 'rollback'"
+                                class="size-4"
+                            />
+                            <IconArrowBackUp v-else class="size-4" />
+                            Quay lại bản trước
+                        </Button>
+                    </li>
+                </ul>
+            </SettingsSection>
+        </div>
+
+        <SettingsSection
+            v-if="latest && blocks.length"
+            class="h-full"
+            :title="`Có gì mới trong bản ${latest.version}`"
+            description="Ghi chú phát hành do kho cập nhật cung cấp."
+            :icon="IconSparkles"
+            tone="amber"
+        >
+            <template v-if="latest.page_url" #actions>
+                <a
+                    :href="latest.page_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 text-sm font-medium text-primary-text hover:underline"
+                >
+                    <IconExternalLink class="size-4" />
+                    Xem trên GitHub
+                </a>
+            </template>
+            <div
+                class="flex flex-col gap-3 rounded-xl border border-border bg-muted p-5 text-sm leading-relaxed"
+                data-testid="fork-update-notes"
+            >
+                <template v-for="(b, i) in blocks" :key="i">
+                    <component
+                        :is="`h${Math.min(6, b.level + 2)}`"
+                        v-if="b.k === 'h'"
+                        class="font-semibold"
+                    >
+                        <template v-for="(p, j) in b.parts" :key="j">{{
+                            p.v
+                        }}</template>
+                    </component>
+                    <ul
+                        v-else-if="b.k === 'ul'"
+                        class="list-disc space-y-1 pl-5"
+                    >
+                        <li v-for="(it, j) in b.items" :key="j">
+                            <template v-for="(p, n) in it" :key="n">
                                 <strong v-if="p.t === 'b'">{{ p.v }}</strong>
-                                <code v-else-if="p.t === 'code'">{{ p.v }}</code>
+                                <code v-else-if="p.t === 'code'">{{
+                                    p.v
+                                }}</code>
                                 <a
                                     v-else-if="p.t === 'a'"
                                     :href="p.href"
@@ -476,9 +519,25 @@ const blocks = computed<Block[]>(() => {
                                 >
                                 <template v-else>{{ p.v }}</template>
                             </template>
-                        </p>
-                    </template>
-                </div>
-            </SettingsSection>
-        </div>
+                        </li>
+                    </ul>
+                    <p v-else>
+                        <template v-for="(p, n) in b.parts" :key="n">
+                            <strong v-if="p.t === 'b'">{{ p.v }}</strong>
+                            <code v-else-if="p.t === 'code'">{{ p.v }}</code>
+                            <a
+                                v-else-if="p.t === 'a'"
+                                :href="p.href"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-primary-text hover:underline"
+                                >{{ p.v }}</a
+                            >
+                            <template v-else>{{ p.v }}</template>
+                        </template>
+                    </p>
+                </template>
+            </div>
+        </SettingsSection>
+    </div>
 </template>

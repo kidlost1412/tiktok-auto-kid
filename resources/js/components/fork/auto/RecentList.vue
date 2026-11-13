@@ -76,11 +76,14 @@ const when = (iso: string | null) => {
 
 <template>
     <section
-        :class="cn(cardCls, 'flex flex-col overflow-hidden')"
+        id="vua-dang"
+        :class="
+            cn(cardCls, 'flex min-h-0 scroll-mt-24 flex-col overflow-hidden')
+        "
         data-testid="fork-auto-recent"
     >
         <header
-            class="flex items-center justify-between gap-2 border-b px-4 py-3"
+            class="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3"
         >
             <h2
                 class="font-heading text-[15px] font-semibold tracking-[-0.01em]"
@@ -96,7 +99,7 @@ const when = (iso: string | null) => {
 
         <ul
             v-if="failed.length"
-            class="divide-y border-b"
+            class="max-h-[232px] shrink-0 divide-y overflow-y-auto overscroll-contain border-b"
             data-testid="fork-auto-failed"
         >
             <li
@@ -210,7 +213,10 @@ const when = (iso: string | null) => {
             Chưa có bài nào lên TikTok.
         </p>
 
-        <ul v-else class="flex flex-col p-1.5">
+        <ul
+            v-else
+            class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-1.5"
+        >
             <li v-for="r in recent.slice(0, limit)" :key="r.id">
                 <button
                     type="button"

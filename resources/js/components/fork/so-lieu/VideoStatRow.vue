@@ -12,6 +12,7 @@ import { fmtCompact, fmtNum } from '@/components/fork/shared/status';
 import type { StatVideo } from '@/components/fork/so-lieu/types';
 import { openVideo } from '@/components/fork/viewer';
 import dayjs from '@/dayjs';
+import { cn } from '@/lib/utils';
 
 const props = defineProps<{
     video: StatVideo;
@@ -20,6 +21,8 @@ const props = defineProps<{
     ids?: number[];
     /** Lượt xem lớn nhất trong bảng, để vẽ thanh so sánh. */
     maxViews?: number;
+    /** Lớp lưới cho màn rộng (cùng với dòng tiêu đề). */
+    gridCls?: string;
 }>();
 
 const open = () => openVideo(props.ids ?? [props.video.id], props.video.id);
@@ -29,7 +32,13 @@ const pct = (n: number) =>
 
 <template>
     <li
-        class="grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors hover:bg-accent/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring lg:grid-cols-[36px_minmax(0,1.7fr)_minmax(120px,1fr)_repeat(3,60px)_84px_96px_28px]"
+        :class="
+            cn(
+                'grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-2 transition-colors hover:bg-accent/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring lg:min-h-14',
+                gridCls ??
+                    'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]',
+            )
+        "
         tabindex="0"
         role="button"
         :data-testid="`fork-so-lieu-video-${video.id}`"
@@ -39,7 +48,7 @@ const pct = (n: number) =>
         <CoverThumb
             :id="video.id"
             :fallback="video.product_image"
-            class="h-16 w-9 rounded-md"
+            class="h-10 w-7 rounded"
         />
 
         <div class="min-w-0">
@@ -61,7 +70,7 @@ const pct = (n: number) =>
             </div>
             <div
                 v-if="video.goc || video.giong"
-                class="mt-1 flex min-w-0 gap-1 overflow-hidden"
+                class="mt-1 flex min-w-0 gap-1 overflow-hidden lg:hidden"
             >
                 <span
                     v-for="t in [video.goc, video.giong].filter(Boolean)"
@@ -72,13 +81,28 @@ const pct = (n: number) =>
             </div>
         </div>
 
+        <!-- Góc · giọng (màn rộng) -->
+        <div class="hidden min-w-0 flex-wrap gap-1 lg:flex">
+            <span
+                v-for="t in [video.goc, video.giong].filter(Boolean)"
+                :key="String(t)"
+                class="max-w-full truncate rounded bg-muted px-1.5 text-[11.5px] leading-5 text-muted-foreground"
+                >{{ t }}</span
+            >
+            <span
+                v-if="!video.goc && !video.giong"
+                class="text-[12px] text-muted-foreground"
+                >—</span
+            >
+        </div>
+
         <!-- Lượt xem -->
         <div v-if="video.has_metrics" class="min-w-0 text-right lg:text-left">
             <div class="text-[14px] font-semibold tabular-nums">
                 {{ fmtNum(video.views) }}
             </div>
             <div
-                class="mt-1 hidden h-1 overflow-hidden rounded-full bg-muted lg:block"
+                class="mt-1 hidden h-1 w-full overflow-hidden rounded-full bg-muted lg:block"
             >
                 <div
                     class="h-full rounded-full bg-primary/70"
@@ -125,7 +149,7 @@ const pct = (n: number) =>
                 }}</span
             >
             <span
-                class="hidden text-right text-[12px] leading-tight text-muted-foreground tabular-nums lg:block"
+                class="hidden text-right text-[11.5px] leading-tight text-muted-foreground tabular-nums lg:block"
             >
                 <span class="block"
                     >24h

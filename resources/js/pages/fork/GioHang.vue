@@ -394,6 +394,29 @@ const needVideos = computed(() =>
 const problemRows = computed(() => props.rows.filter((r) => rank(r) === 1));
 const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
 
+const statTiles = computed(() => [
+    {
+        label: 'Sản phẩm',
+        value: props.rows.length,
+        dot: 'bg-muted-foreground/50',
+    },
+    {
+        label: 'Sẵn sàng đăng',
+        value: readyRows.value.length,
+        dot: 'bg-emerald-500',
+    },
+    {
+        label: `Chưa chọn giỏ · ${needVideos.value} video chờ`,
+        value: needRows.value.length,
+        dot: 'bg-amber-500',
+    },
+    {
+        label: 'Có vấn đề / tạm dừng',
+        value: problemRows.value.length,
+        dot: 'bg-red-500',
+    },
+]);
+
 // ---- Lọc theo trạng thái ----
 type Filter = 'all' | 'need' | 'bad' | 'ok';
 const filter = ref<Filter>('all');
@@ -660,6 +683,32 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                 }}
             </Callout>
 
+            <!-- Tóm tắt nhanh -->
+            <div
+                class="grid grid-cols-2 gap-3 xl:grid-cols-4"
+                data-testid="fork-gio-hang-stats"
+            >
+                <div
+                    v-for="t in statTiles"
+                    :key="t.label"
+                    :class="cn(cardCls, 'flex items-center gap-3 px-4 py-3')"
+                >
+                    <span :class="cn('size-2.5 rounded-full', t.dot)" />
+                    <div class="min-w-0">
+                        <div
+                            class="font-heading text-[22px] leading-tight font-[650] tracking-[-0.02em] tabular-nums"
+                        >
+                            {{ t.value }}
+                        </div>
+                        <div
+                            class="truncate text-[12.5px] text-muted-foreground"
+                        >
+                            {{ t.label }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Bảng sản phẩm -->
             <section
                 :class="cn(cardCls, 'overflow-hidden')"
@@ -719,14 +768,14 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
                 </header>
 
                 <div
-                    class="hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[minmax(170px,1fr)_minmax(250px,1.5fr)_minmax(200px,1.15fr)_minmax(150px,0.8fr)_auto] lg:gap-x-5"
+                    class="hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:gap-x-5"
                     aria-hidden="true"
                 >
                     <span class="pl-5">Sản phẩm</span>
                     <span class="pl-1.5">Sản phẩm TikTok Shop</span>
                     <span>Tên giỏ trên video</span>
                     <span class="pl-1.5">Bìa &amp; hashtag</span>
-                    <span class="w-[72px]" />
+                    <span />
                 </div>
 
                 <div v-if="loading" class="divide-y">

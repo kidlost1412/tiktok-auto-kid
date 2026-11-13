@@ -53,6 +53,8 @@ final class RiengController extends Controller
     /** Bộ lọc trạng thái trong danh sách. */
     private const array STATUS = ['chua', 'hen', 'dang', 'loi'];
 
+    private const string PICK_FAIL = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
+
     public function index(Request $request): Response
     {
         $accountId = $this->authorizeOwner($request);
@@ -258,12 +260,15 @@ final class RiengController extends Controller
         return back()->with('flash.success', "Đã thêm thư mục. Tìm thấy {$r['new']} video".($r['waiting'] > 0 ? ", {$r['waiting']} video đang được ghi dở (sẽ tự nhận khi ghi xong)" : '').'.');
     }
 
-    /** Mở hộp chọn thư mục gốc của Windows qua launcher (trình duyệt không trả được đường dẫn thật). */
+    /**
+     * Mở hộp chọn thư mục gốc của Windows qua launcher (trình duyệt không trả được đường dẫn thật).
+     *
+     * Launcher mới: mở hộp chạy nền và trả ngay {pending, id}; trang hỏi kết quả ở pickFolderResult — không giữ
+     * tiến trình PHP (chỉ có 2) suốt lúc chủ app chọn. Launcher cũ (chưa có /mo) thì chờ như trước.
+     */
     public function pickFolder(Request $request): JsonResponse
     {
         $this->authorizeOwner($request);
-        set_time_limit(660);
-        $fail = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
 
         $last = RiengFolder::query()->orderByDesc('id')->value('path');
         $start = is_string($last) && $last !== '' ? dirname(str_replace('/', '\\', $last)) : '';
@@ -273,11 +278,53 @@ final class RiengController extends Controller
             $body['bat_dau'] = $start;
         }
 
-        $r = LauncherClient::post('/api/chon-thu-muc', $body, 640);
+        $r = LauncherClient::post('/api/chon-thu-muc/mo', $body, 8);
+        $id = is_array($r['data']) ? ($r['data']['id'] ?? null) : null;
+
+        if ($r['ok'] && is_string($id) && $id !== '') {
+            return response()->json(['ok' => true, 'pending' => true, 'id' => $id]);
+        }
+
+        if (($r['status'] ?? null) === 409) {
+            return response()->json(['ok' => false, 'error' => 'Hộp chọn thư mục đang mở sẵn trên máy (xem thanh tác vụ Windows).'], 422);
+        }
+
+        if (($r['status'] ?? null) !== 404) {
+            return response()->json(['ok' => false, 'error' => self::PICK_FAIL], 422);
+        }
+
+        // Launcher cũ: chờ người dùng chọn xong (tối đa ~10 phút).
+        set_time_limit(660);
+
+        return $this->pickAnswer(LauncherClient::post('/api/chon-thu-muc', $body, 640));
+    }
+
+    /** Hỏi kết quả hộp chọn đã mở bằng pickFolder: {pending:true} khi còn chờ, hoặc kết quả cuối. */
+    public function pickFolderResult(Request $request): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $id = $request->input('id');
+
+        if (! is_string($id) || preg_match('/^[a-z0-9-]{1,64}$/i', $id) !== 1) {
+            return response()->json(['ok' => false, 'error' => self::PICK_FAIL], 422);
+        }
+
+        $r = LauncherClient::post('/api/chon-thu-muc/ket-qua', ['id' => $id], 5);
+
+        if ($r['ok'] && is_array($r['data']) && ($r['data']['xong'] ?? null) === false) {
+            return response()->json(['pending' => true]);
+        }
+
+        return $this->pickAnswer($r);
+    }
+
+    /** @param  array{ok: bool, error: ?string, data: ?array, status?: int}  $r */
+    private function pickAnswer(array $r): JsonResponse
+    {
         $data = $r['data'];
 
         if (! $r['ok'] || ! is_array($data)) {
-            return response()->json(['ok' => false, 'error' => $fail], 422);
+            return response()->json(['ok' => false, 'error' => self::PICK_FAIL], 422);
         }
 
         if (($data['huy'] ?? false) === true) {
@@ -287,7 +334,7 @@ final class RiengController extends Controller
         $path = $data['duong_dan'] ?? null;
 
         if (($data['ok'] ?? false) !== true || ! is_string($path) || $path === '') {
-            return response()->json(['ok' => false, 'error' => $fail], 422);
+            return response()->json(['ok' => false, 'error' => self::PICK_FAIL], 422);
         }
 
         return response()->json(['ok' => true, 'path' => $path, 'name' => basename(str_replace('\\', '/', rtrim($path, '\\/')))]);

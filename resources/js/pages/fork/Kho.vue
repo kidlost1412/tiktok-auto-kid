@@ -19,11 +19,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { dayKey, dayLabel, type KhoVideo } from '@/components/fork/kho/kho';
 import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
 import VideoCard from '@/components/fork/kho/VideoCard.vue';
-import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
-import { openVideo as openViewer } from '@/components/fork/viewer';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
+import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import {
     cardCls,
@@ -33,6 +32,7 @@ import {
     toneClasses,
 } from '@/components/fork/shared/status';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
+import { openVideo as openViewer } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
 import {
     Collapsible,
@@ -119,6 +119,33 @@ const busy = ref('');
 const advancedOpen = ref(false);
 const { loading, callbacks } = useVisitLoading();
 
+// Mở trang không chỉ định tab mà tab mặc định trống: tự chọn tab đầu tiên có video.
+const AUTO_ORDER = ['cho', 'xep', 'loi', 'dang'];
+const autoTarget = (): string | null => {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    const f = props.filters;
+
+    if (
+        new URLSearchParams(window.location.search).has('tab') ||
+        f.tab !== 'cho' ||
+        (props.counts.cho ?? 0) > 0
+    ) {
+        return null;
+    }
+
+    if (f.product || f.q || f.day || f.legacy) {
+        return null;
+    }
+
+    return AUTO_ORDER.find((k) => (props.counts[k] ?? 0) > 0) ?? null;
+};
+const autoTab = autoTarget();
+const autoPending = ref(autoTab !== null);
+const autoNote = ref('');
+
 const tabs = [
     { key: 'cho', label: 'Chờ đăng' },
     { key: 'xep', label: 'Đã xếp lịch' },
@@ -172,7 +199,9 @@ watch(
     () => (pickedProduct.value = null),
 );
 
-const activeProduct = computed(() => pickedProduct.value ?? props.filters.product);
+const activeProduct = computed(
+    () => pickedProduct.value ?? props.filters.product,
+);
 
 const pickProduct = (code: string) => {
     go({ product: activeProduct.value === code ? '' : code });
@@ -185,6 +214,11 @@ const go = (patch: Patch) => {
 
     pollCancel?.cancel();
     pollCancel = null;
+
+    if ('tab' in patch) {
+        autoNote.value = '';
+    }
+
     const next = {
         tab: props.filters.tab,
         product: props.filters.product,
@@ -314,8 +348,18 @@ const openVideo = (v: KhoVideo) =>
 let timer: ReturnType<typeof setInterval> | undefined;
 
 onMounted(() => {
+    if (autoTab) {
+        const label = tabs.find((t) => t.key === autoTab)?.label ?? '';
+        go({ tab: autoTab });
+        autoNote.value = `Không có video chờ đăng — đang xem ${label}.`;
+    }
+
+    autoPending.value = false;
+
     // Liên kết từ tin Telegram: /auto/kho?video=<id> mở thẳng khung xem video đó.
-    const wanted = Number(new URLSearchParams(window.location.search).get('video'));
+    const wanted = Number(
+        new URLSearchParams(window.location.search).get('video'),
+    );
 
     if (Number.isInteger(wanted) && wanted > 0) {
         openViewer([wanted], wanted);
@@ -323,11 +367,7 @@ onMounted(() => {
 
     timer = setInterval(() => {
         // Bỏ qua nếu đang chuyển bộ lọc / đang có lần làm mới khác; luôn tải đúng bộ lọc hiện tại (không dựa vào URL cũ).
-        if (
-            document.visibilityState !== 'visible' ||
-            visiting ||
-            pollCancel
-        ) {
+        if (document.visibilityState !== 'visible' || visiting || pollCancel) {
             return;
         }
 
@@ -472,7 +512,12 @@ const description = computed(
 
         <!-- Thanh lọc dính trên cùng khi cuộn -->
         <section
-            :class="cn(cardCls, 'sticky top-2 z-20 flex flex-col gap-3.5 bg-card/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/85')"
+            :class="
+                cn(
+                    cardCls,
+                    'sticky top-2 z-20 flex flex-col gap-2.5 bg-card/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/85',
+                )
+            "
             data-testid="fork-kho-filters"
         >
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -507,7 +552,7 @@ const description = computed(
                             v-model="search"
                             type="search"
                             placeholder="Tìm trong caption, tên file…"
-                            class="h-10 w-64 pl-9"
+                            class="h-9 w-56 pl-9"
                             aria-label="Tìm video theo caption hoặc tên file"
                             data-testid="fork-kho-search"
                         />
@@ -539,20 +584,20 @@ const description = computed(
                         @click="grouped = !grouped"
                     >
                         <IconLayoutList class="size-4" />
-                        Nhóm theo ngày
+                        <span class="max-2xl:sr-only">Nhóm theo ngày</span>
                     </Button>
                 </div>
             </div>
 
             <div
-                class="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-0.5"
+                class="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5"
                 data-testid="fork-kho-products"
             >
                 <Button
                     size="sm"
                     :variant="activeProduct === '' ? 'default' : 'outline'"
                     :aria-pressed="activeProduct === ''"
-                    class="h-9 shrink-0 rounded-full"
+                    class="h-8 shrink-0 rounded-full"
                     @click="go({ product: '' })"
                 >
                     Mọi sản phẩm
@@ -568,7 +613,7 @@ const description = computed(
                     size="sm"
                     :variant="activeProduct === p.code ? 'default' : 'outline'"
                     :aria-pressed="activeProduct === p.code"
-                    class="h-9 shrink-0 rounded-full"
+                    class="h-8 shrink-0 rounded-full"
                     @click="pickProduct(p.code)"
                 >
                     <ProductThumb :src="p.image" class="size-5 rounded" />
@@ -596,9 +641,17 @@ const description = computed(
 
         <!-- Lưới video -->
         <section aria-live="polite">
+            <p
+                v-if="autoNote && !loading"
+                class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-[13px] text-muted-foreground"
+                data-testid="fork-kho-auto-note"
+            >
+                <IconVideoOff class="size-4 shrink-0" />
+                {{ autoNote }}
+            </p>
             <div
-                v-if="loading"
-                class="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                v-if="loading || autoPending"
+                class="grid grid-cols-2 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(232px,1fr))]"
                 data-testid="fork-kho-skeleton"
             >
                 <div v-for="i in 10" :key="i" class="flex flex-col gap-2">
@@ -628,7 +681,7 @@ const description = computed(
                         >
                     </h3>
                     <div
-                        class="grid grid-cols-2 gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
+                        class="grid grid-cols-2 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(232px,1fr))]"
                     >
                         <VideoCard
                             v-for="v in g.items"
@@ -642,6 +695,7 @@ const description = computed(
 
             <EmptyState
                 v-else
+                class="gap-2 py-6"
                 :icon="IconVideoOff"
                 :title="
                     filtered
@@ -742,7 +796,10 @@ const description = computed(
                         description="Hub tự dọn file sau 30 ngày."
                     />
                 </section>
-                <section v-else :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')">
+                <section
+                    v-else
+                    :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')"
+                >
                     <SectionHeading
                         :icon="IconArchive"
                         tone="neutral"
@@ -787,13 +844,23 @@ const description = computed(
                                 <tr>
                                     <th :class="thCls">Sản phẩm</th>
                                     <th :class="thCls">Quy cách</th>
-                                    <th :class="cn(thCls, 'text-right')">Mới</th>
-                                    <th :class="cn(thCls, 'text-right')">Đã xếp</th>
-                                    <th :class="cn(thCls, 'text-right')">Đã đăng</th>
-                                    <th :class="cn(thCls, 'text-right')">Lỗi</th>
+                                    <th :class="cn(thCls, 'text-right')">
+                                        Mới
+                                    </th>
+                                    <th :class="cn(thCls, 'text-right')">
+                                        Đã xếp
+                                    </th>
+                                    <th :class="cn(thCls, 'text-right')">
+                                        Đã đăng
+                                    </th>
+                                    <th :class="cn(thCls, 'text-right')">
+                                        Lỗi
+                                    </th>
                                 </tr>
                             </thead>
-                            <tbody class="tabular-nums [&>tr:hover>td]:bg-accent/60 [&>tr:last-child>td]:border-b-0">
+                            <tbody
+                                class="tabular-nums [&>tr:hover>td]:bg-accent/60 [&>tr:last-child>td]:border-b-0"
+                            >
                                 <tr
                                     v-for="r in matrix"
                                     :key="`${r.code}|${r.quy_cach}`"
@@ -807,10 +874,18 @@ const description = computed(
                                     <td :class="tdCls">
                                         {{ r.quy_cach_name ?? '—' }}
                                     </td>
-                                    <td :class="cn(tdCls, 'text-right')">{{ r.new }}</td>
-                                    <td :class="cn(tdCls, 'text-right')">{{ r.scheduled }}</td>
-                                    <td :class="cn(tdCls, 'text-right')">{{ r.posted }}</td>
-                                    <td :class="cn(tdCls, 'text-right')">{{ r.failed }}</td>
+                                    <td :class="cn(tdCls, 'text-right')">
+                                        {{ r.new }}
+                                    </td>
+                                    <td :class="cn(tdCls, 'text-right')">
+                                        {{ r.scheduled }}
+                                    </td>
+                                    <td :class="cn(tdCls, 'text-right')">
+                                        {{ r.posted }}
+                                    </td>
+                                    <td :class="cn(tdCls, 'text-right')">
+                                        {{ r.failed }}
+                                    </td>
                                 </tr>
                                 <tr v-if="!matrix.length">
                                     <td

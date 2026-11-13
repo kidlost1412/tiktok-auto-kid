@@ -205,6 +205,8 @@ func NewStatusHandlerAll(sup *Supervisor, cfg *Config, root string, retry func()
 	}
 	picker := &folderPicker{}
 	mux.HandleFunc("/api/chon-thu-muc", picker.handler(authed))
+	mux.HandleFunc("/api/chon-thu-muc/mo", picker.openHandler(authed))
+	mux.HandleFunc("/api/chon-thu-muc/ket-qua", picker.resultHandler(authed))
 	mux.HandleFunc("/api/quit",func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if !authed(r) || quit == nil {

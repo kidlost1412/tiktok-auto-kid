@@ -4,6 +4,8 @@
 import { Head, Link } from '@inertiajs/vue3';
 import {
     IconArrowUpRight,
+    IconChevronDown,
+    IconChevronUp,
     IconMovie,
     IconNotes,
     IconPower,
@@ -192,6 +194,7 @@ const nha = ref<NhaData | null>(null);
 const sep = ref<string | undefined>(undefined);
 const miniFailed = ref(false);
 const diaryOpen = ref(false);
+const mini = ref(false); // chỉ có tác dụng dưới 1536px: thu khung nổi thành viên thuốc
 let alive = true;
 let nhaTimer: number | undefined;
 let nhaBusy = false;
@@ -282,63 +285,89 @@ const status = computed(() => {
 
     <AppLayout title="Xưởng Video" :icon="IconMovie" full-width>
         <div
-            class="relative flex min-h-0 flex-1 flex-col"
+            class="relative flex min-h-0 flex-1 flex-col 2xl:flex-row"
             style="height: calc(100vh - 4rem)"
             data-testid="fork-xuong"
         >
-            <iframe
-                v-if="up && src"
-                ref="frame"
-                :src="src"
-                title="Xưởng Video"
-                class="size-full flex-1 border-0"
-                allow="clipboard-write; fullscreen"
-                data-testid="fork-xuong-frame"
-            />
-            <div
-                v-else-if="up === false"
-                class="m-auto flex max-w-md flex-col items-center gap-4 p-8 text-center"
-                data-testid="fork-xuong-offline"
-            >
-                <IconPower class="size-12 text-muted-foreground" />
-                <h1 class="font-heading text-2xl font-semibold">
-                    Xưởng Video đang tắt
-                </h1>
-                <p class="text-muted-foreground">
-                    Chưa kết nối được tới Xưởng Video. Bấm nút dưới để bật lại;
-                    lần đầu có thể mất vài giây.
-                </p>
-                <Button
-                    :disabled="restarting"
-                    data-testid="fork-xuong-restart"
-                    @click="restart"
+            <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+                <iframe
+                    v-if="up && src"
+                    ref="frame"
+                    :src="src"
+                    title="Xưởng Video"
+                    class="size-full flex-1 border-0"
+                    allow="clipboard-write; fullscreen"
+                    data-testid="fork-xuong-frame"
+                />
+                <div
+                    v-else-if="up === false"
+                    class="m-auto flex max-w-md flex-col items-center gap-4 p-8 text-center"
+                    data-testid="fork-xuong-offline"
                 >
-                    {{ restarting ? 'Đang bật…' : 'Bật lại' }}
-                </Button>
-                <p
-                    v-if="message"
-                    class="text-sm text-muted-foreground"
-                    role="status"
-                >
-                    {{ message }}
-                </p>
-            </div>
-            <div v-else class="m-auto text-muted-foreground">
-                Đang kiểm tra Xưởng Video…
+                    <IconPower class="size-12 text-muted-foreground" />
+                    <h1 class="font-heading text-2xl font-semibold">
+                        Xưởng Video đang tắt
+                    </h1>
+                    <p class="text-muted-foreground">
+                        Chưa kết nối được tới Xưởng Video. Bấm nút dưới để bật
+                        lại; lần đầu có thể mất vài giây.
+                    </p>
+                    <Button
+                        :disabled="restarting"
+                        data-testid="fork-xuong-restart"
+                        @click="restart"
+                    >
+                        {{ restarting ? 'Đang bật…' : 'Bật lại' }}
+                    </Button>
+                    <p
+                        v-if="message"
+                        class="text-sm text-muted-foreground"
+                        role="status"
+                    >
+                        {{ message }}
+                    </p>
+                </div>
+                <div v-else class="m-auto text-muted-foreground">
+                    Đang kiểm tra Xưởng Video…
+                </div>
             </div>
 
-            <!-- "Khu Tự Trị" thu nhỏ: luôn hiện ở góc dưới phải; nhật ký gấp lại mặc định. -->
+            <!-- "Khu Tự Trị": từ 1536px là cột phải cố định cạnh hub; màn hẹp hơn là khung nổi, thu nhỏ được thành viên thuốc. -->
             <section
-                class="absolute right-4 bottom-4 z-20 flex w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border bg-card shadow-[0_12px_32px_-8px_rgba(0,0,0,.28)]"
+                :class="
+                    cn(
+                        'absolute right-4 bottom-4 z-20 flex flex-col overflow-hidden border bg-card shadow-[0_12px_32px_-8px_rgba(0,0,0,.28)]',
+                        'w-[min(20rem,calc(100vw-2rem))] rounded-2xl',
+                        mini && 'max-2xl:w-auto max-2xl:rounded-full',
+                        '2xl:static 2xl:z-auto 2xl:w-[340px] 2xl:shrink-0 2xl:rounded-none 2xl:border-y-0 2xl:border-r-0 2xl:border-l 2xl:shadow-none',
+                    )
+                "
                 aria-label="Khu Tự Trị"
                 data-testid="xuong-mini-panel"
             >
-                <header class="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+                <header
+                    :class="
+                        cn(
+                            'flex shrink-0 items-center gap-2 px-3 pt-2.5 pb-1.5',
+                            mini && 'max-2xl:py-1.5 max-2xl:pr-1.5',
+                            '2xl:px-4 2xl:pt-3 2xl:pb-2',
+                        )
+                    "
+                >
                     <span
                         :class="cn('size-2 shrink-0 rounded-full', status.dot)"
                     />
                     <div class="min-w-0 flex-1 leading-tight">
-                        <div class="text-[13px] font-semibold">Khu Tự Trị</div>
+                        <div
+                            :class="
+                                cn(
+                                    'text-[13px] font-semibold',
+                                    mini && 'max-2xl:hidden',
+                                )
+                            "
+                        >
+                            Khu Tự Trị
+                        </div>
                         <div
                             class="truncate text-[11.5px] text-muted-foreground"
                             data-testid="xuong-mini-status"
@@ -354,6 +383,8 @@ const status = computed(() => {
                                 diaryOpen
                                     ? 'bg-secondary text-foreground'
                                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                                mini && 'max-2xl:hidden',
+                                '2xl:hidden',
                             )
                         "
                         :aria-expanded="diaryOpen"
@@ -365,36 +396,78 @@ const status = computed(() => {
                     </button>
                     <Link
                         href="/nha"
-                        class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        :class="
+                            cn(
+                                'flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground',
+                                mini && 'max-2xl:hidden',
+                            )
+                        "
                         title="Mở Khu Tự Trị đầy đủ"
                         aria-label="Mở Khu Tự Trị đầy đủ"
                         data-testid="xuong-mini-ve-xuong"
                     >
                         <IconArrowUpRight class="size-4" />
                     </Link>
+                    <button
+                        type="button"
+                        class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground 2xl:hidden"
+                        :title="mini ? 'Mở rộng' : 'Thu nhỏ'"
+                        :aria-label="
+                            mini ? 'Mở rộng Khu Tự Trị' : 'Thu nhỏ Khu Tự Trị'
+                        "
+                        :aria-expanded="!mini"
+                        data-testid="xuong-mini-thu-nho"
+                        @click="mini = !mini"
+                    >
+                        <IconChevronDown v-if="!mini" class="size-4" />
+                        <IconChevronUp v-else class="size-4" />
+                    </button>
                 </header>
                 <div
-                    class="relative mx-2 h-44 overflow-hidden rounded-xl bg-gradient-to-b from-violet-100/70 to-secondary/40 dark:from-violet-950/40 dark:to-secondary/30"
+                    :class="
+                        cn(
+                            'flex min-h-0 flex-1 flex-col',
+                            mini && 'max-2xl:hidden',
+                        )
+                    "
                 >
-                    <MiniScene
-                        v-if="!miniFailed"
-                        :data="nha"
-                        :sep="sep"
-                        @fail="miniFailed = true"
-                    />
                     <div
-                        v-else
-                        class="grid h-full place-items-center px-4 text-center text-xs text-muted-foreground"
+                        :class="
+                            cn(
+                                'relative mx-2 h-44 shrink-0 overflow-hidden rounded-xl bg-gradient-to-b from-violet-100/70 to-secondary/40 2xl:mx-3 2xl:h-80 dark:from-violet-950/40 dark:to-secondary/30',
+                            )
+                        "
                     >
-                        Máy này không dựng được cảnh 3D — mở Khu Tự Trị đầy đủ
-                        để xem bản 2D.
+                        <MiniScene
+                            v-if="!miniFailed"
+                            :data="nha"
+                            :sep="sep"
+                            @fail="miniFailed = true"
+                        />
+                        <div
+                            v-else
+                            class="grid h-full place-items-center px-4 text-center text-xs text-muted-foreground"
+                        >
+                            Máy này không dựng được cảnh 3D — mở Khu Tự Trị đầy
+                            đủ để xem bản 2D.
+                        </div>
                     </div>
-                </div>
-                <p class="px-3 pt-1.5 pb-2 text-[11px] text-muted-foreground">
-                    Bấm vào một Đạo diễn để trò chuyện.
-                </p>
-                <div v-if="diaryOpen" class="border-t px-2.5 py-2">
-                    <NhatKyDaoDien :data="nha" class="max-h-32" />
+                    <p
+                        class="shrink-0 px-3 pt-1.5 pb-2 text-[11px] text-muted-foreground 2xl:px-4"
+                    >
+                        Bấm vào một Đạo diễn để trò chuyện.
+                    </p>
+                    <!-- Cột riêng (≥1536px) không che gì nên nhật ký luôn hiện, lấp phần dưới cột; màn hẹp thì bấm "Nhật ký" mới mở. -->
+                    <div
+                        :class="
+                            cn(
+                                'flex max-h-32 min-h-0 flex-col border-t px-2.5 py-2 2xl:max-h-none 2xl:flex-1 2xl:px-4',
+                                !diaryOpen && 'hidden 2xl:flex',
+                            )
+                        "
+                    >
+                        <NhatKyDaoDien :data="nha" class="min-h-0 flex-1" />
+                    </div>
                 </div>
             </section>
         </div>

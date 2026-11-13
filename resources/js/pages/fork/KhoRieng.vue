@@ -5,8 +5,10 @@ import { router } from '@inertiajs/vue3';
 import {
     IconChecks,
     IconClipboardList,
+    IconDots,
     IconFolder,
     IconFolderPlus,
+    IconPlus,
     IconPlaylistAdd,
     IconRefresh,
     IconSend,
@@ -17,10 +19,10 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
-import BatchDialog, { type BatchAccount } from '@/components/fork/kho/BatchDialog.vue';
+import BatchDialog, {
+    type BatchAccount,
+} from '@/components/fork/kho/BatchDialog.vue';
 import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
-import RiengCard from '@/components/fork/kho/RiengCard.vue';
-import RiengQueueDialog from '@/components/fork/kho/RiengQueueDialog.vue';
 import {
     type BatchItem,
     postJson,
@@ -28,16 +30,33 @@ import {
     type RiengVideo,
     xsrf,
 } from '@/components/fork/kho/rieng';
+import RiengCard from '@/components/fork/kho/RiengCard.vue';
+import RiengQueueDialog from '@/components/fork/kho/RiengQueueDialog.vue';
 import RiengSteps from '@/components/fork/kho/RiengSteps.vue';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
-import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import { cardCls } from '@/components/fork/shared/status';
-import { openVideo as openViewer, viewerActions } from '@/components/fork/viewer';
+import {
+    openVideo as openViewer,
+    viewerActions,
+} from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -72,11 +91,24 @@ const props = defineProps<{
     scan_sig: string;
     accounts: BatchAccount[];
     hashtag_suggestions?: { tag: string; uses: number }[];
-    limits: { min_lead_minutes: number; gap_minutes: number; caption_max: number };
+    limits: {
+        min_lead_minutes: number;
+        gap_minutes: number;
+        caption_max: number;
+    };
     last_scan_at: string | null;
 }>();
 
-const RELOAD_ONLY = ['videos', 'counts', 'selectable', 'days', 'folders', 'queue', 'scan_sig', 'last_scan_at'];
+const RELOAD_ONLY = [
+    'videos',
+    'counts',
+    'selectable',
+    'days',
+    'folders',
+    'queue',
+    'scan_sig',
+    'last_scan_at',
+];
 const FORMATS = '.mp4, .mov, .m4v, .webm';
 
 const busy = ref('');
@@ -86,25 +118,42 @@ const dialogOpen = ref(false);
 const batchStep = ref<'form' | 'preview' | 'result'>('form');
 const batchItems = ref<BatchItem[]>([]);
 const queueOpen = ref(false);
+const folderDialog = ref(false);
+const openMenu = ref<number | null>(null);
 
 // ---------------------------------------------------------------- Chọn video
 // Các video đã chọn (nhớ cả khi sang trang khác): id -> tên file + cờ trùng.
-const picked = ref<Record<number, { file_name: string; duplicate: string | null }>>({});
+const picked = ref<
+    Record<number, { file_name: string; duplicate: string | null }>
+>({});
 const selectMode = ref(false);
 
 // Thời lượng (giây) của video đã chọn, để hộp thoại đăng hiện trên hình nhỏ.
 const durationOf = (id: number): number | null =>
-    props.selectable.find((x) => x.id === id)?.duration ?? props.videos.data.find((x) => x.id === id)?.duration ?? null;
+    props.selectable.find((x) => x.id === id)?.duration ??
+    props.videos.data.find((x) => x.id === id)?.duration ??
+    null;
 
 const pickedItems = computed<BatchItem[]>(() =>
-    Object.entries(picked.value).map(([id, p]) => ({ id: Number(id), file_name: p.file_name, duration: durationOf(Number(id)), duplicate: p.duplicate })),
+    Object.entries(picked.value).map(([id, p]) => ({
+        id: Number(id),
+        file_name: p.file_name,
+        duration: durationOf(Number(id)),
+        duplicate: p.duplicate,
+    })),
 );
-const pickedDupCount = computed(() => pickedItems.value.filter((i) => i.duplicate).length);
+const pickedDupCount = computed(
+    () => pickedItems.value.filter((i) => i.duplicate).length,
+);
 
 // "Chọn tất cả" chỉ chọn video không trùng; video trùng phải tự chọn.
 const plain = computed(() => props.selectable.filter((s) => !s.duplicate));
 const dupCount = computed(() => props.selectable.length - plain.value.length);
-const allSelected = computed(() => plain.value.length > 0 && plain.value.every((s) => s.id in picked.value));
+const allSelected = computed(
+    () =>
+        plain.value.length > 0 &&
+        plain.value.every((s) => s.id in picked.value),
+);
 
 const dupOf = (v: RiengVideo): string | null => v.duplicate?.text ?? null;
 const pickOne = (v: RiengVideo) => {
@@ -187,12 +236,22 @@ interface Drag {
 }
 
 let drag: Drag | null = null;
-let hold: { x: number; y: number; id: number; timer: ReturnType<typeof setTimeout> } | null = null;
+let hold: {
+    x: number;
+    y: number;
+    id: number;
+    timer: ReturnType<typeof setTimeout>;
+} | null = null;
 let raf = 0;
 let suppressClick = false;
 
 /** Khung chọn đang vẽ (toạ độ màn hình, position: fixed). */
-const band = ref<{ left: number; top: number; width: number; height: number } | null>(null);
+const band = ref<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+} | null>(null);
 /** Thẻ đang được nhấn giữ (cảm ứng) để nháy báo hiệu sắp vào chế độ kéo. */
 const holdingId = ref<number | null>(null);
 
@@ -229,14 +288,23 @@ const applyBand = () => {
     const b = band.value;
     const next = { ...drag.base };
 
-    for (const el of grid.value.querySelectorAll<HTMLElement>('[data-card-id]')) {
+    for (const el of grid.value.querySelectorAll<HTMLElement>(
+        '[data-card-id]',
+    )) {
         const r = el.getBoundingClientRect();
 
-        if (r.right < b.left || r.left > b.left + b.width || r.bottom < b.top || r.top > b.top + b.height) {
+        if (
+            r.right < b.left ||
+            r.left > b.left + b.width ||
+            r.bottom < b.top ||
+            r.top > b.top + b.height
+        ) {
             continue;
         }
 
-        const x = props.videos.data.find((v) => v.id === Number(el.dataset.cardId));
+        const x = props.videos.data.find(
+            (v) => v.id === Number(el.dataset.cardId),
+        );
 
         if (!x?.selectable) {
             continue;
@@ -267,7 +335,12 @@ const tick = () => {
 
     const top = EDGE - drag.cy;
     const bottom = drag.cy - (window.innerHeight - EDGE);
-    const speed = top > 0 ? -Math.min(28, 4 + top * 0.25) : bottom > 0 ? Math.min(28, 4 + bottom * 0.25) : 0;
+    const speed =
+        top > 0
+            ? -Math.min(28, 4 + top * 0.25)
+            : bottom > 0
+              ? Math.min(28, 4 + bottom * 0.25)
+              : 0;
 
     if (speed) {
         window.scrollBy(0, speed);
@@ -345,7 +418,10 @@ const onMove = (e: PointerEvent) => {
     drag.cy = e.clientY;
 
     if (!drag.active) {
-        const moved = Math.hypot(e.clientX - (drag.ax - window.scrollX), e.clientY - (drag.ay - window.scrollY));
+        const moved = Math.hypot(
+            e.clientX - (drag.ax - window.scrollX),
+            e.clientY - (drag.ay - window.scrollY),
+        );
 
         if (drag.touch) {
             // Vuốt trước khi nhấn giữ đủ lâu = đang cuộn trang, bỏ.
@@ -374,7 +450,10 @@ const onPointerDown = (e: PointerEvent) => {
         return;
     }
 
-    if (e.pointerType === 'mouse' && (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
+    if (
+        e.pointerType === 'mouse' &&
+        (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)
+    ) {
         return;
     }
 
@@ -434,7 +513,7 @@ const onContextMenu = (e: Event) => {
     }
 };
 
-const onCardClick =(v: RiengVideo, shift: boolean) => {
+const onCardClick = (v: RiengVideo, shift: boolean) => {
     if (suppressClick) {
         return;
     }
@@ -482,11 +561,16 @@ const addToQueue = async (ids: number[]) => {
 
     if (await queueCall('/auto/kho/rieng/gio-cho/them', { ids })) {
         const n = queue.value.length - before;
-        toast.success(n > 0 ? `Đã cất ${n} video vào giỏ chờ đăng.` : 'Các video này đã có trong giỏ chờ đăng.');
+        toast.success(
+            n > 0
+                ? `Đã cất ${n} video vào giỏ chờ đăng.`
+                : 'Các video này đã có trong giỏ chờ đăng.',
+        );
     }
 };
 
-const removeFromQueue = (ids: number[]) => queueCall('/auto/kho/rieng/gio-cho/bo', { ids });
+const removeFromQueue = (ids: number[]) =>
+    queueCall('/auto/kho/rieng/gio-cho/bo', { ids });
 
 const toggleQueue = async (id: number) => {
     if (queuedIds.value.has(id)) {
@@ -497,7 +581,11 @@ const toggleQueue = async (id: number) => {
 };
 
 const clearQueue = async () => {
-    if (!window.confirm('Xoá hết video khỏi giỏ chờ đăng? Video vẫn còn nguyên trong kho, chỉ bỏ khỏi giỏ.')) {
+    if (
+        !window.confirm(
+            'Xoá hết video khỏi giỏ chờ đăng? Video vẫn còn nguyên trong kho, chỉ bỏ khỏi giỏ.',
+        )
+    ) {
         return;
     }
 
@@ -523,14 +611,28 @@ const openBatch = (items: BatchItem[]) => {
 const postPicked = () => openBatch(pickedItems.value);
 const postQueue = () => {
     queueOpen.value = false;
-    openBatch(queue.value.map((q) => ({ id: q.id, file_name: q.file_name, duration: q.duration, duplicate: q.duplicate })));
+    openBatch(
+        queue.value.map((q) => ({
+            id: q.id,
+            file_name: q.file_name,
+            duration: q.duration,
+            duplicate: q.duplicate,
+        })),
+    );
 };
 
 const postOne = (id: number) => {
     const v = props.videos.data.find((x) => x.id === id);
     const s = props.selectable.find((x) => x.id === id);
 
-    openBatch([{ id, file_name: v?.file_name ?? s?.file_name ?? `#${id}`, duration: v?.duration ?? s?.duration ?? null, duplicate: v?.duplicate?.text ?? s?.duplicate ?? null }]);
+    openBatch([
+        {
+            id,
+            file_name: v?.file_name ?? s?.file_name ?? `#${id}`,
+            duration: v?.duration ?? s?.duration ?? null,
+            duplicate: v?.duplicate?.text ?? s?.duplicate ?? null,
+        },
+    ]);
 };
 
 const onBatchDone = () => {
@@ -555,7 +657,14 @@ const currentStep = computed<1 | 2 | 3>(() => {
 });
 
 // ---------------------------------------------------------------- Lọc, thư mục, quét
-const go = (patch: Partial<{ folder: number; status: string; day: string; page: number }>) => {
+const go = (
+    patch: Partial<{
+        folder: number;
+        status: string;
+        day: string;
+        page: number;
+    }>,
+) => {
     const next = { ...props.filters, ...patch };
     const query: Record<string, string | number> = {};
 
@@ -603,6 +712,7 @@ const addFolder = () => {
             onSuccess: () => {
                 folderPath.value = '';
                 folderName.value = '';
+                folderDialog.value = false;
             },
         },
     );
@@ -611,8 +721,88 @@ const addFolder = () => {
 const picking = ref(false);
 const pickError = ref('');
 const PICK_FAIL = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
+const PICK_POLL_MS = 1000;
+const PICK_MAX_MS = 11 * 60 * 1000;
+let alive = true;
 
-// Mở hộp chọn thư mục gốc của Windows (qua launcher), điền đường dẫn vào ô.
+const sleep = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+// Kết quả cuối của hộp chọn: điền ô đường dẫn / tên, hoặc báo lỗi (huỷ thì im lặng).
+const applyPick = (
+    j: {
+        ok?: boolean;
+        path?: unknown;
+        name?: unknown;
+        cancelled?: boolean;
+        error?: unknown;
+    } | null,
+) => {
+    if (j?.ok && typeof j.path === 'string') {
+        folderPath.value = j.path;
+
+        if (!folderName.value.trim() && typeof j.name === 'string' && j.name) {
+            folderName.value = j.name;
+        }
+    } else if (!j?.cancelled) {
+        pickError.value = typeof j?.error === 'string' ? j.error : PICK_FAIL;
+    }
+};
+
+// Hộp chọn thư mục của Windows mở ở máy chủ và không chặn app: hỏi kết quả mỗi giây cho tới khi xong.
+const waitPick = async (id: string) => {
+    const started = Date.now();
+    let fails = 0;
+
+    while (alive && Date.now() - started < PICK_MAX_MS) {
+        await sleep(PICK_POLL_MS);
+
+        if (!alive) {
+            return;
+        }
+
+        try {
+            const r = await fetch('/auto/kho/rieng/chon-thu-muc/ket-qua', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': xsrf(),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id }),
+            });
+            const j = await r.json().catch(() => null);
+
+            if (j === null) {
+                throw new Error('bad response');
+            }
+
+            fails = 0;
+
+            if (j.pending) {
+                continue;
+            }
+
+            applyPick(j);
+
+            return;
+        } catch {
+            fails++;
+
+            if (fails >= 3) {
+                pickError.value = PICK_FAIL;
+
+                return;
+            }
+        }
+    }
+
+    if (alive) {
+        pickError.value = PICK_FAIL;
+    }
+};
+
 const pickFolder = async () => {
     if (picking.value) {
         return;
@@ -629,14 +819,10 @@ const pickFolder = async () => {
         });
         const j = await r.json().catch(() => null);
 
-        if (j?.ok && typeof j.path === 'string') {
-            folderPath.value = j.path;
-
-            if (!folderName.value.trim() && j.name) {
-                folderName.value = j.name;
-            }
-        } else if (!j?.cancelled) {
-            pickError.value = typeof j?.error === 'string' ? j.error : PICK_FAIL;
+        if (j?.ok && j.pending && typeof j.id === 'string') {
+            await waitPick(j.id);
+        } else {
+            applyPick(j);
         }
     } catch {
         pickError.value = PICK_FAIL;
@@ -646,6 +832,8 @@ const pickFolder = async () => {
 };
 
 const removeFolder = (f: Folder) => {
+    openMenu.value = null;
+
     if (
         !window.confirm(
             `Bỏ thư mục "${f.name}" khỏi Kho riêng?\nFile video trong thư mục vẫn còn nguyên, app chỉ quên chúng.`,
@@ -660,7 +848,8 @@ const removeFolder = (f: Folder) => {
 const retry = (v: RiengVideo) =>
     router.post(`/auto/videos/${v.id}/thu-lai`, {}, { preserveScroll: true });
 
-const fmt = (iso: string | null) => (iso ? dayjs(iso).format('HH:mm DD/MM') : '—');
+const fmt = (iso: string | null) =>
+    iso ? dayjs(iso).format('HH:mm DD/MM') : '—';
 
 const statuses = [
     { key: '', label: 'Mọi trạng thái' },
@@ -676,7 +865,9 @@ const nothingYet = computed(() => {
         return false;
     }
 
-    const f = props.filters.folder ? props.folders.find((x) => x.id === props.filters.folder) : null;
+    const f = props.filters.folder
+        ? props.folders.find((x) => x.id === props.filters.folder)
+        : null;
 
     return f ? f.count === 0 : (props.counts.all ?? 0) === 0;
 });
@@ -701,23 +892,36 @@ watch(
 );
 
 const poll = async () => {
-    if (polling || drag || busy.value !== '' || document.visibilityState !== 'visible') {
+    if (
+        polling ||
+        drag ||
+        busy.value !== '' ||
+        document.visibilityState !== 'visible'
+    ) {
         return;
     }
 
     polling = true;
 
     try {
-        const j = await postJson<{ sig: string; total: number; new: number }>('/auto/kho/rieng/quet-nhanh');
+        const j = await postJson<{ sig: string; total: number; new: number }>(
+            '/auto/kho/rieng/quet-nhanh',
+        );
 
         if (j && j.sig !== lastSig) {
             const added = Math.max(j.new ?? 0, (j.total ?? 0) - lastTotal);
             lastSig = j.sig;
             lastTotal = j.total ?? lastTotal;
-            router.reload({ only: RELOAD_ONLY, preserveScroll: true, preserveState: true });
+            router.reload({
+                only: RELOAD_ONLY,
+                preserveScroll: true,
+                preserveState: true,
+            });
 
             if (added > 0) {
-                toast.success(added === 1 ? 'Có 1 video mới' : `Có ${added} video mới`);
+                toast.success(
+                    added === 1 ? 'Có 1 video mới' : `Có ${added} video mới`,
+                );
             }
         }
     } finally {
@@ -743,6 +947,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    alive = false;
     clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', onVisible);
     grid.value?.removeEventListener('touchmove', onTouchMove);
@@ -752,7 +957,9 @@ onBeforeUnmount(() => {
     viewerActions.isQueued = null;
 });
 
-const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.value);
+const barVisible = computed(
+    () => pickedItems.value.length > 0 || selectMode.value,
+);
 </script>
 
 <template>
@@ -762,77 +969,219 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
         testid="fork-rieng-page"
     >
         <template #actions>
-            <Button size="sm" :disabled="busy === 'scan'" data-testid="fork-rieng-scan" @click="scan">
-                <IconRefresh class="size-4" :class="{ 'animate-spin': busy === 'scan' }" />
+            <Button
+                size="sm"
+                :disabled="busy === 'scan'"
+                data-testid="fork-rieng-scan"
+                @click="scan"
+            >
+                <IconRefresh
+                    class="size-4"
+                    :class="{ 'animate-spin': busy === 'scan' }"
+                />
                 {{ busy === 'scan' ? 'Đang quét…' : 'Quét lại' }}
             </Button>
         </template>
 
         <KhoSwitch active="rieng" />
 
-        <!-- Thư mục -->
-        <section :class="cn(cardCls, 'flex flex-col gap-4 p-5')" data-testid="fork-rieng-folders">
-            <SectionHeading
-                :icon="IconFolder"
-                tone="info"
-                title="Thư mục video của bạn"
-                :description="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của bạn.`"
-            />
-            <ul v-if="folders.length" class="flex flex-col divide-y rounded-lg border">
-                <li v-for="f in folders" :key="f.id" class="flex flex-wrap items-center gap-3 p-3 text-sm">
-                    <IconFolder class="size-5 shrink-0 text-muted-foreground" />
-                    <div class="min-w-0 flex-1">
-                        <div class="font-medium">
-                            {{ f.name }}
-                            <span class="font-normal text-muted-foreground">· {{ f.count }} video</span>
+        <!-- Thư mục: một dải gọn, thêm thư mục trong hộp thoại -->
+        <section
+            :class="cn(cardCls, 'flex flex-wrap items-center gap-2 p-3')"
+            data-testid="fork-rieng-folders"
+        >
+            <span
+                class="flex items-center gap-1.5 pr-1 text-[13px] font-semibold text-muted-foreground"
+                :title="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của bạn.`"
+            >
+                <IconFolder class="size-4" /> Thư mục
+            </span>
+            <div
+                v-for="f in folders"
+                :key="f.id"
+                class="flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 py-1 pr-1 pl-2.5 text-sm"
+                :title="f.path"
+                :data-testid="`fork-rieng-folder-${f.id}`"
+            >
+                <span
+                    v-if="!f.exists"
+                    class="size-2 shrink-0 rounded-full bg-red-500"
+                    title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
+                />
+                <span class="truncate font-medium">{{ f.name }}</span>
+                <span
+                    class="shrink-0 text-xs text-muted-foreground tabular-nums"
+                    >{{ f.count }} video</span
+                >
+                <Popover
+                    :open="openMenu === f.id"
+                    @update:open="(o: boolean) => (openMenu = o ? f.id : null)"
+                >
+                    <PopoverTrigger as-child>
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            class="size-7"
+                            :aria-label="`Tuỳ chọn thư mục ${f.name}`"
+                        >
+                            <IconDots class="size-4" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-72 p-3" align="end">
+                        <div
+                            class="mb-2 text-xs break-all text-muted-foreground"
+                        >
+                            {{ f.path }}
                         </div>
-                        <div class="truncate text-xs text-muted-foreground" :title="f.path">{{ f.path }}</div>
-                        <div v-if="!f.exists" class="text-xs text-red-600 dark:text-red-400">Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?).</div>
-                    </div>
-                    <Button size="sm" variant="ghost" @click="removeFolder(f)">
-                        <IconTrash class="size-4" /> Bỏ khỏi danh sách
-                    </Button>
-                </li>
-            </ul>
-            <div class="flex flex-wrap items-end gap-3">
-                <label class="flex min-w-72 flex-1 flex-col gap-1 text-sm font-medium">
-                    Chọn hoặc dán đường dẫn thư mục
-                    <Input v-model="folderPath" placeholder="Ví dụ: D:\Video\Video-cua-toi" data-testid="fork-rieng-path" @keydown.enter="addFolder" />
-                </label>
-                <Button variant="outline" :disabled="picking" data-testid="fork-rieng-pick" @click="pickFolder">
-                    <IconFolder class="size-4" :class="{ 'animate-pulse': picking }" />
-                    {{ picking ? 'Đang chờ bạn chọn…' : 'Chọn thư mục…' }}
-                </Button>
-                <label class="flex w-56 flex-col gap-1 text-sm font-medium">
-                    Tên gọi (tuỳ chọn)
-                    <Input v-model="folderName" placeholder="Ví dụ: Video quay tay" />
-                </label>
-                <Button :disabled="busy === 'add' || !folderPath.trim()" data-testid="fork-rieng-add" @click="addFolder">
-                    <IconFolderPlus class="size-4" /> Thêm thư mục
-                </Button>
+                        <div
+                            v-if="!f.exists"
+                            class="mb-2 text-xs text-red-600 dark:text-red-400"
+                        >
+                            Không mở được thư mục này (ổ đĩa đang tắt hoặc đã
+                            đổi tên?).
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            class="w-full justify-start"
+                            @click="removeFolder(f)"
+                        >
+                            <IconTrash class="size-4" /> Bỏ khỏi danh sách
+                        </Button>
+                    </PopoverContent>
+                </Popover>
             </div>
-            <p v-if="pickError" class="text-sm text-red-600 dark:text-red-400" data-testid="fork-rieng-pick-error">{{ pickError }}</p>
+            <Button
+                size="sm"
+                variant="outline"
+                data-testid="fork-rieng-add-open"
+                @click="folderDialog = true"
+            >
+                <IconPlus class="size-4" /> Thêm thư mục
+            </Button>
+            <span v-if="!folders.length" class="text-sm text-muted-foreground"
+                >Chưa có thư mục nào: thêm thư mục chứa video của bạn.</span
+            >
         </section>
 
-        <RiengSteps v-if="folders.length" :current="currentStep" />
+        <Dialog v-model:open="folderDialog">
+            <DialogContent class="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Thêm thư mục video</DialogTitle>
+                    <DialogDescription>
+                        App chỉ đọc video trong thư mục ({{ FORMATS }}; kể cả
+                        thư mục con, trừ thư mục bắt đầu bằng _). App không bao
+                        giờ dời hay xoá file của bạn.
+                    </DialogDescription>
+                </DialogHeader>
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-end gap-2">
+                        <label
+                            class="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
+                        >
+                            Chọn hoặc dán đường dẫn thư mục
+                            <Input
+                                v-model="folderPath"
+                                placeholder="Ví dụ: D:\Video\Video-cua-toi"
+                                data-testid="fork-rieng-path"
+                                @keydown.enter="addFolder"
+                            />
+                        </label>
+                        <Button
+                            variant="outline"
+                            :disabled="picking"
+                            data-testid="fork-rieng-pick"
+                            @click="pickFolder"
+                        >
+                            <IconFolder
+                                class="size-4"
+                                :class="{ 'animate-pulse': picking }"
+                            />
+                            {{
+                                picking
+                                    ? 'Đang mở hộp chọn… (xem cửa sổ Windows)'
+                                    : 'Chọn thư mục…'
+                            }}
+                        </Button>
+                    </div>
+                    <label class="flex flex-col gap-1 text-sm font-medium">
+                        Tên gọi (tuỳ chọn)
+                        <Input
+                            v-model="folderName"
+                            placeholder="Ví dụ: Video quay tay"
+                        />
+                    </label>
+                    <p
+                        v-if="pickError"
+                        class="text-sm text-red-600 dark:text-red-400"
+                        data-testid="fork-rieng-pick-error"
+                    >
+                        {{ pickError }}
+                    </p>
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" @click="folderDialog = false"
+                        >Đóng</Button
+                    >
+                    <Button
+                        :disabled="busy === 'add' || !folderPath.trim()"
+                        data-testid="fork-rieng-add"
+                        @click="addFolder"
+                    >
+                        <IconFolderPlus class="size-4" /> Thêm thư mục
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
-        <!-- Bộ lọc + chọn -->
-        <section :class="cn(cardCls, 'sticky top-2 z-20 flex flex-wrap items-center gap-3 bg-card/95 p-4 backdrop-blur')" data-testid="fork-rieng-filters">
-            <NativeSelect :model-value="filters.folder || ''" aria-label="Lọc theo thư mục" @update:model-value="go({ folder: Number($event) || 0 })">
-                <option value="">Tất cả thư mục</option>
-                <option v-for="f in folders" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </NativeSelect>
-            <NativeSelect :model-value="filters.status" aria-label="Lọc theo trạng thái" data-testid="fork-rieng-status" @update:model-value="go({ status: String($event) })">
-                <option v-for="s in statuses" :key="s.key" :value="s.key">
-                    {{ s.label }}{{ s.key ? ` (${counts[s.key] ?? 0})` : ` (${counts.all ?? 0})` }}
-                </option>
-            </NativeSelect>
-            <NativeSelect :model-value="filters.day" aria-label="Lọc theo ngày" data-testid="fork-rieng-day" @update:model-value="go({ day: String($event) })">
-                <option value="">Tất cả ngày</option>
-                <option v-for="d in days" :key="d" :value="d">{{ dayjs(d).format('DD/MM/YYYY') }}</option>
-            </NativeSelect>
-
+        <!-- Các bước + bộ lọc + chọn: gộp một thanh -->
+        <section
+            :class="
+                cn(
+                    cardCls,
+                    'sticky top-2 z-20 flex flex-wrap items-center gap-x-4 gap-y-2 bg-card/95 p-3 backdrop-blur',
+                )
+            "
+            data-testid="fork-rieng-filters"
+        >
+            <RiengSteps v-if="folders.length" :current="currentStep" />
             <div class="ml-auto flex flex-wrap items-center gap-2">
+                <NativeSelect
+                    :model-value="filters.folder || ''"
+                    aria-label="Lọc theo thư mục"
+                    @update:model-value="go({ folder: Number($event) || 0 })"
+                >
+                    <option value="">Tất cả thư mục</option>
+                    <option v-for="f in folders" :key="f.id" :value="f.id">
+                        {{ f.name }}
+                    </option>
+                </NativeSelect>
+                <NativeSelect
+                    :model-value="filters.status"
+                    aria-label="Lọc theo trạng thái"
+                    data-testid="fork-rieng-status"
+                    @update:model-value="go({ status: String($event) })"
+                >
+                    <option v-for="s in statuses" :key="s.key" :value="s.key">
+                        {{ s.label
+                        }}{{
+                            s.key
+                                ? ` (${counts[s.key] ?? 0})`
+                                : ` (${counts.all ?? 0})`
+                        }}
+                    </option>
+                </NativeSelect>
+                <NativeSelect
+                    :model-value="filters.day"
+                    aria-label="Lọc theo ngày"
+                    data-testid="fork-rieng-day"
+                    @update:model-value="go({ day: String($event) })"
+                >
+                    <option value="">Tất cả ngày</option>
+                    <option v-for="d in days" :key="d" :value="d">
+                        {{ dayjs(d).format('DD/MM/YYYY') }}
+                    </option>
+                </NativeSelect>
                 <Button
                     size="sm"
                     :variant="selectMode ? 'default' : 'outline'"
@@ -841,7 +1190,8 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
                     data-testid="fork-rieng-select-mode"
                     @click="toggleSelectMode"
                 >
-                    <IconChecks class="size-4" /> {{ selectMode ? 'Đang chọn…' : 'Chọn' }}
+                    <IconChecks class="size-4" />
+                    {{ selectMode ? 'Đang chọn…' : 'Chọn' }}
                 </Button>
                 <label class="flex cursor-pointer items-center gap-2 text-sm">
                     <input
@@ -853,7 +1203,12 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
                         @change="toggleAll"
                     />
                     Chọn tất cả ({{ plain.length }})
-                    <span v-if="dupCount" class="text-xs text-muted-foreground" data-testid="fork-rieng-select-all-note">· bỏ qua {{ dupCount }} video trùng</span>
+                    <span
+                        v-if="dupCount"
+                        class="text-xs text-muted-foreground"
+                        data-testid="fork-rieng-select-all-note"
+                        >· bỏ qua {{ dupCount }} video trùng</span
+                    >
                 </label>
             </div>
         </section>
@@ -862,7 +1217,12 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
         <div
             v-if="band"
             class="pointer-events-none fixed z-50 rounded-sm border-2 border-primary bg-primary/15"
-            :style="{ left: band.left + 'px', top: band.top + 'px', width: band.width + 'px', height: band.height + 'px' }"
+            :style="{
+                left: band.left + 'px',
+                top: band.top + 'px',
+                width: band.width + 'px',
+                height: band.height + 'px',
+            }"
             data-testid="fork-rieng-band"
         />
 
@@ -870,7 +1230,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
         <section
             v-if="videos.data.length"
             ref="grid"
-            class="grid grid-cols-2 gap-5 select-none md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 [-webkit-touch-callout:none]"
+            class="grid grid-cols-2 gap-4 select-none [-webkit-touch-callout:none] sm:grid-cols-[repeat(auto-fill,minmax(232px,1fr))]"
             :class="barVisible ? 'pb-28' : ''"
             data-testid="fork-rieng-grid"
             @pointerdown="onPointerDown"
@@ -894,6 +1254,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
 
         <EmptyState
             v-else-if="nothingYet"
+            class="gap-2 py-6"
             :icon="IconVideoOff"
             title="Chưa có video nào trong thư mục này"
             :description="`App nhận video ${FORMATS} (kể cả thư mục con, trừ thư mục bắt đầu bằng _). Bỏ video vào thư mục, nó sẽ tự hiện ở đây trong khoảng 10 giây khi ghi xong, bạn không cần bấm gì.`"
@@ -901,32 +1262,75 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
         />
         <EmptyState
             v-else
+            class="gap-2 py-6"
             :icon="IconVideoOff"
-            :title="folders.length ? 'Không có video nào khớp bộ lọc' : 'Chưa có thư mục nào'"
-            :description="folders.length ? 'Thử đổi bộ lọc, hoặc bấm Quét lại nếu vừa bỏ video mới vào thư mục.' : `Dán đường dẫn thư mục chứa video của bạn ở trên, app sẽ tự tìm các file ${FORMATS}.`"
+            :title="
+                folders.length
+                    ? 'Không có video nào khớp bộ lọc'
+                    : 'Chưa có thư mục nào'
+            "
+            :description="
+                folders.length
+                    ? 'Thử đổi bộ lọc, hoặc bấm Quét lại nếu vừa bỏ video mới vào thư mục.'
+                    : `Bấm Thêm thư mục ở trên rồi dán đường dẫn thư mục chứa video của bạn, app sẽ tự tìm các file ${FORMATS}.`
+            "
         />
 
-        <Callout v-if="accounts.length && !accounts.some((a) => a.usable)" tone="warn">
-            Chưa có kênh nào sẵn sàng đăng hàng loạt: {{ accounts.map((a) => `${a.name} (${a.unusable_reason})`).join('; ') }}.
+        <Callout
+            v-if="accounts.length && !accounts.some((a) => a.usable)"
+            tone="warn"
+        >
+            Chưa có kênh nào sẵn sàng đăng hàng loạt:
+            {{
+                accounts
+                    .map((a) => `${a.name} (${a.unusable_reason})`)
+                    .join('; ')
+            }}.
         </Callout>
 
-        <div v-if="videos.last_page > 1" class="flex items-center justify-center gap-3 text-sm">
-            <Button size="sm" variant="outline" :disabled="videos.current_page <= 1" @click="go({ page: videos.current_page - 1 })">Trước</Button>
-            <span class="tabular-nums">Trang {{ videos.current_page }} / {{ videos.last_page }}</span>
-            <Button size="sm" variant="outline" :disabled="videos.current_page >= videos.last_page" @click="go({ page: videos.current_page + 1 })">Sau</Button>
+        <div
+            v-if="videos.last_page > 1"
+            class="flex items-center justify-center gap-3 text-sm"
+        >
+            <Button
+                size="sm"
+                variant="outline"
+                :disabled="videos.current_page <= 1"
+                @click="go({ page: videos.current_page - 1 })"
+                >Trước</Button
+            >
+            <span class="tabular-nums"
+                >Trang {{ videos.current_page }} / {{ videos.last_page }}</span
+            >
+            <Button
+                size="sm"
+                variant="outline"
+                :disabled="videos.current_page >= videos.last_page"
+                @click="go({ page: videos.current_page + 1 })"
+                >Sau</Button
+            >
         </div>
 
         <!-- Nút nổi: Giỏ chờ đăng (không phải giỏ hàng TikTok Shop) -->
         <button
             type="button"
-            :class="cn('fixed right-4 z-40 flex items-center gap-2 rounded-full border bg-card px-4 py-3 text-sm font-semibold shadow-lg transition hover:bg-muted', barVisible ? 'bottom-24' : 'bottom-5')"
+            :class="
+                cn(
+                    'fixed right-4 z-40 flex items-center gap-2 rounded-full border bg-card px-4 py-3 text-sm font-semibold shadow-lg transition hover:bg-muted',
+                    barVisible ? 'bottom-24' : 'bottom-5',
+                )
+            "
             data-testid="fork-rieng-queue-btn"
             title="Giỏ chờ đăng: các video bạn để dành đăng sau"
             @click="queueOpen = true"
         >
             <IconClipboardList class="size-5" />
             Giỏ chờ đăng
-            <span class="flex min-w-6 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground tabular-nums" data-testid="fork-rieng-queue-count">{{ queue.length }}</span>
+            <span
+                class="flex min-w-6 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground tabular-nums"
+                data-testid="fork-rieng-queue-count"
+                >{{ queue.length }}</span
+            >
         </button>
 
         <!-- Thanh thao tác dính ở đáy: số video đã chọn + việc làm tiếp -->
@@ -937,20 +1341,52 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
         >
             <div class="min-w-0 flex-1 text-sm">
                 <template v-if="pickedItems.length">
-                    <b class="tabular-nums" data-testid="fork-rieng-picked-count">Đã chọn {{ pickedItems.length }} video</b>
-                    <span v-if="pickedDupCount" class="ml-1 text-amber-700 dark:text-amber-300">· {{ pickedDupCount }} video trùng</span>
+                    <b
+                        class="tabular-nums"
+                        data-testid="fork-rieng-picked-count"
+                        >Đã chọn {{ pickedItems.length }} video</b
+                    >
+                    <span
+                        v-if="pickedDupCount"
+                        class="ml-1 text-amber-700 dark:text-amber-300"
+                        >· {{ pickedDupCount }} video trùng</span
+                    >
                 </template>
-                <span v-else class="text-muted-foreground">Chạm hoặc kéo qua các video để chọn.</span>
+                <span v-else class="text-muted-foreground"
+                    >Chạm hoặc kéo qua các video để chọn.</span
+                >
             </div>
-            <Button v-if="pickedItems.length" variant="ghost" size="sm" @click="clearPicked">
+            <Button
+                v-if="pickedItems.length"
+                variant="ghost"
+                size="sm"
+                @click="clearPicked"
+            >
                 <IconX class="size-4" /> Bỏ chọn
             </Button>
-            <Button v-if="selectMode && !pickedItems.length" variant="outline" size="sm" @click="selectMode = false">Xong</Button>
-            <Button v-if="pickedItems.length" variant="outline" data-testid="fork-rieng-to-queue" @click="pickedToQueue">
+            <Button
+                v-if="selectMode && !pickedItems.length"
+                variant="outline"
+                size="sm"
+                @click="selectMode = false"
+                >Xong</Button
+            >
+            <Button
+                v-if="pickedItems.length"
+                variant="outline"
+                data-testid="fork-rieng-to-queue"
+                @click="pickedToQueue"
+            >
                 <IconPlaylistAdd class="size-4" /> Thêm vào giỏ chờ
             </Button>
-            <Button v-if="pickedItems.length" data-testid="fork-rieng-batch-btn" @click="postPicked">
-                <IconSend class="size-4" /> Đăng / hẹn giờ ({{ pickedItems.length }})
+            <Button
+                v-if="pickedItems.length"
+                data-testid="fork-rieng-batch-btn"
+                @click="postPicked"
+            >
+                <IconSend class="size-4" /> Đăng / hẹn giờ ({{
+                    pickedItems.length
+                }})
             </Button>
         </div>
 

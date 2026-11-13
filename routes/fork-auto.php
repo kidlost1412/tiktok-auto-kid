@@ -65,6 +65,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::get('/', [RiengController::class, 'index'])->name('index');
         Route::post('thu-muc', [RiengController::class, 'addFolder'])->middleware('throttle:30,1')->name('folders.add');
         Route::post('chon-thu-muc', [RiengController::class, 'pickFolder'])->middleware('throttle:20,1')->name('folders.pick');
+        Route::post('chon-thu-muc/ket-qua', [RiengController::class, 'pickFolderResult'])->middleware('throttle:120,1')->name('folders.pick.result');
         Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
         Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');
         // Quét nhanh cho trang đang mở (tự giới hạn ~8 giây/lần bằng khoá bộ nhớ đệm, không ngủ chờ).

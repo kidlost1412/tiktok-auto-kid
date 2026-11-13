@@ -86,6 +86,12 @@ export interface LichItem {
     error: string | null;
 }
 
+/** Một dòng của bảng lịch: bài trong lịch kèm kênh của nó. */
+export interface ScheduleEntry extends LichItem {
+    channelId: string;
+    username: string;
+}
+
 export interface BlockedGroup {
     code: string;
     quy_cach: string | null;
@@ -119,6 +125,14 @@ export interface RecentRow {
     views: number | null;
     views_24h: number | null;
     link: string | null;
+}
+
+/** Một ngày trong 7 ngày gần nhất: số bài đã lên TikTok và tổng lượt xem mới nhất của chúng. */
+export interface TrendDay {
+    date: string;
+    label: string;
+    posts: number;
+    views: number;
 }
 
 export interface ProductRow {

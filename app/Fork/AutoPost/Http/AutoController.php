@@ -129,6 +129,7 @@ final class AutoController extends Controller
             'upcoming' => $this->upcoming($accounts),
             'recent' => $this->recent($accounts, $images),
             'failed_recent' => $this->failedRecent($accounts, $images),
+            'trend' => $this->trend($accounts),
             // Thẻ "Bắt đầu" hỏi hub (có thể chậm vài giây) nên tải sau, cùng nhóm với hub.
             'onboarding' => Inertia::defer(fn (): ?array => app(Onboarding::class)->forAccounts($accounts->pluck('id')->map(fn ($id): string => (string) $id)->all())),
             'insights' => $insights->breakdowns(),
@@ -555,6 +556,42 @@ final class AutoController extends Controller
                     'can_confirm_retry' => $refusal !== null && $retry->refusal($v, true) === null,
                 ];
             })->all();
+    }
+
+    /**
+     * 7 ngày gần nhất (tính cả hôm nay, theo giờ của kênh đầu tiên): số bài đã lên TikTok và tổng lượt xem mới nhất
+     * của các bài đó — cho biểu đồ nhỏ ở dải "Hôm nay".
+     *
+     * @param  Collection<int, SocialAccount>  $accounts
+     * @return list<array{date: string, label: string, posts: int, views: int}>
+     */
+    private function trend($accounts): array
+    {
+        $tz = $accounts->first()?->timezone ?: self::DEFAULT_TZ;
+        $start = CarbonImmutable::now($tz)->startOfDay()->subDays(6);
+
+        $byDay = AutoVideo::query()
+            ->livePosted()
+            ->whereNotNull('posted_at')
+            ->whereIn('social_account_id', $accounts->pluck('id'))
+            ->where('posted_at', '>=', $start->utc())
+            ->get(['id', 'posted_at', 'stats'])
+            ->groupBy(fn (AutoVideo $v): string => $v->posted_at->setTimezone($tz)->format('Y-m-d'));
+
+        $out = [];
+
+        for ($i = 0; $i < 7; $i++) {
+            $d = $start->addDays($i);
+            $rows = $byDay[$d->format('Y-m-d')] ?? collect();
+            $out[] = [
+                'date' => $d->format('Y-m-d'),
+                'label' => $d->format('d/m'),
+                'posts' => $rows->count(),
+                'views' => (int) $rows->sum(fn (AutoVideo $v): int => (int) data_get($v->stats, 'latest.views', 0)),
+            ];
+        }
+
+        return $out;
     }
 
     private function snippet(?string $text): ?string

@@ -84,6 +84,19 @@ const stateText = computed(() => {
     }
 });
 
+const chipCls = computed(() => {
+    switch (state.value) {
+        case 'need':
+            return toneClasses.warn.chip;
+        case 'bad':
+            return toneClasses.danger.chip;
+        case 'ok':
+            return toneClasses.success.chip;
+        default:
+            return toneClasses.neutral.chip;
+    }
+});
+
 const persona = computed(() => {
     const p = props.persona;
     const cover =
@@ -112,7 +125,7 @@ const nameLen = computed(() => [...props.name].length);
     <div
         :class="
             cn(
-                'group/row grid gap-x-5 gap-y-3 px-5 py-4 transition-colors lg:grid-cols-[minmax(170px,1fr)_minmax(250px,1.5fr)_minmax(200px,1.15fr)_minmax(150px,0.8fr)_auto] lg:items-center',
+                'group/row grid gap-x-5 gap-y-2 px-5 py-2.5 transition-colors lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:items-center',
                 state === 'need' && 'bg-amber-50/70 dark:bg-amber-950/25',
                 state === 'bad' && 'bg-red-50/50 dark:bg-red-950/20',
             )
@@ -120,9 +133,9 @@ const nameLen = computed(() => [...props.name].length);
         :data-testid="`fork-gio-hang-row-${row.code}-${row.quy_cach ?? ''}`"
     >
         <!-- Sản phẩm hub -->
-        <div class="flex min-w-0 items-start gap-3">
+        <div class="flex min-w-0 items-center gap-3">
             <span
-                :class="cn('mt-[7px] size-2 shrink-0 rounded-full', dot[state])"
+                :class="cn('size-2 shrink-0 rounded-full', dot[state])"
                 :title="stateText"
             />
             <div class="min-w-0">
@@ -142,6 +155,16 @@ const nameLen = computed(() => [...props.name].length);
                         v-if="!row.enabled"
                         class="shrink-0 rounded bg-muted px-1.5 text-[11px] text-muted-foreground"
                         >hub tắt</span
+                    >
+                    <span
+                        :class="
+                            cn(
+                                'inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11.5px] font-medium',
+                                chipCls,
+                            )
+                        "
+                        data-testid="fork-gio-hang-state"
+                        >{{ stateText }}</span
                     >
                 </div>
                 <div class="truncate text-[12.5px] text-muted-foreground">
@@ -165,11 +188,11 @@ const nameLen = computed(() => [...props.name].length);
         <button
             v-if="card"
             type="button"
-            class="flex min-w-0 items-center gap-3 rounded-lg border border-transparent p-1.5 text-left transition-colors hover:border-border hover:bg-background/60 focus-visible:outline-2 focus-visible:outline-ring"
+            class="flex min-w-0 items-center gap-3 rounded-lg border border-transparent p-1 text-left transition-colors hover:border-border hover:bg-background/60 focus-visible:outline-2 focus-visible:outline-ring"
             title="Đổi sản phẩm shop"
             @click="emit('pick')"
         >
-            <ProductThumb :src="card.image" class="size-11 rounded-lg" />
+            <ProductThumb :src="card.image" class="size-10 rounded-lg" />
             <div class="min-w-0 flex-1">
                 <div
                     class="truncate text-[13.5px] font-medium"
@@ -206,7 +229,7 @@ const nameLen = computed(() => [...props.name].length);
             type="button"
             :class="
                 cn(
-                    'flex h-[58px] items-center justify-center gap-2 rounded-lg border border-dashed text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                    'flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                     state === 'need'
                         ? 'border-amber-400 bg-background/70 text-amber-800 hover:bg-amber-100/60 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/30'
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
@@ -222,7 +245,7 @@ const nameLen = computed(() => [...props.name].length);
         <label v-if="card" class="relative block min-w-0">
             <span class="sr-only">Tên giỏ hiện trên video</span>
             <input
-                class="h-10 w-full rounded-lg border bg-background pr-14 pl-3 text-[13.5px] font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                class="h-9 w-full rounded-lg border bg-background pr-14 pl-3 text-[13.5px] font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                 :maxlength="nameMax"
                 placeholder="Tên giỏ hiện trên video"
                 :value="name"
@@ -258,7 +281,7 @@ const nameLen = computed(() => [...props.name].length);
             @click="emit('personalise')"
         >
             <span
-                class="flex h-10 w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground ring-1 ring-border"
+                class="flex h-9 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground ring-1 ring-border"
             >
                 <img
                     v-if="persona.thumb"
@@ -298,16 +321,6 @@ const nameLen = computed(() => [...props.name].length);
                 <Spinner v-if="busy" class="size-3.5" />
                 Lưu
             </Button>
-            <span
-                v-else-if="state === 'ok'"
-                :class="
-                    cn(
-                        'hidden h-6 items-center rounded-full px-2 text-[12px] font-medium xl:inline-flex',
-                        toneClasses.success.chip,
-                    )
-                "
-                >Sẵn sàng</span
-            >
             <Popover v-model:open="menuOpen">
                 <PopoverTrigger as-child>
                     <Button
