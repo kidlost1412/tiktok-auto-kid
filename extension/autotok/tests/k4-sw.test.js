@@ -302,3 +302,15 @@ test('identity: passport without avatar -> avatar from tiktok.com user detail (v
     '/@me.user': () => ({ ok: true, status: 200, text: async () => page }) }), store0: {} });
   assert.equal((await sw2.ctx.passportIdentity()).avatar_url, 'https://p16.tiktokcdn.com/m.jpeg');
 });
+
+test('identity: avatar read from a Studio page header (avatarSeen, v1.4.5) beats the blocked profile fetches; foreign senders ignored', async () => {
+  const none = { data: { username: 'Me.User', user_id_str: '7000000000000000001' } };
+  const sw = loadSw({ server: baseServer({ '/passport/web/account/info/': () => json(none) }), store0: {} });
+  const bad = await sw.send({ type: 'avatarSeen', url: 'https://p16.tiktokcdn.com/seen.jpeg' }, { id: 5, url: 'https://evil.example/' });
+  assert.equal(bad.ok, false);
+  const ok = await sw.send({ type: 'avatarSeen', url: 'https://p16.tiktokcdn.com/seen.jpeg' }, { id: 5, url: 'https://www.tiktok.com/tiktokstudio/content' });
+  assert.equal(ok.ok, true);
+  const id = await sw.ctx.passportIdentity();
+  assert.equal(id.avatar_url, 'https://p16.tiktokcdn.com/seen.jpeg');
+  assert.equal(sw.calls.some((c) => c.path === '/api/user/detail/'), false);
+});

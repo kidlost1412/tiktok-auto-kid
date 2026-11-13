@@ -21,6 +21,8 @@ const props = defineProps<{
     selected: boolean;
     selectMode: boolean;
     queued: boolean;
+    /** Đang nhấn giữ (cảm ứng) chờ vào chế độ kéo chọn: thẻ thu nhẹ + viền nháy. */
+    holding?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -86,6 +88,7 @@ const onClick = (e: MouseEvent) => {
             cn(
                 'flex flex-col overflow-hidden rounded-[14px] border bg-card shadow-sm transition',
                 selected && 'ring-2 ring-primary',
+                holding && 'scale-[0.97] ring-2 ring-primary/60',
                 selectMode && 'cursor-pointer',
             )
         "

@@ -26,6 +26,8 @@ export interface Row {
     hub_name: string;
     quy_cach_name: string | null;
     enabled: boolean;
+    /** Sản phẩm ví dụ hub tạo sẵn cho người mới. */
+    is_sample?: boolean;
     new_videos: number;
     link: {
         shop_product_id: string;
@@ -41,6 +43,8 @@ export interface Sync {
     reason: string | null;
     requested_at: string | null;
     synced_at: string | null;
+    /** Đang lấy dở: đã có got trên tổng total (null nếu shop chưa cho biết tổng). */
+    progress?: { got: number; total: number | null } | null;
 }
 
 /** Cá nhân hoá theo sản phẩm hub (ảnh bìa, hashtag). */

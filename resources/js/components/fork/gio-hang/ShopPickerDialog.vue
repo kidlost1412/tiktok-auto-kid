@@ -23,6 +23,9 @@ const props = defineProps<{
     products: ShopProduct[];
     currentId: string;
     busyId: string | null;
+    /** 'add' = thêm sản phẩm mới vào hub từ sản phẩm shop (không có sản phẩm đang chọn). */
+    mode?: 'pick' | 'add';
+    adding?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -76,10 +79,21 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
     <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
         <DialogContent class="sm:max-w-3xl" data-testid="fork-gio-hang-picker">
             <DialogHeader>
-                <DialogTitle>Chọn giỏ hàng cho {{ rowLabel }}</DialogTitle>
+                <DialogTitle>{{
+                    mode === 'add'
+                        ? 'Thêm sản phẩm từ shop'
+                        : `Chọn giỏ hàng cho ${rowLabel}`
+                }}</DialogTitle>
                 <DialogDescription>
-                    Chọn đúng sản phẩm TikTok Shop sẽ gắn vào video của dòng
-                    này.
+                    <template v-if="mode === 'add'">
+                        Chọn sản phẩm TikTok Shop. App sẽ tạo sản phẩm tương
+                        ứng trong Xưởng Video (tên lấy từ sản phẩm shop, anh
+                        đổi tên được sau) và gắn luôn giỏ hàng cho kênh này.
+                    </template>
+                    <template v-else>
+                        Chọn đúng sản phẩm TikTok Shop sẽ gắn vào video của
+                        dòng này.
+                    </template>
                 </DialogDescription>
             </DialogHeader>
 
@@ -162,6 +176,8 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                                     ? 'secondary'
                                     : 'default'
                             "
+                            :disabled="adding"
+                            :data-testid="`fork-gio-hang-choose-${p.product_id}`"
                             @click="emit('select', p)"
                         >
                             <IconCheck
@@ -171,7 +187,9 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                             {{
                                 p.product_id === currentId
                                     ? 'Đang chọn'
-                                    : 'Chọn'
+                                    : mode === 'add'
+                                      ? 'Thêm'
+                                      : 'Chọn'
                             }}
                         </Button>
                         <Button

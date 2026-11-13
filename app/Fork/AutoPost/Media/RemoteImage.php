@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Media;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -18,7 +19,7 @@ final class RemoteImage
         'ibytedtos.com', 'muscdn.com', 'ttwstatic.com', 'bytedance.com', 'tiktokw.us',
     ];
 
-    private const int MAX_BYTES = 3_000_000;
+    private const int MAX_BYTES = 8_000_000;
 
     private const array TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
 
@@ -39,6 +40,8 @@ final class RemoteImage
         return false;
     }
 
+    public const string USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
+
     /**
      * @return array{body: string, ext: string}|null
      */
@@ -50,9 +53,23 @@ final class RemoteImage
 
         try {
             $res = Http::timeout(8)->connectTimeout(4)->withoutRedirecting()
-                ->withHeaders(['User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Referer' => 'https://www.tiktok.com/'])
+                ->withHeaders(['User-Agent' => self::USER_AGENT, 'Referer' => 'https://www.tiktok.com/'])
                 ->get($url);
         } catch (Throwable) {
+            return null;
+        }
+
+        return self::fromResponse($res);
+    }
+
+    /**
+     * Kiểm tra phản hồi tải ảnh (thành công, không quá lớn, đúng là ảnh jpg/png/webp/gif).
+     *
+     * @return array{body: string, ext: string}|null
+     */
+    public static function fromResponse(mixed $res): ?array
+    {
+        if (! $res instanceof Response) {
             return null;
         }
 

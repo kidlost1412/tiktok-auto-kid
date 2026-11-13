@@ -3,9 +3,14 @@
 import { router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
+import ClipThumb from '@/components/fork/kho/ClipThumb.vue';
+import ProductPicker from '@/components/fork/kho/ProductPicker.vue';
 import type { BatchItem } from '@/components/fork/kho/rieng';
 import Callout from '@/components/fork/shared/Callout.vue';
-import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
+import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
+import HashtagChips from '@/components/fork/shared/HashtagChips.vue';
+import type { TagSuggestion } from '@/components/fork/shared/hashtags';
+import MediaLightbox from '@/components/fork/shared/MediaLightbox.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -76,6 +81,8 @@ const props = defineProps<{
     items: BatchItem[];
     accounts: BatchAccount[];
     limits: { min_lead_minutes: number; gap_minutes: number; caption_max: number };
+    /** Hashtag đã dùng trước đây (nhiều nhất trước) để gợi ý dưới ô "Hashtag chung". */
+    hashtagSuggestions?: TagSuggestion[];
 }>();
 
 const emit = defineEmits<{
@@ -109,6 +116,20 @@ const coverError = ref('');
 const frameOpen = ref<Record<number, boolean>>({});
 const frameT = ref<Record<number, number>>({});
 const frameDur = ref<Record<number, number>>({});
+
+// Xem phóng to video / ảnh bìa (lightbox).
+const lightbox = ref<{ kind: 'image' | 'video'; src: string; title: string; poster?: string } | null>(null);
+const zoomVideo = (it: { id: number; file_name: string }) => {
+    lightbox.value = { kind: 'video', src: `/auto/kho/video/${it.id}`, title: it.file_name, poster: `/auto/kho/rieng/video/${it.id}/thumb` };
+};
+const zoomCover = (url: string, title: string) => {
+    lightbox.value = { kind: 'image', src: url, title };
+};
+const durationOf = (id: number) => props.items.find((i) => i.id === id)?.duration ?? null;
+
+const pickerOptions = computed(() =>
+    (account.value?.products ?? []).map((o) => ({ key: optionKey(o), name: o.name, label: o.label, image: o.image })),
+);
 
 const account = computed(() => usable.value.find((a) => a.id === accountId.value) ?? null);
 const optionKey = (o: ProductOption) => `${o.code}|${o.quy_cach ?? ''}`;
@@ -414,18 +435,19 @@ const areaCls =
 
 <template>
     <Dialog :open="open" @update:open="(v: boolean) => (v ? emit('update:open', true) : close())">
+        <!-- Khung cố định: tiêu đề trên, thân cuộn ở giữa, nút dưới cùng. Không đặt chiều cao cứng nên không thừa khoảng trắng. -->
         <DialogContent
-            class="flex max-h-[90dvh] max-w-3xl flex-col overflow-hidden"
+            class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(56rem,calc(100%-2rem))]"
             data-testid="fork-rieng-batch"
         >
-            <DialogHeader>
-                <DialogTitle>Đăng hàng loạt · {{ items.length }} video</DialogTitle>
+            <DialogHeader class="shrink-0 border-b px-5 pt-5 pr-14 pb-4 sm:px-6">
+                <DialogTitle class="text-lg">Đăng hàng loạt · {{ items.length }} video</DialogTitle>
                 <DialogDescription>
                     Chọn kênh và sản phẩm giỏ hàng, viết caption, rồi hẹn giờ đăng.
                 </DialogDescription>
             </DialogHeader>
 
-            <div class="-mx-6 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6">
+            <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 sm:px-6">
                 <Callout v-if="problem" tone="danger">{{ problem }}</Callout>
 
                 <!-- BƯỚC 1: nhập thông tin -->
@@ -441,7 +463,7 @@ const areaCls =
 
                     <template v-else>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="flex flex-col gap-1.5 text-sm font-medium">
+                            <label class="flex min-w-0 flex-col gap-1.5 text-sm font-medium">
                                 Kênh đăng
                                 <NativeSelect v-model="accountId" :class="selectCls" data-testid="fork-rieng-account">
                                     <option v-for="a in usable" :key="a.id" :value="a.id">
@@ -449,40 +471,17 @@ const areaCls =
                                     </option>
                                 </NativeSelect>
                             </label>
-                            <div class="flex flex-col gap-1.5 text-sm font-medium">
+                            <div class="flex min-w-0 flex-col gap-1.5 text-sm font-medium">
                                 Sản phẩm gắn giỏ hàng
-                                <span v-if="product" class="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 font-normal" data-testid="fork-rieng-product-chosen">
-                                    <ProductThumb :src="product.image" class="size-8" />
-                                    <span class="min-w-0 truncate">{{ product.label }}</span>
-                                </span>
+                                <ProductPicker v-model="productKey" :options="pickerOptions" testid="fork-rieng-product-trigger" />
                             </div>
-                        </div>
-
-                        <!-- Chọn sản phẩm: ảnh + tên (danh sách có thể cuộn) -->
-                        <div class="-mt-1 grid max-h-64 shrink-0 auto-rows-min gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Sản phẩm gắn giỏ hàng" data-testid="fork-rieng-product">
-                            <button
-                                v-for="o in account?.products ?? []"
-                                :key="optionKey(o)"
-                                type="button"
-                                role="radio"
-                                :aria-checked="optionKey(o) === productKey"
-                                :class="cn('flex items-center gap-2.5 rounded-md border p-2 text-left text-sm transition', optionKey(o) === productKey ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-muted/50')"
-                                :data-testid="`fork-rieng-product-opt-${o.code}`"
-                                @click="productKey = optionKey(o)"
-                            >
-                                <ProductThumb :src="o.image" class="size-10" />
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-medium">{{ o.name }}</span>
-                                    <span v-if="o.label !== o.name" class="block truncate text-xs text-muted-foreground">{{ o.label }}</span>
-                                </span>
-                            </button>
                         </div>
 
                         <Callout v-if="dupItems.length" tone="warn" data-testid="fork-rieng-dup-warning">
                             <div>
                                 Có {{ dupItems.length }} video trùng với video đã có. Bạn vẫn đăng được, nhưng hãy kiểm tra để khỏi đăng trùng:
                                 <ul class="mt-1.5 list-disc pl-5 text-sm font-normal">
-                                    <li v-for="d in dupItems" :key="d.id"><b>{{ d.file_name }}</b>: {{ d.duplicate }}</li>
+                                    <li v-for="d in dupItems" :key="d.id"><b class="break-all">{{ d.file_name }}</b>: {{ d.duplicate }}</li>
                                 </ul>
                             </div>
                         </Callout>
@@ -490,8 +489,8 @@ const areaCls =
                         <div class="flex flex-col gap-1.5">
                             <label class="text-sm font-medium" for="rieng-caption">Caption chung cho cả lượt</label>
                             <textarea id="rieng-caption" v-model="caption" :class="areaCls" placeholder="Viết nội dung bài đăng…" data-testid="fork-rieng-caption" />
-                            <label class="text-sm font-medium" for="rieng-tags">Hashtag chung</label>
-                            <Input id="rieng-tags" v-model="tags" placeholder="#nongnghiep #nanodong" />
+                            <label class="mt-1 text-sm font-medium" for="rieng-tags">Hashtag chung</label>
+                            <HashtagChips v-model="tags" input-id="rieng-tags" :suggestions="hashtagSuggestions ?? []" placeholder="Ví dụ: #nongnghiep #nanodong" testid="fork-rieng-tags" />
                             <span :class="cn('text-xs', captionLen > limits.caption_max ? 'text-red-600' : 'text-muted-foreground')">
                                 {{ captionLen }} / {{ limits.caption_max }} ký tự
                             </span>
@@ -552,10 +551,10 @@ const areaCls =
                         </div>
 
                         <div v-if="mode === 'manual'" class="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/40 p-3">
-                            <label class="flex flex-col gap-1 text-sm">
+                            <div class="flex flex-col gap-1 text-sm">
                                 Giờ bắt đầu
-                                <Input v-model="startAt" type="datetime-local" class="w-56" />
-                            </label>
+                                <DateTimePicker v-model="startAt" class="w-60" aria-label="Giờ bắt đầu" testid="fork-rieng-start" />
+                            </div>
                             <label class="flex flex-col gap-1 text-sm">
                                 Cách nhau (phút)
                                 <Input v-model.number="stepMin" type="number" min="1" class="w-28" />
@@ -564,64 +563,101 @@ const areaCls =
                             <span class="text-xs text-muted-foreground">Cách hiện tại ít nhất {{ limits.min_lead_minutes }} phút; các bài cùng kênh nên cách nhau từ {{ limits.gap_minutes }} phút.</span>
                         </div>
 
-                        <ul class="flex flex-col divide-y rounded-lg border text-sm">
-                            <li v-for="it in items" :key="it.id" class="flex flex-col gap-2 p-2.5">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <img v-if="coverUrlOf(it.id)" :src="coverUrlOf(it.id)!" alt="Ảnh bìa" class="h-12 w-9 rounded border object-cover" :data-testid="`fork-rieng-cover-thumb-${it.id}`" />
-                                    <span class="min-w-0 flex-1 truncate font-medium">{{ it.file_name }}</span>
-                                    <Input v-if="mode === 'manual'" v-model="times[it.id]" type="datetime-local" class="w-52" :data-testid="`fork-rieng-time-${it.id}`" />
-                                    <label v-if="coverMode === 'upload'" class="inline-flex">
-                                        <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="uploadCover($event, it.id)" />
-                                        <span class="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-sm font-medium hover:bg-muted">
-                                            {{ coverBusy[`up-${it.id}`] ? 'Đang tải…' : 'Đổi ảnh' }}
-                                        </span>
-                                    </label>
-                                    <Button v-if="coverMode === 'upload' && rowCover[it.id]" type="button" size="sm" variant="ghost" @click="delete rowCover[it.id]">Dùng ảnh chung</Button>
-                                    <Button v-if="coverMode === 'frame'" type="button" size="sm" variant="ghost" :data-testid="`fork-rieng-frame-btn-${it.id}`" @click="frameOpen[it.id] = !frameOpen[it.id]">
-                                        {{ frameOpen[it.id] ? 'Ẩn khung' : 'Chọn khung' }}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        @click="overrides[it.id] = { caption: overrides[it.id]?.caption ?? '', tags: overrides[it.id]?.tags ?? '', open: !overrides[it.id]?.open }"
-                                    >
-                                        {{ overrides[it.id]?.open ? 'Ẩn' : 'Sửa caption riêng' }}
-                                    </Button>
-                                </div>
-                                <div v-if="coverMode === 'frame' && frameOpen[it.id]" class="flex flex-wrap items-start gap-3 rounded-lg border bg-muted/40 p-2.5">
-                                    <video
-                                        :id="`rieng-frame-${it.id}`"
-                                        :src="`/auto/kho/video/${it.id}`"
-                                        class="h-44 rounded bg-black"
-                                        preload="metadata"
-                                        muted
-                                        playsinline
-                                        @loadedmetadata="onMeta(it.id, $event)"
-                                    />
-                                    <div class="flex min-w-48 flex-1 flex-col gap-2">
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            :max="frameDur[it.id] ?? 0"
-                                            step="0.1"
-                                            :value="frameT[it.id] ?? 0"
-                                            :disabled="!frameDur[it.id]"
-                                            class="w-full"
-                                            @input="seek(it.id, Number(($event.target as HTMLInputElement).value))"
-                                        />
-                                        <span class="text-xs tabular-nums text-muted-foreground">Giây {{ (frameT[it.id] ?? 0).toFixed(1) }} / {{ (frameDur[it.id] ?? 0).toFixed(1) }}</span>
-                                        <Button type="button" size="sm" :disabled="coverBusy[`fr-${it.id}`]" class="self-start" :data-testid="`fork-rieng-frame-take-${it.id}`" @click="takeFrame(it.id)">
-                                            {{ coverBusy[`fr-${it.id}`] ? 'Đang lấy…' : 'Lấy khung này' }}
-                                        </Button>
+                        <!-- Danh sách video: mỗi video một thẻ, hình nhỏ bên trái, thông tin + nút bên phải. -->
+                        <div class="flex flex-col gap-2">
+                            <span class="text-sm font-medium">Các video ({{ items.length }})</span>
+                            <ul class="flex flex-col gap-2.5" data-testid="fork-rieng-rows">
+                                <li v-for="(it, n) in items" :key="it.id" class="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-sm" :data-testid="`fork-rieng-row-${it.id}`">
+                                    <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2.5">
+                                        <!-- Hình: video 9:16 (rê chuột để xem thử) và ảnh bìa đã chọn 3:4 -->
+                                        <div class="flex items-end gap-2 sm:row-span-2">
+                                            <ClipThumb :id="it.id" :duration="it.duration ?? durationOf(it.id)" :name="it.file_name" class="w-14 sm:w-16" @zoom="zoomVideo(it)" />
+                                            <div v-if="coverMode !== 'product'" class="flex flex-col items-center gap-1">
+                                                <button
+                                                    v-if="coverUrlOf(it.id)"
+                                                    type="button"
+                                                    class="block aspect-[3/4] w-12 overflow-hidden rounded-md border bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                                    :aria-label="`Phóng to ảnh bìa video ${n + 1}`"
+                                                    :data-testid="`fork-rieng-cover-thumb-${it.id}`"
+                                                    @click="zoomCover(coverUrlOf(it.id)!, `Bìa · ${it.file_name}`)"
+                                                >
+                                                    <img :src="coverUrlOf(it.id)!" alt="Ảnh bìa" class="size-full object-cover" />
+                                                </button>
+                                                <span v-else class="flex aspect-[3/4] w-12 items-center justify-center rounded-md border border-dashed text-center text-[10px] leading-tight text-muted-foreground">Chưa có bìa</span>
+                                                <span class="text-[10px] text-muted-foreground">Bìa</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="min-w-0 self-center">
+                                            <div class="min-w-0">
+                                                <span class="block truncate font-medium" :title="it.file_name">{{ n + 1 }}. {{ it.file_name }}</span>
+                                                <span v-if="coverMode === 'product'" class="block text-xs text-muted-foreground">Bìa theo sản phẩm, xoay vòng giữa các bài</span>
+                                                <span v-if="it.duplicate" class="mt-0.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Trùng video đã có</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-span-2 min-w-0 sm:col-span-1">
+                                            <div class="grid items-center gap-2 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+                                                <DateTimePicker v-if="mode === 'manual'" v-model="times[it.id]" :aria-label="`Giờ đăng video ${n + 1}`" :testid="`fork-rieng-time-${it.id}`" />
+                                                <div :class="cn('flex flex-wrap items-center gap-1.5', mode !== 'manual' && 'sm:col-span-2')">
+                                                    <label v-if="coverMode === 'upload'" class="inline-flex">
+                                                        <input type="file" accept="image/jpeg,image/png,image/webp" class="peer sr-only" @change="uploadCover($event, it.id)" />
+                                                        <span class="inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-sm font-medium whitespace-nowrap hover:bg-muted peer-focus-visible:outline-2 peer-focus-visible:outline-ring">
+                                                            {{ coverBusy[`up-${it.id}`] ? 'Đang tải…' : 'Đổi ảnh' }}
+                                                        </span>
+                                                    </label>
+                                                    <Button v-if="coverMode === 'upload' && rowCover[it.id]" type="button" size="sm" variant="ghost" class="h-8" @click="delete rowCover[it.id]">Dùng ảnh chung</Button>
+                                                    <Button v-if="coverMode === 'frame'" type="button" size="sm" variant="outline" class="h-8" :data-testid="`fork-rieng-frame-btn-${it.id}`" @click="frameOpen[it.id] = !frameOpen[it.id]">
+                                                        {{ frameOpen[it.id] ? 'Ẩn khung' : 'Chọn khung' }}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        class="h-8"
+                                                        @click="overrides[it.id] = { caption: overrides[it.id]?.caption ?? '', tags: overrides[it.id]?.tags ?? '', open: !overrides[it.id]?.open }"
+                                                    >
+                                                        {{ overrides[it.id]?.open ? 'Ẩn caption riêng' : 'Sửa caption riêng' }}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div v-if="overrides[it.id]?.open" class="flex flex-col gap-1.5">
-                                    <textarea v-model="overrides[it.id].caption" :class="areaCls" placeholder="Caption riêng (để trống = dùng caption chung)" />
-                                    <Input v-model="overrides[it.id].tags" placeholder="Hashtag riêng (để trống = dùng hashtag chung)" />
-                                </div>
-                            </li>
-                        </ul>
+
+                                    <div v-if="coverMode === 'frame' && frameOpen[it.id]" class="flex flex-wrap items-start gap-3 rounded-lg border bg-muted/40 p-2.5">
+                                        <video
+                                            :id="`rieng-frame-${it.id}`"
+                                            :src="`/auto/kho/video/${it.id}`"
+                                            class="h-44 rounded bg-black"
+                                            preload="metadata"
+                                            muted
+                                            playsinline
+                                            @loadedmetadata="onMeta(it.id, $event)"
+                                        />
+                                        <div class="flex min-w-48 flex-1 flex-col gap-2">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                :max="frameDur[it.id] ?? 0"
+                                                step="0.1"
+                                                :value="frameT[it.id] ?? 0"
+                                                :disabled="!frameDur[it.id]"
+                                                class="w-full"
+                                                @input="seek(it.id, Number(($event.target as HTMLInputElement).value))"
+                                            />
+                                            <span class="text-xs tabular-nums text-muted-foreground">Giây {{ (frameT[it.id] ?? 0).toFixed(1) }} / {{ (frameDur[it.id] ?? 0).toFixed(1) }}</span>
+                                            <Button type="button" size="sm" :disabled="coverBusy[`fr-${it.id}`]" class="self-start" :data-testid="`fork-rieng-frame-take-${it.id}`" @click="takeFrame(it.id)">
+                                                {{ coverBusy[`fr-${it.id}`] ? 'Đang lấy…' : 'Lấy khung này' }}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div v-if="overrides[it.id]?.open" class="flex flex-col gap-1.5">
+                                        <textarea v-model="overrides[it.id].caption" :class="areaCls" placeholder="Caption riêng (để trống = dùng caption chung)" />
+                                        <Input v-model="overrides[it.id].tags" placeholder="Hashtag riêng (để trống = dùng hashtag chung)" />
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
                     </template>
                 </template>
 
@@ -636,7 +672,10 @@ const areaCls =
                     <ul class="flex flex-col divide-y rounded-lg border text-sm" data-testid="fork-rieng-preview">
                         <li v-for="r in plan.rows" :key="r.id" class="flex flex-col gap-1 p-2.5">
                             <div class="flex flex-wrap items-center gap-2">
-                                <img v-if="r.cover?.url" :src="r.cover.url" alt="Ảnh bìa" class="h-12 w-9 rounded border object-cover" :data-testid="`fork-rieng-preview-cover-${r.id}`" />
+                                <ClipThumb :id="r.id" :duration="durationOf(r.id)" :name="nameOf(r)" class="w-9" @zoom="zoomVideo({ id: r.id, file_name: nameOf(r) })" />
+                                <button v-if="r.cover?.url" type="button" class="block h-12 w-9 shrink-0 overflow-hidden rounded border bg-muted" :aria-label="`Phóng to ảnh bìa ${nameOf(r)}`" :data-testid="`fork-rieng-preview-cover-${r.id}`" @click="zoomCover(r.cover.url!, `Bìa · ${nameOf(r)}`)">
+                                    <img :src="r.cover.url" alt="Ảnh bìa" class="size-full object-cover" />
+                                </button>
                                 <span class="min-w-0 flex-1 truncate font-medium">
                                     {{ nameOf(r) }}
                                     <span v-if="r.cover" class="block text-xs font-normal text-muted-foreground">Bìa: {{ r.cover.note }}</span>
@@ -662,6 +701,7 @@ const areaCls =
                     <ul class="flex flex-col divide-y rounded-lg border text-sm">
                         <li v-for="r in plan.rows" :key="r.id" class="flex flex-col gap-1 p-2.5">
                             <div class="flex flex-wrap items-center gap-2">
+                                <ClipThumb :id="r.id" :duration="durationOf(r.id)" :name="nameOf(r)" class="w-9" @zoom="zoomVideo({ id: r.id, file_name: nameOf(r) })" />
                                 <span class="min-w-0 flex-1 truncate font-medium">{{ nameOf(r) }}</span>
                                 <span class="tabular-nums">{{ r.result === 'done' ? fmt(r.at) : '' }}</span>
                                 <span :class="cn('rounded-full px-2 py-0.5 text-xs font-medium', chip(r.result === 'done' ? 'ok' : r.result === 'skip' ? 'skip' : 'error'))">
@@ -675,7 +715,7 @@ const areaCls =
                 </template>
             </div>
 
-            <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t bg-background px-5 py-3.5 sm:px-6">
                 <template v-if="step === 'form'">
                     <Button variant="outline" @click="close">Đóng</Button>
                     <Button :disabled="busy || !usable.length" data-testid="fork-rieng-preview-btn" @click="preview">
@@ -691,5 +731,14 @@ const areaCls =
                 <Button v-else @click="close">Xong</Button>
             </div>
         </DialogContent>
+
+        <MediaLightbox
+            :open="lightbox !== null"
+            :kind="lightbox?.kind ?? 'image'"
+            :src="lightbox?.src ?? null"
+            :title="lightbox?.title"
+            :poster="lightbox?.poster"
+            @update:open="(v: boolean) => !v && (lightbox = null)"
+        />
     </Dialog>
 </template>

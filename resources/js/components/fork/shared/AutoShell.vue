@@ -5,7 +5,6 @@ import {
     IconBuildingWarehouse,
     IconCalendarEvent,
     IconChartBar,
-    IconPhotoEdit,
     IconRobot,
     IconShoppingCart,
 } from '@tabler/icons-vue';
@@ -39,11 +38,6 @@ const items = [
     },
     { href: '/auto/kho', label: 'Kho video', icon: IconBuildingWarehouse },
     { href: '/auto/gio-hang', label: 'Giỏ hàng', icon: IconShoppingCart },
-    {
-        href: '/auto/anh-bia-hashtag',
-        label: 'Ảnh bìa & hashtag',
-        icon: IconPhotoEdit,
-    },
     { href: '/auto/so-lieu', label: 'Số liệu', icon: IconChartBar },
 ];
 

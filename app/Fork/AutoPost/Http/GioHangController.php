@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Http;
 
+use App\Fork\AutoPost\Hub\HubProducts;
 use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
@@ -12,7 +13,9 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Shop\CartRules;
+use App\Fork\AutoPost\Shop\ProductNaming;
 use App\Fork\AutoPost\Shop\ShopSync;
+use App\Fork\AutoPost\VideoLibrary;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
@@ -49,6 +52,8 @@ final class GioHangController extends Controller
             'sync' => null,
             'products' => [],
             'rows' => [],
+            'sample_hidden' => false,
+            'name_short_max' => ProductNaming::SHORT_MAX,
             'name_max' => CartRules::NAME_MAX,
             // Cá nhân hoá (ảnh bìa, hashtag) theo mã sản phẩm hub, và hashtag mặc định chung.
             'personalise' => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p)])->all(),
@@ -134,6 +139,114 @@ final class GioHangController extends Controller
         return back()->with('flash.success', 'Đã bỏ chọn. Video của sản phẩm này sẽ được giữ lại trong kho, không đăng.');
     }
 
+    /**
+     * "+ Thêm sản phẩm": chọn một sản phẩm TikTok Shop của kênh -> tạo luôn sản phẩm hub tương ứng (qua API của Xưởng Video,
+     * tên và mã suy ra từ sản phẩm shop, chủ app đổi tên được) và gắn giỏ hàng cho kênh này trong một lần.
+     */
+    public function addProduct(Request $request, string $socialAccount): RedirectResponse
+    {
+        $account = $this->findAccount($this->authorizeOwner($request), $socialAccount);
+
+        $data = $request->validate([
+            'shop_product_id' => ['required', 'string', 'regex:'.ShopSync::ID_PATTERN],
+            'name' => ['nullable', 'string', 'max:'.ProductNaming::SHORT_MAX],
+            'display_name' => ['nullable', 'string', 'max:'.CartRules::NAME_MAX],
+        ]);
+
+        $shop = ShopProduct::query()->where('social_account_id', $account->id)->where('product_id', $data['shop_product_id'])->first();
+
+        if ($shop === null) {
+            return back()->with('flash.error', 'Sản phẩm này không thuộc shop của kênh @'.$account->username.'.');
+        }
+
+        if ($shop->missing || $shop->hidden) {
+            return back()->with('flash.error', $shop->missing
+                ? 'Sản phẩm này đã không còn trong shop, hãy lấy lại sản phẩm từ shop.'
+                : 'Sản phẩm này đang bị ẩn, hãy hiện lại trước khi chọn.');
+        }
+
+        $title = (string) $shop->title;
+        $short = filled($data['name'] ?? null) ? trim((string) preg_replace('/\s+/u', ' ', (string) $data['name'])) : ProductNaming::shortName($title);
+        $cartName = filled($data['display_name'] ?? null) ? CartRules::limitName((string) $data['display_name']) : CartRules::suggestName($title);
+        $hubPath = app(VideoLibrary::class)->hubPath();
+        $code = ProductNaming::code($short, fn (string $c): bool => AutoProduct::query()->whereKey($c)->exists() || is_dir($hubPath.'/san-pham/'.$c));
+
+        $made = app(HubProducts::class)->create($code, ProductNaming::fullName($title), $short, (string) $shop->product_id);
+
+        if (! $made['ok']) {
+            return back()->with('flash.error', 'Chưa tạo được sản phẩm: '.$made['error']);
+        }
+
+        app(VideoLibrary::class)->syncProducts();
+        $product = AutoProduct::query()->find($code);
+
+        if ($product === null) {
+            return back()->with('flash.error', 'Hub đã tạo sản phẩm nhưng app chưa thấy nó. Chờ vài phút hoặc mở trang Kho video rồi quay lại.');
+        }
+
+        $product->update(['enabled' => true]);
+        ProductLink::query()->create([
+            'social_account_id' => $account->id, 'auto_product_id' => $product->code, 'quy_cach' => null,
+            'shop_product_id' => $shop->product_id, 'display_name' => $cartName,
+        ]);
+
+        $msg = 'Đã thêm sản phẩm "'.$product->short_name.'" và gắn giỏ hàng cho @'.$account->username.'. Anh có thể đổi tên ngay trên thẻ.';
+
+        return back()->with(filled($made['warning']) ? 'flash.error' : 'flash.success', filled($made['warning']) ? $msg.' Lưu ý: '.$made['warning'] : $msg);
+    }
+
+    /** Đổi tên gọi ngắn của sản phẩm hub (tên hiện trên thẻ và đọc trong video). */
+    public function renameProduct(Request $request, string $code): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+        $product = AutoProduct::query()->findOrFail($code);
+        $data = $request->validate(['name' => ['required', 'string', 'min:1', 'max:'.ProductNaming::SHORT_MAX]]);
+        $name = trim((string) preg_replace('/\s+/u', ' ', $data['name']));
+
+        if ($name === '') {
+            return back()->with('flash.error', 'Tên sản phẩm không được để trống.');
+        }
+
+        $done = app(HubProducts::class)->rename($product->code, $name);
+
+        if (! $done['ok']) {
+            return back()->with('flash.error', 'Chưa đổi được tên: '.$done['error']);
+        }
+
+        app(VideoLibrary::class)->syncProducts();
+
+        return back()->with('flash.success', 'Đã đổi tên sản phẩm thành "'.$name.'".');
+    }
+
+    /**
+     * Xoá sản phẩm hub (hồ sơ vào Thùng rác của Windows; video gốc và video đã làm không bị đụng).
+     * Không cho xoá khi còn video đang chờ hoặc đã xếp lịch để khỏi mất video giữa chừng.
+     */
+    public function deleteProduct(Request $request, string $code): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+        $product = AutoProduct::query()->findOrFail($code);
+
+        $busy = AutoVideo::query()->where('product_code', $product->code)
+            ->whereIn('status', [AutoVideo::NEW, AutoVideo::RESERVED, AutoVideo::SCHEDULED])->count();
+
+        if ($busy > 0) {
+            return back()->with('flash.error', 'Sản phẩm "'.$product->short_name.'" còn '.$busy.' video đang chờ hoặc đã xếp lịch đăng nên chưa xoá được.');
+        }
+
+        $done = app(HubProducts::class)->delete($product->code);
+
+        if (! $done['ok']) {
+            return back()->with('flash.error', 'Chưa xoá được: '.$done['error']);
+        }
+
+        ProductLink::query()->where('auto_product_id', $product->code)->delete();
+        $product->update(['enabled' => false]);
+        app(VideoLibrary::class)->syncProducts();
+
+        return back()->with('flash.success', 'Đã xoá sản phẩm "'.$product->short_name.'" (hồ sơ nằm trong Thùng rác của Windows nếu anh cần lấy lại).');
+    }
+
     /** Ẩn/hiện một sản phẩm trong danh sách chọn. Chỉ có tác dụng trong app, không đụng TikTok Shop. */
     public function setHidden(Request $request, string $socialAccount, string $productId): RedirectResponse
     {
@@ -179,8 +292,13 @@ final class GioHangController extends Controller
 
         $rows = [];
         $usedBy = [];
+        $hubProducts = AutoProduct::query()->orderBy('short_name')->get();
+        // Sản phẩm ví dụ chỉ để người mới thấy cách dùng: có sản phẩm thật rồi thì ẩn thẻ ví dụ chưa dùng (chưa có giỏ, chưa có video).
+        $hasReal = $hubProducts->contains(fn (AutoProduct $p): bool => $p->enabled && $p->code !== HubProducts::SAMPLE_CODE
+            && (is_array($p->facts) ? ($p->facts['loai'] ?? null) : null) !== 'kho-chung');
+        $sampleHidden = false;
 
-        foreach (AutoProduct::query()->orderBy('short_name')->get() as $hub) {
+        foreach ($hubProducts as $hub) {
             $list = CartRules::quyCachList($hub);
 
             foreach ($list === [] ? [['ma' => null, 'ten' => null]] : $list as $qc) {
@@ -188,6 +306,12 @@ final class GioHangController extends Controller
                 $link = $links[$key] ?? null;
 
                 if (! $hub->enabled && $link === null) {
+                    continue;
+                }
+
+                if ($hub->code === HubProducts::SAMPLE_CODE && $hasReal && $link === null && (int) ($waiting[$key] ?? 0) === 0) {
+                    $sampleHidden = true;
+
                     continue;
                 }
 
@@ -206,6 +330,7 @@ final class GioHangController extends Controller
                     'hub_name' => $hub->short_name,
                     'quy_cach_name' => $qc['ten'],
                     'enabled' => (bool) $hub->enabled,
+                    'is_sample' => $hub->code === HubProducts::SAMPLE_CODE,
                     'new_videos' => (int) ($waiting[$key] ?? 0),
                     'link' => $link ? [
                         'shop_product_id' => (string) $link->shop_product_id,
@@ -226,6 +351,7 @@ final class GioHangController extends Controller
                 'used_by' => $usedBy[$p->product_id] ?? [],
             ])->values()->all(),
             'rows' => $rows,
+            'sample_hidden' => $sampleHidden,
         ];
     }
 

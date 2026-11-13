@@ -146,9 +146,9 @@ const recOpen = ref(false);
                 <div
                     v-if="!avatarUrl"
                     class="truncate text-xs text-muted-foreground"
-                    title="Tiện ích Chrome tự lấy ảnh đại diện khi mở tiktok.com trong Chrome đã ghép"
+                    title="Tiện ích Chrome tự lấy ảnh đại diện khi bạn mở TikTok Studio hoặc tiktok.com trong Chrome đã ghép (cần tiện ích bản 1.4.5 trở lên)"
                 >
-                    Chưa có ảnh đại diện — sẽ tự hiện sau khi Chrome đã ghép mở tiktok.com
+                    Chưa có ảnh đại diện — mở TikTok Studio trong Chrome đã ghép, ảnh sẽ tự hiện (nhớ tải lại tiện ích)
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">

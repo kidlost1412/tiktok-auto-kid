@@ -52,6 +52,7 @@ interface Folder {
 interface Selectable {
     id: number;
     file_name: string;
+    duration?: number | null;
     duplicate: string | null;
 }
 
@@ -70,6 +71,7 @@ const props = defineProps<{
     queue: QueueItem[];
     scan_sig: string;
     accounts: BatchAccount[];
+    hashtag_suggestions?: { tag: string; uses: number }[];
     limits: { min_lead_minutes: number; gap_minutes: number; caption_max: number };
     last_scan_at: string | null;
 }>();
@@ -90,8 +92,12 @@ const queueOpen = ref(false);
 const picked = ref<Record<number, { file_name: string; duplicate: string | null }>>({});
 const selectMode = ref(false);
 
+// Thời lượng (giây) của video đã chọn, để hộp thoại đăng hiện trên hình nhỏ.
+const durationOf = (id: number): number | null =>
+    props.selectable.find((x) => x.id === id)?.duration ?? props.videos.data.find((x) => x.id === id)?.duration ?? null;
+
 const pickedItems = computed<BatchItem[]>(() =>
-    Object.entries(picked.value).map(([id, p]) => ({ id: Number(id), file_name: p.file_name, duplicate: p.duplicate })),
+    Object.entries(picked.value).map(([id, p]) => ({ id: Number(id), file_name: p.file_name, duration: durationOf(Number(id)), duplicate: p.duplicate })),
 );
 const pickedDupCount = computed(() => pickedItems.value.filter((i) => i.duplicate).length);
 
@@ -161,11 +167,34 @@ const toggleSelectMode = () => {
     selectMode.value = !selectMode.value;
 };
 
-// ---- Kéo để chọn (chuột: ở chế độ Chọn; cảm ứng: nhấn giữ một thẻ). Chọn cả đoạn từ thẻ bắt đầu tới thẻ đang chạm.
+// ---- Kéo để chọn (khung chọn): nhấn chuột rồi kéo quét qua các thẻ, không cần Shift hay chế độ "Chọn".
+// Chuột: kéo quá ~6px mới tính là kéo (bấm thường vẫn mở/chọn như cũ). Cảm ứng: nhấn giữ ~0,35 giây rồi kéo.
+// Bắt đầu từ thẻ chưa chọn = thêm vào; bắt đầu từ thẻ đã chọn = quét bỏ chọn. Esc huỷ, về như trước khi kéo.
 const grid = ref<HTMLElement | null>(null);
-let drag: { start: number; on: boolean; base: typeof picked.value; last: number } | null = null;
-let press: { x: number; y: number; id: number; timer: ReturnType<typeof setTimeout> } | null = null;
+const DRAG_THRESHOLD = 6;
+const HOLD_MS = 350;
+const EDGE = 90;
+
+interface Drag {
+    ax: number; // điểm bắt đầu theo toạ độ trang (đã cộng cuộn)
+    ay: number;
+    cx: number; // con trỏ hiện tại theo màn hình
+    cy: number;
+    on: boolean;
+    base: typeof picked.value;
+    active: boolean; // false = mới nhấn, chưa vượt ngưỡng
+    touch: boolean;
+}
+
+let drag: Drag | null = null;
+let hold: { x: number; y: number; id: number; timer: ReturnType<typeof setTimeout> } | null = null;
+let raf = 0;
 let suppressClick = false;
+
+/** Khung chọn đang vẽ (toạ độ màn hình, position: fixed). */
+const band = ref<{ left: number; top: number; width: number; height: number } | null>(null);
+/** Thẻ đang được nhấn giữ (cảm ứng) để nháy báo hiệu sắp vào chế độ kéo. */
+const holdingId = ref<number | null>(null);
 
 const cardIdAt = (el: Element | null): number | null => {
     const c = el?.closest?.('[data-card-id]') as HTMLElement | null;
@@ -173,16 +202,43 @@ const cardIdAt = (el: Element | null): number | null => {
     return c ? Number(c.dataset.cardId) : null;
 };
 
-const applyRange = (cur: number) => {
-    if (!drag) {
+const updateBand = () => {
+    if (!drag?.active) {
+        band.value = null;
+
         return;
     }
 
-    const [lo, hi] = [Math.min(drag.start, cur), Math.max(drag.start, cur)];
+    const x1 = drag.ax - window.scrollX;
+    const y1 = drag.ay - window.scrollY;
+
+    band.value = {
+        left: Math.min(x1, drag.cx),
+        top: Math.min(y1, drag.cy),
+        width: Math.abs(drag.cx - x1),
+        height: Math.abs(drag.cy - y1),
+    };
+};
+
+// Chọn mọi thẻ chạm khung (cộng/trừ vào tập chọn ban đầu).
+const applyBand = () => {
+    if (!drag?.active || !grid.value || !band.value) {
+        return;
+    }
+
+    const b = band.value;
     const next = { ...drag.base };
 
-    for (const x of props.videos.data.slice(lo, hi + 1)) {
-        if (!x.selectable) {
+    for (const el of grid.value.querySelectorAll<HTMLElement>('[data-card-id]')) {
+        const r = el.getBoundingClientRect();
+
+        if (r.right < b.left || r.left > b.left + b.width || r.bottom < b.top || r.top > b.top + b.height) {
+            continue;
+        }
+
+        const x = props.videos.data.find((v) => v.id === Number(el.dataset.cardId));
+
+        if (!x?.selectable) {
             continue;
         }
 
@@ -196,129 +252,184 @@ const applyRange = (cur: number) => {
     picked.value = next;
 };
 
-const startDrag = (id: number) => {
-    const i = idxOf(id);
+const refresh = () => {
+    updateBand();
+    applyBand();
+};
 
-    if (i < 0) {
+// Tự cuộn khi con trỏ gần mép trên/dưới; càng sát mép càng nhanh.
+const tick = () => {
+    raf = 0;
+
+    if (!drag?.active) {
         return;
     }
 
-    drag = { start: i, on: !(id in picked.value), base: { ...picked.value }, last: i };
-    lastIdx = i;
-    applyRange(i);
+    const top = EDGE - drag.cy;
+    const bottom = drag.cy - (window.innerHeight - EDGE);
+    const speed = top > 0 ? -Math.min(28, 4 + top * 0.25) : bottom > 0 ? Math.min(28, 4 + bottom * 0.25) : 0;
+
+    if (speed) {
+        window.scrollBy(0, speed);
+        refresh();
+    }
+
+    raf = requestAnimationFrame(tick);
+};
+
+const removeListeners = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', endDrag);
+    window.removeEventListener('pointercancel', endDrag);
+    window.removeEventListener('keydown', onKey);
+    document.documentElement.classList.remove('rieng-dragging');
+};
+
+const endDrag = () => {
+    removeListeners();
+
+    if (hold) {
+        clearTimeout(hold.timer);
+        hold = null;
+    }
+
+    holdingId.value = null;
+
+    if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+    }
+
+    const wasActive = drag?.active ?? false;
+
+    drag = null;
+    band.value = null;
+
+    // Vừa kéo xong: nuốt cú click đi kèm để không mở video ngoài ý muốn.
+    if (wasActive) {
+        suppressClick = true;
+        setTimeout(() => {
+            suppressClick = false;
+        }, 0);
+    }
+};
+
+const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && drag) {
+        if (drag.active) {
+            picked.value = drag.base;
+        }
+
+        endDrag();
+    }
+};
+
+const activate = () => {
+    if (!drag || drag.active) {
+        return;
+    }
+
+    drag.active = true;
+    document.documentElement.classList.add('rieng-dragging');
+    window.getSelection()?.removeAllRanges();
+    holdingId.value = null;
+    raf = requestAnimationFrame(tick);
 };
 
 const onMove = (e: PointerEvent) => {
-    if (press && !drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) {
-        // Đang cuộn trang bằng ngón tay, không phải nhấn giữ.
-        clearTimeout(press.timer);
-        press = null;
-    }
-
     if (!drag) {
         return;
     }
 
-    const id = cardIdAt(document.elementFromPoint(e.clientX, e.clientY));
+    drag.cx = e.clientX;
+    drag.cy = e.clientY;
 
-    if (id !== null) {
-        const i = idxOf(id);
+    if (!drag.active) {
+        const moved = Math.hypot(e.clientX - (drag.ax - window.scrollX), e.clientY - (drag.ay - window.scrollY));
 
-        if (i >= 0 && i !== drag.last) {
-            drag.last = i;
-            applyRange(i);
+        if (drag.touch) {
+            // Vuốt trước khi nhấn giữ đủ lâu = đang cuộn trang, bỏ.
+            if (moved > 10) {
+                endDrag();
+            }
+
+            return;
         }
+
+        if (moved < DRAG_THRESHOLD) {
+            return;
+        }
+
+        activate();
     }
 
-    // Kéo sát mép trên/dưới thì tự cuộn.
-    if (e.clientY < 90) {
-        window.scrollBy(0, -14);
-    } else if (e.clientY > window.innerHeight - 90) {
-        window.scrollBy(0, 14);
-    }
-};
-
-const endDrag = () => {
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('pointerup', endDrag);
-    window.removeEventListener('pointercancel', endDrag);
-
-    if (press) {
-        clearTimeout(press.timer);
-        press = null;
-    }
-
-    drag = null;
-    // Cho sự kiện click (nếu có) đi qua rồi mới nhận click bình thường trở lại.
-    setTimeout(() => {
-        suppressClick = false;
-    }, 0);
+    refresh();
 };
 
 const onPointerDown = (e: PointerEvent) => {
     const t = e.target as HTMLElement;
     const id = cardIdAt(t);
 
-    if (id === null || t.closest('button, a, input, select, textarea')) {
+    if (t.closest('button, a, input, select, textarea, [role="checkbox"]')) {
         return;
     }
 
-    const v = props.videos.data.find((x) => x.id === id);
-
-    if (!v) {
+    if (e.pointerType === 'mouse' && (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) {
         return;
     }
 
-    if (e.pointerType === 'mouse') {
-        if (e.button !== 0 || !selectMode.value) {
+    // Điểm bắt đầu: trên thẻ chưa chọn = thêm; trên thẻ đã chọn = quét bỏ; ở khe giữa các thẻ = thêm.
+    const startsOnPicked = id !== null && id in picked.value;
+    const touch = e.pointerType !== 'mouse';
+
+    drag = {
+        ax: e.clientX + window.scrollX,
+        ay: e.clientY + window.scrollY,
+        cx: e.clientX,
+        cy: e.clientY,
+        on: !startsOnPicked,
+        base: { ...picked.value },
+        active: false,
+        touch,
+    };
+
+    if (touch) {
+        if (id === null) {
+            drag = null;
+
             return;
         }
 
-        e.preventDefault();
-        suppressClick = true;
-
-        if (e.shiftKey) {
-            toggle(v, true);
-            setTimeout(() => (suppressClick = false), 0);
-
-            return;
-        }
-
-        startDrag(id);
-    } else {
-        // Cảm ứng: nhấn giữ ~0,45 giây mới bắt đầu chọn kéo, để vuốt cuộn trang bình thường.
-        press = {
+        holdingId.value = id;
+        hold = {
             x: e.clientX,
             y: e.clientY,
             id,
             timer: setTimeout(() => {
-                if (!press) {
-                    return;
-                }
-
-                selectMode.value = true;
-                suppressClick = true;
-                startDrag(press.id);
-                navigator.vibrate?.(15);
-            }, 450),
+                hold = null;
+                activate();
+                refresh();
+            }, HOLD_MS),
         };
     }
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
+    window.addEventListener('keydown', onKey);
 };
 
-// Đang kéo chọn bằng ngón tay thì chặn trang cuộn theo.
+// Đang kéo bằng ngón tay thì chặn trang cuộn theo.
 const onTouchMove = (e: TouchEvent) => {
-    if (drag && e.cancelable) {
+    if (drag?.active && e.cancelable) {
         e.preventDefault();
     }
 };
 
-// Nhấn giữ trên điện thoại hay bật menu chuột phải: chặn khi đang chọn kéo.
+// Chặn kéo ảnh gốc của trình duyệt và menu chuột phải/nhấn giữ khi đang kéo chọn.
+const onDragStart = (e: Event) => e.preventDefault();
 const onContextMenu = (e: Event) => {
-    if (drag || press) {
+    if (drag || hold) {
         e.preventDefault();
     }
 };
@@ -412,14 +523,14 @@ const openBatch = (items: BatchItem[]) => {
 const postPicked = () => openBatch(pickedItems.value);
 const postQueue = () => {
     queueOpen.value = false;
-    openBatch(queue.value.map((q) => ({ id: q.id, file_name: q.file_name, duplicate: q.duplicate })));
+    openBatch(queue.value.map((q) => ({ id: q.id, file_name: q.file_name, duration: q.duration, duplicate: q.duplicate })));
 };
 
 const postOne = (id: number) => {
     const v = props.videos.data.find((x) => x.id === id);
     const s = props.selectable.find((x) => x.id === id);
 
-    openBatch([{ id, file_name: v?.file_name ?? s?.file_name ?? `#${id}`, duplicate: v?.duplicate?.text ?? s?.duplicate ?? null }]);
+    openBatch([{ id, file_name: v?.file_name ?? s?.file_name ?? `#${id}`, duration: v?.duration ?? s?.duration ?? null, duplicate: v?.duplicate?.text ?? s?.duplicate ?? null }]);
 };
 
 const onBatchDone = () => {
@@ -747,7 +858,15 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
             </div>
         </section>
 
-        <!-- Lưới video: bấm, kéo hoặc Shift để chọn -->
+        <!-- Khung chọn khi kéo -->
+        <div
+            v-if="band"
+            class="pointer-events-none fixed z-50 rounded-sm border-2 border-primary bg-primary/15"
+            :style="{ left: band.left + 'px', top: band.top + 'px', width: band.width + 'px', height: band.height + 'px' }"
+            data-testid="fork-rieng-band"
+        />
+
+        <!-- Lưới video: bấm để mở, nhấn giữ chuột và kéo (hoặc nhấn giữ trên điện thoại) để quét chọn -->
         <section
             v-if="videos.data.length"
             ref="grid"
@@ -755,6 +874,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
             :class="barVisible ? 'pb-28' : ''"
             data-testid="fork-rieng-grid"
             @pointerdown="onPointerDown"
+            @dragstart="onDragStart"
             @contextmenu="onContextMenu"
         >
             <RiengCard
@@ -763,6 +883,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
                 :video="v"
                 :selected="v.id in picked"
                 :select-mode="selectMode"
+                :holding="holdingId === v.id"
                 :queued="queuedIds.has(v.id)"
                 @open="onCardOpen(v)"
                 @toggle="(shift: boolean) => onCardClick(v, shift)"
@@ -847,8 +968,18 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
             :items="batchItems"
             :accounts="accounts"
             :limits="limits"
+            :hashtag-suggestions="hashtag_suggestions ?? []"
             @step="batchStep = $event"
             @done="onBatchDone"
         />
     </AutoShell>
 </template>
+
+<style>
+/* Đang kéo chọn: không bôi đen chữ, con trỏ hình chữ thập. */
+html.rieng-dragging,
+html.rieng-dragging * {
+    cursor: crosshair !important;
+    user-select: none !important;
+}
+</style>

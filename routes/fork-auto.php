@@ -30,6 +30,10 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::delete('accounts/{socialAccount}/links/{code}', [GioHangController::class, 'clearLink'])->name('accounts.links.clear');
     Route::patch('accounts/{socialAccount}/shop-products/{productId}', [GioHangController::class, 'setHidden'])
         ->where('productId', '[0-9]{6,25}')->name('accounts.shop-products.hide');
+    // "+ Thêm sản phẩm": tạo sản phẩm hub từ sản phẩm shop (qua API Xưởng Video) và gắn giỏ một lần; đổi tên / xoá sản phẩm hub.
+    Route::post('accounts/{socialAccount}/hub-products', [GioHangController::class, 'addProduct'])->middleware('throttle:20,1')->name('accounts.hub-products.add');
+    Route::patch('hub-products/{code}', [GioHangController::class, 'renameProduct'])->where('code', '[a-z0-9-]+')->name('hub-products.rename');
+    Route::delete('hub-products/{code}', [GioHangController::class, 'deleteProduct'])->where('code', '[a-z0-9-]+')->name('hub-products.delete');
     Route::patch('products/{code}', [AutoController::class, 'updateProduct'])->name('products.update');
     // Cá nhân hoá theo sản phẩm hub: ảnh bìa riêng và hashtag riêng (trang tổng hợp + các thao tác).
     Route::get('anh-bia-hashtag', [PersonaliseController::class, 'index'])->name('anh-bia-hashtag');

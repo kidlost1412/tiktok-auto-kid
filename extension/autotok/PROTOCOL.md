@@ -51,7 +51,7 @@ Errors: 403 `bad_code` (`tries_left`), 410 `no_code`, 409 `need_reload`, 400 `ba
 ### 3.2 `POST /api/ext/hello`
 Send at startup, right after pairing, after every TikTok login change, and at least every 60 s.
 Request: `{"protocol": 1, "ext_version": "1.0.0", "identity": {"username": "mt.tri.2.pin", "user_id": "7012345678901234567"} | null}`.
-`identity` comes from the passport endpoint only (`data.username`, `data.user_id_str`, plus optional `avatar_url` from v1.3, https only; the app downloads it); null when
+`identity` comes from the passport endpoint only (`data.username`, `data.user_id_str`, plus optional `avatar_url` from v1.3, https only; the app downloads it; from v1.4.5 it is also read from the Studio / tiktok.com page header by `avatar.js`); null when
 not logged in or unknown.
 Response 200:
 ```json

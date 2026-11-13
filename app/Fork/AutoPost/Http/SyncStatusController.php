@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 
 /**
  * POST /api/ext/sync_status: tiện ích báo lần lấy sản phẩm shop bị lỗi (kèm lý do) để trang Giỏ hàng hiện rõ.
- * Body: {request_id, ok: false, reason}. Chỉ ghi khi request_id vẫn là yêu cầu đang chờ của kênh gắn với Chrome này.
+ * Body: {request_id, ok: false, reason}, hoặc tiến độ {request_id, ok: true, progress: {got, total}}. Chỉ ghi khi request_id vẫn là yêu cầu đang chờ của kênh gắn với Chrome này.
  */
 final class SyncStatusController
 {
@@ -31,6 +31,11 @@ final class SyncStatusController
 
         if ($account !== null && ($body['ok'] ?? null) === false) {
             $recorded = $shop->reportFailure((string) $account->social_account_id, $requestId, self::describe($reason));
+        } elseif ($account !== null && ($body['ok'] ?? null) === true && is_array($body['progress'] ?? null)) {
+            // Tiến độ đang lấy: {got, total}. Không đụng gì tới lỗi hay dữ liệu sản phẩm.
+            $got = $body['progress']['got'] ?? null;
+            $total = $body['progress']['total'] ?? null;
+            $recorded = is_int($got) && $shop->reportProgress((string) $account->social_account_id, $requestId, $got, is_int($total) ? $total : null);
         }
 
         return response()->json(['ok' => true, 'recorded' => $recorded]);

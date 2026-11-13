@@ -4,8 +4,10 @@ import {
     IconAlertTriangle,
     IconCheck,
     IconPackage,
+    IconPencil,
     IconPhoto,
     IconShoppingCartPlus,
+    IconTrash,
 } from '@tabler/icons-vue';
 import { computed } from 'vue';
 
@@ -33,6 +35,8 @@ const emit = defineEmits<{
     save: [];
     clear: [];
     personalise: [];
+    rename: [];
+    remove: [];
 }>();
 
 type Tone = 'need' | 'bad' | 'ok' | 'idle';
@@ -103,11 +107,44 @@ const personaSummary = computed(() => {
                     Quy cách: {{ row.quy_cach_name }}
                 </div>
             </div>
-            <Badge v-if="tone === 'ok'" variant="success">
-                <IconCheck class="size-4" />
-                Sẵn sàng
-            </Badge>
-            <Badge v-else-if="!row.enabled" variant="outline">Hub đã tắt</Badge>
+            <div class="flex shrink-0 items-center gap-1">
+                <Badge v-if="tone === 'ok'" variant="success">
+                    <IconCheck class="size-4" />
+                    Sẵn sàng
+                </Badge>
+                <Badge v-else-if="!row.enabled" variant="outline"
+                    >Hub đã tắt</Badge
+                >
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    title="Đổi tên sản phẩm"
+                    aria-label="Đổi tên sản phẩm"
+                    :data-testid="`fork-gio-hang-rename-${row.code}`"
+                    @click="emit('rename')"
+                >
+                    <IconPencil class="size-4" />
+                </Button>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    title="Xoá sản phẩm"
+                    aria-label="Xoá sản phẩm"
+                    :data-testid="`fork-gio-hang-delete-${row.code}`"
+                    @click="emit('remove')"
+                >
+                    <IconTrash class="size-4" />
+                </Button>
+            </div>
+        </div>
+
+        <div
+            v-if="row.is_sample"
+            class="rounded-lg border border-dashed p-3 text-sm text-muted-foreground"
+            data-testid="fork-gio-hang-sample-note"
+        >
+            Đây là <b>sản phẩm ví dụ</b> để anh xem app hoạt động. Bấm nút bút
+            để đổi tên, hoặc nút thùng rác để xoá khi đã có sản phẩm thật.
         </div>
 
         <div

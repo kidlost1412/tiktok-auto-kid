@@ -35,6 +35,10 @@ const COLLECT_ON_OPEN_MS = 20 * 60 * 1000;      // a Studio page was opened: col
 const COLLECT_DEADLINE_MS = 8 * 60 * 1000;      // whole run (the MAIN world gives up after 6 min)
 const COLLECT_CHUNK = 100;                   // ... nor more than this many times
 
+// Shared pure helpers (shop API parsing). Missing (old test harness / load error) just disables the fast product sync below.
+let L = null;
+try { if (typeof importScripts === 'function') { importScripts('lib.js'); L = (typeof globalThis !== 'undefined' && globalThis.AutotokLib) || null; } } catch (_) { L = null; }
+
 // ---------- storage helpers (serialized so concurrent handlers cannot interleave read-modify-write) ----------
 let chain = Promise.resolve();
 const locked = (fn) => { const r = chain.then(fn); chain = r.catch(() => {}); return r; };
@@ -121,6 +125,14 @@ const AVATAR_TTL_MS = 6 * 3600 * 1000;
 function avatarFromUser(u) {
   return avatarOf({ avatar_url: u && u.avatarLarger, avatar_larger: u && u.avatarMedium, avatar_medium: u && u.avatarThumb });
 }
+// v1.4.5: avatar.js reads the avatar from Studio / tiktok.com pages (the server-side fetches below are usually blocked).
+const SEEN_TTL_MS = 3 * 24 * 3600 * 1000;
+async function seenAvatar() {
+  try {
+    const st = (await chrome.storage.local.get('avatarSeen')).avatarSeen;
+    return st && st.url && Date.now() - st.at < SEEN_TTL_MS ? avatarOf({ avatar_url: st.url }) : '';
+  } catch (_) { return ''; }
+}
 async function tiktokAvatar(username) {
   try {
     const st = (await chrome.storage.local.get('avatarCache')).avatarCache;
@@ -156,7 +168,8 @@ async function passportIdentity() {
     const av = avatarOf(d);
     if (av) id.avatar_url = av;   // v1.3: the app downloads it (TikTok CDN links expire / block hotlinking)
     else {
-      const pub = await tiktokAvatar(username);
+      const seen = await seenAvatar();   // v1.4.5: read from the page header by avatar.js
+      const pub = seen || await tiktokAvatar(username);
       if (pub) id.avatar_url = pub;
     }
     return id;
@@ -476,6 +489,97 @@ async function recoverSync() {
   return true;
 }
 
+// ---- v1.4.5: fast product sync, done entirely in the service worker (no Studio window, no page load) ----
+// The service worker holds the tiktok.com / shop.tiktok.com host permissions and the browser's cookies, so it can read the
+// same GET endpoints the Studio tab used to. Pages after the first are fetched in parallel and both sources at once; the
+// app is told "got/total" while it runs. Anything unexpected returns false and the old Studio-tab flow takes over.
+const SYNC_PAGE_SIZE = 50, SYNC_PAGE_CAP = 40, SYNC_PARALLEL = 4;
+
+async function shopPageSw(type, page) {
+  const url = L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE_SIZE, count: SYNC_PAGE_SIZE });
+  let last = 'unknown';
+  for (let a = 0; a < 2; a++) {
+    try {
+      const r = await fetch(url, { credentials: 'include' });
+      const text = await r.text();
+      if (r.status !== 200) last = 'HTTP ' + r.status;
+      else {
+        const p = L.parseShopProducts(text);
+        if (p.ok) return p;
+        last = p.reason;
+      }
+    } catch (e) { last = String((e && e.message) || e).slice(0, 80); }
+    if (a === 0) await wait(400);
+  }
+  throw new Error(last);
+}
+
+// -> {products, complete, total, pages, error}. `note(count, total)` is told about every page.
+async function shopSourceSw(type, note) {
+  const list = [], seen = new Set();
+  let total = null, pages = 0, complete = false, error = null;
+  const add = (r) => {
+    pages++;
+    if (r.total != null) total = r.total;
+    for (const p of r.products) if (!seen.has(p.product_id)) { seen.add(p.product_id); list.push(p); }
+    note(list, total);
+  };
+  try {
+    const first = await shopPageSw(type, 0);
+    add(first);
+    if (first.rawCount < SYNC_PAGE_SIZE || (total != null && SYNC_PAGE_SIZE >= total)) complete = true;
+    else if (total != null) {
+      const want = Math.ceil(total / SYNC_PAGE_SIZE), last = Math.min(want, SYNC_PAGE_CAP);
+      for (let i = 1; i < last; i += SYNC_PARALLEL) {
+        const batch = [];
+        for (let pg = i; pg < Math.min(i + SYNC_PARALLEL, last); pg++) batch.push(shopPageSw(type, pg));
+        for (const r of await Promise.all(batch)) add(r);
+      }
+      complete = want <= SYNC_PAGE_CAP;
+    } else {
+      for (let pg = 1; pg < SYNC_PAGE_CAP; pg++) {
+        const r = await shopPageSw(type, pg);
+        add(r);
+        if (r.rawCount < SYNC_PAGE_SIZE) { complete = true; break; }
+      }
+    }
+  } catch (e) { error = e.message; complete = false; }
+  return { products: list, complete, total, pages, error };
+}
+
+// POST /api/ext/sync_status {request_id, ok:true, progress:{got,total}}: "Đã lấy 20/58" on the app's page. Old app: ignored.
+async function reportSyncProgress(rid, got, total) {
+  try { await api('/api/ext/sync_status', { method: 'POST', timeoutMs: 8000, body: { request_id: rid, ok: true, progress: { got, total: total == null ? null : Math.max(total, got) } } }); }
+  catch (_) { /* progress is cosmetic */ }
+}
+
+// true = the sync was handled here (products uploaded or the failure reported); false = use the Studio tab instead.
+async function directSync(rid) {
+  if (!L || typeof L.parseShopProducts !== 'function' || typeof L.shopSearchUrl !== 'function') return false;
+  const t0 = Date.now();
+  const id = await passportIdentity();
+  if (!id) { await log('đồng bộ nhanh: chưa biết tài khoản TikTok, dùng cửa sổ Studio', 'WARN'); return false; }
+  const all = new Set(), totals = {};
+  let lastSent = 0;
+  const note = (source) => (list, total) => {
+    for (const p of list) all.add(p.product_id);
+    if (total != null) totals[source] = total;
+    const now = Date.now();
+    if (now - lastSent < 600 && !(lastSent === 0)) return;
+    lastSent = now;
+    reportSyncProgress(rid, all.size, Math.max(0, ...Object.values(totals)));
+  };
+  const [mine, showcase] = await Promise.all([shopSourceSw(3, note('my_shop')), shopSourceSw(2, note('showcase'))]);
+  if (!mine.complete && !showcase.complete) {
+    await log(`đồng bộ nhanh không được (${mine.error || showcase.error || 'chưa đủ'}), dùng cửa sổ Studio`, 'WARN');
+    return false;
+  }
+  await reportSyncProgress(rid, all.size, Math.max(all.size, ...Object.values(totals)));
+  await log(`đồng bộ nhanh: ${all.size} sản phẩm trong ${Date.now() - t0}ms`);
+  await finishSync({ outcome: 'sync_ok', identity: { username: id.username, user_id: id.user_id }, sources: { my_shop: mine, showcase }, elapsed_ms: Date.now() - t0 });
+  return true;
+}
+
 // Every NEW request_id is started promptly: it replaces a sync still running for an older request_id (the owner pressed
 // the button again), and its retry budget starts at zero. The same request_id is retried at most SYNC_MAX_TRIES times.
 async function startSync(rid) {
@@ -498,6 +602,7 @@ async function startSync(rid) {
   if (!started) return false;
   if (superseded) { await log(`yêu cầu mới ${rid} thay yêu cầu ${superseded.request_id} đang chạy`, 'WARN'); await closeSyncWindow(superseded); }
   await log(`đồng bộ sản phẩm (yêu cầu ${rid})`);
+  try { if (await directSync(rid)) return true; } catch (e) { await log('đồng bộ nhanh: ' + String((e && e.message) || e), 'WARN'); }
   try {
     const s = await getSettings();
     const { tab, windowId, strategy } = await createStudioWindow(STUDIO_URL + '#autotok=sync-' + encodeURIComponent(rid), s);
@@ -947,6 +1052,15 @@ const handlers = {
       await log(`đã học mẫu giỏ hàng (sản phẩm ${productId}, ${identity.username})`);
       return { ok: true };
     } catch (e) { await log('gửi mẫu giỏ hàng lỗi: ' + e.message, 'WARN'); return { ok: false, reason: 'send-failed' }; }
+  },
+
+  async avatarSeen(msg, sender) {
+    const url = avatarOf({ avatar_url: msg.url });
+    if (!url || !/^https:\/\/www\.tiktok\.com\//.test((sender.tab && sender.tab.url) || '')) return { ok: false };
+    const old = (await chrome.storage.local.get('avatarSeen')).avatarSeen;
+    await chrome.storage.local.set({ avatarSeen: { url, at: Date.now() } });
+    if (!old || old.url !== url || Date.now() - old.at > 6 * 3600 * 1000) await helloIfDue(true);   // send it to the app now
+    return { ok: true };
   },
 
   async result(msg, sender) {

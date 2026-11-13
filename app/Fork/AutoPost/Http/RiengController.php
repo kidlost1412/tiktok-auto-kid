@@ -11,6 +11,7 @@ use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Persona\CoverStore;
+use App\Fork\AutoPost\Persona\HashtagSuggestions;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
@@ -28,10 +29,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use InvalidArgumentException;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
@@ -117,6 +119,8 @@ final class RiengController extends Controller
             'queue' => $this->queueItems($accountId),
             'scan_sig' => $this->signature(),
             'accounts' => $this->accounts($accountId),
+            // Gợi ý hashtag cho hộp thoại đăng hàng loạt (không tính lại khi chỉ tải lại danh sách video).
+            'hashtag_suggestions' => fn (): array => HashtagSuggestions::top(),
             'limits' => ['min_lead_minutes' => intdiv(Planner::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
             'last_scan_at' => Cache::get('fork-rieng:last-scan'),
         ]);
@@ -149,7 +153,7 @@ final class RiengController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, string>  $names
+     * @param  Collection<int, string>  $names
      * @param  array<string, mixed>|null  $duplicate
      * @param  array<string, mixed>|null  $product
      * @return array<string, mixed>

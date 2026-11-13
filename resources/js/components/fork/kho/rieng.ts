@@ -49,6 +49,8 @@ export interface QueueItem {
 export interface BatchItem {
     id: number;
     file_name: string;
+    /** Thời lượng (giây) để hiện trên hình nhỏ; không có cũng được. */
+    duration?: number | null;
     duplicate?: string | null;
 }
 

@@ -6,6 +6,7 @@ import {
     IconBrandTiktok,
     IconHash,
     IconPlugConnectedX,
+    IconPlus,
     IconRefresh,
     IconShoppingCart,
 } from '@tabler/icons-vue';
@@ -30,6 +31,16 @@ import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
 import { cardCls } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
@@ -49,6 +60,8 @@ const props = defineProps<{
     sync_ttl_minutes: number;
     personalise?: Record<string, Persona>;
     personalise_default?: PersonaDefault;
+    sample_hidden?: boolean;
+    name_short_max?: number;
 }>();
 
 const busy = ref<string | null>(null);
@@ -85,11 +98,28 @@ const syncShop = () => {
     router.post(`/auto/accounts/${props.selected}/shop/sync`, {}, opts);
 };
 
-// Đang chờ tiện ích thì tự làm mới trạng thái mỗi 5 giây.
+// "Đã lấy 20/58…": tiện ích báo tiến độ khi đang lấy.
+const syncProgress = computed(() => props.sync?.progress ?? null);
+const syncPercent = computed(() => {
+    const p = syncProgress.value;
+
+    return p && p.total ? Math.min(100, Math.round((p.got / p.total) * 100)) : null;
+});
+const syncProgressText = computed(() => {
+    const p = syncProgress.value;
+
+    if (!p) {
+        return null;
+    }
+
+    return p.total ? `${p.got}/${p.total}` : `${p.got}`;
+});
+
+// Đang chờ tiện ích thì tự làm mới trạng thái mỗi 2 giây (chỉ phần trạng thái, nhẹ); lấy xong thì tải lại danh sách.
 let timer: ReturnType<typeof setInterval> | null = null;
 watch(
     syncState,
-    (state) => {
+    (state, before) => {
         if (timer) {
             clearInterval(timer);
             timer = null;
@@ -97,10 +127,12 @@ watch(
 
         if (state === 'waiting') {
             timer = setInterval(() => {
-                router.reload({
-                    only: ['sync', 'products', 'rows'],
-                });
-            }, 5000);
+                router.reload({ only: ['sync'] });
+            }, 2000);
+        } else if (before === 'waiting') {
+            router.reload({
+                only: ['sync', 'products', 'rows', 'sample_hidden'],
+            });
         }
     },
     { immediate: true },
@@ -230,6 +262,78 @@ const clearRow = (r: Row) => {
     });
 };
 
+// ---- "+ Thêm sản phẩm": chọn sản phẩm shop -> app tạo sản phẩm hub tương ứng và gắn giỏ một lần ----
+const addOpen = ref(false);
+const adding = ref(false);
+
+const addProduct = (p: ShopProduct) => {
+    if (!props.selected) {
+        return;
+    }
+
+    adding.value = true;
+    router.post(
+        `/auto/accounts/${props.selected}/hub-products`,
+        { shop_product_id: p.product_id, display_name: p.suggested_name },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                addOpen.value = false;
+            },
+            onFinish: () => {
+                adding.value = false;
+            },
+        },
+    );
+};
+
+// ---- Đổi tên / xoá sản phẩm hub ----
+const renaming = ref<Row | null>(null);
+const renameValue = ref('');
+
+const openRename = (r: Row) => {
+    renaming.value = r;
+    renameValue.value = r.hub_name;
+};
+
+const saveRename = () => {
+    const r = renaming.value;
+    const name = renameValue.value.trim();
+
+    if (!r || name === '') {
+        return;
+    }
+
+    busy.value = `rename-${r.code}`;
+    router.patch(
+        `/auto/hub-products/${r.code}`,
+        { name },
+        {
+            ...opts,
+            onSuccess: () => {
+                renaming.value = null;
+            },
+        },
+    );
+};
+
+const removeProduct = (r: Row) => {
+    if (
+        !window.confirm(
+            `Xoá sản phẩm "${r.hub_name}"?\nHồ sơ sản phẩm được đưa vào Thùng rác của Windows; video gốc và video đã làm không bị xoá. Giỏ hàng đã chọn cho sản phẩm này cũng bị bỏ.`,
+        )
+    ) {
+        return;
+    }
+
+    busy.value = `rename-${r.code}`;
+    router.delete(`/auto/hub-products/${r.code}`, opts);
+};
+
+const onlySample = computed(
+    () => props.rows.length > 0 && props.rows.every((r) => r.is_sample),
+);
+
 // ---- Cá nhân hoá (ảnh bìa, hashtag) theo sản phẩm hub; 'default' = hashtag mặc định chung ----
 const { personaOf, dialogProps, openProduct, openDefault, closePersonalise } =
     usePersonalise(() => props);
@@ -326,7 +430,9 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             <IconRefresh v-else class="size-4" />
                             {{
                                 syncState === 'waiting'
-                                    ? 'Đang chờ tiện ích…'
+                                    ? syncProgressText
+                                        ? `Đang lấy… ${syncProgressText}`
+                                        : 'Đang chờ tiện ích…'
                                     : syncState === 'idle' ||
                                         syncState === 'done'
                                       ? 'Lấy sản phẩm từ shop'
@@ -347,10 +453,25 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                         tone="info"
                         data-testid="fork-gio-hang-sync-waiting"
                     >
-                        Đang chờ tiện ích Chrome lấy sản phẩm từ shop. Chrome
-                        cần đang mở và đã đăng nhập TikTok. Trang tự cập nhật;
-                        nếu quá
-                        {{ sync_ttl_minutes }} phút yêu cầu sẽ hết hạn.
+                        <template v-if="syncProgress">
+                            <div
+                                class="font-medium"
+                                data-testid="fork-gio-hang-sync-progress"
+                            >
+                                Đã lấy {{ syncProgressText }} sản phẩm…
+                            </div>
+                            <Progress
+                                v-if="syncPercent !== null"
+                                class="mt-2 h-2"
+                                :model-value="syncPercent"
+                            />
+                        </template>
+                        <template v-else>
+                            Đang chờ tiện ích Chrome lấy sản phẩm từ shop. Chrome
+                            cần đang mở và đã đăng nhập TikTok (thường mất vài
+                            giây). Trang tự cập nhật; nếu quá
+                            {{ sync_ttl_minutes }} phút yêu cầu sẽ hết hạn.
+                        </template>
                     </Callout>
                     <Callout
                         v-else-if="syncState === 'error'"
@@ -407,6 +528,13 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                         description="Mỗi thẻ là một sản phẩm của hub theo từng quy cách. Phải chọn đúng một sản phẩm shop cho mỗi thẻ."
                     >
                         <Button
+                            data-testid="fork-gio-hang-add"
+                            @click="addOpen = true"
+                        >
+                            <IconPlus class="size-4" />
+                            Thêm sản phẩm
+                        </Button>
+                        <Button
                             variant="outline"
                             data-testid="fork-personalise-default"
                             @click="openDefault"
@@ -419,6 +547,21 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             }}
                         </Button>
                     </SectionHeading>
+
+                    <Callout
+                        v-if="onlySample"
+                        tone="info"
+                        data-testid="fork-gio-hang-only-sample"
+                    >
+                        Hiện mới có <b>sản phẩm ví dụ</b>. Bấm
+                        <b>+ Thêm sản phẩm</b>, chọn sản phẩm thật trong shop
+                        của anh: app tự tạo sản phẩm tương ứng và gắn giỏ hàng.
+                        {{
+                            products.length
+                                ? ''
+                                : 'Nhớ bấm "Lấy sản phẩm từ shop" trước để có danh sách.'
+                        }}
+                    </Callout>
 
                     <div
                         v-if="loading"
@@ -446,6 +589,8 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             :busy="busy === `row-${r.key}`"
                             :persona="personaOf(r.code)"
                             @personalise="openProduct(r.code, r.hub_name)"
+                            @rename="openRename(r)"
+                            @remove="removeProduct(r)"
                             @pick="picking = r.key"
                             @update:name="(v: string) => editName(r, v)"
                             @save="saveRow(r)"
@@ -453,13 +598,23 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                         />
                     </div>
 
+                    <p
+                        v-if="sample_hidden"
+                        class="text-sm text-muted-foreground"
+                        data-testid="fork-gio-hang-sample-hidden"
+                    >
+                        Thẻ sản phẩm ví dụ đã được ẩn vì anh đã có sản phẩm
+                        thật.
+                    </p>
+
                     <EmptyState
                         v-if="!rows.length"
-                        title="Hub chưa có sản phẩm nào đang bật"
-                        description="Khi Xưởng Video gửi sản phẩm sang, thẻ chọn giỏ sẽ hiện ở đây. Bạn có thể quét kho ở trang Kho video."
+                        title="Chưa có sản phẩm nào"
+                        description="Bấm &quot;Thêm sản phẩm&quot;, chọn một sản phẩm trong shop TikTok của anh: app tạo sản phẩm trong Xưởng Video và gắn giỏ hàng luôn."
                     >
-                        <Button as-child size="sm" variant="outline">
-                            <a href="/auto/kho">Đến Kho video →</a>
+                        <Button size="sm" @click="addOpen = true">
+                            <IconPlus class="size-4" />
+                            Thêm sản phẩm
                         </Button>
                     </EmptyState>
                 </section>
@@ -470,6 +625,53 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
             v-bind="dialogProps"
             @update:open="closePersonalise"
         />
+
+        <ShopPickerDialog
+            mode="add"
+            :open="addOpen"
+            row-label=""
+            :products="products"
+            current-id=""
+            :busy-id="
+                busy?.startsWith('hide-') ? busy.slice('hide-'.length) : null
+            "
+            :adding="adding"
+            @update:open="(v: boolean) => (addOpen = v)"
+            @select="addProduct"
+            @toggle-hidden="setHidden"
+        />
+
+        <Dialog
+            :open="renaming !== null"
+            @update:open="(v: boolean) => !v && (renaming = null)"
+        >
+            <DialogContent class="sm:max-w-md" data-testid="fork-gio-hang-rename">
+                <DialogHeader>
+                    <DialogTitle>Đổi tên sản phẩm</DialogTitle>
+                    <DialogDescription>
+                        Tên gọi ngắn hiện trên thẻ và được đọc trong video. Mã
+                        sản phẩm không đổi.
+                    </DialogDescription>
+                </DialogHeader>
+                <Input
+                    v-model="renameValue"
+                    class="h-11"
+                    :maxlength="name_short_max ?? 40"
+                    data-testid="fork-gio-hang-rename-input"
+                    @keyup.enter="saveRename"
+                />
+                <DialogFooter>
+                    <Button variant="outline" @click="renaming = null"
+                        >Huỷ</Button
+                    >
+                    <Button
+                        :disabled="!renameValue.trim() || busy !== null"
+                        @click="saveRename"
+                        >Lưu tên</Button
+                    >
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
         <ShopPickerDialog
             :open="picking !== null"

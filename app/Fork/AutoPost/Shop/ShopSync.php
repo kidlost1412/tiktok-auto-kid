@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Shop;
 
+use App\Fork\AutoPost\Jobs\PrefetchProductCovers;
 use App\Fork\AutoPost\Models\AnchorTemplate;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Models\Post;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -36,6 +38,7 @@ final class ShopSync
     public function requestSync(string $socialAccountId): string
     {
         $id = (string) Str::uuid();
+        Cache::forget(self::progressKey($socialAccountId));
 
         AutoAccount::query()->updateOrCreate(['social_account_id' => $socialAccountId], [
             'products_sync_request' => $id,
@@ -81,10 +84,39 @@ final class ShopSync
         return true;
     }
 
+    /** Tiến độ "Đã lấy 20/58" chỉ cần sống trong lúc đang lấy. */
+    public const int PROGRESS_TTL = 900;
+
+    private static function progressKey(string $socialAccountId): string
+    {
+        return 'fork-shop-sync-progress:'.$socialAccountId;
+    }
+
+    /**
+     * Tiện ích báo đang lấy dở: đã có $got sản phẩm trên tổng $total (null nếu shop chưa cho biết tổng).
+     * Chỉ ghi nếu request_id còn là yêu cầu đang chờ.
+     */
+    public function reportProgress(string $socialAccountId, string $requestId, int $got, ?int $total): bool
+    {
+        $auto = AutoAccount::query()->find($socialAccountId);
+
+        if ($auto === null || $requestId === '' || $auto->products_sync_request !== $requestId) {
+            return false;
+        }
+
+        $got = max(0, min($got, self::MAX_PRODUCTS));
+        $total = $total === null ? null : max($got, min(max(0, $total), self::MAX_PRODUCTS));
+
+        Cache::put(self::progressKey($socialAccountId), ['request_id' => $requestId, 'got' => $got, 'total' => $total], self::PROGRESS_TTL);
+
+        return true;
+    }
+
     /**
      * Trạng thái hiển thị cho chủ app: idle | waiting | error | expired | done.
+     * Khi đang chờ, `progress` là {got, total} nếu tiện ích đã báo tiến độ.
      *
-     * @return array{state: string, reason: ?string, requested_at: ?string, synced_at: ?string}
+     * @return array{state: string, reason: ?string, requested_at: ?string, synced_at: ?string, progress: ?array{got: int, total: ?int}}
      */
     public function status(?AutoAccount $auto): array
     {
@@ -104,9 +136,20 @@ final class ShopSync
             $state = 'done';
         }
 
+        $progress = null;
+
+        if ($state === 'waiting') {
+            $p = Cache::get(self::progressKey((string) $auto?->social_account_id));
+
+            if (is_array($p) && ($p['request_id'] ?? null) === $auto?->products_sync_request) {
+                $progress = ['got' => (int) $p['got'], 'total' => $p['total'] === null ? null : (int) $p['total']];
+            }
+        }
+
         return [
             'state' => $state,
             'reason' => $reason,
+            'progress' => $progress,
             'requested_at' => $auto?->products_sync_requested_at?->toIso8601String(),
             'synced_at' => $auto?->products_synced_at?->toIso8601String(),
         ];
@@ -205,11 +248,20 @@ final class ShopSync
             }
 
             $auto->forceFill($changes)->save();
+            Cache::forget(self::progressKey($socialAccountId));
         });
 
         try {
             app(HubCartAttach::class)->run();   // Shop vừa đồng bộ → gắn ngay giỏ đã chọn ở Xưởng (ô còn trống)
         } catch (Throwable) {
+        }
+
+        if ($products !== []) {
+            try {
+                // Tải sẵn ảnh bìa ở nền để hộp chọn sản phẩm có ảnh ngay.
+                PrefetchProductCovers::dispatch($socialAccountId);
+            } catch (Throwable) {
+            }
         }
 
         return ['received' => count($products), 'missing' => $missing];
