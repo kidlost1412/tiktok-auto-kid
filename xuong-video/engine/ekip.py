@@ -16,7 +16,7 @@ from kiem_khung import scan
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, kem, kem_ngay
 CFG = cfg_hub()
 COT = ["file", "goc", "giong", "gu_dao_dien", "cong_thuc", "diem_giam_khao", "lan_dung", "loi_giam_khao", "y_tuong", "bo_cuc", "khoi",
        "sfx", "nhac", "thoi_luong", "caption", "hashtag", "loi", "canh", "may_sua", "danh_gia_kid", "gop_y_kid", "luot_xem", "don"]
@@ -82,7 +82,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         except HetHanMuc as e:
             log(f"⛔ HẾT HẠN MỨC CLAUDE khi viết lời: {e}. Đổi tài khoản rồi chạy lại."); return
         log(f"Biên kịch xong: {len(scripts)} lời đạt kiểm")
-    sheet = out_dir / "bang-ghi-ekip.csv"
+    sheet = kem_ngay(out_dir, "bang-ghi-ekip.csv", ghi=True)
     new = not sheet.exists()
     fsheet = open(sheet, "a", newline="", encoding="utf-8-sig"); w = csv.writer(fsheet)
     if new:
@@ -283,7 +283,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         log(f"  chấm lại {t['fname']}: {r.get('diem')}/10 < bản cũ {cu_t['gk'].get('diem')}/10 → giữ bản cũ")
                         (out_dir / "_ban-chua-dat").mkdir(exist_ok=True)
                         for duoi in (".mp4", ".jpg"):
-                            moi = Path(t["job"]["out"]).with_suffix(duoi)
+                            moi = kem(t["job"]["out"], duoi) if duoi != ".mp4" else Path(t["job"]["out"])
                             if moi.exists():
                                 shutil.move(str(moi), out_dir / "_ban-chua-dat" / moi.name)
                         for k in ("job", "info", "fname", "gk", "edl", "plan", "music"):
@@ -296,8 +296,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                     if Path(old).exists() and old not in {t["job"]["out"] for t in dot}:
                         (out_dir / "_ban-chua-dat").mkdir(exist_ok=True)
                         for duoi in (".mp4", ".jpg"):
-                            if Path(old).with_suffix(duoi).exists():
-                                shutil.move(str(Path(old).with_suffix(duoi)), out_dir / "_ban-chua-dat" / Path(old).with_suffix(duoi).name)
+                            fo = kem(old, duoi) if duoi != ".mp4" else Path(old)
+                            if fo.exists():
+                                shutil.move(str(fo), out_dir / "_ban-chua-dat" / fo.name)
         except HetHanMuc as e:
             het_msg = str(e)[:160]
         except Exception as e:
@@ -315,7 +316,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                    " | ".join(info.get("canh", [])), "; ".join(t.get("sua", []) + ([f"khung {bad[0][1]} {bad[0][0]}s"] if bad else [])),
                    "", "", "", ""]
             w.writerow(row); fsheet.flush()
-            Path(t["job"]["out"]).with_suffix(".txt").write_text(
+            kem(t["job"]["out"], ".txt", ghi=True).write_text(
                 (cap_cua(t) + "\n" + " ".join(t["sc"].get("hashtag", []))).strip() + "\n", encoding="utf-8")
             meta = {"id": Path(t["job"]["out"]).stem, "ma": ma_sp, "quy_cach": t["sc"].get("quy_cach"), "goc": t["sc"]["goc"],
                     "dang": t["sc"].get("dang"), "giong": t["sc"]["giong"], "dao_dien": t["gu"], "cong_thuc": info.get("cong_thuc"),
@@ -327,7 +328,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                     "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "nhan_tu", "captions", "caption",
                                                              "hashtag", "dang", "quy_cach")},
                     "lam_lai_tu": t.get("lam_lai_tu")}
-            Path(t["job"]["out"]).with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
+            kem(t["job"]["out"], ".json", ghi=True).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
             with open(da_dung_f, "a", encoding="utf-8") as f:
                 f.write(" ".join(sg["shot"]["id"] for sg in (t["plan"].get("edl_segs") or [])) + "\n")
             made += 1
@@ -335,8 +336,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             if t.get("lam_lai_tu"):                       # bản anh không ưng → cất vào _ban-chua-dat (tự dọn sau 5 ngày)
                 cu = Path(t["lam_lai_tu"]); dich = cu.parent / "_ban-chua-dat"; dich.mkdir(exist_ok=True)
                 for duoi in (".mp4", ".jpg", ".json", ".txt"):
-                    if cu.with_suffix(duoi).exists():
-                        shutil.move(str(cu.with_suffix(duoi)), str(dich / cu.with_suffix(duoi).name))
+                    fo = cu if duoi == ".mp4" else kem(cu, duoi)
+                    if fo.exists():
+                        shutil.move(str(fo), str(dich / fo.name))
                 log(f"     ↳ thay cho {cu.name} (bản cũ cất vào _ban-chua-dat)")
         sig_file.write_text("\n".join(sorted(used_sigs)), encoding="utf-8")
         if het_msg:

@@ -1322,7 +1322,8 @@ $('#btnDung').onclick = async () => { if (confirm('Dừng lô đang làm? Video 
 // ---------- KHO VIDEO
 async function taiNgay() {
   const ds = await api('/api/ngay'); const s = $('#ngayChon'); const cu = s.value; s.innerHTML = '';
-  ds.forEach(d => s.add(new Option(d.split('-').reverse().join('/'), d))); if (cu) s.value = cu; taiVideo();
+  s.add(new Option('Tất cả ngày', 'tat-ca'));
+  ds.forEach(d => s.add(new Option(d.split('-').reverse().join('/'), d))); s.value = cu || ds[0] || 'tat-ca'; taiVideo();
 }
 async function taiVideo() {
   if (!VIDS.length) $('#vids').innerHTML = '<div class="vskel"><div class="skel"></div><div style="padding:14px;display:grid;gap:8px"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:12px;width:45%"></div></div></div>'.repeat(5);
@@ -1336,7 +1337,7 @@ function veVideo() {
     return `<div class="vid ${dg || ''}" data-f="${esc(v.file)}">
       <div class="thumb" data-i="${VIDS.indexOf(v)}">${v.bia ? `<img src="${v.bia}" alt="" loading="lazy">` : `<video src="${v.url}#t=1.2" preload="metadata" muted></video>`}<div class="play"><span>${ic('play', 'f')}</span></div>${diem}</div>
       <div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
-        <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + v.luc : ''}</div>
+        <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + ($('#ngayChon').value === 'tat-ca' && v.ngay ? v.ngay.split('-').reverse().slice(0, 2).join('/') + ' ' : '') + v.luc : ''}</div>
         ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : 'r'}">${v.danh_gia.tu_dong ? ic('bot') : ic(dg === 'dat' ? 'check' : 'x')}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt' : 'Anh ưng') : (v.danh_gia.tu_dong ? 'Tự bỏ' : 'Anh bỏ')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">${ic('send')} Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">${ic('alert')} Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}

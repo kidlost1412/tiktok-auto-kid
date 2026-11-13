@@ -6,7 +6,9 @@ namespace App\Fork\AutoPost\Console;
 
 use App\Fork\AutoPost\Hub\HubApi;
 use App\Fork\AutoPost\Hub\HubReporter;
+use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Shop\HubCartAttach;
+use Illuminate\Support\Facades\Cache;
 use App\Fork\AutoPost\VideoLibrary;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -36,6 +38,15 @@ final class AutoIngestCommand extends Command
             }
         } catch (Throwable $e) {
             Log::warning('Giỏ hàng: tự gắn theo hub lỗi.', ['error' => $e->getMessage()]);
+        }
+
+        // Kho riêng (video chủ app tự làm): quét song song với luồng hub, không ảnh hưởng hub.
+        try {
+            $r = app(RiengScanner::class)->scan();
+            Cache::forever('fork-rieng:last-scan', now()->toIso8601String());
+            $this->line("Kho riêng: mới {$r['new']}, chờ ghi xong {$r['waiting']}, trùng {$r['duplicate']}, mất file {$r['gone']}.");
+        } catch (Throwable $e) {
+            Log::warning('Kho riêng: quét lỗi.', ['error' => $e->getMessage()]);
         }
 
         $result = $library->ingest();

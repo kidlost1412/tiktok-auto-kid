@@ -33,7 +33,7 @@ final class HubText
             $found = ['caption' => trim($json['caption']), 'hashtags' => self::tags($json['hashtag'] ?? null)];
         }
 
-        $found ??= self::fromTxt(pathinfo($videoPath, PATHINFO_DIRNAME).'/'.pathinfo($videoPath, PATHINFO_FILENAME).'.txt');
+        $found ??= self::fromTxt(Sidecar::path(pathinfo($videoPath, PATHINFO_DIRNAME), pathinfo($videoPath, PATHINFO_FILENAME).'.txt'));
         $found ??= self::fromCsv($videoPath);
 
         $tenGio = $json === null ? null : self::cartName($json['ten_gio'] ?? null);
@@ -105,7 +105,7 @@ final class HubText
     /** @return array{caption: string, hashtags: list<string>}|null */
     private static function fromCsv(string $videoPath): ?array
     {
-        $row = self::readCsv(dirname($videoPath).'/'.self::CSV_NAME)[basename($videoPath)] ?? null;
+        $row = self::readCsv(Sidecar::path(dirname($videoPath), self::CSV_NAME))[basename($videoPath)] ?? null;
 
         if ($row === null || trim($row['caption'] ?? '') === '') {
             return null;

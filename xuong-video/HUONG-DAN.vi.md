@@ -5,7 +5,7 @@ Xưởng Video chạy cùng **TikTok Auto Kid** (dịch vụ `xuong-video`, cổ
 
 ## Làm video hằng ngày
 🎬 **Sản xuất** → chọn sản phẩm + số video → **Bắt đầu làm**. Xem tiến độ, nhật ký ê-kíp AI; có nút Dừng.
-Video ra ở `ra\<ngày>\`: mỗi video có `.mp4` (đã làm sạch metadata) + `.jpg` (ảnh bìa) + `.txt` (caption + hashtag).
+Video ra ở `ra\<ngày>\`: chỉ có các file `.mp4` thành phẩm (đã làm sạch metadata); ảnh bìa `.jpg`, caption `.txt`, hồ sơ `.json`, bảng ghi `.csv` nằm trong `ra\<ngày>\_kem\`.
 
 📺 **Kho video** → xem to, điểm giám khảo, chép caption, tải bìa; ✅ Ưng / ❌ Bỏ + 1 dòng góp ý → vào sổ gu.
 

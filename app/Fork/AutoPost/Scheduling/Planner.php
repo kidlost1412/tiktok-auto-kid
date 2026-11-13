@@ -354,7 +354,7 @@ final class Planner
         }
     }
 
-    private function ineligible(AutoAccount $auto): ?string
+    public function ineligible(AutoAccount $auto): ?string
     {
         if (filled($auto->paused_reason)) {
             return 'đang tạm dừng: '.$auto->paused_reason;
@@ -465,7 +465,7 @@ final class Planner
 
     // ---------------------------------------------------------------- Dữ liệu đã có
 
-    private function timezoneFor(AutoAccount $a): DateTimeZone
+    public function timezoneFor(AutoAccount $a): DateTimeZone
     {
         $name = SocialAccount::query()->whereKey($a->social_account_id)->value('timezone');
 
@@ -476,7 +476,7 @@ final class Planner
         }
     }
 
-    private function gapSeconds(): int
+    public function gapSeconds(): int
     {
         return max(1, (int) config('fork.auto.min_gap_minutes', 20)) * 60;
     }

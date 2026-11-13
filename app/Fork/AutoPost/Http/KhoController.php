@@ -11,6 +11,8 @@ use App\Fork\AutoPost\Media\ProductImageLookup;
 use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\KhoStore;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Rieng\RiengThumbs;
+use App\Fork\AutoPost\Sidecar;
 use App\Fork\AutoPost\Shop\HubCartAttach;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoSetting;
@@ -67,6 +69,18 @@ final class KhoController extends Controller
         };
     }
 
+    /** Biểu thức SQL "ngày" (giờ VN, dạng date) theo tab: ngày đăng / ngày hẹn / ngày làm video. Cột timestamp lưu UTC. */
+    private function dayExpression(string $tab): string
+    {
+        $vn = fn (string $col): string => "(({$col} at time zone 'UTC') at time zone 'Asia/Ho_Chi_Minh')::date";
+
+        return match ($tab) {
+            'dang' => $vn('posted_at'),
+            'xep' => $vn('coalesce(scheduled_for, posted_at)'),
+            default => 'batch_date',
+        };
+    }
+
     public function index(Request $request): Response
     {
         $this->authorizeOwner($request);
@@ -83,7 +97,11 @@ final class KhoController extends Controller
         $like = '%'.addcslashes($search, '%_'.chr(92)).'%';
 
         // Bản ghi cũ (nguồn `ra`) ẩn mặc định.
-        $base = fn () => AutoVideo::query()->when(! $showLegacy, fn ($q) => $q->where('source', '!=', 'ra'));
+        // Video riêng của chủ app có trang "Kho riêng" riêng, không lẫn vào kho hub.
+        $base = fn () => AutoVideo::query()->notRieng()->when(! $showLegacy, fn ($q) => $q->where('source', '!=', 'ra'));
+        $day = $request->query('day');
+        $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
+        $dayExpr = $this->dayExpression($tab);
 
         // Số trên tab KHÔNG phụ thuộc sản phẩm đang chọn; số trên chip sản phẩm tính trong tab đang chọn.
         $statusCounts = $base()
@@ -101,9 +119,15 @@ final class KhoController extends Controller
 
         $legacyCount = AutoVideo::query()->where('source', 'ra')->count();
 
+        // Các ngày để chọn trong bộ lọc ngày (mặc định "Tất cả ngày" = không lọc).
+        $days = $base()->tap(fn ($q) => $this->applyTab($q, $tab))
+            ->selectRaw($dayExpr.' as d')->whereRaw($dayExpr.' is not null')->groupByRaw($dayExpr)->orderByRaw($dayExpr.' desc')->limit(120)->pluck('d')
+            ->map(fn ($d): string => (string) $d)->values()->all();
+
         $videos = $base()
             ->with('socialAccount:id,username,display_name,avatar_url')
             ->tap(fn ($q) => $this->applyTab($q, $tab))
+            ->when($day !== '', fn ($q) => $q->whereRaw($dayExpr.' = ?', [$day]))
             ->when($product !== '', fn ($q) => $q->where('product_code', $product))
             ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('caption', 'ilike', $like)
@@ -150,7 +174,8 @@ final class KhoController extends Controller
                 'image' => $images->forCode($p->code),
                 'count' => (int) ($productCounts[$p->code] ?? 0),
             ])->values()->all(),
-            'filters' => ['tab' => $tab, 'product' => $product, 'legacy' => $showLegacy, 'sort' => $sort, 'q' => $search],
+            'filters' => ['tab' => $tab, 'product' => $product, 'legacy' => $showLegacy, 'sort' => $sort, 'q' => $search, 'day' => $day],
+            'days' => $days,
             'counts' => $counts,
             'legacy_count' => $legacyCount,
             'blockers' => $readiness->summarize($assessed, $waiting),
@@ -243,6 +268,14 @@ final class KhoController extends Controller
     {
         $this->authorizeOwner($request);
 
+        // Video riêng: chỉ phát file nằm dưới thư mục Kho riêng đã đăng ký.
+        if ($video->isRieng()) {
+            $own = RiengController::safeVideoPath($video);
+            abort_if($own === null, SymfonyResponse::HTTP_NOT_FOUND);
+
+            return response()->file($own, ['Content-Type' => 'video/mp4', 'Cache-Control' => 'private, max-age=300']);
+        }
+
         $hub = realpath(app(KhoStore::class)->hub());
         $file = $video->files_deleted_at === null ? realpath((string) $video->path) : false;
 
@@ -279,11 +312,31 @@ final class KhoController extends Controller
     {
         $this->authorizeOwner($request);
 
+        if ($video->isRieng()) {
+            $thumb = app(RiengThumbs::class)->get($video);
+            abort_if($thumb === null, SymfonyResponse::HTTP_NOT_FOUND);
+
+            return response()->file($thumb, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=86400']);
+        }
+
         $rel = data_get($video->meta, 'anh_bia');
         $hub = realpath(app(KhoStore::class)->hub());
-        $file = $hub !== false && is_string($rel) && $rel !== '' && ! str_contains($rel, "\0")
-            ? realpath($hub.DIRECTORY_SEPARATOR.ltrim(str_replace('\\', '/', $rel), '/'))
-            : false;
+        $file = false;
+
+        if ($hub !== false && is_string($rel) && $rel !== '' && ! str_contains($rel, "\0")) {
+            $rel = ltrim(str_replace('\\', '/', $rel), '/');
+            // Hub chuyển file đi kèm vào <thư mục ngày>/_kem/: tìm ở đó trước, rồi mới tới chỗ cũ.
+            $kem = dirname($rel) === '.' ? Sidecar::DIR.'/'.basename($rel) : dirname($rel).'/'.Sidecar::DIR.'/'.basename($rel);
+
+            foreach ([$kem, $rel] as $candidate) {
+                $real = realpath($hub.DIRECTORY_SEPARATOR.$candidate);
+
+                if ($real !== false && is_file($real)) {
+                    $file = $real;
+                    break;
+                }
+            }
+        }
         $types = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
         $ext = $file === false ? '' : strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
@@ -344,7 +397,7 @@ final class KhoController extends Controller
      */
     private function matrix($products, ProductImageLookup $images): array
     {
-        $rows = AutoVideo::query()
+        $rows = AutoVideo::query()->notRieng()
             ->selectRaw('product_code, quy_cach, '.AutoVideo::effectiveStatusSql().' as eff, count(*) as total')
             ->groupByRaw('product_code, quy_cach, eff')
             ->get();
@@ -491,7 +544,7 @@ final class KhoController extends Controller
             // Bài lỗi chắc chắn chưa lên TikTok thì hiện nút "Thử lại" (máy chủ vẫn kiểm lại khi bấm).
             'can_retry' => $v->status === AutoVideo::FAILED && app(RetryFailed::class)->refusal($v) === null,
             'readiness' => $assessment,
-            'has_cover' => (is_string(data_get($v->meta, 'anh_bia')) && data_get($v->meta, 'anh_bia') !== '') || app(HubFiles::class)->hasCoverUrl($v),
+            'has_cover' => $v->isRieng() || (is_string(data_get($v->meta, 'anh_bia')) && data_get($v->meta, 'anh_bia') !== '') || app(HubFiles::class)->hasCoverUrl($v),
             'duration' => $v->duration,
             'tiktok_link' => is_string($link) && preg_match('#^https://#i', $link) === 1 ? $link : null,
             'can_preview' => $v->files_deleted_at === null && (($v->path !== '' && is_file($v->path)) || app(HubFiles::class)->available($v)),

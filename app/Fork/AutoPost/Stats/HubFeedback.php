@@ -7,6 +7,7 @@ namespace App\Fork\AutoPost\Stats;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Models\SocialAccount;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Sidecar;
 use Carbon\CarbonImmutable;
 
 /**
@@ -41,6 +42,7 @@ final class HubFeedback
 
             $videos = AutoVideo::query()
                 ->where('status', 'posted')
+                ->notRieng()
                 ->whereDate('batch_date', $date)
                 ->orderBy('posted_at')
                 ->get();
@@ -49,12 +51,12 @@ final class HubFeedback
                 continue;
             }
 
-            if ($this->writeSheet($dir.'/so-lieu.csv', $videos)) {
+            if ($this->writeSheet(Sidecar::path($dir, 'so-lieu.csv'), $videos)) {
                 $sheets++;
             }
 
             if ($date < $now->format('Y-m-d')) {
-                $filled += $this->fillViews($dir.'/bang-ghi.csv', $videos, $now);
+                $filled += $this->fillViews(Sidecar::path($dir, 'bang-ghi.csv'), $videos, $now);
             }
         }
 

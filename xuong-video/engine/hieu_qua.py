@@ -11,7 +11,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parent))
-from duong_dan import DATA as HUB, cfg as cfg_hub  # noqa: E402
+from duong_dan import DATA as HUB, cfg as cfg_hub, glob_kem  # noqa: E402
 
 LS = HUB / "lich-su"
 CHIEU = {"goc": "góc bán", "dang": "dạng bài", "dao_dien": "gu đạo diễn", "cong_thuc": "công thức dựng", "giong": "giọng đọc"}
@@ -57,14 +57,14 @@ def _doc_so_lieu():
 
 
 def _ho_so(vid, ra):
-    for f in ra.glob(f"*/{vid}.json"):
+    for f in glob_kem(ra, f"{vid}.json"):
         try:
             j = json.loads(f.read_text(encoding="utf-8"))
         except Exception:
             return None
         return {"ma": j.get("ma"), "goc": j.get("goc"), "dang": j.get("dang"), "dao_dien": j.get("dao_dien"),
                 "cong_thuc": j.get("cong_thuc"), "giong": j.get("giong"), "cau_mo": _cau_mo(j.get("loi_doc")),
-                "diem": j.get("diem"), "ngay": f.parent.name}
+                "diem": j.get("diem"), "ngay": (f.parent.parent if f.parent.name == "_kem" else f.parent).name}
     return None
 
 

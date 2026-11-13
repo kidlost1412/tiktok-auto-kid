@@ -22,7 +22,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, KEM
 LS = HUB / "lich-su"
 _lock = threading.Lock()
 
@@ -118,7 +118,7 @@ def ds_video(status="ung", may=None):
         if v.parent.name.startswith("_"):
             continue
         vid = v.stem
-        meta = _doc(v.with_suffix(".json"), {})
+        meta = _doc(kem(v, ".json"), {})
         ung = (dg.get(v.name) or {}).get("ket_qua") == "dat"
         t = tt.get(vid, {})
         if status == "ung" and not (ung and t.get("trang_thai") != "da_dang"):
@@ -132,8 +132,9 @@ def ds_video(status="ung", may=None):
         if ma not in sps:
             f = HUB / "san-pham" / ma / "san-pham.json"
             sps[ma] = _doc(f, {})
-        txt = v.with_suffix(".txt").read_text(encoding="utf-8").splitlines() if v.with_suffix(".txt").exists() else []
-        bia = v.with_suffix(".jpg")
+        f_txt = kem(v, ".txt")
+        txt = f_txt.read_text(encoding="utf-8").splitlines() if f_txt.exists() else []
+        bia = kem(v, ".jpg")
         out.append({
             "id": vid, "file": v.relative_to(HUB).as_posix(), "sha256": _sha256(v), "ma": ma,
             "quy_cach": meta.get("quy_cach"), "caption": meta.get("caption") or (txt[0] if txt else ""),
@@ -174,9 +175,10 @@ class H(BaseHTTPRequestHandler):
         if not re.fullmatch(r"[\w.\-]+", vid) or ".." in vid:
             return None
         ra = Path(cfg()["duong_dan"]["ra"]).resolve()
-        for f in ra.glob(f"*/{vid}{duoi}"):
+        for f in list(ra.glob(f"*/{vid}{duoi}")) + ([] if duoi == ".mp4" else list(ra.glob(f"*/{KEM}/{vid}{duoi}"))):
             f = f.resolve()
-            if not f.parent.name.startswith("_") and ra in f.parents and f.is_file():
+            ngay = f.parent.parent if f.parent.name == KEM else f.parent
+            if not ngay.name.startswith("_") and ra in f.parents and f.is_file():
                 return f
         return None
 

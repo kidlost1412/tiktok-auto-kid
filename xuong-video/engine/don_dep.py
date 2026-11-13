@@ -9,7 +9,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, KEM
 
 
 def _ra():
@@ -31,7 +31,7 @@ def don(log=print):
             d = ngay / ten
             if d.exists() and now - d.stat().st_mtime > ngay_giu * 86400 + (3600 if ten == "_tam" else 0):
                 giai_phong += _size(d); shutil.rmtree(d, ignore_errors=True)
-    # video ĐÃ ĐĂNG (TryPost báo) quá N ngày → Thùng rác. CHỈ đúng 4 file ra/<ngày>/<id>.{mp4,jpg,json,txt}, kiểm nằm trong ra/.
+    # video ĐÃ ĐĂNG (TryPost báo) quá N ngày → Thùng rác. CHỈ đúng 4 file <id>.{mp4,jpg,json,txt} (mp4 ở ra/<ngày>/, 3 file kia ở ra/<ngày>/_kem/ hoặc chỗ cũ), kiểm nằm trong ra/.
     try:
         import datetime, re, subprocess
         cfg = cfg_hub()
@@ -52,8 +52,8 @@ def don(log=print):
             for ngay in ra.iterdir():
                 if not ngay.is_dir() or ngay.name.startswith("_"):
                     continue
-                for duoi in (".mp4", ".jpg", ".json", ".txt"):
-                    f = (ngay / (vid + duoi)).resolve()
+                for rel in (vid + ".mp4", *(f"{KEM}/{vid}{d}" for d in (".jpg", ".json", ".txt")), *(vid + d for d in (".jpg", ".json", ".txt"))):
+                    f = (ngay / rel).resolve()
                     if f.exists() and f.is_file() and ra_r in f.parents:
                         giai_phong += f.stat().st_size; bo.append(str(f))
         for k in range(0, len(bo), 20):        # lô nhỏ, thoát dấu ', không bật hộp thoại, có giới hạn thời gian

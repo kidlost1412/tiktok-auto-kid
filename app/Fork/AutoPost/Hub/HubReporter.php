@@ -130,7 +130,7 @@ final class HubReporter
 
     private function applies(AutoVideo $video): bool
     {
-        return HubApi::enabled() && filled($video->hub_id);
+        return HubApi::enabled() && filled($video->hub_id) && ! $video->isRieng();
     }
 
     /** @param  array<string, mixed>  $payload */

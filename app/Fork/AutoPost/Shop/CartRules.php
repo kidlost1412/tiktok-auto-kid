@@ -98,7 +98,7 @@ final class CartRules
 
         // Quy cách còn video trong kho mà chưa chọn sản phẩm: video giữ lại trong kho.
         $waiting = AutoVideo::query()
-            ->where('status', AutoVideo::NEW)
+            ->notRieng()->where('status', AutoVideo::NEW)
             ->whereNotNull('product_code')
             ->select('product_code', 'quy_cach')
             ->distinct()

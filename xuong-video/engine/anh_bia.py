@@ -4,6 +4,8 @@ python anh_bia.py <file.mp4|thư mục>"""
 import subprocess, sys, tempfile
 from pathlib import Path
 from PIL import Image, ImageFilter, ImageStat
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from duong_dan import kem
 
 
 def _dur(v):
@@ -13,7 +15,7 @@ def _dur(v):
 
 def chon_bia(video, out=None, n=20, uu_tien=None):
     """uu_tien=(a, b) giây: khoảng khối chữ mở đầu đang hiện → bìa có chữ móc câu."""
-    video = Path(video); out = Path(out) if out else video.with_suffix(".jpg")
+    video = Path(video); out = Path(out) if out else kem(video, ".jpg", ghi=True)
     d = _dur(video)
     if d <= 0:
         return None

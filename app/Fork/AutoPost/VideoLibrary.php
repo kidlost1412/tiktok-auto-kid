@@ -256,10 +256,11 @@ final class VideoLibrary
         }
 
         // Cùng nội dung (sha256) với video khác đã có thì không thêm.
-        $sameHash = AutoVideo::query()->where('hash', $hash)->first(['id', 'hub_id']);
+        $sameHash = AutoVideo::query()->where('hash', $hash)->first(['id', 'hub_id', 'source']);
 
         if ($sameHash !== null && ($existing === null || $sameHash->id !== $existing->id)) {
-            if ($sameHash->hub_id === null && $existing === null) {
+            // Video riêng của chủ app trùng nội dung: không biến nó thành video hub.
+            if ($sameHash->hub_id === null && $existing === null && ! $sameHash->isRieng()) {
                 AutoVideo::query()->whereKey($sameHash->id)->update(['hub_id' => $id]);
             }
 
@@ -350,7 +351,7 @@ final class VideoLibrary
                 continue;
             }
 
-            $rows = $this->readCsv($dir.'/bang-ghi.csv');
+            $rows = $this->readCsv(Sidecar::path($dir, 'bang-ghi.csv'));
 
             foreach (Paths::glob($dir.'/*.mp4') as $path) {
                 $name = basename($path);
@@ -765,7 +766,8 @@ final class VideoLibrary
 
         // Chế độ API: hub tự dọn file của nó (30 ngày), TikTok Auto Kid không chuyển hay xoá file nào.
         // Kho chuẩn mới: da-dang/<ngày> + .ket-qua.json + lưu giữ theo cài đặt. Kiểu cũ: ra/_da-dang/.
-        if (! HubApi::enabled()) {
+        // Video riêng của chủ app: file nằm trong thư mục của chủ, KHÔNG bao giờ chuyển hay xoá.
+        if (! HubApi::enabled() && ! $v->isRieng()) {
             if ($v->source === 'kho') {
                 $this->kho->archive($v);
             } else {
@@ -779,6 +781,10 @@ final class VideoLibrary
 
     private function archiveFile(AutoVideo $v): void
     {
+        if ($v->isRieng()) {
+            return;
+        }
+
         $target = $this->hubPath().'/ra/_da-dang/'.$v->batch_date->format('Y-m-d');
 
         if (dirname($v->path) === $target) {
@@ -870,7 +876,7 @@ final class VideoLibrary
     {
         $this->hubReport = ['updated' => 0, 'waiting' => 0];
 
-        AutoVideo::query()->where('status', AutoVideo::NEW)->orderBy('id')->each(function (AutoVideo $v): void {
+        AutoVideo::query()->notRieng()->where('status', AutoVideo::NEW)->orderBy('id')->each(function (AutoVideo $v): void {
             // Video từ API hub: chữ do API cấp, không đọc .txt/.csv cạnh file.
             if ($v->hub_id !== null || ! is_file($v->path)) {
                 return;
@@ -913,7 +919,7 @@ final class VideoLibrary
     /** Video nhặt trước khi sản phẩm được đồng bộ thì gắn lại sản phẩm ở lần sau. */
     private function resolveMissingProducts(): void
     {
-        AutoVideo::query()->whereNull('product_code')->get(['id', 'file_name'])->each(function (AutoVideo $v): void {
+        AutoVideo::query()->notRieng()->whereNull('product_code')->get(['id', 'file_name'])->each(function (AutoVideo $v): void {
             if ($code = $this->productCodeForFile($v->file_name)) {
                 AutoVideo::query()->whereKey($v->id)->update(['product_code' => $code]);
             }

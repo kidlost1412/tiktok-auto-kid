@@ -5,7 +5,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem
 
 
 def tu_duyet(log=print):
@@ -20,7 +20,7 @@ def tu_duyet(log=print):
     for v in ra.glob("*/*.mp4"):
         if v.parent.name.startswith("_") or v.name in dg:
             continue
-        mf = v.with_suffix(".json")
+        mf = kem(v, ".json")
         if not mf.exists():
             continue
         try:

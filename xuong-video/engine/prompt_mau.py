@@ -11,7 +11,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA
+from duong_dan import CODE, DATA, glob_kem
 
 GIU_BAN_CU = 20
 _RE_BIEN = re.compile(r"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}")
@@ -314,7 +314,7 @@ def _sidecar_moi(ma):
         ra = Path(cfg()["duong_dan"]["ra"])
     except Exception:
         ra = DATA / "ra"
-    ds = [f for f in ra.glob(f"*/{ma}_*.json") if f.is_file()]
+    ds = glob_kem(ra, f"{ma}_*.json")
     return max(ds, key=lambda f: f.stat().st_mtime) if ds else None
 
 

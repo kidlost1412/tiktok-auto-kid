@@ -141,6 +141,11 @@ final class KhoStore
     /** Dời video đã đăng vào da-dang/<ngày đăng>/, ghi .ket-qua.json, rồi xoá mp4/json nếu cài đặt là xoa_ngay. */
     public function archive(AutoVideo $v): void
     {
+        // Video riêng của chủ app: không bao giờ dời/xoá file.
+        if ($v->isRieng()) {
+            return;
+        }
+
         $postedAt = CarbonImmutable::instance($v->posted_at ?? now())->setTimezone('Asia/Ho_Chi_Minh');
         $dir = $this->donePath().'/'.$postedAt->format('Y-m-d');
 
@@ -272,6 +277,10 @@ final class KhoStore
 
     private function deleteFiles(AutoVideo $v): void
     {
+        if ($v->isRieng()) {
+            return;
+        }
+
         foreach ([$v->path, $v->json_path] as $file) {
             if ($file && is_file($file)) {
                 @unlink($file);
@@ -306,7 +315,7 @@ final class KhoStore
     }
 
     /** Ổn định = kích thước không đổi suốt `settle_seconds` (theo dõi qua cache giữa các lần quét). */
-    private function isStable(string $path): bool
+    public function isStable(string $path): bool
     {
         $settle = (int) config('fork.auto.settle_seconds', 20);
         clearstatcache(true, $path);

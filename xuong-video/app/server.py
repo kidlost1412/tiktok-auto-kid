@@ -8,7 +8,7 @@ import anh_sp
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, kem_ngay, don_kem_cu, glob_kem
 WEB = Path(__file__).resolve().parent / "web"
 PORT = int(os.environ.get("XUONG_PORT") or 8765)
 LS = HUB / "lich-su"
@@ -767,11 +767,24 @@ def token_video(ma_viec):
     f = LS / "token.csv"
     if not ma_viec or not f.exists():
         return None
-    tong = 0
-    for x in csv.DictReader(open(f, encoding="utf-8-sig")):
-        if x.get("video") == ma_viec:
-            tong += sum(int(x.get(k) or 0) for k in ("vao", "vao_cache_tao", "vao_cache_doc", "ra"))
-    return tong or None
+    return _token_map(f).get(ma_viec) or None
+
+
+_TOKEN_MAP = {"k": None, "d": {}}
+
+
+def _token_map(f):
+    """{mã việc: tổng token} — đọc token.csv một lần, nhớ theo (thời điểm sửa, cỡ file) để liệt kê nhiều video không đọc lại từng lần."""
+    st = f.stat(); k = (st.st_mtime_ns, st.st_size)
+    if _TOKEN_MAP["k"] != k:
+        d = {}
+        for x in csv.DictReader(open(f, encoding="utf-8-sig")):
+            try:
+                d[x.get("video")] = d.get(x.get("video"), 0) + sum(int(x.get(c) or 0) for c in ("vao", "vao_cache_tao", "vao_cache_doc", "ra"))
+            except ValueError:
+                pass
+        _TOKEN_MAP["d"], _TOKEN_MAP["k"] = d, k
+    return _TOKEN_MAP["d"]
 
 
 def lam_lai(ds):
@@ -783,7 +796,8 @@ def lam_lai(ds):
         v = (ra_dir() / x.get("file", "")).resolve()
         if not v.is_relative_to(ra_dir().resolve()) or not v.exists() or v.suffix != ".mp4":
             continue
-        meta = json.loads(v.with_suffix(".json").read_text(encoding="utf-8")) if v.with_suffix(".json").exists() else {}
+        fm = kem(v, ".json")
+        meta = json.loads(fm.read_text(encoding="utf-8")) if fm.exists() else {}
         viec.append({"file": str(v), "gop_y": str(x.get("gop_y", ""))[:500], "meta": meta, "ma": meta.get("ma") or v.name.split("_")[0]})
     if not viec:
         return {"ok": False, "loi": "Không tìm thấy video cần làm lại"}
@@ -807,32 +821,50 @@ def doc_danh_gia():
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
 
 
+TAT_CA = "tat-ca"          # giá trị "Tất cả ngày" của ô chọn ngày trong Kho video
+
+
 def video_ngay(ngay):
+    """Video của 1 ngày (YYYY-MM-DD) — hoặc ngay == "tat-ca": mọi ngày, mới nhất trước. Mỗi video mang sẵn ngày + đường dẫn riêng."""
+    if ngay == TAT_CA:
+        d = ra_dir()
+        ngays = sorted([x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x.name)], reverse=True) if d.exists() else []
+        dg = doc_danh_gia()
+        tp = json.loads((LS / "trypost.json").read_text(encoding="utf-8")) if (LS / "trypost.json").exists() else {}
+        out = []
+        for n in ngays:
+            out += _video_mot_ngay(n, dg, tp)
+        return out
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", ngay or ""):
+        return []
+    return _video_mot_ngay(ngay, doc_danh_gia(), json.loads((LS / "trypost.json").read_text(encoding="utf-8")) if (LS / "trypost.json").exists() else {})
+
+
+def _video_mot_ngay(ngay, dg, tp):
     d = ra_dir() / ngay
     if not d.exists():
         return []
     rows = {}
     for sheet in ("bang-ghi-ekip.csv", "bang-ghi-v2.csv", "bang-ghi.csv"):
-        f = d / sheet
+        f = kem_ngay(d, sheet)
         if f.exists():
             for r in csv.DictReader(open(f, encoding="utf-8-sig")):
                 rows.setdefault(r.get("file"), r)
-    dg = doc_danh_gia()
-    tp = json.loads((LS / "trypost.json").read_text(encoding="utf-8")) if (LS / "trypost.json").exists() else {}
     out = []
     for v in sorted(d.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
         r = rows.get(v.name, {})
-        cap = v.with_suffix(".txt")
+        cap = kem(v, ".txt")
         parts = v.stem.split("_")
-        bia = v.with_suffix(".jpg")
+        bia = kem(v, ".jpg")
         dang = tp.get(v.stem, {})
-        out.append({"dang": dang, "file": v.name, "url": f"/file?p={ngay}/{v.name}", "bia": f"/file?p={ngay}/{bia.name}" if bia.exists() else "", "san_pham": parts[0] if parts else "",
+        out.append({"ngay": ngay, "dang": dang, "file": v.name, "url": f"/file?p={ngay}/{v.name}", "bia": f"/file?p={ngay}/{bia.relative_to(d).as_posix()}" if bia.exists() else "", "san_pham": parts[0] if parts else "",
                     "goc": r.get("goc") or (parts[1] if len(parts) > 1 else ""), "gu": r.get("gu_dao_dien", ""),
                     "diem": r.get("diem_giam_khao", ""), "loi_gk": r.get("loi_giam_khao", ""), "y_tuong": r.get("y_tuong", ""),
                     "cong_thuc": r.get("cong_thuc", ""), "nhac": r.get("nhac", ""), "loi": r.get("loi", ""),
                     "caption": cap.read_text(encoding="utf-8") if cap.exists() else (r.get("caption", "") + "\n" + r.get("hashtag", "")).strip(),
                     "danh_gia": dg.get(v.name, {}), "luc": datetime.datetime.fromtimestamp(v.stat().st_mtime).strftime("%H:%M")})
-        m = json.loads(v.with_suffix(".json").read_text(encoding="utf-8")) if v.with_suffix(".json").exists() else {}
+        fm = kem(v, ".json")
+        m = json.loads(fm.read_text(encoding="utf-8")) if fm.exists() else {}
         out[-1].update({"diem": out[-1]["diem"] or (m.get("diem") if m.get("diem") is not None else ""),
                         "thoi_luong": m.get("thoi_luong"), "ky_tu_giong": m.get("ky_tu_giong"), "dung_chung_giong": m.get("dung_chung_giong"),
                         "token": token_video(m.get("ma_viec")), "lam_lai_tu": Path(m["lam_lai_tu"]).name if m.get("lam_lai_tu") else "",
@@ -920,7 +952,7 @@ def danh_gia(body):
         parts = f.split("_")
         hs = {}
         try:
-            for jf in Path(cfg()["duong_dan"]["ra"]).glob(f"*/{Path(f).stem}.json"):
+            for jf in glob_kem(Path(cfg()["duong_dan"]["ra"]), f"{Path(f).stem}.json"):
                 hs = json.loads(jf.read_text(encoding="utf-8")); break
         except Exception:
             hs = {}
@@ -1356,6 +1388,13 @@ def main():
         don()
     except Exception:
         pass
+    try:                                   # gom json/jpg/txt/csv cũ trong ra/<ngày>/ vào _kem/ (bỏ qua khi đang có lô chạy)
+        nk = LS / "nhat-ky.txt"
+        lo_chay = dang_chay() or (nk.exists() and time.time() - nk.stat().st_mtime < 240)
+        kq = don_kem_cu(ra_dir(), dang_chay=lo_chay)
+        print(f"[kem] chuyển {kq['da_chuyen']} file vào _kem ({kq['ngay']} ngày, bỏ qua {kq['bo_qua']})" + (" — đang có lô chạy nên chưa làm" if lo_chay else ""))
+    except Exception as e:
+        print("Không gom được file kèm:", e)
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), H)
     try:                                   # tự động giữ kho video
         from tu_dong import bat_dau

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet, glob_kem
 CFG = cfg_hub()
 from ai import goi, lay_json, HetHanMuc  # noqa: E402
 import prompt_mau  # noqa: E402
@@ -44,7 +44,7 @@ def cau_cua_sp(ma, limit=150):
     f = HUB / "lich-su" / f"cau-da-dung-{ma}.txt"
     if not f.exists():
         ds = []
-        for j in sorted(Path(CFG["duong_dan"]["ra"]).glob(f"*/{ma}_*.json")):
+        for j in glob_kem(Path(CFG["duong_dan"]["ra"]), f"{ma}_*.json"):
             try:
                 t = (json.loads(j.read_text(encoding="utf-8")).get("kich_ban") or {}).get("text") or ""
             except Exception:

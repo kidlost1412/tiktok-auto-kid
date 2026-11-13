@@ -7,6 +7,7 @@ use App\Fork\AutoPost\Http\GioHangController;
 use App\Fork\AutoPost\Http\KhoController;
 use App\Fork\AutoPost\Http\MediaController;
 use App\Fork\AutoPost\Http\PersonaliseController;
+use App\Fork\AutoPost\Http\RiengController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
 use App\Fork\Chrome\Http\Extension\AuthenticateExtension;
@@ -54,6 +55,17 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
     Route::get('video/{video}', [KhoController::class, 'video'])->whereNumber('video')->name('video');
     Route::get('video/{video}/info', [KhoController::class, 'info'])->whereNumber('video')->name('info');
     Route::get('video/{video}/cover', [KhoController::class, 'cover'])->whereNumber('video')->name('cover');
+
+    // Kho riêng: video chủ app tự làm (thư mục, quét, danh sách, đăng hàng loạt).
+    Route::prefix('rieng')->name('rieng.')->group(function (): void {
+        Route::get('/', [RiengController::class, 'index'])->name('index');
+        Route::post('thu-muc', [RiengController::class, 'addFolder'])->middleware('throttle:30,1')->name('folders.add');
+        Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
+        Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');
+        Route::get('video/{video}/thumb', [RiengController::class, 'thumb'])->whereNumber('video')->name('thumb');
+        Route::post('dat-lich/xem', [RiengController::class, 'batchPreview'])->middleware('throttle:60,1')->name('batch.preview');
+        Route::post('dat-lich', [RiengController::class, 'batchCommit'])->middleware('throttle:20,1')->name('batch.commit');
+    });
 });
 
 // Tiện ích báo lỗi khi lấy sản phẩm shop (cùng xác thực với /api/ext/*, đặt ở đây để không đụng phần Chrome).

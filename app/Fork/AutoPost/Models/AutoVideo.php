@@ -24,6 +24,9 @@ class AutoVideo extends Model
 
     public const FAILED = 'failed';
 
+    /** Nguồn của video chủ app tự làm (thư mục "Kho riêng"): không bao giờ vào luồng tự đăng của hub. */
+    public const SOURCE_RIENG = 'rieng';
+
     protected $table = 'fork_auto_videos';
 
     protected $guarded = [];
@@ -63,6 +66,8 @@ class AutoVideo extends Model
     public function scopeEligibleNew(Builder $q): Builder
     {
         return $q->where('status', self::NEW)
+            // Video riêng của chủ app chỉ đăng qua "Đăng hàng loạt", không bao giờ do planner tự lấy.
+            ->where('source', '!=', self::SOURCE_RIENG)
             // File mp4 của hub chưa có trên đĩa (chế độ API) thì chưa giữ chỗ.
             ->whereNull('files_deleted_at')
             // Không có caption do hub viết thì không đăng (chờ hub bổ sung, lần ingest sau cập nhật).
@@ -72,6 +77,21 @@ class AutoVideo extends Model
             // Chế độ API: chỉ đăng video hub đã duyệt (có hub_id). Bản ghi cũ đọc từ thư mục có thể trùng
             // video hub (hub làm sạch metadata nên sha256 đổi) → không bao giờ đăng, tránh đăng 2 lần.
             ->when(filled(config('fork.auto.hub_api.key')), fn ($w) => $w->whereNotNull('hub_id'));
+    }
+
+    /**
+     * Bỏ video riêng (source `rieng`); cột source không null (mặc định 'ra') nên so sánh trực tiếp là đủ.
+     *
+     * @param  Builder<static>  $q
+     */
+    public function scopeNotRieng(Builder $q): Builder
+    {
+        return $q->where('source', '!=', self::SOURCE_RIENG);
+    }
+
+    public function isRieng(): bool
+    {
+        return $this->source === self::SOURCE_RIENG;
     }
 
     /**

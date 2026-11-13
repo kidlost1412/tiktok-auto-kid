@@ -57,7 +57,7 @@ final class PersonaliseController
                     fn ($q): ?string => is_array($q) && filled($q['ten'] ?? null) ? (string) $q['ten'] : null,
                     (array) ($p->quy_cach ?? []),
                 ))),
-                'videos_waiting' => AutoVideo::query()->where('product_code', $p->code)->where('status', AutoVideo::NEW)->count(),
+                'videos_waiting' => AutoVideo::query()->notRieng()->where('product_code', $p->code)->where('status', AutoVideo::NEW)->count(),
                 'caption' => $this->captionPreview($p),
             ])->values()->all(),
             // Cùng tên prop với trang Giỏ hàng: hộp thoại tải lại 'personalise' sau khi thêm/xoá ảnh.

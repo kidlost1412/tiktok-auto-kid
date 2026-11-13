@@ -171,7 +171,7 @@ final class GioHangController extends Controller
             ->keyBy(fn (ProductLink $l): string => $l->auto_product_id.'|'.($l->quy_cach ?? ''));
 
         $waiting = AutoVideo::query()
-            ->where('status', AutoVideo::NEW)
+            ->notRieng()->where('status', AutoVideo::NEW)
             ->selectRaw('product_code, quy_cach, count(*) as total')
             ->groupBy('product_code', 'quy_cach')
             ->get()

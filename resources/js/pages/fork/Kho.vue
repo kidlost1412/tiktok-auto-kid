@@ -17,6 +17,7 @@ import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { dayKey, dayLabel, type KhoVideo } from '@/components/fork/kho/kho';
+import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
 import VideoCard from '@/components/fork/kho/VideoCard.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { openVideo as openViewer } from '@/components/fork/viewer';
@@ -98,7 +99,9 @@ const props = defineProps<{
         legacy: boolean;
         sort?: string;
         q?: string;
+        day?: string;
     };
+    days: string[];
     counts: Record<string, number>;
     legacy_count: number;
     blockers: Blocker[];
@@ -154,6 +157,7 @@ type Patch = Partial<{
     page: number;
     sort: string;
     q: string;
+    day: string;
 }>;
 
 // Lần tự làm mới đang bay: phải huỷ ngay khi người dùng đổi bộ lọc, kẻo dữ liệu của bộ lọc cũ ghi đè lưới mới.
@@ -187,6 +191,9 @@ const go = (patch: Patch) => {
         legacy: props.filters.legacy,
         sort: props.filters.sort ?? 'moi',
         q: props.filters.q ?? '',
+        day: props.filters.day ?? '',
+        // Đổi tab thì ngày đang chọn không còn ý nghĩa (mỗi tab tính ngày theo cách khác).
+        ...('tab' in patch && !('day' in patch) ? { day: '' } : {}),
         ...patch,
     };
     const query: Record<string, string | number> = { tab: next.tab };
@@ -205,6 +212,10 @@ const go = (patch: Patch) => {
 
     if (next.q) {
         query.q = next.q;
+    }
+
+    if (next.day) {
+        query.day = next.day;
     }
 
     if (patch.page) {
@@ -242,12 +253,13 @@ const filtered = computed(
     () =>
         props.filters.product !== '' ||
         (props.filters.q ?? '') !== '' ||
+        (props.filters.day ?? '') !== '' ||
         props.filters.legacy,
 );
 
 const clearFilters = () => {
     search.value = '';
-    go({ product: '', q: '', legacy: false });
+    go({ product: '', q: '', legacy: false, day: '' });
 };
 
 // ----- Nhóm theo ngày (nhớ lựa chọn của người dùng).
@@ -338,6 +350,10 @@ onMounted(() => {
             query.q = f.q;
         }
 
+        if (f.day) {
+            query.day = f.day;
+        }
+
         if (props.videos.current_page > 1) {
             query.page = props.videos.current_page;
         }
@@ -355,6 +371,7 @@ onMounted(() => {
                 'products',
                 'blockers',
                 'legacy_count',
+                'days',
                 'hub',
                 'updated_at',
                 'last_ingest_at',
@@ -418,6 +435,8 @@ const description = computed(
                 {{ busy === 'scan' ? 'Đang quét…' : 'Quét kho ngay' }}
             </Button>
         </template>
+
+        <KhoSwitch active="hub" />
 
         <!-- Vấn đề đang chặn video -->
         <Callout
@@ -493,6 +512,17 @@ const description = computed(
                             data-testid="fork-kho-search"
                         />
                     </div>
+                    <NativeSelect
+                        :model-value="filters.day ?? ''"
+                        aria-label="Lọc theo ngày"
+                        data-testid="fork-kho-day"
+                        @update:model-value="go({ day: String($event) })"
+                    >
+                        <option value="">Tất cả ngày</option>
+                        <option v-for="d in days" :key="d" :value="d">
+                            {{ dayjs(d).format('DD/MM/YYYY') }}
+                        </option>
+                    </NativeSelect>
                     <NativeSelect
                         :model-value="sort"
                         aria-label="Sắp xếp"

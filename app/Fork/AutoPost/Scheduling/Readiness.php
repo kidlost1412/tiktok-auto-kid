@@ -72,7 +72,7 @@ final class Readiness
      */
     public function assess(?Collection $videos = null): array
     {
-        $videos ??= AutoVideo::query()->where('status', AutoVideo::NEW)->get();
+        $videos ??= AutoVideo::query()->notRieng()->where('status', AutoVideo::NEW)->get();
         $out = [];
 
         foreach ($videos as $v) {
