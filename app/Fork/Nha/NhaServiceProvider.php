@@ -6,7 +6,7 @@ namespace App\Fork\Nha;
 
 use Illuminate\Support\ServiceProvider;
 
-/** "Xưởng nhỏ": trang chủ hoạt hình, hiện ê-kíp đang làm gì theo dữ liệu thật. */
+/** "Khu Tự Trị": trang chủ hoạt hình, hiện ê-kíp đang làm gì theo dữ liệu thật. */
 final class NhaServiceProvider extends ServiceProvider
 {
     public function boot(): void

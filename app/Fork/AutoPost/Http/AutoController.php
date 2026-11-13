@@ -217,7 +217,8 @@ final class AutoController extends Controller
 
         abort_if($video->social_account_id !== null && ! $accounts->contains('id', $video->social_account_id), 404);
 
-        $refusal = app(RetryFailed::class)->retry($video);
+        // "da_kiem_tra": chủ app đã mở TikTok Studio và xác nhận bài "chưa rõ" thật sự CHƯA lên.
+        $refusal = app(RetryFailed::class)->retry($video, $request->boolean('da_kiem_tra'));
 
         if ($refusal !== null) {
             return back()->with('flash.error', $refusal);
@@ -551,6 +552,7 @@ final class AutoController extends Controller
                     'error' => $this->snippet($v->skip_reason),
                     'can_retry' => $refusal === null,
                     'retry_note' => $refusal,
+                    'can_confirm_retry' => $refusal !== null && $retry->refusal($v, true) === null,
                 ];
             })->all();
     }

@@ -31,6 +31,14 @@ def don(log=print):
             d = ngay / ten
             if d.exists() and now - d.stat().st_mtime > ngay_giu * 86400 + (3600 if ten == "_tam" else 0):
                 giai_phong += _size(d); shutil.rmtree(d, ignore_errors=True)
+    # file dựng dở còn sót khi lô crash: *.part.mp4 (ffmpeg chưa xong) và *.__sach.mp4 (lam_sach chưa xong) cũ hơn 1 giờ
+    for mau in ("*.part.mp4", "*.__sach.mp4", "_kem/*.part.mp4"):
+        for f in ra.glob("*/" + mau):
+            try:
+                if f.is_file() and now - f.stat().st_mtime > 3600:
+                    giai_phong += f.stat().st_size; f.unlink()
+            except OSError:
+                pass
     # video ĐÃ ĐĂNG (TryPost báo) quá N ngày → Thùng rác. CHỈ đúng 4 file <id>.{mp4,jpg,json,txt} (mp4 ở ra/<ngày>/, 3 file kia ở ra/<ngày>/_kem/ hoặc chỗ cũ), kiểm nằm trong ra/.
     try:
         import datetime, re, subprocess
@@ -78,7 +86,7 @@ def dung_luong():
     ngay = []
     if ra.exists():
         for d in sorted([x for x in ra.iterdir() if x.is_dir()], reverse=True):
-            ngay.append({"ngay": d.name, "gb": round(_size(d) / 1e9, 2), "video": len(list(d.glob("*.mp4")))})
+            ngay.append({"ngay": d.name, "gb": round(_size(d) / 1e9, 2), "video": len([x for x in d.glob("*.mp4") if not x.name.endswith(".part.mp4")])})
     o = shutil.disk_usage(ra if ra.exists() else HUB)
     return {"o_trong_gb": round(o.free / 1e9, 1), "o_tong_gb": round(o.total / 1e9, 1),
             "ra_gb": round(sum(x["gb"] for x in ngay), 2), "ngay": ngay}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Trang chủ "Xưởng nhỏ": ngôi nhà hoạt hình hiện ê-kíp đang làm gì (dữ liệu thật, hỏi lại mỗi ~3 giây khi đang xem).
+// Trang chủ "Khu Tự Trị": ngôi nhà hoạt hình hiện ê-kíp đang làm gì (dữ liệu thật, hỏi lại mỗi ~3 giây khi đang xem).
 // Bấm nhân vật/phòng để tới đúng nơi làm việc của vai đó. Mặc định là ngôi nhà 3D (three.js tải lười);
 // máy không có WebGL hoặc dựng lỗi thì tự quay về ngôi nhà 2D. `?demo=1` phát lại một lô giả (không gọi máy chủ).
 import { Head, router } from '@inertiajs/vue3';
@@ -152,6 +152,8 @@ const go = (key: string) => {
 
 let timer: number | undefined;
 let inflight = false;
+// Rời trang khi một lượt hỏi đang dở: lượt đó xong thì KHÔNG hẹn lượt mới (tránh vòng hỏi chạy ngầm mãi).
+let alive = true;
 const load = async () => {
     if (inflight || document.hidden) {
         return;
@@ -173,8 +175,11 @@ const load = async () => {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         });
-        data.value = (await r.json()) as NhaData;
-        failed.value = false;
+        const d = (await r.json()) as NhaData;
+        if (alive) {
+            data.value = d;
+            failed.value = false;
+        }
     } catch {
         failed.value = true;
     } finally {
@@ -184,7 +189,7 @@ const load = async () => {
 // Đang làm việc thì hỏi dày (3 giây), rảnh/tắt thì thưa (10 giây); tab ẩn thì dừng hẳn.
 const schedule = () => {
     window.clearTimeout(timer);
-    if (document.hidden) {
+    if (!alive || document.hidden) {
         return;
     }
     const busy =
@@ -212,15 +217,16 @@ onMounted(() => {
     void load().then(schedule);
 });
 onBeforeUnmount(() => {
+    alive = false;
     document.removeEventListener('visibilitychange', onVis);
     window.clearTimeout(timer);
 });
 </script>
 
 <template>
-    <Head title="Xưởng nhỏ" />
+    <Head title="Khu Tự Trị" />
 
-    <AppLayout title="Xưởng nhỏ" :icon="IconHome" full-width>
+    <AppLayout title="Khu Tự Trị" :icon="IconHome" full-width>
         <div class="flex w-full flex-col" data-testid="fork-nha">
             <!-- Ngôi nhà phủ kín màn hình dưới thanh tiêu đề; lời chào là một khung kính nhỏ góc trên trái -->
             <div

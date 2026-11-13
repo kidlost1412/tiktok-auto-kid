@@ -146,6 +146,8 @@ export interface FailedRow {
     error: string | null;
     can_retry: boolean;
     retry_note: string | null;
+    /** Chrome không rõ đã gửi: chủ app kiểm tra TikTok rồi xác nhận "chưa lên" để đăng lại. */
+    can_confirm_retry?: boolean;
 }
 
 export interface OnboardingStep {

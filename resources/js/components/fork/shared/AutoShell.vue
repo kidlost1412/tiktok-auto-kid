@@ -57,7 +57,7 @@ const active = (i: (typeof items)[number]) =>
                 <div
                     class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3"
                 >
-                    <div class="min-w-0">
+                    <div class="min-w-[min(100%,20rem)] flex-1 basis-0">
                         <h1
                             class="font-heading text-[22px] leading-tight font-[650] tracking-[-0.022em]"
                         >
@@ -111,7 +111,7 @@ const active = (i: (typeof items)[number]) =>
                         {{ i.label }}
                         <span
                             v-if="i.href === '/auto/so-lieu' && buyBadge > 0"
-                            class="rounded-full bg-amber-500 px-2 text-xs leading-5 font-semibold text-white"
+                            class="rounded-full bg-amber-500 px-2 text-xs leading-5 font-semibold text-amber-950"
                             title="Bình luận hỏi mua trong 24 giờ qua"
                             data-testid="fork-badge-buy-comments"
                             >{{ buyBadge }}</span

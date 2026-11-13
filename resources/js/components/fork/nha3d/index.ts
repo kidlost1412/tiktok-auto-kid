@@ -1,4 +1,4 @@
-// Điểm vào của thế giới 3D "Xưởng nhỏ" (tải lười: chỉ trang /nha mới kéo three.js về).
+// Điểm vào của thế giới 3D "Khu Tự Trị" (tải lười: chỉ trang /nha mới kéo three.js về).
 // Dựng renderer + camera phối cảnh (đi dạo cùng Kid hoặc toàn cảnh), ghép nhà/vườn/nhân vật/mèo, vòng lặp vẽ, chọn bằng chuột, dọn sạch khi rời trang.
 import * as THREE from 'three';
 
@@ -54,20 +54,7 @@ export interface NhaWorld {
     dispose(): void;
 }
 
-export const webglOk = (): boolean => {
-    try {
-        const c = document.createElement('canvas');
-        const gl = c.getContext('webgl2') ?? c.getContext('webgl');
-        const ok = !!gl;
-        (gl as WebGLRenderingContext | null)
-            ?.getExtension('WEBGL_lose_context')
-            ?.loseContext();
-
-        return ok;
-    } catch {
-        return false;
-    }
-};
+export { webglOk } from './util';
 
 type Hover =
     | { kind: 'role'; key: string; room?: boolean }
@@ -1374,6 +1361,8 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         },
         dispose() {
             save();
+            avPanel?.close(); // bảng chỉnh nhân vật đang mở thì đóng theo, không để sót trên trang khác
+            avPanel = null;
             document.removeEventListener('visibilitychange', onHide);
             window.removeEventListener('pagehide', save);
             interact.dispose();

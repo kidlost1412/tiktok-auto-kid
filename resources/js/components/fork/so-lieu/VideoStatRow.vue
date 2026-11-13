@@ -1,19 +1,15 @@
 <script setup lang="ts">
-// Một video đã đăng kèm số liệu: ảnh bìa, thông tin đăng, lượt xem / tim / bình luận / chia sẻ, mốc 24h và 72h.
+// Một dòng trong bảng "Video đã đăng": ảnh bìa · sản phẩm & giờ đăng · lượt xem · tim · bình luận · chia sẻ · tương tác · mốc 24h/72h.
 import {
-    IconBookmark,
     IconExternalLink,
-    IconEye,
     IconHeart,
     IconMessageCircle,
     IconShare3,
-    IconShoppingCart,
 } from '@tabler/icons-vue';
 
-import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
-import { fmtNum } from '@/components/fork/shared/status';
+import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
+import { fmtCompact, fmtNum } from '@/components/fork/shared/status';
 import type { StatVideo } from '@/components/fork/so-lieu/types';
-import VideoThumb from '@/components/fork/VideoThumb.vue';
 import { openVideo } from '@/components/fork/viewer';
 import dayjs from '@/dayjs';
 
@@ -22,141 +18,146 @@ const props = defineProps<{
     productName: string;
     /** Danh sách id đang hiển thị, để ←/→ trong khung xem. */
     ids?: number[];
+    /** Lượt xem lớn nhất trong bảng, để vẽ thanh so sánh. */
+    maxViews?: number;
 }>();
 
 const open = () => openVideo(props.ids ?? [props.video.id], props.video.id);
+const pct = (n: number) =>
+    `${Math.max(2, Math.min(100, (n / Math.max(1, props.maxViews ?? n)) * 100))}%`;
 </script>
 
 <template>
     <li
-        class="flex cursor-pointer flex-col gap-3 rounded-[14px] border bg-card p-3.5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)] transition hover:border-foreground/25 hover:shadow-sm sm:flex-row sm:items-center"
+        class="grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors hover:bg-accent/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring lg:grid-cols-[36px_minmax(0,1.7fr)_minmax(120px,1fr)_repeat(3,60px)_84px_96px_28px]"
         tabindex="0"
         role="button"
+        :data-testid="`fork-so-lieu-video-${video.id}`"
         @click="open"
         @keydown.enter.self.prevent="open"
-        :data-testid="`fork-so-lieu-video-${video.id}`"
     >
-        <div class="flex min-w-0 flex-1 gap-3">
-            <VideoThumb :id="video.id" class="h-24 w-[54px] rounded-lg" />
-            <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                <div class="flex flex-wrap items-center gap-x-2">
-                    <ProductThumb :src="video.product_image" class="size-5" />
-                    <span class="truncate font-medium">{{ productName }}</span>
-                    <span
-                        v-if="video.quy_cach"
-                        class="text-xs text-muted-foreground"
-                        >{{ video.quy_cach }}</span
-                    >
-                </div>
-                <div class="text-xs text-muted-foreground">
-                    {{ dayjs(video.posted_at).format('HH:mm DD/MM/YYYY') }}
-                    <template v-if="video.channel">
-                        · {{ video.channel }}</template
-                    >
-                </div>
-                <div
-                    v-if="video.cart_name"
-                    class="flex items-center gap-1 truncate text-xs text-muted-foreground"
+        <CoverThumb
+            :id="video.id"
+            :fallback="video.product_image"
+            class="h-16 w-9 rounded-md"
+        />
+
+        <div class="min-w-0">
+            <div class="flex min-w-0 items-center gap-2">
+                <span class="truncate text-[13.5px] font-medium">{{
+                    productName
+                }}</span>
+                <span
+                    v-if="video.quy_cach"
+                    class="shrink-0 text-[12px] text-muted-foreground"
+                    >{{ video.quy_cach }}</span
                 >
-                    <IconShoppingCart class="size-3.5 shrink-0" />
-                    <span class="truncate">{{ video.cart_name }}</span>
-                </div>
-                <div class="mt-0.5 flex flex-wrap gap-1">
-                    <span
-                        v-for="t in [video.goc, video.giong, video.nhac].filter(
-                            Boolean,
-                        )"
-                        :key="String(t)"
-                        class="rounded-full bg-muted px-1.5 py-0.5 text-[0.75rem] text-muted-foreground"
-                        >{{ t }}</span
-                    >
-                </div>
+            </div>
+            <div class="truncate text-[12px] text-muted-foreground">
+                {{ dayjs(video.posted_at).format('HH:mm DD/MM')
+                }}<template v-if="video.channel">
+                    · {{ video.channel }}</template
+                >
+            </div>
+            <div
+                v-if="video.goc || video.giong"
+                class="mt-1 flex min-w-0 gap-1 overflow-hidden"
+            >
+                <span
+                    v-for="t in [video.goc, video.giong].filter(Boolean)"
+                    :key="String(t)"
+                    class="truncate rounded bg-muted px-1.5 text-[11.5px] leading-5 text-muted-foreground"
+                    >{{ t }}</span
+                >
             </div>
         </div>
 
-        <div class="flex shrink-0 flex-col gap-1.5 sm:w-64">
-            <template v-if="video.has_metrics">
-                <div class="flex items-baseline gap-2">
-                    <IconEye class="size-4 self-center text-muted-foreground" />
-                    <span class="text-lg font-semibold tabular-nums">{{
-                        fmtNum(video.views)
-                    }}</span>
-                    <span class="text-xs text-muted-foreground">lượt xem</span>
-                    <span
-                        v-if="video.engagement > 0"
-                        class="ml-auto text-xs text-muted-foreground tabular-nums"
-                        title="Tỉ lệ tương tác = (tim + bình luận + chia sẻ) / lượt xem"
-                        >{{ video.engagement.toLocaleString('vi-VN') }}%</span
-                    >
-                </div>
-                <div
-                    class="flex items-center gap-3 text-xs text-muted-foreground tabular-nums"
-                >
-                    <span class="inline-flex items-center gap-1" title="Tim"
-                        ><IconHeart class="size-3.5" />{{
-                            fmtNum(video.likes)
-                        }}</span
-                    >
-                    <span
-                        class="inline-flex items-center gap-1"
-                        title="Bình luận"
-                        ><IconMessageCircle class="size-3.5" />{{
-                            fmtNum(video.comments)
-                        }}</span
-                    >
-                    <span class="inline-flex items-center gap-1" title="Chia sẻ"
-                        ><IconShare3 class="size-3.5" />{{
-                            fmtNum(video.shares)
-                        }}</span
-                    >
-                    <span
-                        v-if="video.saves"
-                        class="inline-flex items-center gap-1"
-                        title="Lưu"
-                        ><IconBookmark class="size-3.5" />{{
-                            fmtNum(video.saves)
-                        }}</span
-                    >
-                </div>
-                <div
-                    v-if="video.avg_watch_s !== null || video.finish_rate !== null"
-                    class="text-xs text-muted-foreground tabular-nums"
-                >
-                    <template v-if="video.avg_watch_s !== null"
-                        >Xem TB
-                        <b class="text-foreground"
-                            >{{ video.avg_watch_s.toLocaleString('vi-VN') }}s</b
-                        ></template
-                    >
-                    <template v-if="video.finish_rate !== null">
-                        · Xem hết
-                        <b class="text-foreground"
-                            >{{ video.finish_rate.toLocaleString('vi-VN') }}%</b
-                        ></template
-                    >
-                </div>
-                <div class="text-xs text-muted-foreground tabular-nums">
-                    24h:
-                    <b class="text-foreground">{{ fmtNum(video.views_24h) }}</b>
-                    · 72h:
-                    <b class="text-foreground">{{ fmtNum(video.views_72h) }}</b>
-                </div>
-            </template>
-            <p v-else class="text-sm text-muted-foreground">
-                Chưa có số liệu
-                <span class="text-xs">(tiện ích thu mỗi giờ)</span>
-            </p>
-            <a
-                v-if="video.link"
-                :href="video.link"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary-text hover:underline"
-                @click.stop
+        <!-- Lượt xem -->
+        <div v-if="video.has_metrics" class="min-w-0 text-right lg:text-left">
+            <div class="text-[14px] font-semibold tabular-nums">
+                {{ fmtNum(video.views) }}
+            </div>
+            <div
+                class="mt-1 hidden h-1 overflow-hidden rounded-full bg-muted lg:block"
             >
-                Mở trên TikTok
-                <IconExternalLink class="size-3.5" />
-            </a>
+                <div
+                    class="h-full rounded-full bg-primary/70"
+                    :style="{ width: pct(video.views) }"
+                />
+            </div>
         </div>
+        <div
+            v-else
+            class="text-right text-[12px] text-muted-foreground lg:col-span-6 lg:text-left"
+        >
+            Chưa có số liệu (tiện ích thu mỗi giờ)
+        </div>
+
+        <template v-if="video.has_metrics">
+            <span
+                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                title="Tim"
+                ><IconHeart class="size-3.5" />{{
+                    fmtCompact(video.likes)
+                }}</span
+            >
+            <span
+                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                title="Bình luận"
+                ><IconMessageCircle class="size-3.5" />{{
+                    fmtCompact(video.comments)
+                }}</span
+            >
+            <span
+                class="hidden items-center justify-end gap-1 text-[13px] text-muted-foreground tabular-nums lg:flex"
+                title="Chia sẻ"
+                ><IconShare3 class="size-3.5" />{{
+                    fmtCompact(video.shares)
+                }}</span
+            >
+            <span
+                class="hidden text-right text-[13px] tabular-nums lg:block"
+                title="Tỉ lệ tương tác = (tim + bình luận + chia sẻ) / lượt xem"
+                >{{
+                    video.engagement > 0
+                        ? `${video.engagement.toLocaleString('vi-VN')}%`
+                        : '—'
+                }}</span
+            >
+            <span
+                class="hidden text-right text-[12px] leading-tight text-muted-foreground tabular-nums lg:block"
+            >
+                <span class="block"
+                    >24h
+                    <b class="font-medium text-foreground">{{
+                        video.views_24h === null
+                            ? '—'
+                            : fmtCompact(video.views_24h)
+                    }}</b></span
+                >
+                <span class="block"
+                    >72h
+                    <b class="font-medium text-foreground">{{
+                        video.views_72h === null
+                            ? '—'
+                            : fmtCompact(video.views_72h)
+                    }}</b></span
+                >
+            </span>
+        </template>
+
+        <a
+            v-if="video.link"
+            :href="video.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hidden size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:flex"
+            title="Mở trên TikTok"
+            aria-label="Mở trên TikTok"
+            @click.stop
+        >
+            <IconExternalLink class="size-4" />
+        </a>
+        <span v-else class="hidden lg:block" />
     </li>
 </template>

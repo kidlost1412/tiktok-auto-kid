@@ -1,7 +1,7 @@
 """Khâu dựng v2: FFmpeg dựng NỀN (cảnh, chuyển cảnh, chuyển động, màu, âm thanh) + Remotion dựng LỚP CHỮ trong suốt
 (karaoke DT Phudu, thẻ mở/chốt, mũi tên, thanh tiến độ) → FFmpeg ghép.
 chuan_bi(...) dựng nền + props cho 1 video; dung_lo(jobs) dựng lớp chữ cả lô bằng 1 lần đóng gói rồi ghép."""
-import json, random, shutil, subprocess
+import json, os, random, shutil, subprocess
 from pathlib import Path
 
 from dung import render, sentence_times, MENU as MENU_NEN
@@ -140,11 +140,20 @@ def dung_lo(jobs, public_dir, log=print):
         pat = f"f%0{len(first) - 1}d.png"
         am = Path(j["frames"]).parent / "am.m4a"
         SFX.tron_am(j["base"], j.get("sfx") or [], am, j.get("total", 30))
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", j["base"], "-framerate", str(FPS), "-i", str(Path(j["frames"]) / pat), "-i", str(am),
+        out = Path(j["out"]); part = out.with_name(out.stem + ".part.mp4")      # ghi ra file tạm .part.mp4 rồi mới đổi tên: crash không để lại .mp4 cụt trông như đã xong
+        try:
+          subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", j["base"], "-framerate", str(FPS), "-i", str(Path(j["frames"]) / pat), "-i", str(am),
                         "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto:shortest=0,format=yuv420p[v]", "-map", "[v]", "-map", "2:a",
                         "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-maxrate", "9M", "-bufsize", "18M", "-threads", "4",
-                        "-c:a", "copy", "-shortest", "-movflags", "+faststart", j["out"]], check=True)
-        lam_sach(j["out"])                                            # bỏ metadata lộ nguồn/công cụ (mã TikTok gốc, encoder, SEI x264)
+                        "-c:a", "copy", "-shortest", "-movflags", "+faststart", str(part)], check=True)
+          lam_sach(part)
+          os.replace(part, out)
+        except BaseException:
+            for x in (part, part.with_name(part.stem + ".__sach.mp4")):
+                try: x.unlink()
+                except OSError: pass
+            raise
+        # (lam_sach đã chạy trên file .part: bỏ metadata lộ nguồn/công cụ — mã TikTok gốc, encoder, SEI x264)
         try:                                                          # ảnh bìa: khung đẹp nhất, ưu tiên lúc chữ câu mở đang hiện
             pr = json.loads(Path(j["props"]).read_text(encoding="utf-8"))
             b0 = (pr.get("blocks") or [None])[0]

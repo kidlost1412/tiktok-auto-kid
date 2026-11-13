@@ -1,4 +1,4 @@
-// Kiểu dùng chung của "Xưởng nhỏ".
+// Kiểu dùng chung của "Khu Tự Trị".
 export type VaiState = 'working' | 'idle' | 'sleep';
 
 /** Thông số đặt một căn phòng/nhân vật vào ngôi nhà (toạ độ viewBox của nhà). */

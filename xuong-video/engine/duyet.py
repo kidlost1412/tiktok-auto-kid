@@ -5,7 +5,7 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, ghi_json, KHOA_DANH_GIA
 
 
 def tu_duyet(log=print):
@@ -15,10 +15,12 @@ def tu_duyet(log=print):
         return 0
     dat_tu = float(td.get("dat_tu", 7)); bo_duoi = float(td.get("bo_duoi", 0) or 0)
     f = HUB / "lich-su" / "danh-gia.json"
-    dg = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    doc = lambda: json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    dg = doc()
     ra = Path(cfg["duong_dan"]["ra"]); n_dat = n_bo = 0
+    moi = {}                                   # quyết định tự duyệt (chưa ghi) — quét mất thời gian nên KHÔNG giữ khoá lúc này
     for v in ra.glob("*/*.mp4"):
-        if v.parent.name.startswith("_") or v.name in dg:
+        if v.parent.name.startswith("_") or v.name.endswith(".part.mp4") or v.name in dg:      # .part.mp4 = đang ghi dở
             continue
         mf = kem(v, ".json")
         if not mf.exists():
@@ -31,10 +33,20 @@ def tu_duyet(log=print):
             continue
         luc = datetime.datetime.now().isoformat(timespec="minutes")
         if diem >= dat_tu:
-            dg[v.name] = {"ket_qua": "dat", "gop_y": "", "luc": luc, "tu_dong": f"điểm {diem} ≥ {dat_tu:g}"}; n_dat += 1
+            moi[v.name] = {"ket_qua": "dat", "gop_y": "", "luc": luc, "tu_dong": f"điểm {diem} ≥ {dat_tu:g}"}
         elif bo_duoi and diem < bo_duoi:
-            dg[v.name] = {"ket_qua": "bo", "gop_y": "", "luc": luc, "tu_dong": f"điểm {diem} < {bo_duoi:g}"}; n_bo += 1
+            moi[v.name] = {"ket_qua": "bo", "gop_y": "", "luc": luc, "tu_dong": f"điểm {diem} < {bo_duoi:g}"}
+    if moi:
+        with KHOA_DANH_GIA:                    # đọc lại ngay trước khi ghi: quyết định tay của anh (✅/❌) luôn thắng
+            hien = doc()
+            for ten, x in moi.items():
+                if ten in hien:
+                    continue
+                hien[ten] = x
+                if x["ket_qua"] == "dat": n_dat += 1
+                else: n_bo += 1
+            if n_dat or n_bo:
+                ghi_json(f, hien, indent=1)
     if n_dat or n_bo:
-        f.write_text(json.dumps(dg, ensure_ascii=False, indent=1), encoding="utf-8")
         log(f"  ✅ Tự duyệt theo điểm: {n_dat} video đạt (≥ {dat_tu:g})" + (f", {n_bo} video bỏ (< {bo_duoi:g})" if n_bo else ""))
     return n_dat + n_bo

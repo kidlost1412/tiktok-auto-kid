@@ -17,7 +17,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
 
-/** Trang chủ "Xưởng nhỏ" và nguồn trạng thái cho nó (chỉ đọc: không đổi gì trong hub hay lịch đăng). */
+/** Trang chủ "Khu Tự Trị" và nguồn trạng thái cho nó (chỉ đọc: không đổi gì trong hub hay lịch đăng). */
 final class NhaController extends Controller
 {
     public function index(): Response

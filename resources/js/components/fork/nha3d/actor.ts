@@ -1027,10 +1027,8 @@ export class Actor implements Talker {
                             )
                           : s.to;
                 this.gait =
-                    s.gait ??
-                    (s.k === 'home' && this.base === 'working'
-                        ? 'run'
-                        : 'walk');
+                    // việc thường ngày (kể cả về chỗ làm) thì đi bộ; chạy chỉ khi kịch bản ghi rõ
+                    s.gait ?? 'walk';
                 this.seated = false;
                 this.lying = null;
                 if (!this.ctx.motion) {

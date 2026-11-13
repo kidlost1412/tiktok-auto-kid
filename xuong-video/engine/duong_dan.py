@@ -5,11 +5,59 @@ Thư mục dữ liệu chọn theo thứ tự:
   1. biến môi trường XUONG_DATA (tuyệt đối, hoặc tương đối so với thư mục gốc repo);
   2. mặc định <repo>/du-lieu/xuong-video (bản cài mới).
 Lần chạy đầu với thư mục dữ liệu trống: tự tạo từ mẫu trong <repo>/xuong-video/mau/."""
-import json, os, secrets, shutil, sys
+import json, os, secrets, shutil, sys, threading
 from pathlib import Path
 
 CODE = Path(__file__).resolve().parents[1]      # <repo>/xuong-video
 REPO = CODE.parent
+
+
+# Khoá dùng chung cho danh-gia.json: server (bấm ✅/❌) và tự duyệt (duyet.py) cùng khoá này, khỏi ghi đè nhau.
+KHOA_DANH_GIA = threading.RLock()
+
+
+def ghi_nguyen_tu(f, noi_dung, ma_hoa="utf-8"):
+    """Ghi file kiểu nguyên tử: ghi vào file tạm cùng thư mục → flush+fsync → os.replace. Mất điện/crash giữa chừng
+    thì file cũ vẫn nguyên, không bao giờ để lại JSON cụt. noi_dung: str (hoặc bytes)."""
+    f = Path(f); f.parent.mkdir(parents=True, exist_ok=True)
+    tam = f.with_name(f"{f.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with open(tam, "wb") as fh:
+            fh.write(noi_dung if isinstance(noi_dung, bytes) else noi_dung.encode(ma_hoa))
+            fh.flush(); os.fsync(fh.fileno())
+        os.replace(tam, f)
+    finally:
+        try:
+            tam.unlink()
+        except OSError:
+            pass
+
+
+def ghi_json(f, obj, **kw):
+    """json.dumps rồi ghi nguyên tử (mặc định ensure_ascii=False)."""
+    kw.setdefault("ensure_ascii", False)
+    ghi_nguyen_tu(f, json.dumps(obj, **kw))
+
+
+def ten_tien_trinh(pid):
+    """Tên file chạy (vd. 'python.exe') của PID, None nếu PID không còn / không đọc được. Windows: tasklist."""
+    import csv, io, subprocess
+    try:
+        r = subprocess.run(["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        for row in csv.reader(io.StringIO(r.stdout)):
+            if len(row) >= 2 and row[1].strip() == str(int(pid)):
+                return row[0].strip()
+    except Exception:
+        pass
+    return None
+
+
+def pid_la_lo_sx(pid, ten=None):
+    """File khoá dang-chay.lock chỉ còn hiệu lực nếu PID ghi trong đó VẪN là tiến trình python (lô sản xuất).
+    PID bị Windows cấp lại cho tiến trình khác (chrome, notepad...) → coi là khoá cũ. ten: để test (tên tiến trình giả định)."""
+    ten = ten_tien_trinh(pid) if ten is None else ten
+    return bool(ten) and ten.lower().startswith(("python", "pythonw"))
 
 
 def _tim_data():
@@ -35,7 +83,7 @@ def khoi_tao():
     if not f.exists() and (mau / "config.mau.json").exists():
         c = json.loads((mau / "config.mau.json").read_text(encoding="utf-8"))
         c.setdefault("trypost", {})["khoa"] = secrets.token_urlsafe(24)      # khoá cổng /trypost/* — sinh riêng cho mỗi máy
-        f.write_text(json.dumps(c, ensure_ascii=False, indent=2), encoding="utf-8")
+        ghi_json(f, c, indent=2)
         for d in ("ho-so", "san-pham"):
             if (mau / d).is_dir():
                 shutil.copytree(mau / d, DATA / d, dirs_exist_ok=True)

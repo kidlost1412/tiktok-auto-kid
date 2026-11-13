@@ -7,7 +7,7 @@ namespace App\Fork\Nha;
 use Carbon\CarbonImmutable;
 
 /**
- * Biến dữ liệu thật (sổ sự kiện của hub + lịch đăng của app) thành trạng thái từng nhân vật trong "Xưởng nhỏ".
+ * Biến dữ liệu thật (sổ sự kiện của hub + lịch đăng của app) thành trạng thái từng nhân vật trong "Khu Tự Trị".
  * Hàm thuần: không gọi mạng/DB, nên test được bằng dữ liệu giả.
  *
  * Khoá nhân vật: bienkich, thuam, daodien, thodung, giamkhao, thukho, chuquay, cu, buuta (mèo không có trạng thái thật).

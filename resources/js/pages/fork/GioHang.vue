@@ -1,18 +1,18 @@
 <script setup lang="ts">
 // Trang riêng của bản Việt hoá: chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh.
+// Bố cục: thanh kênh + lấy sản phẩm shop ở trên, bộ lọc theo trạng thái, rồi một bảng gọn — mỗi dòng một sản phẩm.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import {
-    IconBrandTiktok,
+    IconCheck,
     IconHash,
     IconPlugConnectedX,
     IconPlus,
     IconRefresh,
-    IconShoppingCart,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
-import HubProductCard from '@/components/fork/gio-hang/HubProductCard.vue';
+import CartRow from '@/components/fork/gio-hang/CartRow.vue';
 import PersonaliseDialog from '@/components/fork/gio-hang/PersonaliseDialog.vue';
 import ShopPickerDialog from '@/components/fork/gio-hang/ShopPickerDialog.vue';
 import type {
@@ -27,9 +27,8 @@ import { usePersonalise } from '@/components/fork/gio-hang/usePersonalise';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
-import SectionHeading from '@/components/fork/shared/SectionHeading.vue';
+import { cardCls, toneClasses } from '@/components/fork/shared/status';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
-import { cardCls } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -72,13 +71,26 @@ const opts = {
     },
 };
 
-const fmtTime = (iso: string | null | undefined) =>
-    iso ? dayjs(iso).format('DD/MM HH:mm') : 'chưa lần nào';
+const fmtTime = (iso: string | null | undefined) => {
+    if (!iso) {
+        return 'chưa lấy lần nào';
+    }
+
+    const d = dayjs(iso);
+
+    return d.isSame(dayjs(), 'day')
+        ? `lấy lúc ${d.format('HH:mm')} hôm nay`
+        : `lấy lúc ${d.format('HH:mm DD/MM')}`;
+};
 
 // ---- Chọn kênh ----
 const { loading, callbacks } = useVisitLoading();
 
 const chooseChannel = (id: string) => {
+    if (id === props.selected) {
+        return;
+    }
+
     router.get(
         '/auto/gio-hang',
         { kenh: id },
@@ -88,6 +100,13 @@ const chooseChannel = (id: string) => {
 
 // ---- Lấy sản phẩm từ shop ----
 const syncState = computed(() => props.sync?.state ?? 'idle');
+// "Vừa lấy xong" chỉ hiện khi lần lấy mới đây (trạng thái 'done' giữ mãi sau lần lấy cuối).
+const justSynced = computed(
+    () =>
+        syncState.value === 'done' &&
+        !!props.sync?.synced_at &&
+        dayjs().diff(dayjs(props.sync.synced_at), 'minute') < 10,
+);
 
 const syncShop = () => {
     if (!props.selected) {
@@ -103,7 +122,9 @@ const syncProgress = computed(() => props.sync?.progress ?? null);
 const syncPercent = computed(() => {
     const p = syncProgress.value;
 
-    return p && p.total ? Math.min(100, Math.round((p.got / p.total) * 100)) : null;
+    return p && p.total
+        ? Math.min(100, Math.round((p.got / p.total) * 100))
+        : null;
 });
 const syncProgressText = computed(() => {
     const p = syncProgress.value;
@@ -157,7 +178,7 @@ const setHidden = (p: ShopProduct, hidden: boolean) => {
     );
 };
 
-// ---- Thẻ ghép: mỗi thẻ = sản phẩm hub x quy cách ----
+// ---- Dòng ghép: mỗi dòng = sản phẩm hub x quy cách ----
 interface Draft {
     shop_product_id?: string;
     display_name?: string;
@@ -317,17 +338,22 @@ const saveRename = () => {
     );
 };
 
-const removeProduct = (r: Row) => {
-    if (
-        !window.confirm(
-            `Xoá sản phẩm "${r.hub_name}"?\nHồ sơ sản phẩm được đưa vào Thùng rác của Windows; video gốc và video đã làm không bị xoá. Giỏ hàng đã chọn cho sản phẩm này cũng bị bỏ.`,
-        )
-    ) {
+const removing = ref<Row | null>(null);
+
+const confirmRemove = () => {
+    const r = removing.value;
+
+    if (!r) {
         return;
     }
 
     busy.value = `rename-${r.code}`;
-    router.delete(`/auto/hub-products/${r.code}`, opts);
+    router.delete(`/auto/hub-products/${r.code}`, {
+        ...opts,
+        onSuccess: () => {
+            removing.value = null;
+        },
+    });
 };
 
 const onlySample = computed(
@@ -338,8 +364,8 @@ const onlySample = computed(
 const { personaOf, dialogProps, openProduct, openDefault, closePersonalise } =
     usePersonalise(() => props);
 
-// ---- Sắp xếp: thẻ có video chờ mà chưa có giỏ lên đầu ----
-// Một thẻ đã chọn sản phẩm trong nháp (chưa lưu) vẫn tính là chưa có giỏ cho tới khi lưu.
+// ---- Sắp xếp: dòng có video chờ mà chưa có giỏ lên đầu ----
+// Một dòng đã chọn sản phẩm trong nháp (chưa lưu) vẫn tính là chưa có giỏ cho tới khi lưu.
 const rank = (r: Row) => {
     if (!r.link && r.new_videos > 0) {
         return 0;
@@ -367,54 +393,164 @@ const needVideos = computed(() =>
 );
 const problemRows = computed(() => props.rows.filter((r) => rank(r) === 1));
 const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
+
+// ---- Lọc theo trạng thái ----
+type Filter = 'all' | 'need' | 'bad' | 'ok';
+const filter = ref<Filter>('all');
+
+const filters = computed(() => [
+    {
+        key: 'all' as const,
+        label: 'Tất cả',
+        count: props.rows.length,
+        dot: null,
+    },
+    {
+        key: 'need' as const,
+        label: 'Chưa chọn giỏ',
+        count: needRows.value.length,
+        dot: 'bg-amber-500',
+    },
+    {
+        key: 'bad' as const,
+        label: 'Có vấn đề',
+        count: problemRows.value.length,
+        dot: 'bg-red-500',
+    },
+    {
+        key: 'ok' as const,
+        label: 'Sẵn sàng',
+        count: readyRows.value.length,
+        dot: 'bg-emerald-500',
+    },
+]);
+
+const visibleRows = computed(() => {
+    const want = { all: null, need: 0, bad: 1, ok: 2 }[filter.value];
+
+    return want === null
+        ? sortedRows.value
+        : sortedRows.value.filter((r) => rank(r) === want);
+});
+
+watch(
+    () => props.selected,
+    () => {
+        filter.value = 'all';
+    },
+);
+
+const channel = computed(
+    () => props.channels.find((c) => c.id === props.selected) ?? null,
+);
+const initial = (c: { username: string | null; display_name: string | null }) =>
+    [...(c.display_name || c.username || '?').trim()][0]?.toUpperCase() ?? '?';
 </script>
 
 <template>
     <AutoShell
         title="Giỏ hàng"
-        description="Chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh. Thẻ chưa chọn giỏ thì video được giữ trong kho."
+        description="Gắn sản phẩm TikTok Shop cho video của từng sản phẩm, theo từng kênh. Sản phẩm chưa chọn giỏ thì video được giữ trong kho."
         testid="fork-gio-hang-page"
     >
-        <div class="flex flex-col gap-5">
-            <EmptyState
-                v-if="!channels.length"
-                :icon="IconPlugConnectedX"
-                title="Chưa có kênh TikTok nào bật đăng qua Chrome"
-                description="Bật đăng qua Chrome cho kênh trong phần Kết nối Chrome, rồi quay lại đây chọn giỏ hàng."
-                data-testid="fork-gio-hang-empty"
+        <template v-if="channels.length" #actions>
+            <Button
+                variant="outline"
+                data-testid="fork-personalise-default"
+                @click="openDefault"
             >
-                <Button as-child size="sm">
-                    <a href="/settings/chrome">Kết nối Chrome →</a>
-                </Button>
-            </EmptyState>
+                <IconHash class="size-4" />
+                Hashtag mặc định{{
+                    personalise_default?.tags.length
+                        ? ` (${personalise_default.tags.length})`
+                        : ''
+                }}
+            </Button>
+            <Button data-testid="fork-gio-hang-add" @click="addOpen = true">
+                <IconPlus class="size-4" />
+                Thêm sản phẩm
+            </Button>
+        </template>
 
-            <template v-else>
-                <!-- Chọn kênh + lấy sản phẩm -->
-                <section :class="cn(cardCls, 'flex flex-col gap-4 p-5')">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <span
-                            class="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
-                            ><IconBrandTiktok class="size-[18px]"
-                        /></span>
-                        <span class="text-sm font-semibold">Kênh</span>
-                        <div
-                            class="flex flex-wrap gap-1.5"
-                            data-testid="fork-gio-hang-channel"
+        <EmptyState
+            v-if="!channels.length"
+            :icon="IconPlugConnectedX"
+            title="Chưa có kênh TikTok nào bật đăng qua Chrome"
+            description="Bật đăng qua Chrome cho kênh trong phần Kết nối Chrome, rồi quay lại đây chọn giỏ hàng."
+            data-testid="fork-gio-hang-empty"
+        >
+            <Button as-child size="sm">
+                <Link href="/settings#chrome">Kết nối Chrome →</Link>
+            </Button>
+        </EmptyState>
+
+        <template v-else>
+            <!-- Kênh + sản phẩm shop -->
+            <section :class="cn(cardCls, 'overflow-hidden')">
+                <div
+                    class="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 px-5 py-4"
+                >
+                    <div
+                        class="flex min-w-0 flex-wrap items-center gap-2"
+                        role="tablist"
+                        aria-label="Chọn kênh"
+                        data-testid="fork-gio-hang-channel"
+                    >
+                        <button
+                            v-for="c in channels"
+                            :key="c.id"
+                            type="button"
+                            role="tab"
+                            :aria-selected="c.id === selected"
+                            :class="
+                                cn(
+                                    'flex h-10 items-center gap-2.5 rounded-full border py-1 pr-4 pl-1 text-[13.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                    c.id === selected
+                                        ? 'border-primary bg-primary/[0.07] text-foreground dark:bg-primary/15'
+                                        : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                                )
+                            "
+                            @click="chooseChannel(c.id)"
                         >
-                            <Button
-                                v-for="c in channels"
-                                :key="c.id"
-                                class="rounded-full"
-                                :variant="
-                                    c.id === selected ? 'default' : 'outline'
+                            <span
+                                :class="
+                                    cn(
+                                        'flex size-8 items-center justify-center rounded-full text-[13px] font-semibold',
+                                        c.id === selected
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-muted text-muted-foreground',
+                                    )
                                 "
-                                @click="chooseChannel(c.id)"
-                                >@{{ c.username }}</Button
+                                >{{ initial(c) }}</span
                             >
-                        </div>
+                            @{{ c.username }}
+                            <IconCheck
+                                v-if="c.id === selected"
+                                class="size-4 text-primary-text"
+                            />
+                        </button>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
+                        <div
+                            class="text-right text-[12.5px] leading-snug"
+                            data-testid="fork-gio-hang-synced-at"
+                        >
+                            <div class="font-medium tabular-nums">
+                                {{ products.length }} sản phẩm trong shop
+                            </div>
+                            <div class="text-muted-foreground">
+                                <template v-if="justSynced"
+                                    ><span
+                                        :class="toneClasses.success.text"
+                                        data-testid="fork-gio-hang-sync-done"
+                                        >Vừa lấy xong</span
+                                    >
+                                    ·
+                                </template>
+                                {{ fmtTime(sync?.synced_at) }}
+                            </div>
+                        </div>
                         <Button
                             variant="outline"
                             :disabled="
@@ -424,7 +560,9 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                             @click="syncShop"
                         >
                             <Spinner
-                                v-if="syncState === 'waiting'"
+                                v-if="
+                                    syncState === 'waiting' || busy === 'sync'
+                                "
                                 class="size-4"
                             />
                             <IconRefresh v-else class="size-4" />
@@ -432,194 +570,224 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                                 syncState === 'waiting'
                                     ? syncProgressText
                                         ? `Đang lấy… ${syncProgressText}`
-                                        : 'Đang chờ tiện ích…'
-                                    : syncState === 'idle' ||
-                                        syncState === 'done'
-                                      ? 'Lấy sản phẩm từ shop'
-                                      : 'Bấm lại để lấy sản phẩm từ shop'
+                                        : 'Đang chờ Chrome…'
+                                    : 'Lấy lại từ shop'
                             }}
                         </Button>
-                        <span
-                            class="text-sm text-muted-foreground"
-                            data-testid="fork-gio-hang-synced-at"
-                        >
-                            {{ products.length }} sản phẩm shop · lần lấy gần
-                            nhất: {{ fmtTime(sync?.synced_at) }}
-                        </span>
                     </div>
+                </div>
 
-                    <Callout
-                        v-if="syncState === 'waiting'"
-                        tone="info"
-                        data-testid="fork-gio-hang-sync-waiting"
-                    >
-                        <template v-if="syncProgress">
-                            <div
-                                class="font-medium"
-                                data-testid="fork-gio-hang-sync-progress"
-                            >
-                                Đã lấy {{ syncProgressText }} sản phẩm…
-                            </div>
-                            <Progress
+                <div
+                    v-if="syncState === 'waiting'"
+                    class="border-t bg-sky-50/60 px-5 py-3 dark:bg-sky-950/20"
+                    data-testid="fork-gio-hang-sync-waiting"
+                >
+                    <template v-if="syncProgress">
+                        <div
+                            class="flex items-center justify-between text-[13px] font-medium"
+                            data-testid="fork-gio-hang-sync-progress"
+                        >
+                            <span>Đã lấy {{ syncProgressText }} sản phẩm…</span>
+                            <span
                                 v-if="syncPercent !== null"
-                                class="mt-2 h-2"
-                                :model-value="syncPercent"
-                            />
-                        </template>
-                        <template v-else>
-                            Đang chờ tiện ích Chrome lấy sản phẩm từ shop. Chrome
-                            cần đang mở và đã đăng nhập TikTok (thường mất vài
-                            giây). Trang tự cập nhật; nếu quá
-                            {{ sync_ttl_minutes }} phút yêu cầu sẽ hết hạn.
-                        </template>
-                    </Callout>
-                    <Callout
-                        v-else-if="syncState === 'error'"
-                        tone="danger"
-                        data-testid="fork-gio-hang-sync-error"
-                    >
-                        Lấy sản phẩm bị lỗi: {{ sync?.reason }}. Tiện ích có thể
-                        tự thử lại; nếu không được, bấm nút để gửi yêu cầu mới.
-                    </Callout>
-                    <Callout
-                        v-else-if="syncState === 'expired'"
-                        tone="warn"
-                        data-testid="fork-gio-hang-sync-expired"
-                    >
-                        Yêu cầu đã hết hạn sau {{ sync_ttl_minutes }} phút mà
-                        tiện ích chưa lấy được. Hãy kiểm tra Chrome đang mở rồi
-                        bấm lại.
-                    </Callout>
-                    <Callout
-                        v-else-if="syncState === 'done'"
-                        tone="success"
-                        data-testid="fork-gio-hang-sync-done"
-                    >
-                        Đã lấy xong sản phẩm lúc {{ fmtTime(sync?.synced_at) }}.
-                    </Callout>
-                </section>
-
-                <!-- Tóm tắt -->
-                <Callout
-                    v-if="needRows.length"
-                    tone="warn"
-                    data-testid="fork-gio-hang-summary"
-                >
-                    <b>{{ needVideos }} video</b> thuộc
-                    <b>{{ needRows.length }} sản phẩm</b> đang chờ vì chưa chọn
-                    giỏ. Chọn giỏ ở các thẻ màu vàng bên dưới để app bắt đầu
-                    đăng.
-                </Callout>
-                <Callout v-else-if="rows.length" tone="success">
-                    Mọi video đang chờ đều đã có giỏ ({{ readyRows.length }} sản
-                    phẩm sẵn sàng<template v-if="problemRows.length"
-                        >, {{ problemRows.length }} đang gặp vấn đề</template
-                    >).
-                </Callout>
-
-                <!-- Lưới thẻ sản phẩm hub -->
-                <section
-                    class="flex flex-col gap-5"
-                    data-testid="fork-gio-hang-rows"
-                >
-                    <SectionHeading
-                        :icon="IconShoppingCart"
-                        title="Video nào gắn sản phẩm nào"
-                        description="Mỗi thẻ là một sản phẩm của hub theo từng quy cách. Phải chọn đúng một sản phẩm shop cho mỗi thẻ."
-                    >
-                        <Button
-                            data-testid="fork-gio-hang-add"
-                            @click="addOpen = true"
-                        >
-                            <IconPlus class="size-4" />
-                            Thêm sản phẩm
-                        </Button>
-                        <Button
-                            variant="outline"
-                            data-testid="fork-personalise-default"
-                            @click="openDefault"
-                        >
-                            <IconHash class="size-4" />
-                            Hashtag mặc định chung{{
-                                personalise_default?.tags.length
-                                    ? ` (${personalise_default.tags.length})`
-                                    : ''
-                            }}
-                        </Button>
-                    </SectionHeading>
-
-                    <Callout
-                        v-if="onlySample"
-                        tone="info"
-                        data-testid="fork-gio-hang-only-sample"
-                    >
-                        Hiện mới có <b>sản phẩm ví dụ</b>. Bấm
-                        <b>+ Thêm sản phẩm</b>, chọn sản phẩm thật trong shop
-                        của anh: app tự tạo sản phẩm tương ứng và gắn giỏ hàng.
-                        {{
-                            products.length
-                                ? ''
-                                : 'Nhớ bấm "Lấy sản phẩm từ shop" trước để có danh sách.'
-                        }}
-                    </Callout>
-
-                    <div
-                        v-if="loading"
-                        class="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-                    >
-                        <Skeleton
-                            v-for="i in 6"
-                            :key="i"
-                            class="h-56 rounded-[14px]"
+                                class="text-muted-foreground tabular-nums"
+                                >{{ syncPercent }}%</span
+                            >
+                        </div>
+                        <Progress
+                            v-if="syncPercent !== null"
+                            class="mt-2 h-1.5"
+                            :model-value="syncPercent"
                         />
-                    </div>
-                    <div
-                        v-else
-                        class="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-                    >
-                        <HubProductCard
-                            v-for="r in sortedRows"
-                            :key="r.key"
-                            :row="r"
-                            :card="cardOf(r)"
-                            :name="nameOf(r)"
-                            :name-max="name_max"
-                            :dirty="isDirty(r)"
-                            :has-draft="!!draft[r.key]"
-                            :busy="busy === `row-${r.key}`"
-                            :persona="personaOf(r.code)"
-                            @personalise="openProduct(r.code, r.hub_name)"
-                            @rename="openRename(r)"
-                            @remove="removeProduct(r)"
-                            @pick="picking = r.key"
-                            @update:name="(v: string) => editName(r, v)"
-                            @save="saveRow(r)"
-                            @clear="clearRow(r)"
-                        />
-                    </div>
-
-                    <p
-                        v-if="sample_hidden"
-                        class="text-sm text-muted-foreground"
-                        data-testid="fork-gio-hang-sample-hidden"
-                    >
-                        Thẻ sản phẩm ví dụ đã được ẩn vì anh đã có sản phẩm
-                        thật.
+                    </template>
+                    <p v-else class="text-[13px] text-muted-foreground">
+                        Đang chờ tiện ích Chrome lấy sản phẩm từ shop — Chrome
+                        cần đang mở và đã đăng nhập TikTok, thường mất vài giây.
+                        Trang tự cập nhật; quá {{ sync_ttl_minutes }} phút thì
+                        yêu cầu hết hạn.
                     </p>
+                </div>
+                <div
+                    v-else-if="syncState === 'error' || syncState === 'expired'"
+                    :class="
+                        cn(
+                            'border-t px-5 py-3 text-[13px]',
+                            syncState === 'error'
+                                ? toneClasses.danger.box
+                                : toneClasses.warn.box,
+                            'rounded-none border-x-0 border-b-0',
+                        )
+                    "
+                    :data-testid="
+                        syncState === 'error'
+                            ? 'fork-gio-hang-sync-error'
+                            : 'fork-gio-hang-sync-expired'
+                    "
+                >
+                    <template v-if="syncState === 'error'">
+                        Lấy sản phẩm bị lỗi: {{ sync?.reason }}. Tiện ích có thể
+                        tự thử lại; nếu không được, bấm “Lấy lại từ shop”.
+                    </template>
+                    <template v-else>
+                        Yêu cầu đã hết hạn sau {{ sync_ttl_minutes }} phút mà
+                        tiện ích chưa lấy được. Kiểm tra Chrome đang mở rồi bấm
+                        lại.
+                    </template>
+                </div>
+            </section>
 
-                    <EmptyState
-                        v-if="!rows.length"
-                        title="Chưa có sản phẩm nào"
-                        description="Bấm &quot;Thêm sản phẩm&quot;, chọn một sản phẩm trong shop TikTok của anh: app tạo sản phẩm trong Xưởng Video và gắn giỏ hàng luôn."
+            <Callout
+                v-if="needRows.length"
+                tone="warn"
+                data-testid="fork-gio-hang-summary"
+            >
+                <b>{{ needVideos }} video</b> của
+                <b>{{ needRows.length }} sản phẩm</b> đang chờ vì chưa chọn giỏ
+                — chọn giỏ ở các dòng màu vàng để app bắt đầu đăng.
+            </Callout>
+            <Callout
+                v-if="onlySample"
+                tone="info"
+                data-testid="fork-gio-hang-only-sample"
+            >
+                Hiện mới có <b>sản phẩm ví dụ</b>. Bấm <b>Thêm sản phẩm</b> và
+                chọn sản phẩm thật trong shop: app tự tạo sản phẩm tương ứng và
+                gắn giỏ hàng.
+                {{
+                    products.length
+                        ? ''
+                        : 'Nhớ bấm “Lấy lại từ shop” trước để có danh sách.'
+                }}
+            </Callout>
+
+            <!-- Bảng sản phẩm -->
+            <section
+                :class="cn(cardCls, 'overflow-hidden')"
+                data-testid="fork-gio-hang-rows"
+            >
+                <header
+                    class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5"
+                >
+                    <div
+                        class="flex flex-wrap items-center gap-1"
+                        role="tablist"
+                        aria-label="Lọc theo trạng thái"
                     >
-                        <Button size="sm" @click="addOpen = true">
-                            <IconPlus class="size-4" />
-                            Thêm sản phẩm
-                        </Button>
-                    </EmptyState>
-                </section>
-            </template>
-        </div>
+                        <button
+                            v-for="f in filters"
+                            :key="f.key"
+                            type="button"
+                            role="tab"
+                            :aria-selected="filter === f.key"
+                            :disabled="f.key !== 'all' && !f.count"
+                            :class="
+                                cn(
+                                    'flex h-8 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-colors disabled:opacity-40',
+                                    filter === f.key
+                                        ? 'bg-foreground text-background'
+                                        : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                                )
+                            "
+                            @click="filter = f.key"
+                        >
+                            <span
+                                v-if="f.dot"
+                                :class="cn('size-1.5 rounded-full', f.dot)"
+                            />
+                            {{ f.label }}
+                            <span
+                                :class="
+                                    cn(
+                                        'tabular-nums',
+                                        filter === f.key
+                                            ? 'opacity-70'
+                                            : 'text-muted-foreground/80',
+                                    )
+                                "
+                                >{{ f.count }}</span
+                            >
+                        </button>
+                    </div>
+                    <span
+                        v-if="channel"
+                        class="text-[12.5px] text-muted-foreground"
+                        >Giỏ hàng của
+                        <b class="font-medium text-foreground"
+                            >@{{ channel.username }}</b
+                        ></span
+                    >
+                </header>
+
+                <div
+                    class="hidden border-b bg-muted/40 px-5 py-2 text-[11.5px] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:grid-cols-[minmax(170px,1fr)_minmax(250px,1.5fr)_minmax(200px,1.15fr)_minmax(150px,0.8fr)_auto] lg:gap-x-5"
+                    aria-hidden="true"
+                >
+                    <span class="pl-5">Sản phẩm</span>
+                    <span class="pl-1.5">Sản phẩm TikTok Shop</span>
+                    <span>Tên giỏ trên video</span>
+                    <span class="pl-1.5">Bìa &amp; hashtag</span>
+                    <span class="w-[72px]" />
+                </div>
+
+                <div v-if="loading" class="divide-y">
+                    <div
+                        v-for="i in 5"
+                        :key="i"
+                        class="flex items-center gap-5 px-5 py-4"
+                    >
+                        <Skeleton class="h-10 w-40" />
+                        <Skeleton class="h-12 flex-1" />
+                        <Skeleton class="h-10 w-56" />
+                    </div>
+                </div>
+                <div v-else-if="visibleRows.length" class="divide-y">
+                    <CartRow
+                        v-for="r in visibleRows"
+                        :key="r.key"
+                        :row="r"
+                        :card="cardOf(r)"
+                        :name="nameOf(r)"
+                        :name-max="name_max"
+                        :dirty="isDirty(r)"
+                        :has-draft="!!draft[r.key]"
+                        :busy="busy === `row-${r.key}`"
+                        :persona="personaOf(r.code)"
+                        @personalise="openProduct(r.code, r.hub_name)"
+                        @rename="openRename(r)"
+                        @remove="removing = r"
+                        @pick="picking = r.key"
+                        @update:name="(v: string) => editName(r, v)"
+                        @save="saveRow(r)"
+                        @clear="clearRow(r)"
+                    />
+                </div>
+                <EmptyState
+                    v-else-if="!rows.length"
+                    class="border-0 shadow-none"
+                    title="Chưa có sản phẩm nào"
+                    description="Bấm “Thêm sản phẩm”, chọn một sản phẩm trong shop TikTok: app tạo sản phẩm trong Xưởng Video và gắn giỏ hàng luôn."
+                >
+                    <Button size="sm" @click="addOpen = true">
+                        <IconPlus class="size-4" />
+                        Thêm sản phẩm
+                    </Button>
+                </EmptyState>
+                <p
+                    v-else
+                    class="px-5 py-10 text-center text-[13px] text-muted-foreground"
+                >
+                    Không có sản phẩm nào ở mục này.
+                </p>
+
+                <p
+                    v-if="sample_hidden"
+                    class="border-t px-5 py-3 text-[12.5px] text-muted-foreground"
+                    data-testid="fork-gio-hang-sample-hidden"
+                >
+                    Sản phẩm ví dụ đã được ẩn vì đã có sản phẩm thật.
+                </p>
+            </section>
+        </template>
 
         <PersonaliseDialog
             v-bind="dialogProps"
@@ -645,13 +813,16 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
             :open="renaming !== null"
             @update:open="(v: boolean) => !v && (renaming = null)"
         >
-            <DialogContent class="sm:max-w-md" data-testid="fork-gio-hang-rename">
+            <DialogContent
+                class="sm:max-w-md"
+                data-testid="fork-gio-hang-rename"
+            >
                 <DialogHeader>
                     <DialogTitle>Đổi tên sản phẩm</DialogTitle>
-                    <DialogDescription>
-                        Tên gọi ngắn hiện trên thẻ và được đọc trong video. Mã
-                        sản phẩm không đổi.
-                    </DialogDescription>
+                    <DialogDescription
+                        >Tên gọi ngắn hiện trong app và được đọc trong video. Mã
+                        sản phẩm không đổi.</DialogDescription
+                    >
                 </DialogHeader>
                 <Input
                     v-model="renameValue"
@@ -669,6 +840,43 @@ const readyRows = computed(() => props.rows.filter((r) => rank(r) === 2));
                         @click="saveRename"
                         >Lưu tên</Button
                     >
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog
+            :open="removing !== null"
+            @update:open="(v: boolean) => !v && (removing = null)"
+        >
+            <DialogContent
+                class="sm:max-w-md"
+                data-testid="fork-gio-hang-remove-confirm"
+            >
+                <DialogHeader>
+                    <DialogTitle
+                        >Xoá sản phẩm “{{ removing?.hub_name }}”?</DialogTitle
+                    >
+                    <DialogDescription>
+                        Hồ sơ sản phẩm được đưa vào Thùng rác của Windows; video
+                        gốc và video đã làm không bị xoá. Giỏ hàng đã chọn cho
+                        sản phẩm này cũng bị bỏ.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" @click="removing = null"
+                        >Huỷ</Button
+                    >
+                    <Button
+                        variant="destructive"
+                        :disabled="busy !== null"
+                        @click="confirmRemove"
+                    >
+                        <Spinner
+                            v-if="busy?.startsWith('rename-')"
+                            class="size-4"
+                        />
+                        Xoá sản phẩm
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

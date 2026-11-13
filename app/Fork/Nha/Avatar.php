@@ -7,7 +7,7 @@ namespace App\Fork\Nha;
 use App\Fork\AutoPost\Models\AutoSetting;
 
 /**
- * Hình dáng nhân vật trong "Xưởng nhỏ" do chủ app tự đặt (tên + ngoại hình), lưu trên máy chủ để đổi trình duyệt vẫn giữ.
+ * Hình dáng nhân vật trong "Khu Tự Trị" do chủ app tự đặt (tên + ngoại hình), lưu trên máy chủ để đổi trình duyệt vẫn giữ.
  * Hiện chỉ có nhân vật chính ("chinh" = Kid); sau này thêm nhân vật khác chỉ cần thêm vào WHO.
  * Mọi lựa chọn đều phải nằm trong danh sách cho phép (giao diện 3D dùng đúng các khoá này).
  */

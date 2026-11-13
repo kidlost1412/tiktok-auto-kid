@@ -12,6 +12,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Persona\Hashtags;
+use App\Fork\AutoPost\Shop\CartRefresh;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ProductNaming;
 use App\Fork\AutoPost\Shop\ShopSync;
@@ -119,14 +120,20 @@ final class GioHangController extends Controller
 
         $values = ['shop_product_id' => $shop->product_id, 'display_name' => $data['display_name'], 'paused_reason' => null];
         $existing = ProductLink::slot($account->id, $product->code, $quyCach)->first();
+        $oldName = $existing?->display_name;
 
         if ($existing !== null) {
             $existing->update($values);
+            $link = $existing;
         } else {
-            ProductLink::query()->create([...$values, 'social_account_id' => $account->id, 'auto_product_id' => $product->code, 'quy_cach' => $quyCach]);
+            $link = ProductLink::query()->create([...$values, 'social_account_id' => $account->id, 'auto_product_id' => $product->code, 'quy_cach' => $quyCach]);
         }
 
-        return back()->with('flash.success', 'Đã chọn sản phẩm giỏ hàng cho '.CartRules::label($product, $product->code, $quyCach).' trên @'.$account->username.'.');
+        // Bài đã xếp lịch (chưa đăng) của sản phẩm này đổi sang giỏ mới luôn.
+        $moved = CartRefresh::apply($account->id, $link, $oldName);
+        $note = $moved > 0 ? ' '.$moved.' bài đã xếp lịch cũng được đổi sang giỏ mới.' : '';
+
+        return back()->with('flash.success', 'Đã chọn sản phẩm giỏ hàng cho '.CartRules::label($product, $product->code, $quyCach).' trên @'.$account->username.'.'.$note);
     }
 
     public function clearLink(Request $request, string $socialAccount, string $code): RedirectResponse
@@ -134,9 +141,14 @@ final class GioHangController extends Controller
         $account = $this->findAccount($this->authorizeOwner($request), $socialAccount);
         $data = $request->validate(['quy_cach' => ['nullable', 'string', 'max:100']]);
 
-        ProductLink::slot($account->id, $code, $data['quy_cach'] ?? null)->delete();
+        $link = ProductLink::slot($account->id, $code, $data['quy_cach'] ?? null)->first();
+        $link?->delete();
+        $still = $link !== null ? CartRefresh::scheduledUsing($account->id, (string) $link->shop_product_id) : 0;
 
-        return back()->with('flash.success', 'Đã bỏ chọn. Video của sản phẩm này sẽ được giữ lại trong kho, không đăng.');
+        // Bài đã xếp lịch thì không tự huỷ (chủ app quyết): chỉ báo để chủ app biết còn bài đăng kèm giỏ cũ.
+        return $still > 0
+            ? back()->with('flash.warning', 'Đã bỏ chọn. Video mới của sản phẩm này sẽ được giữ trong kho. Lưu ý: '.$still.' bài đã xếp lịch vẫn đăng kèm giỏ cũ — muốn đổi thì chọn giỏ mới cho sản phẩm này.')
+            : back()->with('flash.success', 'Đã bỏ chọn. Video của sản phẩm này sẽ được giữ lại trong kho, không đăng.');
     }
 
     /**

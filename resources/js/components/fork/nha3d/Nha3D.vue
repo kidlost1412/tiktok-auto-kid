@@ -21,7 +21,7 @@ let world: NhaWorld | null = null;
 let gone = false;
 
 const fail = (err: unknown) => {
-    console.error('[Xưởng nhỏ 3D] chuyển về bản 2D:', err);
+    console.error('[Khu Tự Trị 3D] chuyển về bản 2D:', err);
     world?.dispose();
     world = null;
     if (!gone) {
@@ -83,7 +83,7 @@ onBeforeUnmount(() => {
         ref="host"
         class="n3-host h-full"
         role="img"
-        aria-label="Xưởng nhỏ 3D: ngôi nhà và các nhân vật đang làm việc"
+        aria-label="Khu Tự Trị 3D: ngôi nhà và các nhân vật đang làm việc"
         data-testid="nha-3d"
     >
         <div

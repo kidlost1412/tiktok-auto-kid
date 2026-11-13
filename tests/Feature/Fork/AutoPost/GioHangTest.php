@@ -223,3 +223,41 @@ test('the page shows the sync state and the extension can report a failure', fun
         ->where('sync.state', 'error')
         ->where('sync.reason', fn (string $r) => str_contains($r, '4 phút')));
 });
+
+test('changing the cart also moves already scheduled posts that Chrome has not started, keeping per-video cart names', function (): void {
+    ($this->shop)(GH_1L);
+    ($this->shop)(GH_5L, ['title' => 'Đạm cá 5L']);
+    $url = "/auto/accounts/{$this->sa->id}/links/dam-ca";
+    $this->actingAs($this->owner)->put($url, ['quy_cach' => '1l', 'shop_product_id' => GH_1L, 'display_name' => 'ĐẠM CÁ CŨ'])->assertSessionHas('flash.success');
+
+    $post = function (array $meta, string $hash): App\Models\Post {
+        $p = App\Models\Post::factory()->forAccount($this->sa)->scheduled()->create(['user_id' => $this->owner->id, 'meta' => [
+            'fork_shop_product_id' => GH_1L, ...$meta,
+        ]]);
+        AutoVideo::query()->create(['hash' => $hash, 'path' => "/{$hash}.mp4", 'batch_date' => '2026-01-05', 'file_name' => "{$hash}.mp4",
+            'product_code' => 'dam-ca', 'quy_cach' => '1l', 'status' => 'scheduled', 'post_id' => $p->id]);
+
+        return $p;
+    };
+    $legacy = $post(['fork_shop_product_name' => 'ĐẠM CÁ CŨ'], 'a');            // bài cũ: tên lấy từ liên kết
+    $own = $post(['fork_shop_product_name' => 'TÊN RIÊNG VIDEO', 'fork_shop_name_src' => 'video'], 'b');
+    $running = $post(['fork_shop_product_name' => 'ĐẠM CÁ CŨ'], 'c');
+    App\Fork\Chrome\Models\ChromeJob::create([
+        'id' => 'ej_'.bin2hex(random_bytes(8)), 'post_id' => $running->id, 'social_account_id' => $this->sa->id, 'attempt' => 1, 'mode' => 'scheduled',
+        'expect_user_id' => '777', 'media_path' => 'x.mp4', 'video_name' => 'x.mp4', 'video_size' => 1, 'state' => 'uploading', 'options' => [],
+        'nonce' => 'n', 'deliver_by' => now(),
+    ]);
+
+    $this->actingAs($this->owner)->put($url, ['quy_cach' => '1l', 'shop_product_id' => GH_5L, 'display_name' => 'ĐẠM CÁ MỚI'])
+        ->assertSessionHas('flash.success', fn (string $m): bool => str_contains($m, '2 bài đã xếp lịch'));
+
+    expect($legacy->fresh()->meta['fork_shop_product_id'])->toBe(GH_5L)
+        ->and($legacy->fresh()->meta['fork_shop_product_name'])->toBe('ĐẠM CÁ MỚI')
+        ->and($own->fresh()->meta['fork_shop_product_id'])->toBe(GH_5L)
+        ->and($own->fresh()->meta['fork_shop_product_name'])->toBe('TÊN RIÊNG VIDEO')
+        ->and($running->fresh()->meta['fork_shop_product_id'])->toBe(GH_1L); // đang đăng dở: để yên
+
+    // Bỏ chọn: bài đã xếp lịch không bị huỷ, chỉ báo cho chủ app.
+    $this->actingAs($this->owner)->delete($url, ['quy_cach' => '1l'])->assertSessionHas('flash.warning');
+    expect($legacy->fresh()->status)->toBe(App\Enums\Post\Status::Scheduled);
+});

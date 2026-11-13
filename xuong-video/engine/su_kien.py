@@ -1,5 +1,5 @@
 """Sổ sự kiện có cấu trúc của xưởng (mỗi dòng 1 JSON) -> <DATA>/lich-su/su-kien.jsonl.
-Trang "Xưởng nhỏ" đọc sổ này để biết vai nào đang làm gì. Ghi lỗi KHÔNG BAO GIỜ làm hỏng việc sản xuất.
+Trang "Khu Tự Trị" đọc sổ này để biết vai nào đang làm gì. Ghi lỗi KHÔNG BAO GIỜ làm hỏng việc sản xuất.
 
 Mỗi sự kiện: n (số thứ tự tăng dần, dùng làm con trỏ `sau`), t (ISO giờ), vai, loai, video, msg, và các trường thêm (diem, dat, so...).
 vai : he-thong | bien-kich | giong | dao-dien | dung | giam-khao | kho

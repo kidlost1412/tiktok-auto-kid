@@ -23,7 +23,15 @@ const props = withDefaults(
     },
 );
 
-const max = computed(() => Math.max(1, ...props.points.map((p) => p.value)));
+// Mốc trục tròn số để vạch giữa luôn là số nguyên (không hiện "1 · 1 · 0" khi số nhỏ).
+const max = computed(() => {
+    const top = Math.max(1, ...props.points.map((p) => p.value));
+    const base = 10 ** Math.floor(Math.log10(top));
+    const steps =
+        base >= 100 ? [1.2, 1.6, 2, 3, 4, 5, 6, 8, 10] : [2, 4, 6, 8, 10];
+
+    return (steps.find((m) => m * base >= top) ?? 10) * base;
+});
 const active = ref<string | null>(null);
 const fmt = (v: number) => (props.formatValue ?? fmtNum)(v);
 const empty = computed(() => props.points.every((p) => p.value === 0));
@@ -54,7 +62,7 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                 <div
                     v-for="p in points"
                     :key="p.key"
-                    class="group relative flex h-full min-w-0 flex-1 items-end"
+                    class="group relative flex h-full min-w-0 flex-1 items-end justify-center"
                     @mouseenter="active = p.key"
                     @mouseleave="active = null"
                     @click="active = active === p.key ? null : p.key"
@@ -62,7 +70,7 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                     <div
                         :class="
                             cn(
-                                'w-full rounded-t-[3px] transition-[height,opacity] duration-500',
+                                'w-full max-w-14 rounded-t-[4px] transition-[height,opacity] duration-500',
                                 hasHighlight && !highlight.includes(p.key)
                                     ? 'bg-primary-strong/30 group-hover:bg-primary-strong/60'
                                     : 'bg-primary-strong/80 group-hover:bg-primary-strong',

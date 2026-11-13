@@ -731,7 +731,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     cn(
                                         'tabular-nums',
                                         preview.length > preview.max &&
-                                            'font-semibold text-red-600',
+                                            'font-semibold text-red-600 dark:text-red-400',
                                     )
                                 "
                                 >{{ preview.length }}/{{ preview.max }} ký

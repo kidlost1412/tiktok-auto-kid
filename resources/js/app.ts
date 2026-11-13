@@ -17,17 +17,25 @@ createInertiaApp({
             .use(plugin)
             .mount(el);
 
-        // Chuyển trang mượt: mọi lượt điều hướng Inertia (đổi trang hoặc đổi tab trong trang,
-        // vì các tab đều đi qua Inertia) được bọc trong một cú mờ-đi/rõ-lại ngắn trên #app,
-        // tránh cảm giác giật/nhoáng khi nội dung đổi. Các vòng quét nền (health check, số liệu…)
-        // trong app đều dùng fetch() thẳng, không qua router, nên không bị ảnh hưởng.
+        // Chuyển trang mượt: chỉ khi ĐỔI TRANG thật (GET sang đường dẫn khác) mà máy chủ trả chậm hơn ~120ms
+        // thì #app mờ nhẹ cho biết đang tải. Không mờ khi: tự làm mới số liệu (reload `only`), tải trước
+        // (prefetch), gửi form (POST/PUT/PATCH/DELETE) hay đổi bộ lọc trên cùng trang — để trang không
+        // "nháy" mỗi 30 giây. Chỉ đổi opacity (không transform: transform trên #app làm hỏng position:fixed).
+        let showAt: number | undefined;
         let hideAt: number | undefined;
-        router.on('start', () => {
+        router.on('start', (event) => {
+            const v = event.detail.visit;
+            const samePage = v.url.pathname === window.location.pathname;
+            if (v.method !== 'get' || v.only.length > 0 || v.prefetch || v.async || samePage) {
+                return;
+            }
             window.clearTimeout(hideAt);
-            el.classList.add('nav-fade');
+            window.clearTimeout(showAt);
+            showAt = window.setTimeout(() => el.classList.add('nav-fade'), 120);
         });
         router.on('finish', () => {
-            // một nhịp để DOM mới kịp vào trước khi mờ dần hiện lại
+            window.clearTimeout(showAt);
+            // một nhịp để DOM mới kịp vào trước khi rõ lại
             hideAt = window.setTimeout(() => el.classList.remove('nav-fade'), 20);
         });
     },

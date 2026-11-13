@@ -924,7 +924,7 @@ export class Interact {
                 d: 1.5,
             },
             { k: 'stand' },
-            { k: 'home', gait: 'run' },
+            { k: 'home', gait: 'walk' },
             { k: 'anim', a: work, d: rand(10, 14), expr: 'focus' },
             this.done(a),
         );

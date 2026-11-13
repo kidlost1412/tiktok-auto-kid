@@ -22,9 +22,9 @@ from urllib.parse import urlparse, parse_qs, unquote
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, KEM
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, KEM, ghi_json
 LS = HUB / "lich-su"
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def cfg():
@@ -41,8 +41,12 @@ def trang_thai_dang():
 
 def _ghi_trang_thai(vid, obj):
     with _lock:
-        d = trang_thai_dang(); d[vid] = obj
-        (LS / "trypost.json").write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        d = trang_thai_dang()
+        if (d.get(vid) or {}).get("trang_thai") == "da_dang" and obj.get("trang_thai") != "da_dang":
+            return False                      # video ĐÃ đăng thì không bao giờ bị hạ xuống "loi" (tránh đăng trùng)
+        d[vid] = obj
+        ghi_json(LS / "trypost.json", d, indent=1)
+    return True
 
 
 F_GIU = LS / "trypost-giu.json"
@@ -62,7 +66,7 @@ def ds_giu():
 
 
 def _ghi_giu(d):
-    F_GIU.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    ghi_json(F_GIU, d, indent=1)
 
 
 def giu(vid, may, kenh=None, han=None):
@@ -96,8 +100,9 @@ def _sha256(p):
             for chunk in iter(lambda: fh.read(1 << 20), b""):
                 h.update(chunk)
         cache[k] = h.hexdigest()
-        with _lock:
-            cache_f.write_text(json.dumps(cache, indent=0), encoding="utf-8")
+        with _lock:                           # đọc lại + gộp rồi ghi nguyên tử (luồng khác có thể vừa thêm khoá)
+            moi = _doc(cache_f, {}); moi.update(cache)
+            ghi_json(cache_f, moi, indent=0)
     return cache[k]
 
 
@@ -115,7 +120,7 @@ def ds_video(status="ung", may=None):
     sps = {}
     out = []
     for v in sorted(ra.glob("*/*.mp4")):
-        if v.parent.name.startswith("_"):
+        if v.parent.name.startswith("_") or v.name.endswith(".part.mp4"):      # .part.mp4 = file đang ghi dở, chưa phải video xong
             continue
         vid = v.stem
         meta = _doc(kem(v, ".json"), {})

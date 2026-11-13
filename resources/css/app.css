@@ -788,21 +788,6 @@
     }
 }
 
-/*
- * Anchor links glide rather than jump. Native `scroll-behavior` is used
- * instead of a scripted scroll because Inertia rewrites `history` whenever it
- * saves a scroll position, which wipes a hash set from JavaScript.
- */
-html {
-    scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    html {
-        scroll-behavior: auto;
-    }
-}
-
 @keyframes motion-progress-sweep {
     from {
         transform: translateX(-100%);
@@ -841,12 +826,11 @@ html {
  * không gây giật/nhoáng khi đổi trang hoặc đổi tab trong trang (mọi tab đều đi qua Inertia).
  */
 #app {
-    transition: opacity 0.16s ease, transform 0.16s ease;
+    transition: opacity 0.16s ease;
 }
 
 #app.nav-fade {
-    opacity: 0.35;
-    transform: translateY(3px);
+    opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -854,31 +838,6 @@ html {
     #app.nav-fade {
         transition: none;
         opacity: 1;
-        transform: none;
     }
 }
 
-/*
- * Bảng thu/mở mượt (thẻ "Xưởng nhỏ" nhúng + nhật ký ở trang Xưởng Video): chiều cao co giãn
- * bằng grid-template-rows (0fr ↔ 1fr) thay vì "nhảy" tức thì; nội dung bên trong vẫn nằm trong
- * một khối overflow-hidden để không tràn ra ngoài khi đang co.
- */
-.xuong-mini-panel {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.22s ease;
-}
-
-.xuong-mini-panel.is-open {
-    grid-template-rows: 1fr;
-}
-
-.xuong-mini-panel > .xuong-mini-panel-inner {
-    overflow: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .xuong-mini-panel {
-        transition: none;
-    }
-}

@@ -17,7 +17,7 @@ import su_kien as SK
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, kem, kem_ngay
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, kem, kem_ngay, pid_la_lo_sx
 CFG = cfg_hub()
 COT = ["file", "goc", "giong", "gu_dao_dien", "cong_thuc", "diem_giam_khao", "lan_dung", "loi_giam_khao", "y_tuong", "bo_cuc", "khoi",
        "sfx", "nhac", "thoi_luong", "caption", "hashtag", "loi", "canh", "may_sua", "danh_gia_kid", "gop_y_kid", "luot_xem", "don"]
@@ -33,8 +33,7 @@ def dang_co_lo():
         return False
     try:
         pid = int(F_KHOA.read_text().split()[0])
-        r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
-        return str(pid) in r.stdout
+        return pid_la_lo_sx(pid)           # PID phải đúng là tiến trình python (PID bị cấp lại cho app khác = khoá cũ)
     except Exception:
         return False
 

@@ -39,7 +39,9 @@ final class UpdateController extends Controller
             $checked = (string) ($status['checked_at'] ?? '');
 
             if ($checked === '' || (strtotime($checked) ?: 0) < time() - 3600) {
-                $r = LauncherClient::post('/api/update/check');
+                // Tối đa 6 giây: chỉ có 2 worker PHP, không để trang chờ GitHub lâu. Hết giờ thì hiện trạng thái cũ,
+                // launcher vẫn kiểm tra xong và giữ kết quả cho lần mở sau / nút "Kiểm tra ngay".
+                $r = LauncherClient::post('/api/update/check', [], 6);
                 $status = $r['ok'] && is_array($r['data']) ? $r['data'] : $status;
             }
         }

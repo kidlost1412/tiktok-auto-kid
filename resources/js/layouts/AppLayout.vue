@@ -24,7 +24,7 @@ defineProps<{
 const page = usePage();
 const path = computed(() => page.url.split('?')[0]);
 const links = [
-    { href: '/nha', label: 'Xưởng nhỏ', icon: IconHome },
+    { href: '/nha', label: 'Khu Tự Trị', icon: IconHome },
     { href: '/auto', label: 'Tự động đăng', icon: IconRobot },
     { href: '/xuong', label: 'Xưởng Video', icon: IconMovie },
     { href: '/settings', label: 'Cài đặt', icon: IconSettings },

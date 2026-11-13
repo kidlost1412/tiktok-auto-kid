@@ -372,7 +372,7 @@ export class Director {
                         'paper',
                         'bienkich_giao',
                         'thuam_nhan',
-                        'run',
+                        'walk',
                     ),
                 );
                 break;
@@ -388,7 +388,7 @@ export class Director {
                         'board',
                         'daodien_giao',
                         'thodung_nhan',
-                        'run',
+                        'walk',
                         true,
                     ),
                 );
@@ -680,7 +680,7 @@ export class Director {
                 T.push(
                     { k: 'say', text: noi('thodung_giao') },
                     { k: 'item', item: 'reel' },
-                    { k: 'go', to: 'thukho.shelf', gait: 'run' },
+                    { k: 'go', to: 'thukho.shelf', gait: 'walk' },
                     { k: 'face', rot: Math.PI },
                     { k: 'do', fn: () => (flag.arrived = true) },
                     { k: 'anim', a: 'give', d: 1.0 },
@@ -831,7 +831,7 @@ export class Director {
                 P.push(
                     { k: 'item', item: 'letter' },
                     { k: 'say', text: noi('buuta_den') },
-                    { k: 'go', to: 'mail', gait: 'run' },
+                    { k: 'go', to: 'mail', gait: 'walk' },
                     { k: 'face', rot: 0 },
                     { k: 'anim', a: 'give', d: 0.9 },
                     {

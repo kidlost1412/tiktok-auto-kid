@@ -64,11 +64,11 @@ final class PostBuilder
         $content = HubText::compose($final['caption'], $final['hashtags']);
 
         if ($content === '') {
-            throw new RuntimeException('Caption rỗng.');
+            throw new CaptionRefused('Caption rỗng.');
         }
 
         if (mb_strlen($content) > HubText::MAX_CHARS) {
-            throw new RuntimeException('Caption dài quá '.HubText::MAX_CHARS.' ký tự (giới hạn TikTok).');
+            throw new CaptionRefused('Caption dài quá '.HubText::MAX_CHARS.' ký tự (giới hạn TikTok).');
         }
 
         // K4: sản phẩm giỏ hàng lấy từ liên kết chủ app đã chọn cho (kênh, mã hub). Không có liên kết thì không tạo bài.
@@ -112,6 +112,8 @@ final class PostBuilder
                         'fork_auto_video_id' => $video->id,
                         'fork_shop_product_id' => (string) $link->shop_product_id,
                         'fork_shop_product_name' => $cartName,
+                        // tên giỏ lấy từ đâu: 'video' (hub đặt riêng) hay 'link' (tên của liên kết) — đổi liên kết thì chỉ tên 'link' đổi theo
+                        'fork_shop_name_src' => $videoName !== null ? 'video' : 'link',
                         ...($coverFile !== null ? ['fork_cover' => $coverFile] : []),
                         ...($coverFile !== null && $coverFile === $ownCover ? ['fork_cover_src' => RiengCovers::SOURCE] : []),
                     ],

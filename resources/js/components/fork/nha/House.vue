@@ -117,7 +117,7 @@ const flowers = [
 
 <template>
     <div class="relative w-full" data-testid="nha-house">
-        <svg :class="['nha-svg', { 'nha-paused': paused }]" :viewBox="`0 0 ${W} ${H}`" role="group" aria-label="Xưởng nhỏ: ngôi nhà của các nhân vật" preserveAspectRatio="xMidYMid meet">
+        <svg :class="['nha-svg', { 'nha-paused': paused }]" :viewBox="`0 0 ${W} ${H}`" role="group" aria-label="Khu Tự Trị: ngôi nhà của các nhân vật" preserveAspectRatio="xMidYMid meet">
             <defs>
                 <linearGradient id="nha-sky" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0" style="stop-color: var(--nha-sky-a)" />

@@ -1,4 +1,4 @@
-// Tiện ích dùng chung cho thế giới 3D "Xưởng nhỏ": bảng màu, vật liệu toon, gộp hình tĩnh, texture vẽ bằng canvas.
+// Tiện ích dùng chung cho thế giới 3D "Khu Tự Trị": bảng màu, vật liệu toon, gộp hình tĩnh, texture vẽ bằng canvas.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -495,3 +495,19 @@ export const radialTexture = (
         g.fillStyle = gr;
         g.fillRect(0, 0, w, w);
     }).texture;
+
+/** Trình duyệt có WebGL không (thử tạo ngữ cảnh rồi trả lại ngay). */
+export const webglOk = (): boolean => {
+    try {
+        const c = document.createElement('canvas');
+        const gl = c.getContext('webgl2') ?? c.getContext('webgl');
+        const ok = !!gl;
+        (gl as WebGLRenderingContext | null)
+            ?.getExtension('WEBGL_lose_context')
+            ?.loseContext();
+
+        return ok;
+    } catch {
+        return false;
+    }
+};

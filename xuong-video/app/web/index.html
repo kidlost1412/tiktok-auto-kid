@@ -1366,13 +1366,15 @@ async function taiTk(moi) {
   const the = t => {
     const het = t.het_den && t.het_den * 1000 > Date.now();
     const tt = !t.dang_nhap ? '<span class="pill r dot">Chưa đăng nhập</span>' : het ? `<span class="pill r dot">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g dot">Sẵn sàng</span>';
+    const dangDung = (ST.tai_khoan_dung || 'tu_dong') === t.ma;
     return `<div class="acc">
-      <div class="hd"><div class="who"><span class="av">${esc(String(t.ten || '?').trim().slice(-1).toUpperCase())}</span><div style="min-width:0"><b>${esc(t.ten)}</b>
+      <div class="hd"><div class="who"><span class="av">${esc((String(t.ten || '?').trim()[0] || '?').toUpperCase())}</span><div style="min-width:0"><b>${esc(t.ten)}</b>
         <div class="note" style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.email || '—')} ${t.goi ? '· gói ' + esc(t.goi) : ''}</div></div></div>${tt}</div>
       ${vach(t.five_hour, 'Phiên 5 giờ')}${vach(t.seven_day, 'Cả tuần')}
       <div class="note" style="margin:8px 0 0;font-size:12px">${t.cap_nhat ? 'Cập nhật lúc ' + new Date(t.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'Chưa cập nhật'}</div>
       <div class="btns">
-        <button class="btn go sm" data-dung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${ic('play', 'f')}Dùng TK này</button>
+        ${dangDung ? `<button class="btn ghost sm" data-dung="tu_dong" title="Bỏ ghim, để hub tự chọn tài khoản còn dư">${ic('check')}Đang dùng · bỏ ghim</button>`
+          : `<button class="btn go sm" data-dung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${ic('play', 'f')}Dùng TK này</button>`}
         <button class="btn ghost sm" data-dn="${t.ma}">${ic('login')}Đăng nhập</button>
         <button class="btn ghost sm" data-kiem="${t.ma}">${ic('gauge')}Kiểm hạn mức</button>
         <button class="btn ghost sm dz" style="margin-left:auto" data-bo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
@@ -1395,19 +1397,28 @@ async function taiTk(moi) {
     return `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
       ${t.dang_nhap ? mini(p, 'Phiên 5 giờ') + mini(w, 'Cả tuần') : '<div class="note" style="font-size:12px">Vào Cài đặt → Đăng nhập</div>'}</div>`; }).join('') + '</div>';
   document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => { await api('/api/cai-dat', {tai_khoan_dung: b.dataset.dung});
-    ST.tai_khoan_dung = b.dataset.dung; toast('Hub sẽ chạy bằng tài khoản này'); taiTk(); });
-  document.querySelectorAll('[data-dn]').forEach(b => b.onclick = async () => { await api('/api/tai-khoan-dang-nhap/' + b.dataset.dn, {}); toast('Đã mở cửa sổ đăng nhập'); });
+    ST.tai_khoan_dung = b.dataset.dung; toast(b.dataset.dung === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản này'); taiTk(); });
+  document.querySelectorAll('[data-dn]').forEach(b => b.onclick = async () => { await api('/api/tai-khoan-dang-nhap/' + b.dataset.dn, {});
+    toast('Đã mở cửa sổ đăng nhập — đăng nhập xong, thẻ này tự cập nhật'); theoDoiDangNhap(); });
   document.querySelectorAll('[data-kiem]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = '⏳…';
     const r = await api('/api/tai-khoan-kiem/' + b.dataset.kiem, {}); toast(r.ok ? 'Đã cập nhật hạn mức' : r.loi); taiTk(); });
-  document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => { if (!confirm('Bỏ "' + b.dataset.ten + '" khỏi danh sách hub dùng?')) return;
-    const r = await api('/api/tai-khoan-bo/' + b.dataset.bo, {}); toast(r.ok ? 'Đã bỏ' : r.loi); taiTk(true); });
+  document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => { if (!confirm('Bỏ "' + b.dataset.ten + '" khỏi hub?\nPhiên đăng nhập của tài khoản này sẽ được cất đi; thêm lại thì phải đăng nhập lại.')) return;
+    const r = await api('/api/tai-khoan-bo/' + b.dataset.bo, {}); if (r.ok && ST.tai_khoan_dung === b.dataset.bo) ST.tai_khoan_dung = 'tu_dong';
+    toast(r.ok ? 'Đã bỏ tài khoản' : r.loi); taiTk(true); });
+}
+let _dnTimer = null;
+function theoDoiDangNhap() {        // sau khi mở cửa sổ đăng nhập: kiểm lại mỗi 8 giây trong 3 phút để thẻ đổi sang email mới ngay
+  clearInterval(_dnTimer); let n = 0;
+  _dnTimer = setInterval(() => { if (++n > 22) return clearInterval(_dnTimer); if (!document.hidden) taiTk(true).catch(() => {}); }, 8000);
 }
 setInterval(() => { if (!document.hidden) taiTk().catch(() => {}); }, 60000);   // tự làm mới số hạn mức mỗi 60 giây
 $('#tkDung').onchange = async () => { await api('/api/cai-dat', {tai_khoan_dung: $('#tkDung').value}); ST.tai_khoan_dung = $('#tkDung').value;
   toast($('#tkDung').value === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản đã chọn'); };
 $('#tkChuyen').onchange = async () => { await api('/api/cai-dat', {tu_chuyen: $('#tkChuyen').checked}); ST.tu_chuyen = $('#tkChuyen').checked; };
 $('#btnThemTk').onclick = async () => { const ten = prompt('Tên tài khoản (vd. Tài khoản 4):'); if (ten === null) return;
-  await api('/api/tai-khoan-them', {ten}); toast('Đã thêm — bấm 🔑 Đăng nhập ở thẻ mới'); taiTk(true); };
+  const r = await api('/api/tai-khoan-them', {ten}); if (!r.ok) return toast(r.loi || 'Không thêm được');
+  toast('Đã thêm — đang mở cửa sổ đăng nhập cho tài khoản mới'); await taiTk(true);
+  await api('/api/tai-khoan-dang-nhap/' + r.ma, {}); theoDoiDangNhap(); };
 $('#soVideo').oninput = capNhat;
 $('#btnChay').onclick = async () => {
   const sp = $('#spChon').value, n = +$('#soVideo').value;
@@ -1935,11 +1946,16 @@ async function taiLo() {
       <td class="num">${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td class="num">${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '–'}</td>
       <td class="num">${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => esc(a) + ': ' + n).join(', ')}</td></tr>`).join('') + '</tbody>';
 }
-async function taiTuDong() {
+// Anh đang sửa ô nào trong mục Tự động (chưa bấm Lưu) thì vòng làm mới 60 giây KHÔNG ghi đè ô đó —
+// chỉ cập nhật dòng trạng thái. Lưu xong (hoặc bấm công tắc Bật tự động, tự lưu luôn) mới nạp lại cả bảng.
+let TD_BAN = false;
+async function taiTuDong(epBuoc) {
   const t = await api('/api/tu-dong');
-  $('#tdBat').checked = t.bat; $('#tdPhut').value = t.kiem_moi_phut;
   const tr = t.trang_thai || {};
   $('#tdTrangThai').textContent = (tr.ghi || '') + (tr.lan_kiem_toi && t.bat ? ` · lần kiểm tới ${tr.lan_kiem_toi}` : '');
+  if (TD_BAN && !epBuoc) return;
+  TD_BAN = false;
+  $('#tdBat').checked = t.bat; $('#tdPhut').value = t.kiem_moi_phut;
   const ds = Object.entries(t.san_pham || {});
   $('#tdBang').innerHTML = '<thead><tr>' + [['Sản phẩm'], ['Đã làm', 1], ['Còn tồn', 1], ['Hôm nay', 1], ['Tự làm'], ['Giữ tồn ít nhất'], ['Tối đa / ngày'], ['Mỗi lần làm'], ['']].map(([x, n]) => `<th${n ? ' class="num"' : ''}>${x}</th>`).join('') + '</tr></thead><tbody>' +
     (ds.length ? '' : `<tr><td colspan="9" class="empty-td">${rong('bot', 'Chưa có sản phẩm nào', 'Thêm sản phẩm ở tab Sản phẩm & quà.')}</td></tr>`) +
@@ -1957,13 +1973,19 @@ async function taiTuDong() {
     toast(r.ok ? 'Đã xoá sản phẩm' : r.loi); $('#spChon').innerHTML = ''; KT.ma = null; capNhat(); taiTuDong();
   });
 }
-$('#btnLuuTd').onclick = async () => {
+async function luuTuDong() {
   const sp = {}; document.querySelectorAll('#tdBang tr[data-ma]').forEach(r => sp[r.dataset.ma] = {bat: r.querySelector('.tdOn').checked,
     ton_toi_thieu: +r.querySelector('.tdMin').value, toi_da_ngay: +r.querySelector('.tdMax').value, lo: +r.querySelector('.tdLo').value});
-  await api('/api/tu-dong', {bat: $('#tdBat').checked, kiem_moi_phut: +$('#tdPhut').value, san_pham: sp});
-  toast($('#tdBat').checked ? 'Đã bật tự động' : 'Đã lưu (tự động đang tắt)'); taiTuDong();
-};
-capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); setInterval(taiLo, 60000); setInterval(taiTuDong, 60000); setInterval(capNhat, 3000); setInterval(() => taiTk(), 90000);
+  const r = await api('/api/tu-dong', {bat: $('#tdBat').checked, kiem_moi_phut: +$('#tdPhut').value, san_pham: sp});
+  if (r && r.ok === false) { toast(r.loi || 'Chưa lưu được, thử lại'); return; }
+  toast($('#tdBat').checked ? 'Đã bật tự động' : 'Đã lưu (tự động đang tắt)'); taiTuDong(true);
+}
+$('#btnLuuTd').onclick = luuTuDong;
+$('#tdBat').addEventListener('change', luuTuDong);   // công tắc chính: bấm là có hiệu lực, không cần bấm Lưu
+['#tdPhut', '#tdBang'].forEach(s => { const el = $(s); el.addEventListener('input', () => { TD_BAN = true; }); el.addEventListener('change', () => { TD_BAN = true; }); });
+// Vòng làm mới: bỏ qua khi tab ẩn; lỗi mạng thoáng qua không làm vỡ vòng.
+const lap = (fn, ms) => setInterval(() => { if (!document.hidden) Promise.resolve().then(fn).catch(() => {}); }, ms);
+capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); lap(taiLo, 60000); lap(() => taiTuDong(), 60000); lap(capNhat, 3000);
 
 // mở thẳng tab: ?tab=kho  hoặc  #tab=kho  hoặc  #kho
 (() => {

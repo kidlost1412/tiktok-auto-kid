@@ -787,7 +787,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
                             <span class="font-normal text-muted-foreground">· {{ f.count }} video</span>
                         </div>
                         <div class="truncate text-xs text-muted-foreground" :title="f.path">{{ f.path }}</div>
-                        <div v-if="!f.exists" class="text-xs text-red-600">Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?).</div>
+                        <div v-if="!f.exists" class="text-xs text-red-600 dark:text-red-400">Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?).</div>
                     </div>
                     <Button size="sm" variant="ghost" @click="removeFolder(f)">
                         <IconTrash class="size-4" /> Bỏ khỏi danh sách
@@ -811,7 +811,7 @@ const barVisible = computed(() => pickedItems.value.length > 0 || selectMode.val
                     <IconFolderPlus class="size-4" /> Thêm thư mục
                 </Button>
             </div>
-            <p v-if="pickError" class="text-sm text-red-600" data-testid="fork-rieng-pick-error">{{ pickError }}</p>
+            <p v-if="pickError" class="text-sm text-red-600 dark:text-red-400" data-testid="fork-rieng-pick-error">{{ pickError }}</p>
         </section>
 
         <RiengSteps v-if="folders.length" :current="currentStep" />

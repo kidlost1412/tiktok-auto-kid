@@ -8,7 +8,7 @@ import anh_sp
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, kem_ngay, don_kem_cu, glob_kem
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, kem_ngay, don_kem_cu, glob_kem, ghi_json, KHOA_DANH_GIA, pid_la_lo_sx
 WEB = Path(__file__).resolve().parent / "web"
 PORT = int(os.environ.get("XUONG_PORT") or 8765)
 LS = HUB / "lich-su"
@@ -21,9 +21,13 @@ def cfg():
     return cfg_hub()
 
 
+_KHOA_CFG = threading.RLock()
+
+
 def luu_cfg(c):
+  with _KHOA_CFG:
     c = dict(c); c["duong_dan"] = cfg_tho().get("duong_dan", {})        # không ghi đường dẫn đã giải ra file
-    (HUB / "config.json").write_text(json.dumps(c, ensure_ascii=False, indent=2), encoding="utf-8")
+    ghi_json(HUB / "config.json", c, indent=2)
 
 
 NHAC_TAI = {"dang": False, "ghi": "", "da": 0, "tong": 0, "loi": None, "xong": False}
@@ -168,8 +172,7 @@ def pid_lo():
     k = LS / "dang-chay.lock"
     try:
         pid = int(k.read_text().split()[0])
-        r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
-        return pid if str(pid) in r.stdout else None
+        return pid if pid_la_lo_sx(pid) else None      # PID phải là tiến trình python; không thì là khoá cũ (PID bị cấp lại)
     except Exception:
         return None
 
@@ -182,8 +185,10 @@ def dang_chay():
     if k.exists():
         try:
             pid = int(k.read_text().split()[0])
-            r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True)
-            return str(pid) in r.stdout
+            if pid_la_lo_sx(pid):
+                return True
+            k.unlink(missing_ok=True)         # khoá cũ (tiến trình đã chết hoặc PID bị cấp lại cho app khác) → dọn
+            return False
         except Exception:
             return False
     return False
@@ -241,7 +246,7 @@ def moc_dem():
 def token_hom_nay():
     m = moc_dem()
     video = sum(1 for v in ra_dir().glob(f"{datetime.date.today().isoformat()}/*.mp4")
-                if datetime.datetime.fromtimestamp(v.stat().st_mtime) >= m)
+                if not v.name.endswith(".part.mp4") and datetime.datetime.fromtimestamp(v.stat().st_mtime) >= m)
     f = LS / "token.csv"
     if not f.exists():
         return {"luot": 0, "token": 0, "usd": 0, "video": video, "moc": m.strftime("%H:%M")}
@@ -724,7 +729,7 @@ def tong_quan(moi=False):
     for p in san_pham_ds():
         k = kho_trang_thai(p["ma"])
         ton, nay = dem(p["ma"])
-        da_lam = len([v for v in ra_dir().glob(f"*/{p['ma']}_*.mp4") if not v.parent.name.startswith("_")])
+        da_lam = len([v for v in ra_dir().glob(f"*/{p['ma']}_*.mp4") if not v.parent.name.startswith("_") and not v.name.endswith(".part.mp4")])
         out.append(dict(p, video_kho=k["so_video"], mo_ta=k["so_mo_ta"], da_lam=da_lam, ton=ton, lam_hom_nay=nay))
     _TQ.update(t=time.time(), v=out)
     return out
@@ -788,23 +793,60 @@ def tai_khoan_dang_nhap(ma):
     return {"ok": True}
 
 
+_TK_LOCK = threading.Lock()
+
+
+def _quen_trang_thai_tk(ma):
+    """Xoá hạn mức/đăng nhập đã lưu của mã tài khoản (lich-su/tai-khoan.json) + cache email."""
+    sys.path.insert(0, str(CODE / "engine"))
+    import ai
+    _AUTH_TK.pop(ma, None)
+    with ai._lock:
+        d = ai.doc_trang_thai()
+        if d.pop(ma, None) is not None:
+            ghi_json(ai.F_TK, d, indent=1)
+
+
 def tai_khoan_them(ten):
-    c = cfg(); ds = c.setdefault("tai_khoan", [{"ma": "tk1", "ten": "Tài khoản 1", "thu_muc": None}])
-    n = 1
-    while any(t["ma"] == f"tk{n}" for t in ds):
-        n += 1
-    d = HUB / "tai-khoan" / f"tk{n}"; d.mkdir(parents=True, exist_ok=True)
-    ds.append({"ma": f"tk{n}", "ten": (ten or f"Tài khoản {n}").strip()[:40], "thu_muc": str(d)})
-    luu_cfg(c)
-    return {"ok": True, "ma": f"tk{n}"}
+    """Thêm tài khoản MỚI: luôn là thư mục đăng nhập trống (không dùng lại thư mục của tài khoản đã bỏ —
+    trước đây bỏ tk4 rồi thêm lại sẽ ra tk4 cũ, vẫn còn phiên đăng nhập cũ → app nhận nhầm tài khoản cũ)."""
+    with _TK_LOCK:
+        c = cfg(); ds = c.setdefault("tai_khoan", [{"ma": "tk1", "ten": "Tài khoản 1", "thu_muc": None}])
+        goc = HUB / "tai-khoan"
+        n = 1
+        while any(t["ma"] == f"tk{n}" for t in ds) or (goc / f"tk{n}").exists():
+            n += 1
+        ma = f"tk{n}"
+        d = goc / ma; d.mkdir(parents=True, exist_ok=True)
+        ds.append({"ma": ma, "ten": (ten or f"Tài khoản {n}").strip()[:40], "thu_muc": str(d)})
+        luu_cfg(c)
+    _quen_trang_thai_tk(ma)
+    return {"ok": True, "ma": ma}
 
 
 def tai_khoan_bo(ma):
-    """Bỏ tài khoản khỏi danh sách hub dùng (không xoá thư mục đăng nhập)."""
-    c = cfg(); ds = c.get("tai_khoan") or []
-    if len(ds) <= 1:
-        return {"ok": False, "loi": "Phải còn ít nhất 1 tài khoản"}
-    c["tai_khoan"] = [t for t in ds if t["ma"] != ma]; luu_cfg(c)
+    """Bỏ tài khoản khỏi hub: cất thư mục đăng nhập vào tai-khoan/_da-bo/ (không xoá, lấy lại được),
+    quên hạn mức đã lưu, và nếu đang ghim dùng tài khoản này thì về Tự động."""
+    with _TK_LOCK:
+        c = cfg(); ds = c.get("tai_khoan") or []
+        tk = next((t for t in ds if t["ma"] == ma), None)
+        if not tk:
+            return {"ok": False, "loi": "Không có tài khoản này"}
+        if len(ds) <= 1:
+            return {"ok": False, "loi": "Phải còn ít nhất 1 tài khoản"}
+        c["tai_khoan"] = [t for t in ds if t["ma"] != ma]
+        if c.get("tai_khoan_dung") == ma:
+            c["tai_khoan_dung"] = "tu_dong"
+        luu_cfg(c)
+    goc = (HUB / "tai-khoan").resolve()
+    tm = Path(tk["thu_muc"]).resolve() if tk.get("thu_muc") else None
+    if tm and tm.parent == goc and tm.is_dir():          # chỉ cất thư mục hub tự tạo; ~/.claude của máy thì để yên
+        cat = goc / "_da-bo" / f"{ma}-{time.strftime('%Y%m%d-%H%M%S')}"
+        try:
+            cat.parent.mkdir(parents=True, exist_ok=True); tm.rename(cat)
+        except OSError:
+            pass                                            # đang bị khoá (CLI đang chạy) → tài khoản mới vẫn lấy mã khác
+    _quen_trang_thai_tk(ma)
     return {"ok": True}
 
 
@@ -910,7 +952,7 @@ def _video_mot_ngay(ngay, dg, tp):
             for r in csv.DictReader(open(f, encoding="utf-8-sig")):
                 rows.setdefault(r.get("file"), r)
     out = []
-    for v in sorted(d.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for v in sorted((x for x in d.glob("*.mp4") if not x.name.endswith(".part.mp4")), key=lambda p: p.stat().st_mtime, reverse=True):
         r = rows.get(v.name, {})
         cap = kem(v, ".txt")
         parts = v.stem.split("_")
@@ -960,6 +1002,11 @@ def chay(sp, so, kho_them=None, giay=None):
             hs["kho_them"] = ok
             f.write_text(json.dumps(hs, ensure_ascii=False, indent=1), encoding="utf-8")
     c = cfg()
+    try:
+        from tu_dong import huy_nghi
+        huy_nghi()                           # anh/ vòng tự động bắt đầu lô mới → bỏ giờ nghỉ sau DỪNG / lô lỗi
+    except Exception:
+        pass
     log = open(LS / "app-chay.log", "a", encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     RUN["proc"] = _popen([c["duong_dan"]["python"], "-X", "utf8", str(CODE / "engine" / "sanxuat.py"), sp, str(so)],
@@ -981,16 +1028,31 @@ def luu_kho_them(ma, ds):
 
 
 def dung():
+    try:                                       # TRƯỚC khi kill: vòng tự động không được bật lô mới ngay sau khi anh bấm DỪNG
+        from tu_dong import khi_bam_dung
+        khi_bam_dung()
+    except Exception:
+        pass
     p = RUN["proc"]
     pid = p.pid if (p and p.poll() is None) else pid_lo()      # lô của phiên app trước (app đã khởi động lại) cũng dừng được
     if pid:
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
         with open(LS / "nhat-ky.txt", "a", encoding="utf-8") as f:
             f.write(f"[{datetime.datetime.now():%H:%M:%S}] ⏹ Anh đã bấm DỪNG. Video đã xong vẫn giữ nguyên.\n")
+        for _ in range(20):                    # chờ tiến trình thật sự tắt rồi mới xoá khoá (lô bị kill -F không kịp tự xoá)
+            if not pid_la_lo_sx(pid):
+                break
+            time.sleep(0.25)
+        else:
+            return {"ok": True, "con_chay": True}          # vẫn chưa tắt → giữ khoá
+        try:
+            (LS / "dang-chay.lock").unlink(missing_ok=True)
+        except OSError:
+            pass
     return {"ok": True}
 
 
-_KHOA_DG = threading.Lock()
+_KHOA_DG = KHOA_DANH_GIA                       # khoá dùng chung với tự duyệt (engine/duyet.py)
 
 
 def danh_gia(body):
@@ -998,7 +1060,7 @@ def danh_gia(body):
     dg = doc_danh_gia()
     f = body["file"]
     dg[f] = {"ket_qua": body.get("ket_qua"), "gop_y": body.get("gop_y", "").strip(), "luc": datetime.datetime.now().isoformat(timespec="minutes")}
-    danh_gia_f().write_text(json.dumps(dg, ensure_ascii=False, indent=1), encoding="utf-8")
+    ghi_json(danh_gia_f(), dg, indent=1)
     gy = body.get("gop_y", "").strip()
     if gy:      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc
         nhan = "ƯNG" if body.get("ket_qua") == "dat" else "KHÔNG ƯNG"
@@ -1101,7 +1163,7 @@ class H(BaseHTTPRequestHandler):
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
-        if u.path == "/api/su-kien":           # trang "Xưởng nhỏ": sự kiện sản xuất mới + trạng thái hiện tại (chỉ đọc)
+        if u.path == "/api/su-kien":           # trang "Khu Tự Trị": sự kiện sản xuất mới + trạng thái hiện tại (chỉ đọc)
             sys.path.insert(0, str(CODE / "engine"))
             import su_kien
             try:
@@ -1486,7 +1548,7 @@ def main():
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), H)
     try:                                   # tự động giữ kho video
         from tu_dong import bat_dau
-        bat_dau(dang_chay, chay)
+        bat_dau(dang_chay, chay, lambda: (RUN["proc"].poll() if RUN["proc"] else None))      # mã thoát lô vừa rồi: khác 0 = lô lỗi → nghỉ lùi dần
     except Exception as e:
         print("Không bật được tự động:", e)
     threading.Thread(target=_vong_kiem_han_muc, daemon=True, name="kiem-han-muc").start()

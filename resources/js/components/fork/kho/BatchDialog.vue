@@ -491,7 +491,7 @@ const areaCls =
                             <textarea id="rieng-caption" v-model="caption" :class="areaCls" placeholder="Viết nội dung bài đăng…" data-testid="fork-rieng-caption" />
                             <label class="mt-1 text-sm font-medium" for="rieng-tags">Hashtag chung</label>
                             <HashtagChips v-model="tags" input-id="rieng-tags" :suggestions="hashtagSuggestions ?? []" placeholder="Ví dụ: #nongnghiep #nanodong" testid="fork-rieng-tags" />
-                            <span :class="cn('text-xs', captionLen > limits.caption_max ? 'text-red-600' : 'text-muted-foreground')">
+                            <span :class="cn('text-xs', captionLen > limits.caption_max ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground')">
                                 {{ captionLen }} / {{ limits.caption_max }} ký tự
                             </span>
                         </div>
@@ -533,7 +533,7 @@ const areaCls =
                             <p v-if="coverMode === 'frame'" class="text-xs text-muted-foreground">
                                 Không chọn gì thì dùng khung mặc định (hình nhỏ của video). Bấm "Chọn khung" ở từng video bên dưới để đổi.
                             </p>
-                            <p v-if="coverError" class="text-xs text-red-600" data-testid="fork-rieng-cover-error">{{ coverError }}</p>
+                            <p v-if="coverError" class="text-xs text-red-600 dark:text-red-400" data-testid="fork-rieng-cover-error">{{ coverError }}</p>
                         </div>
 
                         <div class="flex flex-col gap-2">
@@ -708,7 +708,7 @@ const areaCls =
                                     {{ r.result === 'done' ? 'Đã hẹn giờ' : r.result === 'skip' ? 'Để lại' : 'Lỗi' }}
                                 </span>
                             </div>
-                            <p v-if="r.error" class="text-xs text-red-600">{{ r.error }}</p>
+                            <p v-if="r.error" class="text-xs text-red-600 dark:text-red-400">{{ r.error }}</p>
                             <p v-for="m in r.result === 'error' && !r.error ? r.messages : []" :key="m" class="text-xs text-muted-foreground">{{ m }}</p>
                         </li>
                     </ul>

@@ -1,4 +1,4 @@
-// "Nhật ký đang làm gì" của hai Đạo diễn, cho thẻ "Xưởng nhỏ" ở trang Xưởng Video.
+// "Nhật ký đang làm gì" của hai Đạo diễn, cho thẻ "Khu Tự Trị" ở trang Xưởng Video.
 // KHÔNG gọi AI, KHÔNG bịa chữ: chỉ lọc + định dạng lại sự kiện thật của hub sản xuất
 // (vai === "dao-dien" trong sổ sự kiện `/nha/trang-thai` → `events`, do xuong-video/engine/ekip.py
 // ghi ra bằng SK.ghi(...) với "msg" đã là câu tiếng Việt dựng sẵn — xem các dòng

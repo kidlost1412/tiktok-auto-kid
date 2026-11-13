@@ -10,9 +10,9 @@ from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, ghi_json
 F_TK = HUB / "lich-su" / "tai-khoan.json"
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def he_thong(vai):
@@ -51,7 +51,7 @@ def _ghi_trang_thai(ma, **kv):
     with _lock:
         d = doc_trang_thai(); x = d.setdefault(ma, {}); x.update(kv)
         F_TK.parent.mkdir(exist_ok=True)
-        F_TK.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        ghi_json(F_TK, d, indent=1)
 
 
 def env_tk(tk):

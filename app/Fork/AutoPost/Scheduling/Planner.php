@@ -327,8 +327,9 @@ final class Planner
                 $caption = $this->captions->captionFor($video);
                 $this->builder->build($social, $video, $caption, $slot);
                 $created++;
-            } catch (MissingVideoFile $e) {
-                // File biến mất: không thử lại mãi, đánh dấu lỗi để người dùng thấy.
+            } catch (MissingVideoFile|CaptionRefused $e) {
+                // Lỗi của riêng video này (file biến mất, caption không hợp lệ): thử lại cũng vậy — đánh dấu lỗi để
+                // người dùng thấy rồi xếp tiếp video khác, không để một video hỏng chặn cả kênh mãi.
                 $this->library->fail($video, $e->getMessage());
                 $failed++;
                 Log::warning('Tự động đăng: '.$e->getMessage(), ['video_id' => $video->id]);

@@ -148,3 +148,29 @@ test('kho cards expose can_retry for failed videos', function (): void {
         ->where('videos.data.0.id', $safe->id)
         ->where('videos.data.0.can_retry', true));
 });
+
+test('an uncertain post can be re-queued only after the owner confirms it is not on TikTok', function (): void {
+    $v = rfFailed($this, 'uncertain');
+
+    $this->actingAs($this->owner)->get('/auto')->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('failed_recent.0.can_retry', false)
+        ->where('failed_recent.0.can_confirm_retry', true));
+
+    $this->actingAs($this->owner)->post("/auto/videos/{$v->id}/thu-lai")->assertSessionHas('flash.error');
+    expect($v->fresh()->status)->toBe(AutoVideo::FAILED);
+
+    $this->actingAs($this->owner)->post("/auto/videos/{$v->id}/thu-lai", ['da_kiem_tra' => true])->assertSessionHas('flash.success');
+
+    $v->refresh();
+    expect($v->status)->toBe(AutoVideo::NEW)
+        ->and($v->post_id)->toBeNull()
+        ->and(data_get($v->meta, 'owner_confirmed_not_posted_at'))->not->toBeNull();
+});
+
+test('owner confirmation never re-queues a post Chrome reported as posted or still running', function (string $state): void {
+    $v = rfFailed($this, $state);
+
+    $this->actingAs($this->owner)->post("/auto/videos/{$v->id}/thu-lai", ['da_kiem_tra' => true])->assertSessionHas('flash.error');
+
+    expect($v->fresh()->status)->toBe(AutoVideo::FAILED);
+})->with(['posted', 'authorized', 'queued']);
