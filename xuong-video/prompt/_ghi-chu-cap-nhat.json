@@ -1,0 +1,3 @@
+{
+ "_cach_dung": "Mỗi khi đổi một gu mặc định (prompt/*.md, luat/*.md): thêm \"<tên-vai>\": {\"<VERSION mới>\": \"vì sao đổi, 1-3 câu cho chủ app không rành kỹ thuật\"}, rồi chạy: python engine/prompt_mau.py ghi-manifest"
+}

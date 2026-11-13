@@ -429,6 +429,21 @@ def ctx_gom(chung, dong):
     return {"luat_chung": nl.join(chung) or "(chưa có)", "loi_san_pham": nl.join(dong)}
 
 
+def tach_chung_rieng(txt):
+    """Đọc câu trả lời 2 phần CHUNG:/RIENG: — chịu được bản đề bài cũ: tiêu đề in đậm/## , chữ thường, gạch đầu dòng '-', '*', '•', '–'."""
+    phan, moi = None, {"CHUNG": [], "RIENG": []}
+    for l in txt.splitlines():
+        l = l.strip()
+        h = re.sub(r"^[#*\s]+|[*\s]+$", "", l).upper().replace("Ê", "E")
+        if re.fullmatch(r"CHUNG\s*:?\s*(\(.*\))?:?", h):
+            phan = "CHUNG"
+        elif re.fullmatch(r"RIENG\s*:?\s*(\(.*\))?:?", h):
+            phan = "RIENG"
+        elif phan and re.match(r"^[-*•–]\s+\S", l):
+            moi[phan].append("- " + re.sub(r"^[-*•–]\s+", "", l))
+    return moi
+
+
 def gom_bai_hoc(ma_sp, log=print, nguong=25):
     """Sổ bài học RIÊNG của sản phẩm dài quá → AI gom thành 2 phần: luật CHUNG (đúng cho mọi sản phẩm, không nêu tên sản phẩm/cây)
     ghi vào bai-hoc.txt, và bài học RIÊNG (chỉ đúng với sản phẩm này) giữ ở bai-hoc-<mã>.txt. Đạo diễn đọc chung + riêng của đúng sản phẩm."""
@@ -445,15 +460,7 @@ def gom_bai_hoc(ma_sp, log=print, nguong=25):
     import prompt_mau
     p = prompt_mau.dien("gom-bai-hoc", **ctx_gom(chung, dong))
     txt, _ = goi("gom bài học", p, model="sonnet", effort="low")
-    phan, moi = None, {"CHUNG": [], "RIENG": []}
-    for l in txt.splitlines():
-        l = l.strip()
-        if l.upper().startswith("CHUNG"):
-            phan = "CHUNG"
-        elif l.upper().startswith("RI"):
-            phan = "RIENG"
-        elif phan and l.startswith("- "):
-            moi[phan].append(l)
+    moi = tach_chung_rieng(txt)
     if len(moi["CHUNG"]) >= 3:
         fc.write_text(nl.join(moi["CHUNG"][:15]) + nl, encoding="utf-8")
         f.write_text(nl.join(moi["RIENG"][:10]) + (nl if moi["RIENG"] else ""), encoding="utf-8")

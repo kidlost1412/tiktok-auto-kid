@@ -531,8 +531,36 @@ def prompt_ds():
     for k, v in pm.VAI.items():
         text, sua = pm.doc(k)
         out.append({"ten": k, "ten_hien_thi": v["ten"], "mo_ta": v["mo_ta"], "bien": v["bien"], "bat_buoc": v["bat_buoc"],
-                    "la_ban_sua": sua, "text": text, "loai": "tai_lieu" if v["file"].startswith("luat/") else "de_bai"})
+                    "la_ban_sua": sua, "co_ban_moi": pm.co_ban_moi(k), "text": text, "loai": "tai_lieu" if v["file"].startswith("luat/") else "de_bai"})
     return out
+
+
+def prompt_cap_nhat(ten):
+    """Chi tiết 'Có bản cập nhật': so bản gốc đã ghim ↔ bản mới đi kèm app (+ bản người dùng đã sửa), kèm ghi chú vì sao đổi."""
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    r = pm.chi_tiet_cap_nhat(ten); r["ok"] = True
+    return r
+
+
+def prompt_hanh_dong(ten, viec):
+    pm = _pm()
+    if ten not in pm.VAI:
+        return {"ok": False, "loi": "Không có đề bài này."}
+    try:
+        (pm.ap_dung_ban_moi if viec == "ap-dung" else pm.giu_ban_cua_toi)(ten)
+    except Exception as e:
+        return {"ok": False, "loi": "Không thực hiện được: " + str(e)[:200]}
+    text, sua = pm.doc(ten)
+    return {"ok": True, "text": text, "la_ban_sua": sua}
+
+
+def prompt_so_ban_moi():
+    try:
+        return len(_pm().ds_ban_moi())
+    except Exception:
+        return 0
 
 
 def prompt_mac_dinh(ten):
@@ -1069,7 +1097,7 @@ class H(BaseHTTPRequestHandler):
             td = tien_do(lines)
             ngoai = (not dang_chay()) and bool(lines) and not td["da_xong"] and not td["het_han_muc"] \
                 and nk.exists() and time.time() - nk.stat().st_mtime < 240 and not any("DỪNG" in l for l in lines[-2:])
-            return self._json({"dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai, "bat_dau": RUN["bat_dau"], "tien_do": td,
+            return self._json({"prompt_moi": prompt_so_ban_moi(), "dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai, "bat_dau": RUN["bat_dau"], "tien_do": td,
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
@@ -1179,6 +1207,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(prompt_ds())
         if u.path == "/api/prompt/mac-dinh":
             return self._json(prompt_mac_dinh(q.get("ten", [""])[0]))
+        if u.path == "/api/prompt/cap-nhat":
+            return self._json(prompt_cap_nhat(q.get("ten", [""])[0]))
         if u.path == "/api/prompt/ban-cu":
             return self._json(prompt_ban_cu(q.get("ten", [""])[0]))
         if u.path == "/api/so-gu":
@@ -1360,6 +1390,10 @@ class H(BaseHTTPRequestHandler):
             luu_cfg(c); return self._json({"ok": True})
         if u.path == "/api/prompt":
             return self._json(prompt_luu(b.get("ten", ""), b.get("text")))
+        if u.path == "/api/prompt/ap-dung":
+            return self._json(prompt_hanh_dong(b.get("ten", ""), "ap-dung"))
+        if u.path == "/api/prompt/giu-ban-cua-toi":
+            return self._json(prompt_hanh_dong(b.get("ten", ""), "giu"))
         if u.path == "/api/prompt/khoi-phuc":
             return self._json(prompt_khoi_phuc(b.get("ten", "")))
         if u.path == "/api/prompt/xem-thu":
@@ -1417,6 +1451,10 @@ def main():
     from duong_dan import khoi_tao
     khoi_tao()                                   # thư mục dữ liệu trống → tạo từ mau/
     LS.mkdir(exist_ok=True)
+    try:                                         # ghim bản gốc các "gu" người dùng đang dùng (cài mới / lần đầu sau nâng cấp) — để cập nhật app không tự đổi gu
+        sys.path.insert(0, str(CODE / "engine")); import prompt_mau; prompt_mau.ghim_tat_ca()
+    except Exception as e:
+        print("Không ghim được bản gốc prompt:", e)
     if "--log" in sys.argv:
         i = sys.argv.index("--log")
         if i + 1 < len(sys.argv):

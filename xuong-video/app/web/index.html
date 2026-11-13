@@ -457,6 +457,17 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 .pm-cu:first-child{border-top:0}
 .pm-cu .tt{flex:1 1 200px;color:var(--ink2);font-size:13.5px}
 .pm-cu pre{flex-basis:100%;margin:4px 0 0;max-height:300px;overflow:auto;font:400 12.5px/1.6 var(--mono)}
+.pm-cn{border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line2));background:var(--amber-soft);border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.pm-cn h3{margin:0 0 4px;font-size:15px}
+.pm-cn p{margin:4px 0;font-size:13.5px;line-height:1.55}
+.pm-cn details{margin-top:10px}
+.pm-cn summary{cursor:pointer;font-weight:600;font-size:13.5px}
+.pm-df{font:400 12.5px/1.55 var(--mono);max-height:340px;overflow:auto;margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.pm-df div{padding:1px 10px;white-space:pre-wrap;word-break:break-word}
+.pm-df .p{background:var(--green-soft);color:var(--green)}
+.pm-df .m{background:var(--red-soft);color:var(--red);text-decoration:line-through}
+.pm-df .g{color:var(--subtle);text-align:center;font-style:italic}
+.pm-tabn{margin-left:2px;min-height:18px;padding:0 7px;font-size:11px}
 @media (max-width:900px){.pm-wrap{grid-template-columns:minmax(0,1fr)}.pm-list{position:static;max-height:none}}
 @keyframes mucSang{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}30%{box-shadow:0 0 0 4px rgba(139,92,246,.55)}}
 .muc-sang{animation:mucSang 1.6s ease 2;border-radius:14px}
@@ -536,7 +547,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <button data-tab="kho"><svg class="i"><use href="#i-film"/></svg>Kho video</button>
     <button data-tab="sp"><svg class="i"><use href="#i-gift"/></svg>Sản phẩm &amp; quà</button>
     <button data-tab="gu"><svg class="i"><use href="#i-spark"/></svg>Gu &amp; bài học</button>
-    <button data-tab="pm"><svg class="i"><use href="#i-bot"/></svg>Prompt AI</button>
+    <button data-tab="pm"><svg class="i"><use href="#i-bot"/></svg>Prompt AI<span class="pill y pm-tabn hidden" id="pmTabN"></span></button>
     <button data-tab="cd"><svg class="i"><use href="#i-cog"/></svg>Cài đặt</button>
   </nav>
   <div class="hdr-chip"><span class="dot"></span><span id="hdrSub">Ê-kíp AI</span></div>
@@ -546,6 +557,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 <!-- SẢN XUẤT -->
 <section id="sx">
   <div class="ph"><div><h1>Sản xuất</h1><p>Chọn sản phẩm và số video — ê-kíp AI tự viết, đọc, dựng và chấm điểm.</p></div></div>
+  <div id="pmThongBao" class="warnbox hidden" style="margin-bottom:16px"></div>
   <div class="grid g2">
     <div class="card hero">
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-clap"/></svg></span>
@@ -803,6 +815,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-bot"/></svg></span>
         <div class="t"><h2 id="pmTen"></h2><p class="sub" id="pmMoTa"></p></div>
         <div class="act"><span class="pill y hidden" id="pmChuaLuu">Chưa lưu</span><span class="pill" id="pmTrang"></span></div></div>
+      <div id="pmCn" class="pm-cn hidden"></div>
       <div id="pmGuard" class="warnbox hidden" style="margin-bottom:14px"></div>
       <div id="pmBienBox" class="pm-sec"><label>Chỗ máy tự điền dữ liệu <span class="note">— bấm để chèn vào chỗ con trỏ; dấu * là bắt buộc phải giữ</span></label>
         <div class="pm-chips" id="pmChips"></div></div>
@@ -1085,7 +1098,7 @@ function pmVeDs() {
   const nhom = [['de_bai', 'Đề bài gửi cho AI'], ['tai_lieu', 'Tài liệu AI đọc kèm']];
   $('#pmDs').innerHTML = nhom.map(([loai, ten]) => `<div class="pm-g">${ten}</div>` + PM.ds.filter(x => x.loai === loai).map(x =>
     `<button class="pm-it${x.ten === PM.cur ? ' on' : ''}" data-pm="${esc(x.ten)}"><span class="nm">${esc(x.ten_hien_thi)}</span>` +
-    (x.la_ban_sua ? '<span class="pill p">Đã chỉnh</span>' : '<span class="pill">Mặc định</span>') + '</button>').join('')).join('');
+    (x.co_ban_moi ? '<span class="pill y">Có bản mới</span>' : '') + (x.la_ban_sua ? '<span class="pill p">Đã chỉnh</span>' : '<span class="pill">Mặc định</span>') + '</button>').join('')).join('');
   document.querySelectorAll('#pmDs [data-pm]').forEach(b => b.onclick = () => pmChon(b.dataset.pm));
 }
 function pmKiem() {
@@ -1122,7 +1135,55 @@ function pmNap() {
   });
   $('#pmGuard').classList.add('hidden'); $('#pmLoi').classList.add('hidden'); $('#pmKpBox').classList.add('hidden'); $('#pmKp').classList.remove('hidden');
   $('#pmXtBox').classList.add('hidden'); $('#pmXtWarn').innerHTML = ''; PM.xt++;
-  pmCapNhat(); pmTaiCu();
+  pmCapNhat(); pmTaiCu(); pmVeCn();
+}
+// ---- "Có bản cập nhật": bản mặc định mới đi kèm app khác bản anh đang đứng trên — KHÔNG tự đổi, anh chọn
+PM.sau = {};
+function pmBadge(n) {
+  n = n || 0;
+  const t = $('#pmTabN'); t.textContent = n; t.classList.toggle('hidden', !n);
+  const b = $('#pmThongBao');
+  b.innerHTML = n ? `${ic('info')}Có <b>${n}</b> đề bài AI có bản mặc định mới. Chưa có gì tự đổi — video vẫn làm theo bản của anh. <a href="#" id="pmThongBaoMo">Xem ở Prompt AI</a>` : '';
+  b.classList.toggle('hidden', !n);
+  const a = $('#pmThongBaoMo'); if (a) a.onclick = e => { e.preventDefault(); moTab('prompt-ai', false); };
+}
+function pmDiff(rows) {
+  return '<div class="pm-df">' + rows.map(([k, t]) => k === '…' ? `<div class="g">… ${esc(t)} dòng giống nhau …</div>`
+    : `<div class="${k === '+' ? 'p' : k === '-' ? 'm' : ''}">${k === '+' ? '+ ' : k === '-' ? '− ' : '  '}${esc(t) || ' '}</div>`).join('') + '</div>';
+}
+async function pmVeCn() {
+  const r = pmRole(), box = $('#pmCn'); if (!r) return;
+  if (!r.co_ban_moi || PM.sau[r.ten]) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const kq = await api('/api/prompt/cap-nhat?ten=' + encodeURIComponent(r.ten));
+  if (!pmRole() || pmRole().ten !== r.ten) return;
+  if (!kq.ok || !kq.co) { box.classList.add('hidden'); return; }
+  const ghi = kq.ghi_chu.length ? kq.ghi_chu.map(g => `<p>• <b>Bản ${esc(g.ver)}:</b> ${esc(g.text)}</p>`).join('') : '<p class="note">Nhà phát triển chưa ghi lý do cho thay đổi này.</p>';
+  const sua = kq.co_ban_sua;
+  box.innerHTML = `<h3>${ic('alert')}Có bản cập nhật cho "${esc(r.ten_hien_thi)}"</h3>
+    <p>${sua ? 'Anh đã tự chỉnh đề bài này.' : 'Anh đang dùng bản mặc định cũ' + (kq.ver_goc && kq.ver_goc !== '?' ? ' (từ bản ' + esc(kq.ver_goc) + ')' : '') + '.'} App vừa có bản mặc định mới. <b>Chưa có gì tự đổi</b> — video vẫn làm theo đúng chữ anh đang dùng; anh quyết định áp dụng hay không.</p>
+    <p><b>Vì sao đổi:</b></p>${ghi}
+    <details open><summary>Bản mới đổi gì (cũ → mới)</summary>${pmDiff(kq.diff_moi)}</details>
+    ${sua ? `<details><summary>Những chỗ anh đã tự sửa (so với bản mặc định cũ)</summary>${pmDiff(kq.diff_ban_sua)}</details>` +
+      (kq.ban_sua_giong_moi ? '<p class="note">Bản của anh đã trùng với bản mới.</p>' : '') : ''}
+    <div class="pm-act" id="pmCnAct">
+      <button class="btn go" id="pmCnAp">Áp dụng bản mới</button>
+      <button class="btn soft" id="pmCnGiu">Giữ bản của tôi</button>
+      <button class="btn ghost" id="pmCnSau">Xem sau</button></div>
+    <div id="pmCnXn" class="pm-kp hidden" style="margin-top:10px"><span class="note" style="color:var(--red)">Bản anh đã chỉnh sẽ bị THAY bằng bản mới. Bản của anh vẫn được cất ở "Phiên bản cũ" bên dưới để lấy lại.</span>
+      <button class="btn sm stop" id="pmCnCo">Thay bằng bản mới</button><button class="btn sm ghost" id="pmCnChep">Chép bản của tôi</button><button class="btn sm ghost" id="pmCnKo">Thôi</button></div>`;
+  box.classList.remove('hidden');
+  const xong = async (url, msg) => {
+    if (pmDirty()) { toast('Hãy Lưu hoặc Huỷ thay đổi đang gõ trước đã'); return; }
+    const k = await api(url, {ten: r.ten});
+    if (!k.ok) { $('#pmLoi').innerHTML = ic('alert') + esc(k.loi || 'Không thực hiện được.'); $('#pmLoi').classList.remove('hidden'); return; }
+    toast(msg); await taiPm(); pmNap(); ST = await api('/api/trang-thai'); pmBadge(ST.prompt_moi);
+  };
+  $('#pmCnAp').onclick = () => sua ? ($('#pmCnXn').classList.remove('hidden'), $('#pmCnAct').classList.add('hidden')) : xong('/api/prompt/ap-dung', 'Đã áp dụng bản mới');
+  $('#pmCnCo').onclick = () => xong('/api/prompt/ap-dung', 'Đã áp dụng bản mới — bản cũ của anh nằm ở "Phiên bản cũ"');
+  $('#pmCnKo').onclick = () => { $('#pmCnXn').classList.add('hidden'); $('#pmCnAct').classList.remove('hidden'); };
+  $('#pmCnChep').onclick = async () => { try { await navigator.clipboard.writeText(kq.ban_sua || ''); toast('Đã chép bản của anh'); } catch (e) { toast('Không chép được — mở "Phiên bản cũ" sau khi áp dụng'); } };
+  $('#pmCnGiu').onclick = () => xong('/api/prompt/giu-ban-cua-toi', 'Đã giữ bản của anh — sẽ không nhắc bản này nữa');
+  $('#pmCnSau').onclick = () => { PM.sau[r.ten] = true; box.classList.add('hidden'); };
 }
 async function taiPm() {
   const ds = await api('/api/prompt'); if (!Array.isArray(ds)) return;
@@ -1130,6 +1191,7 @@ async function taiPm() {
   PM.ds = ds; if (!PM.cur || !pmRole()) PM.cur = ds[0].ten;
   if (PM.muon && !dangGo && ds.some(x => x.ten === PM.muon)) PM.cur = PM.muon; PM.muon = null;
   pmVeDs(); if (!dangGo) pmNap();
+  pmBadge(ds.filter(x => x.co_ban_moi).length);
   const sel = $('#pmSp');
   if (!sel.options.length) {
     if (!(ST.san_pham || []).length) { try { ST = await api('/api/trang-thai'); } catch (e) {} }
@@ -1234,6 +1296,7 @@ function mau(l) {
 }
 async function capNhat() {
   ST = await api('/api/trang-thai');
+  pmBadge(ST.prompt_moi);
   const sel = $('#spChon');
   if (!sel.options.length) {
     ST.san_pham.filter(p => p.loai !== 'kho-chung').forEach(p => { const o = new Option(`${p.ten} (${p.so_canh} cảnh)${p.san_sang ? '' : ' — thiếu: ' + p.thieu.join(', ')}`, p.ma); o.disabled = !p.san_sang; sel.add(o); });

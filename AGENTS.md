@@ -117,3 +117,14 @@ Máy có thể yếu/RAM thấp: **chạy từng bước một**, không song so
 - Migration cũ giữ nguyên (DB cũ và mới đều dựng được).
 - Sửa nhỏ, có test (`tests/Feature/Fork`); không đụng dữ liệu của người dùng khi sửa lỗi; chạy lại `-KiemTra` sau khi sửa cài đặt.
 - Commit: tiếng Việt hoặc không dấu, mô tả ngắn gọn thay đổi.
+
+## 11. Luật của chủ app: cập nhật KHÔNG BAO GIỜ âm thầm đổi "gu" làm video
+
+"Gu" = mọi mặc định chủ app tinh chỉnh theo khẩu vị: 9 đề bài AI (`xuong-video/prompt/*.md`: lời dặn chung, biên kịch, đạo diễn, giám khảo, soát kho, đọc nhãn, gom bài học, học cảnh, lệnh gemini) và 3 tài liệu luật (`xuong-video/luat/*.md`). Mỗi người dùng tự chỉnh riêng ở tab "Prompt AI". Cập nhật về code/lỗi/giao diện thì áp bình thường; cập nhật về gu thì phải để người dùng chọn.
+
+Cơ chế (`xuong-video/engine/prompt_mau.py`):
+- Bản đang dùng = bản người dùng sửa (`<DATA>/prompt/...`) nếu có, KHÔNG thì **bản gốc đã ghim** `<DATA>/prompt/_goc/<tên>.md` (+ `.json` ghi băm/phiên bản). Không bao giờ dùng thẳng mẫu đi kèm app. Cài mới / lần đầu sau nâng cấp tự ghim mẫu hiện hành (`ghim`, `ghim_tat_ca` lúc hub khởi động).
+- Mẫu đi kèm khác bản ghim → tab Prompt AI hiện "Có bản cập nhật" (huy hiệu, số trên tab, thông báo ở tab Sản xuất, diff từng dòng, ghi chú "vì sao đổi", bản người dùng đã sửa). Người dùng chọn Áp dụng (bản cũ được cất vào "Phiên bản cũ"), Giữ bản của tôi (ghim bản mới để thôi nhắc, chữ giữ nguyên), hoặc Xem sau.
+- **Khi đổi một gu mặc định**: (1) sửa file mặc định; (2) bump `VERSION`; (3) thêm ghi chú vào `xuong-video/prompt/_ghi-chu-cap-nhat.json` dạng `{"<tên-vai>": {"<VERSION>": "vì sao đổi, tiếng Việt dễ hiểu"}}` (tên-vai = khoá trong `prompt_mau.VAI`); (4) chạy `python xuong-video/engine/prompt_mau.py ghi-manifest` (từ chối nếu thiếu ghi chú). Test `tests/test_prompt_ghim.py` thất bại nếu bạn đổi gu mà quên manifest/ghi chú. Chỉ ghim được từ bản có cơ chế này trở đi: người nhảy từ bản cũ hơn sẽ ghim bản mới nhất nên bản phát hành ĐẦU TIÊN có cơ chế này không được đổi gu.
+- **Phần chức năng KHÔNG nằm trong chữ gu**: định dạng JSON máy đọc, luật an toàn (học cảnh chỉ đọc video/ghi file liệt kê, không terminal), dữ liệu bắt buộc, nằm trong mã (`HOP_DONG`, `dung()` trong `prompt_mau.py`, bộ đọc trong engine) và tự được gắn thêm nếu đề bài (cũ/đã sửa) thiếu. Thêm yêu cầu chức năng mới → thêm vào `HOP_DONG`, đừng chỉ viết vào file gu; code phải chịu được đề bài cũ (thiếu {{biến}}, bố cục CHUNG:/RIENG: cũ...).
+- Các mặc định gu còn nằm trong mã (vd. `GU` đạo diễn, `DANG_BAI`, danh sách giọng ở `mau/config.mau.json`) hiện không có chỗ để người dùng sửa; nếu muốn người dùng tự chỉnh thì đưa chúng vào cơ chế trên trước khi đổi.

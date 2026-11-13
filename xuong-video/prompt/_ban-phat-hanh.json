@@ -1,0 +1,50 @@
+{
+ "he-thong": {
+  "hash": "6d73ffa3d87c62ec",
+  "ver": "1.2.4"
+ },
+ "bien-kich": {
+  "hash": "58a423245b075afe",
+  "ver": "1.2.4"
+ },
+ "dao-dien": {
+  "hash": "e4433fccf166e65a",
+  "ver": "1.2.4"
+ },
+ "giam-khao": {
+  "hash": "45e92086ef50b4b9",
+  "ver": "1.2.4"
+ },
+ "soat-kho": {
+  "hash": "48096f703b33257a",
+  "ver": "1.2.4"
+ },
+ "doc-nhan": {
+  "hash": "e00cf63693696b28",
+  "ver": "1.2.4"
+ },
+ "gom-bai-hoc": {
+  "hash": "adccf6eec1e2bba7",
+  "ver": "1.2.4"
+ },
+ "hoc-canh": {
+  "hash": "ea3314ca40fe5514",
+  "ver": "1.2.4"
+ },
+ "lenh-gemini": {
+  "hash": "f2e8b6f720331967",
+  "ver": "1.2.4"
+ },
+ "luat-san-xuat": {
+  "hash": "4ce07f2b7555be81",
+  "ver": "1.2.4"
+ },
+ "so-tay-editor": {
+  "hash": "79cb4264bd1e2197",
+  "ver": "1.2.4"
+ },
+ "mo-ta-gemini": {
+  "hash": "4eb3d7fb6012b234",
+  "ver": "1.2.4"
+ }
+}
