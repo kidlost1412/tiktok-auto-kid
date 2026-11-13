@@ -16,6 +16,7 @@ use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
+use App\Fork\Update\LauncherClient;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use Illuminate\Database\Eloquent\Builder;
@@ -217,6 +218,41 @@ final class RiengController extends Controller
         $r = app(RiengScanner::class)->scan();
 
         return back()->with('flash.success', "Đã thêm thư mục. Tìm thấy {$r['new']} video mới".($r['waiting'] > 0 ? ", {$r['waiting']} video đang chờ ghi xong" : '').'.');
+    }
+
+    /** Mở hộp chọn thư mục gốc của Windows qua launcher (trình duyệt không trả được đường dẫn thật). */
+    public function pickFolder(Request $request): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        set_time_limit(660);
+        $fail = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
+
+        $last = RiengFolder::query()->orderByDesc('id')->value('path');
+        $start = is_string($last) && $last !== '' ? dirname(str_replace('/', '\\', $last)) : '';
+        $body = ['tieu_de' => 'Chọn thư mục chứa video của bạn'];
+
+        if ($start !== '' && is_dir($start)) {
+            $body['bat_dau'] = $start;
+        }
+
+        $r = LauncherClient::post('/api/chon-thu-muc', $body, 640);
+        $data = $r['data'];
+
+        if (! $r['ok'] || ! is_array($data)) {
+            return response()->json(['ok' => false, 'error' => $fail], 422);
+        }
+
+        if (($data['huy'] ?? false) === true) {
+            return response()->json(['ok' => false, 'cancelled' => true]);
+        }
+
+        $path = $data['duong_dan'] ?? null;
+
+        if (($data['ok'] ?? false) !== true || ! is_string($path) || $path === '') {
+            return response()->json(['ok' => false, 'error' => $fail], 422);
+        }
+
+        return response()->json(['ok' => true, 'path' => $path, 'name' => basename(str_replace('\\', '/', rtrim($path, '\\/')))]);
     }
 
     /** Bỏ thư mục khỏi Kho riêng: chỉ xoá dòng trong app (video chưa đăng của thư mục này cũng bị bỏ khỏi danh sách); KHÔNG xoá file nào. */

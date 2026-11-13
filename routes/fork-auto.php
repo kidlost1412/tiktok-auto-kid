@@ -60,6 +60,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
     Route::prefix('rieng')->name('rieng.')->group(function (): void {
         Route::get('/', [RiengController::class, 'index'])->name('index');
         Route::post('thu-muc', [RiengController::class, 'addFolder'])->middleware('throttle:30,1')->name('folders.add');
+        Route::post('chon-thu-muc', [RiengController::class, 'pickFolder'])->middleware('throttle:20,1')->name('folders.pick');
         Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
         Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');
         Route::get('video/{video}/thumb', [RiengController::class, 'thumb'])->whereNumber('video')->name('thumb');

@@ -203,7 +203,9 @@ func NewStatusHandlerAll(sup *Supervisor, cfg *Config, root string, retry func()
 	if upd != nil {
 		registerUpdateRoutes(mux, upd, cfg.AppURL, authed)
 	}
-	mux.HandleFunc("/api/quit", func(w http.ResponseWriter, r *http.Request) {
+	picker := &folderPicker{}
+	mux.HandleFunc("/api/chon-thu-muc", picker.handler(authed))
+	mux.HandleFunc("/api/quit",func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if !authed(r) || quit == nil {
 			w.WriteHeader(http.StatusForbidden)

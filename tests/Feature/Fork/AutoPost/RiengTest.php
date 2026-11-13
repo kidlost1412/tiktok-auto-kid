@@ -494,3 +494,37 @@ test('legacy ingest reads bang-ghi.csv from _kem', function () {
     $v = AutoVideo::query()->where('file_name', $name)->firstOrFail();
     expect($v->goc)->toBe('gocA')->and($v->duration)->toBe(12.5)->and($v->caption)->toBe('Cap từ kem');
 });
+
+// ---------------------------------------------------------------- Chọn thư mục (qua launcher)
+
+test('pick folder asks the launcher and maps results to friendly answers', function () {
+    $owner = ownerUser();
+    $tokenFile = sys_get_temp_dir().'/rieng-token-'.bin2hex(random_bytes(4));
+    file_put_contents($tokenFile, 'tok-test');
+    config(['fork-update.token_file' => $tokenFile, 'fork-update.launcher_port' => 8009]);
+
+    Http::fake(['127.0.0.1:8009/api/chon-thu-muc' => Http::sequence()
+        ->push(['ok' => true, 'duong_dan' => 'D:\Video\Video-cua-toi'])
+        ->push(['ok' => false, 'huy' => true])
+        ->push(['ok' => false, 'error' => 'đang mở hộp chọn'], 409)]);
+
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/chon-thu-muc')
+        ->assertOk()->assertJson(['ok' => true, 'path' => 'D:\Video\Video-cua-toi', 'name' => 'Video-cua-toi']);
+    Http::assertSent(fn ($r) => $r->hasHeader('X-TTA-Token', 'tok-test'));
+
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/chon-thu-muc')
+        ->assertOk()->assertJson(['ok' => false, 'cancelled' => true]);
+
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/chon-thu-muc')
+        ->assertStatus(422)->assertJson(['ok' => false, 'error' => 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.']);
+
+    Http::fake(fn () => throw new RuntimeException('down'));
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/chon-thu-muc')
+        ->assertStatus(422)->assertJsonPath('error', 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.');
+
+    @unlink($tokenFile);
+});
+
+test('pick folder is owner only', function () {
+    $this->postJson('/auto/kho/rieng/chon-thu-muc')->assertStatus(401);
+});

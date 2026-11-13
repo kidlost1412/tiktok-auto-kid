@@ -163,6 +163,44 @@ const addFolder = () => {
     );
 };
 
+const picking = ref(false);
+const pickError = ref('');
+const PICK_FAIL = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
+
+// Mở hộp chọn thư mục gốc của Windows (qua launcher), điền đường dẫn vào ô.
+const pickFolder = async () => {
+    if (picking.value) {
+        return;
+    }
+
+    picking.value = true;
+    pickError.value = '';
+
+    try {
+        const xsrf = decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
+        const r = await fetch('/auto/kho/rieng/chon-thu-muc', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'X-XSRF-TOKEN': xsrf },
+            credentials: 'same-origin',
+        });
+        const j = await r.json().catch(() => null);
+
+        if (j?.ok && typeof j.path === 'string') {
+            folderPath.value = j.path;
+
+            if (!folderName.value.trim() && j.name) {
+                folderName.value = j.name;
+            }
+        } else if (!j?.cancelled) {
+            pickError.value = typeof j?.error === 'string' ? j.error : PICK_FAIL;
+        }
+    } catch {
+        pickError.value = PICK_FAIL;
+    } finally {
+        picking.value = false;
+    }
+};
+
 const removeFolder = (f: Folder) => {
     if (
         !window.confirm(
@@ -267,9 +305,13 @@ const thumbFailed = ref<Record<number, boolean>>({});
             </ul>
             <div class="flex flex-wrap items-end gap-3">
                 <label class="flex min-w-72 flex-1 flex-col gap-1 text-sm font-medium">
-                    Dán đường dẫn thư mục
+                    Chọn hoặc dán đường dẫn thư mục
                     <Input v-model="folderPath" placeholder="Ví dụ: D:\Video\Video-cua-toi" data-testid="fork-rieng-path" @keydown.enter="addFolder" />
                 </label>
+                <Button variant="outline" :disabled="picking" data-testid="fork-rieng-pick" @click="pickFolder">
+                    <IconFolder class="size-4" :class="{ 'animate-pulse': picking }" />
+                    {{ picking ? 'Đang chờ bạn chọn…' : 'Chọn thư mục…' }}
+                </Button>
                 <label class="flex w-56 flex-col gap-1 text-sm font-medium">
                     Tên gọi (tuỳ chọn)
                     <Input v-model="folderName" placeholder="Ví dụ: Video quay tay" />
@@ -278,6 +320,7 @@ const thumbFailed = ref<Record<number, boolean>>({});
                     <IconFolderPlus class="size-4" /> Thêm thư mục
                 </Button>
             </div>
+            <p v-if="pickError" class="text-sm text-red-600" data-testid="fork-rieng-pick-error">{{ pickError }}</p>
         </section>
 
         <!-- Bộ lọc + chọn -->
