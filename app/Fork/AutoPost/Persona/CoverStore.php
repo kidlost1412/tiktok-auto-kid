@@ -6,6 +6,7 @@ namespace App\Fork\AutoPost\Persona;
 
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Models\Post;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -83,31 +84,7 @@ final class CoverStore
             throw new InvalidArgumentException('Ảnh lớn hơn 5 MB.');
         }
 
-        $bytes = (string) file_get_contents($upload->getRealPath());
-        $info = @getimagesizefromstring($bytes);
-
-        if ($info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
-            throw new InvalidArgumentException('Chỉ nhận ảnh jpg, png hoặc webp.');
-        }
-
-        [$w, $h] = [(int) $info[0], (int) $info[1]];
-
-        [$cw, $ch] = self::cropSize($w, $h);
-
-        if ($cw < self::MIN_WIDTH || $ch < self::MIN_HEIGHT) {
-            throw new InvalidArgumentException('Ảnh quá nhỏ: sau khi cắt 3:4 phải tối thiểu '.self::MIN_WIDTH.'×'.self::MIN_HEIGHT.' px (ảnh này chỉ còn '.$cw.'×'.$ch.').');
-        }
-
-        if (max($w, $h) > self::MAX_SIDE) {
-            throw new InvalidArgumentException('Ảnh quá lớn (cạnh dài trên '.self::MAX_SIDE.' px).');
-        }
-
-        // Luôn cắt giữa theo 3:4 (đúng cách Studio gửi bìa tự tải lên) và đổi sang jpg.
-        [$bytes, $cw, $ch] = $this->cropToJpeg($bytes);
-
-        if (strlen($bytes) > self::MAX_BYTES) {
-            throw new InvalidArgumentException('Ảnh sau khi cắt và đổi sang jpg vẫn lớn hơn 5 MB.');
-        }
+        ['bytes' => $bytes, 'w' => $cw, 'h' => $ch, 'orig_w' => $w, 'orig_h' => $h] = $this->prepare((string) file_get_contents($upload->getRealPath()));
 
         $dir = self::dir((string) $p->code);
 
@@ -146,6 +123,46 @@ final class CoverStore
         $warning = $notes === [] ? null : ucfirst(implode('; ', $notes)).'.';
 
         return ['entry' => $entry, 'warning' => $warning];
+    }
+
+    /**
+     * Kiểm tra ảnh (jpg/png/webp, đủ lớn, không quá 5 MB) và chuẩn hoá về đúng thứ pipeline cần: jpg cắt giữa 3:4, tối đa 1080x1440.
+     * Dùng chung cho ảnh bìa sản phẩm và ảnh bìa của video riêng. Ném InvalidArgumentException (tiếng Việt) khi không hợp lệ.
+     *
+     * @return array{bytes: string, w: int, h: int, orig_w: int, orig_h: int}
+     */
+    public function prepare(string $bytes, bool $checkInputSize = true): array
+    {
+        if ($checkInputSize && strlen($bytes) > self::MAX_BYTES) {
+            throw new InvalidArgumentException('Ảnh lớn hơn 5 MB.');
+        }
+
+        $info = @getimagesizefromstring($bytes);
+
+        if ($info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            throw new InvalidArgumentException('Chỉ nhận ảnh jpg, png hoặc webp.');
+        }
+
+        [$w, $h] = [(int) $info[0], (int) $info[1]];
+
+        [$cw, $ch] = self::cropSize($w, $h);
+
+        if ($cw < self::MIN_WIDTH || $ch < self::MIN_HEIGHT) {
+            throw new InvalidArgumentException('Ảnh quá nhỏ: sau khi cắt 3:4 phải tối thiểu '.self::MIN_WIDTH.'×'.self::MIN_HEIGHT.' px (ảnh này chỉ còn '.$cw.'×'.$ch.').');
+        }
+
+        if (max($w, $h) > self::MAX_SIDE) {
+            throw new InvalidArgumentException('Ảnh quá lớn (cạnh dài trên '.self::MAX_SIDE.' px).');
+        }
+
+        // Luôn cắt giữa theo 3:4 (đúng cách Studio gửi bìa tự tải lên) và đổi sang jpg.
+        [$out, $cw, $ch] = $this->cropToJpeg($bytes);
+
+        if (strlen($out) > self::MAX_BYTES) {
+            throw new InvalidArgumentException('Ảnh sau khi cắt và đổi sang jpg vẫn lớn hơn 5 MB.');
+        }
+
+        return ['bytes' => $out, 'w' => $cw, 'h' => $ch, 'orig_w' => $w, 'orig_h' => $h];
     }
 
     public function remove(AutoProduct $p, string $file): bool
@@ -230,6 +247,11 @@ final class CoverStore
 
         if (! is_string($file) || $file === '' || ! $videoId) {
             return null;
+        }
+
+        // Ảnh bìa riêng của video trong Kho riêng (tải lên / chọn khung): file nằm ở rieng-covers/<mã video>/, không qua bộ ảnh sản phẩm.
+        if (data_get($post->meta, 'fork_cover_src') === RiengCovers::SOURCE) {
+            return app(RiengCovers::class)->describeFile((int) $videoId, $file);
         }
 
         try {

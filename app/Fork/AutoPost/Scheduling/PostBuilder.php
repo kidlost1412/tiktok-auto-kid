@@ -18,6 +18,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Models\Media;
@@ -42,7 +43,7 @@ final class PostBuilder
     /**
      * @param  array{caption: string, hashtags: list<string>, source: string, product_name?: ?string}  $caption
      */
-    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot): Post
+    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot, ?string $ownCover = null): Post
     {
         // Ưu tiên file trên đĩa; không có thì tải từ hub qua HTTP vào cache (MissingVideoFile nếu file mất/sai sha256,
         // lỗi thường nếu hub tắt: video về kho, thử lại sau).
@@ -56,7 +57,10 @@ final class PostBuilder
         // lưu vào AutoVideo bên dưới; chữ cuối cùng chỉ nằm ở nội dung bài.
         $product = filled($video->product_code) ? AutoProduct::query()->find($video->product_code) : null;
         $final = app(Hashtags::class)->apply($caption['caption'], $hashtags, $product);
-        $coverFile = $product !== null ? app(CoverStore::class)->pick($product) : null;
+        // $ownCover: ảnh bìa riêng của video (Kho riêng: tải lên / chọn khung), thay cho xoay vòng bìa sản phẩm.
+        $coverFile = $ownCover !== null && $ownCover !== ''
+            ? $ownCover
+            : ($product !== null ? app(CoverStore::class)->pick($product) : null);
         $content = HubText::compose($final['caption'], $final['hashtags']);
 
         if ($content === '') {
@@ -84,7 +88,7 @@ final class PostBuilder
         $storedPath = null;
 
         try {
-            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, &$storedPath): Post {
+            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, &$storedPath): Post {
                 $post = $workspace->posts()->forceCreate([
                     'post_group_id' => (string) Str::uuid7(),
                     'user_id' => $owner->id,
@@ -109,6 +113,7 @@ final class PostBuilder
                         'fork_shop_product_id' => (string) $link->shop_product_id,
                         'fork_shop_product_name' => $cartName,
                         ...($coverFile !== null ? ['fork_cover' => $coverFile] : []),
+                        ...($coverFile !== null && $coverFile === $ownCover ? ['fork_cover_src' => RiengCovers::SOURCE] : []),
                     ],
                 ]);
 

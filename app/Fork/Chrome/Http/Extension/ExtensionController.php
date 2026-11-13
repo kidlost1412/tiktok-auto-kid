@@ -358,8 +358,12 @@ final class ExtensionController
     {
         $job = $this->videoJob($request);
         $cv = is_array($job->options['cover'] ?? null) ? $job->options['cover'] : null;
-        $product = $cv === null ? null : \App\Fork\AutoPost\Models\AutoProduct::query()->find((string) ($cv['code'] ?? ''));
-        $path = $product === null ? null : \App\Fork\AutoPost\Persona\CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
+        if ($cv !== null && ($cv['src'] ?? null) === \App\Fork\AutoPost\Rieng\RiengCovers::SOURCE) {
+            $path = app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->path((int) ($cv['video'] ?? 0), (string) ($cv['file'] ?? ''));
+        } else {
+            $product = $cv === null ? null : \App\Fork\AutoPost\Models\AutoProduct::query()->find((string) ($cv['code'] ?? ''));
+            $path = $product === null ? null : \App\Fork\AutoPost\Persona\CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
+        }
 
         if ($path === null) {
             throw new ExtError(404, 'unknown_job', 'việc này không có ảnh bìa (hoặc file đã mất)');

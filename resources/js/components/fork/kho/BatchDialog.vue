@@ -23,6 +23,14 @@ interface ProductOption {
     label: string;
     name: string;
     tags: string[];
+    cover_count: number;
+}
+
+type CoverMode = 'product' | 'upload' | 'frame';
+
+interface PickedCover {
+    token: string;
+    url: string;
 }
 
 export interface BatchAccount {
@@ -41,6 +49,7 @@ interface PlanRow {
     status: 'ok' | 'warn' | 'error' | 'skip';
     messages: string[];
     at: string | null;
+    cover?: { kind: string; url: string | null; note: string };
     result?: 'done' | 'error' | 'skip';
     error?: string;
 }
@@ -82,6 +91,16 @@ const busy = ref(false);
 const problem = ref('');
 let lastTags = '';
 
+// Ảnh bìa: theo sản phẩm (mặc định), tải ảnh lên, hoặc chọn một khung trong video.
+const coverMode = ref<CoverMode>('product');
+const batchCover = ref<PickedCover | null>(null);
+const rowCover = ref<Record<number, PickedCover>>({});
+const coverBusy = ref<Record<string, boolean>>({});
+const coverError = ref('');
+const frameOpen = ref<Record<number, boolean>>({});
+const frameT = ref<Record<number, number>>({});
+const frameDur = ref<Record<number, number>>({});
+
 const account = computed(() => usable.value.find((a) => a.id === accountId.value) ?? null);
 const optionKey = (o: ProductOption) => `${o.code}|${o.quy_cach ?? ''}`;
 const product = computed(() => account.value?.products.find((o) => optionKey(o) === productKey.value) ?? null);
@@ -100,6 +119,14 @@ watch(
         mode.value = 'auto';
         times.value = {};
         overrides.value = {};
+        coverMode.value = 'product';
+        batchCover.value = null;
+        rowCover.value = {};
+        coverBusy.value = {};
+        coverError.value = '';
+        frameOpen.value = {};
+        frameT.value = {};
+        frameDur.value = {};
         startAt.value = dayjs().add(1, 'hour').minute(0).format('YYYY-MM-DDTHH:mm');
         accountId.value = usable.value[0]?.id ?? '';
     },
@@ -142,12 +169,16 @@ const payload = (acceptWarnings: boolean) => ({
     hashtags: tags.value,
     mode: mode.value,
     accept_warnings: acceptWarnings,
+    cover_mode: coverMode.value,
+    cover_token: coverMode.value === 'upload' ? (batchCover.value?.token ?? null) : null,
     items: props.items.map((it) => {
         const o = overrides.value[it.id];
         const at = times.value[it.id];
+        const c = coverMode.value === 'product' ? null : rowCover.value[it.id];
 
         return {
             id: it.id,
+            ...(c ? { cover_token: c.token } : {}),
             ...(mode.value === 'manual' && at ? { at: dayjs(at).toISOString() } : {}),
             ...(o?.caption?.trim() ? { caption: o.caption } : {}),
             ...(o?.tags?.trim() ? { hashtags: o.tags } : {}),
@@ -206,8 +237,109 @@ const checkForm = (): string => {
         return 'Hãy nhập giờ đăng cho từng video (hoặc bấm "Điền giờ").';
     }
 
+    if (coverMode.value === 'upload' && !batchCover.value && props.items.some((it) => !rowCover.value[it.id])) {
+        return 'Hãy tải một ảnh bìa lên (hoặc chọn ảnh cho từng video).';
+    }
+
     return '';
 };
+
+// Ảnh bìa hiện tại của một video trong danh sách (để hiện hình nhỏ).
+const coverUrlOf = (id: number): string | null => {
+    if (coverMode.value === 'product') {
+        return null;
+    }
+
+    return (
+        rowCover.value[id]?.url ??
+        (coverMode.value === 'upload' ? (batchCover.value?.url ?? null) : `/auto/kho/rieng/video/${id}/thumb`)
+    );
+};
+
+async function postCover(url: string, body: FormData | string, key: string): Promise<PickedCover | null> {
+    coverBusy.value[key] = true;
+    coverError.value = '';
+
+    try {
+        const isForm = body instanceof FormData;
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                ...(isForm ? {} : { 'Content-Type': 'application/json' }),
+                'X-XSRF-TOKEN': xsrf(),
+            },
+            credentials: 'same-origin',
+            body,
+        });
+        const j = await r.json().catch(() => ({}));
+
+        if (!r.ok || !j.token) {
+            coverError.value = j?.errors?.image?.[0] ?? j?.error ?? 'Không lấy được ảnh bìa, hãy thử lại.';
+
+            return null;
+        }
+
+        return { token: j.token as string, url: j.url as string };
+    } catch {
+        coverError.value = 'Mất kết nối với app, hãy thử lại.';
+
+        return null;
+    } finally {
+        coverBusy.value[key] = false;
+    }
+}
+
+// Tải ảnh lên: cho cả lượt (id = null) hoặc riêng một video.
+async function uploadCover(e: Event, id: number | null) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) {
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('image', file);
+    const c = await postCover('/auto/kho/rieng/anh-bia/tai-len', fd, id === null ? 'batch' : `up-${id}`);
+
+    if (c) {
+        if (id === null) {
+            batchCover.value = c;
+        } else {
+            rowCover.value[id] = c;
+        }
+    }
+}
+
+const onMeta = (id: number, e: Event) => {
+    const d = (e.target as HTMLVideoElement).duration;
+
+    if (Number.isFinite(d) && d > 0) {
+        frameDur.value[id] = d;
+        frameT.value[id] ??= d > 2 ? 1 : 0;
+        seek(id, frameT.value[id]);
+    }
+};
+
+const seek = (id: number, t: number) => {
+    frameT.value[id] = t;
+    const v = document.getElementById(`rieng-frame-${id}`) as HTMLVideoElement | null;
+
+    if (v) {
+        v.currentTime = t;
+    }
+};
+
+async function takeFrame(id: number) {
+    const c = await postCover(`/auto/kho/rieng/video/${id}/khung`, JSON.stringify({ t: frameT.value[id] ?? 0 }), `fr-${id}`);
+
+    if (c) {
+        rowCover.value[id] = c;
+        frameOpen.value[id] = false;
+    }
+}
 
 async function preview() {
     const err = checkForm();
@@ -323,6 +455,46 @@ const areaCls =
                             </span>
                         </div>
 
+                        <div class="flex flex-col gap-2" data-testid="fork-rieng-cover">
+                            <span class="text-sm font-medium">Ảnh bìa</span>
+                            <div class="grid gap-2 sm:grid-cols-3">
+                                <label :class="cn('flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 text-sm', coverMode === 'product' ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-muted/50')">
+                                    <span class="flex items-center gap-2 font-medium"><input v-model="coverMode" type="radio" value="product" data-testid="fork-rieng-cover-product" /> Ảnh bìa của sản phẩm</span>
+                                    <span class="text-xs text-muted-foreground">Xoay vòng các ảnh bìa đã cài cho sản phẩm.</span>
+                                </label>
+                                <label :class="cn('flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 text-sm', coverMode === 'upload' ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-muted/50')">
+                                    <span class="flex items-center gap-2 font-medium"><input v-model="coverMode" type="radio" value="upload" data-testid="fork-rieng-cover-upload" /> Tải ảnh lên</span>
+                                    <span class="text-xs text-muted-foreground">Một ảnh cho cả lượt, hoặc đổi ảnh riêng từng video.</span>
+                                </label>
+                                <label :class="cn('flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 text-sm', coverMode === 'frame' ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-muted/50')">
+                                    <span class="flex items-center gap-2 font-medium"><input v-model="coverMode" type="radio" value="frame" data-testid="fork-rieng-cover-frame" /> Chọn khung trong video</span>
+                                    <span class="text-xs text-muted-foreground">Chọn một khoảnh khắc của từng video làm bìa.</span>
+                                </label>
+                            </div>
+
+                            <p v-if="coverMode === 'product' && product && product.cover_count === 0" class="text-xs text-amber-700 dark:text-amber-300" data-testid="fork-rieng-cover-empty">
+                                Sản phẩm này chưa có ảnh bìa nên TikTok sẽ dùng bìa mặc định. Muốn tự chọn thì tải ảnh lên hoặc chọn khung.
+                            </p>
+                            <p v-else-if="coverMode === 'product'" class="text-xs text-muted-foreground">
+                                Dùng {{ product?.cover_count ?? 0 }} ảnh bìa của sản phẩm, xoay vòng đều giữa các bài.
+                            </p>
+
+                            <div v-if="coverMode === 'upload'" class="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 p-3">
+                                <img v-if="batchCover" :src="batchCover.url" alt="Ảnh bìa chung" class="h-20 w-[60px] rounded border object-cover" />
+                                <label class="inline-flex">
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" data-testid="fork-rieng-cover-file" @change="uploadCover($event, null)" />
+                                    <span class="inline-flex h-9 cursor-pointer items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted">
+                                        {{ coverBusy.batch ? 'Đang tải…' : batchCover ? 'Đổi ảnh chung' : 'Chọn ảnh' }}
+                                    </span>
+                                </label>
+                                <span class="text-xs text-muted-foreground">jpg, png hoặc webp, tối đa 5 MB. Ảnh được cắt giữa theo tỉ lệ 3:4.</span>
+                            </div>
+                            <p v-if="coverMode === 'frame'" class="text-xs text-muted-foreground">
+                                Không chọn gì thì dùng khung mặc định (hình nhỏ của video). Bấm "Chọn khung" ở từng video bên dưới để đổi.
+                            </p>
+                            <p v-if="coverError" class="text-xs text-red-600" data-testid="fork-rieng-cover-error">{{ coverError }}</p>
+                        </div>
+
                         <div class="flex flex-col gap-2">
                             <span class="text-sm font-medium">Cách hẹn giờ</span>
                             <div class="grid gap-2 sm:grid-cols-2">
@@ -353,8 +525,19 @@ const areaCls =
                         <ul class="flex flex-col divide-y rounded-lg border text-sm">
                             <li v-for="it in items" :key="it.id" class="flex flex-col gap-2 p-2.5">
                                 <div class="flex flex-wrap items-center gap-2">
+                                    <img v-if="coverUrlOf(it.id)" :src="coverUrlOf(it.id)!" alt="Ảnh bìa" class="h-12 w-9 rounded border object-cover" :data-testid="`fork-rieng-cover-thumb-${it.id}`" />
                                     <span class="min-w-0 flex-1 truncate font-medium">{{ it.file_name }}</span>
                                     <Input v-if="mode === 'manual'" v-model="times[it.id]" type="datetime-local" class="w-52" :data-testid="`fork-rieng-time-${it.id}`" />
+                                    <label v-if="coverMode === 'upload'" class="inline-flex">
+                                        <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="uploadCover($event, it.id)" />
+                                        <span class="inline-flex h-8 cursor-pointer items-center rounded-md px-3 text-sm font-medium hover:bg-muted">
+                                            {{ coverBusy[`up-${it.id}`] ? 'Đang tải…' : 'Đổi ảnh' }}
+                                        </span>
+                                    </label>
+                                    <Button v-if="coverMode === 'upload' && rowCover[it.id]" type="button" size="sm" variant="ghost" @click="delete rowCover[it.id]">Dùng ảnh chung</Button>
+                                    <Button v-if="coverMode === 'frame'" type="button" size="sm" variant="ghost" :data-testid="`fork-rieng-frame-btn-${it.id}`" @click="frameOpen[it.id] = !frameOpen[it.id]">
+                                        {{ frameOpen[it.id] ? 'Ẩn khung' : 'Chọn khung' }}
+                                    </Button>
                                     <Button
                                         type="button"
                                         size="sm"
@@ -363,6 +546,33 @@ const areaCls =
                                     >
                                         {{ overrides[it.id]?.open ? 'Ẩn' : 'Sửa caption riêng' }}
                                     </Button>
+                                </div>
+                                <div v-if="coverMode === 'frame' && frameOpen[it.id]" class="flex flex-wrap items-start gap-3 rounded-lg border bg-muted/40 p-2.5">
+                                    <video
+                                        :id="`rieng-frame-${it.id}`"
+                                        :src="`/auto/kho/video/${it.id}`"
+                                        class="h-44 rounded bg-black"
+                                        preload="metadata"
+                                        muted
+                                        playsinline
+                                        @loadedmetadata="onMeta(it.id, $event)"
+                                    />
+                                    <div class="flex min-w-48 flex-1 flex-col gap-2">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            :max="frameDur[it.id] ?? 0"
+                                            step="0.1"
+                                            :value="frameT[it.id] ?? 0"
+                                            :disabled="!frameDur[it.id]"
+                                            class="w-full"
+                                            @input="seek(it.id, Number(($event.target as HTMLInputElement).value))"
+                                        />
+                                        <span class="text-xs tabular-nums text-muted-foreground">Giây {{ (frameT[it.id] ?? 0).toFixed(1) }} / {{ (frameDur[it.id] ?? 0).toFixed(1) }}</span>
+                                        <Button type="button" size="sm" :disabled="coverBusy[`fr-${it.id}`]" class="self-start" :data-testid="`fork-rieng-frame-take-${it.id}`" @click="takeFrame(it.id)">
+                                            {{ coverBusy[`fr-${it.id}`] ? 'Đang lấy…' : 'Lấy khung này' }}
+                                        </Button>
+                                    </div>
                                 </div>
                                 <div v-if="overrides[it.id]?.open" class="flex flex-col gap-1.5">
                                     <textarea v-model="overrides[it.id].caption" :class="areaCls" placeholder="Caption riêng (để trống = dùng caption chung)" />
@@ -384,7 +594,11 @@ const areaCls =
                     <ul class="flex flex-col divide-y rounded-lg border text-sm" data-testid="fork-rieng-preview">
                         <li v-for="r in plan.rows" :key="r.id" class="flex flex-col gap-1 p-2.5">
                             <div class="flex flex-wrap items-center gap-2">
-                                <span class="min-w-0 flex-1 truncate font-medium">{{ nameOf(r) }}</span>
+                                <img v-if="r.cover?.url" :src="r.cover.url" alt="Ảnh bìa" class="h-12 w-9 rounded border object-cover" :data-testid="`fork-rieng-preview-cover-${r.id}`" />
+                                <span class="min-w-0 flex-1 truncate font-medium">
+                                    {{ nameOf(r) }}
+                                    <span v-if="r.cover" class="block text-xs font-normal text-muted-foreground">Bìa: {{ r.cover.note }}</span>
+                                </span>
                                 <span class="tabular-nums">{{ fmt(r.at) }}</span>
                                 <span :class="cn('rounded-full px-2 py-0.5 text-xs font-medium', chip(r.status))">
                                     {{ { ok: 'Ổn', warn: 'Trùng giờ', error: 'Không hẹn được', skip: 'Để lại' }[r.status] }}

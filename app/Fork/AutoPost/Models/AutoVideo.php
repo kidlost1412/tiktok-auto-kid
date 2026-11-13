@@ -31,6 +31,16 @@ class AutoVideo extends Model
 
     protected $guarded = [];
 
+    protected static function booted(): void
+    {
+        // Video riêng bị xoá khỏi app: dọn ảnh bìa riêng của nó (file video của chủ không bao giờ bị đụng).
+        static::deleting(function (self $v): void {
+            if ($v->isRieng()) {
+                app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->forget((int) $v->id);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [

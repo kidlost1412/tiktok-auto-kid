@@ -9,6 +9,7 @@ use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Scheduling\MissingVideoFile;
 use App\Fork\AutoPost\Scheduling\Planner;
@@ -23,6 +24,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -36,6 +38,13 @@ final class RiengBatch
     public const MODE_AUTO = 'auto';
 
     public const MODE_MANUAL = 'manual';
+
+    /** Cách chọn ảnh bìa: bìa của sản phẩm (xoay vòng), ảnh tải lên, hoặc một khung trong video. */
+    public const COVER_PRODUCT = 'product';
+
+    public const COVER_UPLOAD = 'upload';
+
+    public const COVER_FRAME = 'frame';
 
     /** Hai bài cùng kênh cách nhau dưới ngần này giây coi là trùng giờ y hệt (không cho đăng dù đã xác nhận). */
     public const int EXACT_SECONDS = 60;
@@ -76,6 +85,7 @@ final class RiengBatch
                     'label' => CartRules::label($product, (string) $code, $qc),
                     'name' => (string) ($product->short_name ?: $code),
                     'tags' => app(Hashtags::class)->configFor($product)['tags'],
+                    'cover_count' => $this->productCoverInfo($product)['count'],
                 ];
             }
         }
@@ -170,6 +180,9 @@ final class RiengBatch
         $sharedCaption = trim((string) ($in['caption'] ?? ''));
         $sharedTags = Hashtags::normalize($in['hashtags'] ?? []);
         $items = array_values(array_filter((array) ($in['items'] ?? []), 'is_array'));
+        $coverMode = in_array($in['cover_mode'] ?? null, [self::COVER_UPLOAD, self::COVER_FRAME], true) ? (string) $in['cover_mode'] : self::COVER_PRODUCT;
+        $batchToken = filled($in['cover_token'] ?? null) ? (string) $in['cover_token'] : null;
+        $productCover = $this->productCoverInfo($product);
 
         if ($items === []) {
             return $fail('Chưa chọn video nào.');
@@ -233,6 +246,7 @@ final class RiengBatch
                 }
             }
 
+            $row['cover'] = $this->coverFor($coverMode, filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : $batchToken, $video, $productCover, $row);
             $row['_at'] = $mode === self::MODE_MANUAL ? $this->parseAt($item['at'] ?? null) : null;
             $rows[] = $row;
         }
@@ -255,11 +269,78 @@ final class RiengBatch
             'ok' => true,
             'error' => null,
             'mode' => $mode,
+            'cover_mode' => $coverMode,
             'rows' => $rows,
             'left' => $left,
             'needs_confirm' => collect($rows)->contains(fn (array $r): bool => $r['status'] === 'warn'),
             'channel' => '@'.($social->username ?: $social->display_name),
         ];
+    }
+
+    /**
+     * Bìa sản phẩm sẽ dùng khi chọn "Ảnh bìa của sản phẩm": có ảnh dùng được thì xoay vòng, không thì bìa mặc định của TikTok.
+     *
+     * @return array{active: bool, count: int, url: ?string}
+     */
+    private function productCoverInfo(?AutoProduct $product): array
+    {
+        if ($product === null || CoverStore::normalizeMode($product->cover_mode) === CoverStore::DEFAULT) {
+            return ['active' => false, 'count' => 0, 'url' => null];
+        }
+
+        $files = collect(app(CoverStore::class)->describe($product))->filter(fn (array $c): bool => CoverStore::pathFor($product, $c['file']) !== null)->values();
+
+        return ['active' => $files->isNotEmpty(), 'count' => $files->count(), 'url' => $files->first()['url'] ?? null];
+    }
+
+    /**
+     * Ảnh bìa của một dòng (để hiện ở bước xem trước). Lỗi ảnh bìa làm dòng không hẹn được (status error).
+     *
+     * @param  array{active: bool, count: int, url: ?string}  $productCover
+     * @param  array<string, mixed>  $row
+     * @return array{kind: string, url: ?string, note: string, token: ?string}
+     */
+    private function coverFor(string $mode, ?string $token, AutoVideo $video, array $productCover, array &$row): array
+    {
+        $covers = app(RiengCovers::class);
+        $tmpUrl = fn (string $t): string => '/auto/kho/rieng/anh-bia/tam/'.$t;
+
+        if ($mode === self::COVER_PRODUCT) {
+            return [
+                'kind' => 'product',
+                'url' => $productCover['url'],
+                'token' => null,
+                'note' => $productCover['active'] ? 'Bìa của sản phẩm (xoay vòng)' : 'Sản phẩm chưa có ảnh bìa, dùng bìa mặc định của TikTok',
+            ];
+        }
+
+        if ($token !== null && $covers->tmpPath($token) === null) {
+            $row['status'] = 'error';
+            $row['messages'][] = 'Ảnh bìa đã chọn không còn nữa, hãy chọn lại.';
+
+            return ['kind' => $mode, 'url' => null, 'token' => null, 'note' => 'Lỗi ảnh bìa'];
+        }
+
+        if ($token !== null) {
+            return ['kind' => $mode, 'url' => $tmpUrl($token), 'token' => $token, 'note' => $mode === self::COVER_UPLOAD ? 'Ảnh tải lên' : 'Khung đã chọn'];
+        }
+
+        if ($mode === self::COVER_UPLOAD) {
+            $row['status'] = 'error';
+            $row['messages'][] = 'Chưa có ảnh bìa: hãy tải một ảnh lên.';
+
+            return ['kind' => $mode, 'url' => null, 'token' => null, 'note' => 'Chưa có ảnh'];
+        }
+
+        // Khung mặc định = thời điểm của ảnh nhỏ hiện trong lưới.
+        if (! $covers->canExtract()) {
+            $row['status'] = 'error';
+            $row['messages'][] = 'Máy chưa có ffmpeg nên không lấy được khung hình làm ảnh bìa.';
+
+            return ['kind' => $mode, 'url' => null, 'token' => null, 'note' => 'Không có ffmpeg'];
+        }
+
+        return ['kind' => $mode, 'url' => '/auto/kho/rieng/video/'.$video->id.'/thumb', 'token' => null, 'note' => 'Khung mặc định của video'];
     }
 
     private function parseAt(mixed $raw): ?CarbonImmutable
@@ -473,7 +554,7 @@ final class RiengBatch
                 continue;
             }
 
-            $error = $this->applyOne($social, (int) $row['id'], $code, $qc, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc());
+            $error = $this->applyOne($social, (int) $row['id'], $code, $qc, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
 
             if ($error === null) {
                 $done++;
@@ -488,7 +569,7 @@ final class RiengBatch
     }
 
     /** @return string|null lỗi (tiếng Việt) hoặc null khi đã hẹn xong */
-    private function applyOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot): ?string
+    private function applyOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null): ?string
     {
         $video = AutoVideo::query()->whereKey($id)->where('source', AutoVideo::SOURCE_RIENG)->first();
 
@@ -504,7 +585,8 @@ final class RiengBatch
             $video->refresh();
         }
 
-        $previous = $video->only(['product_code', 'quy_cach', 'caption', 'hashtags', 'caption_source']);
+        $previous = $video->only(['product_code', 'quy_cach', 'caption', 'hashtags', 'caption_source', 'meta']);
+        unset($previous['meta']['cover']);
 
         // Giữ chỗ như reserveNext (nhưng không qua hub): chỉ video `new` còn file mới giữ được.
         $won = AutoVideo::query()->whereKey($video->id)->where('status', AutoVideo::NEW)->whereNull('files_deleted_at')->update([
@@ -520,8 +602,31 @@ final class RiengBatch
         $video->refresh();
         $video->forceFill(['product_code' => $code, 'quy_cach' => $qc, 'caption' => $caption, 'hashtags' => $tags, 'caption_source' => 'rieng'])->save();
 
+        // Ảnh bìa riêng của video (mỗi video giữ bản của mình); chế độ "sản phẩm" thì PostBuilder tự xoay vòng bìa sản phẩm.
+        $meta = (array) $video->meta;
+        unset($meta['cover']);
+        $ownCover = null;
+
         try {
-            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot);
+            $covers = app(RiengCovers::class);
+
+            if ($coverMode === self::COVER_PRODUCT) {
+                $covers->forget((int) $video->id);
+            } else {
+                $c = $covers->attach($video, $coverToken);
+                $ownCover = $c['file'];
+                $meta['cover'] = ['file' => $c['file'], 'kind' => $coverMode, 'w' => $c['w'], 'h' => $c['h']];
+            }
+
+            $video->forceFill(['meta' => $meta])->save();
+        } catch (InvalidArgumentException $e) {
+            $this->restore($video, $previous, []);
+
+            return 'Ảnh bìa lỗi: '.$e->getMessage();
+        }
+
+        try {
+            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover);
 
             return null;
         } catch (MissingVideoFile $e) {
@@ -545,6 +650,7 @@ final class RiengBatch
     private function restore(AutoVideo $video, array $previous, array $extra): void
     {
         try {
+            app(RiengCovers::class)->forget((int) $video->id);
             $this->library->release($video, 'Đăng hàng loạt lỗi');
             $video->refresh();
             $video->forceFill($previous + $extra)->save();

@@ -8,7 +8,9 @@ use App\Fork\AutoPost\KhoStore;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Rieng\RiengBatch;
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
@@ -21,6 +23,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use InvalidArgumentException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -73,8 +76,8 @@ final class RiengController extends Controller
         $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
         $selectable = $filtered()
             ->where(fn ($q) => $q->where(fn ($n) => $n->where('status', AutoVideo::NEW)->whereNull('files_deleted_at'))->orWhere('status', AutoVideo::FAILED))
-            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name'])
-            ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name])->all();
+            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration'])
+            ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration])->all();
 
         $folderCounts = $base()->selectRaw("meta->>'folder_id' as fid, count(*) as total")->groupByRaw("meta->>'folder_id'")->pluck('total', 'fid');
 
@@ -224,6 +227,7 @@ final class RiengController extends Controller
 
         $folder->videosQuery()->where('status', AutoVideo::NEW)->each(function (AutoVideo $v) use ($thumbs): void {
             $thumbs->forget($v);
+            app(RiengCovers::class)->forget((int) $v->id);
             $v->delete();
         });
         $folder->delete();
@@ -280,6 +284,53 @@ final class RiengController extends Controller
         return null;
     }
 
+    // ------------------------------------------------------------------ Ảnh bìa (chọn trong hộp thoại đăng hàng loạt)
+
+    /** Tải một ảnh bìa lên chỗ tạm. Cùng giới hạn với ảnh bìa sản phẩm (jpg/png/webp, tối đa 5 MB). */
+    public function coverUpload(Request $request): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $request->validate(['image' => ['required', 'file', 'max:'.(CoverStore::MAX_BYTES / 1024), 'mimes:jpg,jpeg,png,webp']], [
+            'image.required' => 'Hãy chọn một ảnh.',
+            'image.max' => 'Ảnh lớn hơn 5 MB.',
+            'image.mimes' => 'Chỉ nhận ảnh jpg, png hoặc webp.',
+            'image.file' => 'Không đọc được file ảnh.',
+        ]);
+
+        try {
+            $token = app(RiengCovers::class)->stageUpload($request->file('image'));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, 'token' => $token, 'url' => '/auto/kho/rieng/anh-bia/tam/'.$token]);
+    }
+
+    /** Lấy một khung hình của video (giây `t`) làm ảnh bìa, nguyên độ phân giải. */
+    public function coverFrame(Request $request, AutoVideo $video): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        abort_unless($video->isRieng(), SymfonyResponse::HTTP_NOT_FOUND);
+        $data = $request->validate(['t' => ['required', 'numeric', 'min:0', 'max:86400']]);
+
+        try {
+            $token = app(RiengCovers::class)->stageFrame($video, (float) $data['t']);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, 'token' => $token, 'url' => '/auto/kho/rieng/anh-bia/tam/'.$token]);
+    }
+
+    public function coverTemp(Request $request, string $token): BinaryFileResponse|SymfonyResponse
+    {
+        $this->authorizeOwner($request);
+        $path = app(RiengCovers::class)->tmpPath($token);
+        abort_if($path === null, SymfonyResponse::HTTP_NOT_FOUND);
+
+        return response()->file($path, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=3600']);
+    }
+
     // ------------------------------------------------------------------ Đăng hàng loạt
 
     public function batchPreview(Request $request): JsonResponse
@@ -310,6 +361,9 @@ final class RiengController extends Controller
             'items.*.at' => ['nullable', 'string', 'max:40'],
             'items.*.caption' => ['nullable', 'string', 'max:5000'],
             'items.*.hashtags' => ['nullable'],
+            'cover_mode' => ['sometimes', 'in:product,upload,frame'],
+            'cover_token' => ['nullable', 'string', 'max:60'],
+            'items.*.cover_token' => ['nullable', 'string', 'max:60'],
         ]);
 
         $this->findAccount($accountId, (string) $in['social_account_id']);

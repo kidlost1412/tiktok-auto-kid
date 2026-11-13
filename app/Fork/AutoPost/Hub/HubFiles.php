@@ -212,7 +212,7 @@ class HubFiles
             ->where('status', AutoVideo::POSTED)
             ->whereNotNull('post_id')
             ->where('posted_at', '<', $limit)
-            ->select(['id', 'post_id'])
+            ->select(['id', 'post_id', 'source'])
             ->chunkById(200, function ($videos) use ($limit, &$deleted): void {
                 $postIds = Post::query()
                     ->whereIn('id', $videos->pluck('post_id')->all())
@@ -228,6 +228,13 @@ class HubFiles
 
                 $deleted += Media::query()->whereIn('post_id', $postIds)->count();
                 Media::query()->whereIn('post_id', $postIds)->each(fn (Media $m) => $m->delete());
+
+                // Ảnh bìa riêng của video riêng được giữ đúng bằng thời hạn giữ file video của bài.
+                foreach ($videos as $v) {
+                    if ($v->isRieng() && in_array($v->post_id, $postIds, true)) {
+                        app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->forget((int) $v->id);
+                    }
+                }
             }, 'id');
 
         return $deleted;

@@ -661,3 +661,22 @@ test('cover is served only to the claiming client for a job that has one', funct
     \Illuminate\Support\Facades\File::deleteDirectory($dir);
     $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($token))->assertStatus(404);
 });
+
+test('a private-video cover (src rieng) is served from rieng-covers, not from the product set', function () {
+    $tmp = str_replace('\\', '/', sys_get_temp_dir()).'/ext-rc-'.Str::random(6);
+    config(['fork.auto.rieng_covers_dir' => $tmp]);
+    $token = pairExtension($this);
+    helloAs($this, $token);
+
+    $file = '11111111-2222-3333-4444-555555555555.jpg';
+    @mkdir($tmp.'/7', 0775, true);
+    file_put_contents($tmp.'/7/'.$file, 'JPEGDATA');
+
+    $job = makeQueuedJob($this, overrides: ['options' => ['visibility_type' => 0, 'schedule_time' => null, 'cover' => ['src' => 'rieng', 'video' => 7, 'code' => '', 'file' => $file, 'name' => 'cover.jpg', 'mime' => 'image/jpeg', 'size' => 8, 'sha256' => 'x']]]);
+    $this->getJson('/api/ext/next?wait=0', extHeaders($token))->assertOk();
+
+    $this->get('/api/ext/cover?id='.$job->id, extHeaders($token))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+
+    \Illuminate\Support\Facades\File::deleteDirectory($tmp);
+    $this->get('/api/ext/cover?id='.$job->id, extHeaders($token))->assertStatus(404);
+});

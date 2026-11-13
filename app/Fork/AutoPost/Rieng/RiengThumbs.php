@@ -74,6 +74,12 @@ final class RiengThumbs
         }
     }
 
+    /** ffmpeg của app (runtime/ffmpeg) hoặc trong PATH; null nếu không có. */
+    public function ffmpegPath(): ?string
+    {
+        return $this->ffmpeg();
+    }
+
     private function ffmpeg(): ?string
     {
         foreach ([base_path('runtime/ffmpeg/bin/ffmpeg.exe'), base_path('runtime/ffmpeg/bin/ffmpeg')] as $local) {
