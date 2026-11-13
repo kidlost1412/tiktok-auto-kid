@@ -11,6 +11,9 @@ use App\Fork\AutoPost\Media\ProductImageLookup;
 use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\KhoStore;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Rieng\RiengInfo;
+use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Sidecar;
 use App\Fork\AutoPost\Shop\HubCartAttach;
@@ -273,7 +276,7 @@ final class KhoController extends Controller
             $own = RiengController::safeVideoPath($video);
             abort_if($own === null, SymfonyResponse::HTTP_NOT_FOUND);
 
-            return response()->file($own, ['Content-Type' => 'video/mp4', 'Cache-Control' => 'private, max-age=300']);
+            return response()->file($own, ['Content-Type' => RiengReady::mimeFor($own), 'Cache-Control' => 'private, max-age=300']);
         }
 
         $hub = realpath(app(KhoStore::class)->hub());
@@ -461,6 +464,13 @@ final class KhoController extends Controller
      */
     private function singleAssessment(Readiness $readiness, AutoVideo $v): ?array
     {
+        // Video riêng không có "sẵn sàng" kiểu hub (không kiểm sản phẩm hub): chỉ gợi ý trung tính nếu chưa gắn sản phẩm.
+        if ($v->isRieng()) {
+            return $v->status === AutoVideo::NEW && ! filled($v->product_code)
+                ? ['code' => Readiness::RIENG, 'severity' => 'muted', 'reason' => 'Chưa gắn sản phẩm — chọn khi đăng', 'next_slot' => null]
+                : null;
+        }
+
         return $v->status === AutoVideo::NEW ? ($readiness->assess(collect([$v]))[$v->id] ?? null) : null;
     }
 
@@ -548,6 +558,27 @@ final class KhoController extends Controller
             'duration' => $v->duration,
             'tiktok_link' => is_string($link) && preg_match('#^https://#i', $link) === 1 ? $link : null,
             'can_preview' => $v->files_deleted_at === null && (($v->path !== '' && is_file($v->path)) || app(HubFiles::class)->available($v)),
+            ...($v->isRieng() ? $this->riengExtras($v, $products, $images) : []),
+        ];
+    }
+
+    /**
+     * Phần riêng của video Kho riêng trong khung xem: không áp kiểm tra sản phẩm hub; có cờ trùng, sản phẩm đã gắn và liên kết.
+     *
+     * @param  Collection<string, AutoProduct>  $products
+     * @return array<string, mixed>
+     */
+    private function riengExtras(AutoVideo $v, $products, ProductImageLookup $images): array
+    {
+        $info = new RiengInfo;
+        $of = data_get($v->meta, 'duplicate_of');
+
+        return [
+            'rieng' => true,
+            'rieng_selectable' => ($v->status === AutoVideo::NEW && $v->files_deleted_at === null) || $v->status === AutoVideo::FAILED,
+            'duplicate' => is_numeric($of) ? ($info->duplicates([$v])[(int) $v->id] ?? null) : null,
+            'rieng_product' => $info->product($v, $products, $images),
+            'folder' => RiengFolder::query()->find((int) data_get($v->meta, 'folder_id'))?->displayName(),
         ];
     }
 

@@ -52,6 +52,12 @@ export interface KhoVideo {
         traffic?: { key: string; value: number }[];
         collected_at?: string | null;
     } | null;
+    /** Video của Kho riêng (không áp kiểm tra sản phẩm hub). */
+    rieng?: boolean;
+    rieng_selectable?: boolean;
+    duplicate?: import('@/components/fork/kho/rieng').Duplicate | null;
+    rieng_product?: import('@/components/fork/kho/rieng').RiengProduct | null;
+    folder?: string | null;
     comments?: {
         total: number;
         buy: number;

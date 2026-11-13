@@ -6,6 +6,8 @@ namespace App\Fork\AutoPost\Rieng;
 
 use App\Enums\Post\Status as PostStatus;
 use App\Fork\AutoPost\HubText;
+use App\Fork\AutoPost\Media\ProductImageLookup;
+use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
@@ -63,12 +65,13 @@ final class RiengBatch
     /**
      * Các cặp (sản phẩm, quy cách) dùng được cho một kênh: có liên kết giỏ hàng hợp lệ (CartRules) và sản phẩm đang bật.
      *
-     * @return list<array{code: string, quy_cach: ?string, label: string, name: string, tags: list<string>}>
+     * @return list<array{code: string, quy_cach: ?string, label: string, name: string, tags: list<string>, image: ?string}>
      */
-    public function productOptions(string $socialAccountId): array
+    public function productOptions(string $socialAccountId, ?ProductImageLookup $images = null): array
     {
         $allowed = $this->cart->evaluate($socialAccountId)['allowed'];
         $products = AutoProduct::query()->where('enabled', true)->whereIn('code', array_keys($allowed))->get()->keyBy('code');
+        $images ??= ProductImages::lookup([$socialAccountId]);
         $out = [];
 
         foreach ($allowed as $code => $quyCaches) {
@@ -84,6 +87,8 @@ final class RiengBatch
                     'quy_cach' => $qc,
                     'label' => CartRules::label($product, (string) $code, $qc),
                     'name' => (string) ($product->short_name ?: $code),
+                    // Ảnh sản phẩm TikTok Shop đã gắn giỏ trên kênh này (ảnh có sẵn của app, không tải thêm).
+                    'image' => $images->forSlot($socialAccountId, (string) $code, $qc),
                     'tags' => app(Hashtags::class)->configFor($product)['tags'],
                     'cover_count' => $this->productCoverInfo($product)['count'],
                 ];
@@ -198,12 +203,14 @@ final class RiengBatch
 
         $rows = [];
         $seen = [];
+        $dups = (new RiengInfo)->duplicates(AutoVideo::query()->whereIn('id', array_filter(array_map(fn (array $i): int => (int) ($i['id'] ?? 0), $items)))->where('source', AutoVideo::SOURCE_RIENG)->get());
 
         foreach ($items as $item) {
             $id = (int) ($item['id'] ?? 0);
             $video = $id > 0 && ! isset($seen[$id]) ? AutoVideo::query()->whereKey($id)->where('source', AutoVideo::SOURCE_RIENG)->first() : null;
             $seen[$id] = true;
-            $row = ['id' => $id, 'file_name' => $video?->file_name, 'status' => 'ok', 'messages' => [], 'at' => null, 'caption' => null, 'hashtags' => []];
+            // `duplicate`: chỉ để báo (video trùng nội dung vẫn đăng được nếu chủ app chọn).
+            $row = ['id' => $id, 'file_name' => $video?->file_name, 'status' => 'ok', 'messages' => [], 'at' => null, 'caption' => null, 'hashtags' => [], 'duplicate' => $dups[$id]['text'] ?? null];
 
             if ($video === null) {
                 $row['status'] = 'error';
@@ -627,6 +634,8 @@ final class RiengBatch
 
         try {
             $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover);
+            // Đã hẹn giờ thì không còn nằm trong "Giỏ chờ đăng".
+            RiengQueueItem::forget((int) $video->id);
 
             return null;
         } catch (MissingVideoFile $e) {

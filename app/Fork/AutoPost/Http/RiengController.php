@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Fork\AutoPost\Http;
 
 use App\Fork\AutoPost\KhoStore;
+use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Rieng\RiengInfo;
+use App\Fork\AutoPost\Rieng\RiengQueueItem;
+use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
@@ -39,6 +44,9 @@ final class RiengController extends Controller
     use ScopesToOwner;
 
     private const int PER_PAGE = 24;
+
+    /** Quét nhanh: tối đa một lượt quét thật mỗi ngần này giây. */
+    private const int QUICK_SECONDS = 8;
 
     /** Bộ lọc trạng thái trong danh sách. */
     private const array STATUS = ['chua', 'hen', 'dang', 'loi'];
@@ -75,10 +83,15 @@ final class RiengController extends Controller
             ->withQueryString();
 
         $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
-        $selectable = $filtered()
-            ->where(fn ($q) => $q->where(fn ($n) => $n->where('status', AutoVideo::NEW)->whereNull('files_deleted_at'))->orWhere('status', AutoVideo::FAILED))
-            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration'])
-            ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration])->all();
+        $info = new RiengInfo;
+        $selectableRows = $this->onlySelectable($filtered())
+            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration', 'source', 'meta']);
+        $pageVideos = $videos->getCollection();
+        $dups = $info->duplicates($pageVideos->concat($selectableRows));
+        $selectable = $selectableRows
+            ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration, 'duplicate' => $dups[$v->id]['text'] ?? null])->all();
+        $products = AutoProduct::query()->get()->keyBy('code');
+        $images = ProductImages::lookup();
 
         $folderCounts = $base()->selectRaw("meta->>'folder_id' as fid, count(*) as total")->groupByRaw("meta->>'folder_id'")->pluck('total', 'fid');
 
@@ -95,16 +108,32 @@ final class RiengController extends Controller
             'days' => $base()->select('batch_date')->distinct()->orderByDesc('batch_date')->limit(120)->pluck('batch_date')
                 ->map(fn ($d): string => $d->format('Y-m-d'))->values()->all(),
             'videos' => [
-                'data' => $videos->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names))->values()->all(),
+                'data' => $videos->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups[$v->id] ?? null, $info->product($v, $products, $images)))->values()->all(),
                 'current_page' => $videos->currentPage(),
                 'last_page' => $videos->lastPage(),
                 'total' => $videos->total(),
             ],
             'selectable' => $selectable,
+            'queue' => $this->queueItems($accountId),
+            'scan_sig' => $this->signature(),
             'accounts' => $this->accounts($accountId),
             'limits' => ['min_lead_minutes' => intdiv(Planner::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
             'last_scan_at' => Cache::get('fork-rieng:last-scan'),
         ]);
+    }
+
+    /** Video chọn được để đăng: còn mới và còn file, hoặc đang lỗi (thử lại được). */
+    private function onlySelectable(Builder $q): Builder
+    {
+        return $q->where(fn ($w) => $w->where(fn ($n) => $n->where('status', AutoVideo::NEW)->whereNull('files_deleted_at'))->orWhere('status', AutoVideo::FAILED));
+    }
+
+    /** Dấu hiệu danh sách video riêng đã đổi (số lượng, video mới nhất, lần cập nhật gần nhất): trang so để biết cần tải lại. */
+    private function signature(): string
+    {
+        $q = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG);
+
+        return $q()->count().'|'.(int) $q()->max('id').'|'.$q()->max('updated_at');
     }
 
     /** @param  Builder<AutoVideo>  $q */
@@ -121,9 +150,11 @@ final class RiengController extends Controller
 
     /**
      * @param  \Illuminate\Support\Collection<int, string>  $names
+     * @param  array<string, mixed>|null  $duplicate
+     * @param  array<string, mixed>|null  $product
      * @return array<string, mixed>
      */
-    private function row(AutoVideo $v, $names): array
+    private function row(AutoVideo $v, $names, ?array $duplicate = null, ?array $product = null): array
     {
         $held = $v->status === AutoVideo::POSTED && $v->posted_at?->isFuture();
         $tz = RiengScanner::TZ;
@@ -149,6 +180,8 @@ final class RiengController extends Controller
             'can_retry' => $v->status === AutoVideo::FAILED && app(RetryFailed::class)->refusal($v) === null,
             'selectable' => ($v->status === AutoVideo::NEW && ! $gone) || $v->status === AutoVideo::FAILED,
             'can_preview' => ! $gone && is_file((string) $v->path),
+            'duplicate' => $duplicate,
+            'product' => $product,
         ];
     }
 
@@ -216,31 +249,9 @@ final class RiengController extends Controller
 
         RiengFolder::query()->create(['path' => $path, 'name' => filled($data['name'] ?? null) ? trim((string) $data['name']) : null]);
         set_time_limit(300);
-        $r = $this->scanSettled();
+        $r = app(RiengScanner::class)->scan();
 
-        return back()->with('flash.success', "Đã thêm thư mục. Tìm thấy {$r['new']} video mới".($r['waiting'] > 0 ? ", {$r['waiting']} video đang chờ ghi xong" : '').'.');
-    }
-
-    /**
-     * Video mới cần kích thước đứng yên `settle_seconds` mới được nhận, nên lần quét đầu luôn "chờ".
-     * Chờ đủ thời gian rồi quét lại một lần ngay trong yêu cầu này để người dùng không phải bấm lại.
-     *
-     * @return array{new: int, known: int, duplicate: int, waiting: int, gone: int, folders_missing: int}
-     */
-    private function scanSettled(): array
-    {
-        $scanner = app(RiengScanner::class);
-        $r = $scanner->scan();
-
-        if ($r['waiting'] > 0) {
-            sleep(max(0, (int) config('fork.auto.settle_seconds', 20)) + 1);
-            $again = $scanner->scan();
-            $again['new'] += $r['new'];
-            $again['duplicate'] = max($again['duplicate'], $r['duplicate']);
-            $r = $again;
-        }
-
-        return $r;
+        return back()->with('flash.success', "Đã thêm thư mục. Tìm thấy {$r['new']} video".($r['waiting'] > 0 ? ", {$r['waiting']} video đang được ghi dở (sẽ tự nhận khi ghi xong)" : '').'.');
     }
 
     /** Mở hộp chọn thư mục gốc của Windows qua launcher (trình duyệt không trả được đường dẫn thật). */
@@ -298,16 +309,99 @@ final class RiengController extends Controller
     {
         $this->authorizeOwner($request);
         set_time_limit(300);
-        $r = $this->scanSettled();
+        $r = app(RiengScanner::class)->scan();
+
+        if ($r['busy'] > 0) {
+            return back()->with('flash.success', 'App đang quét Kho riêng rồi, vài giây nữa danh sách sẽ tự cập nhật.');
+        }
+
         Cache::forever('fork-rieng:last-scan', now()->toIso8601String());
 
         $parts = ["{$r['new']} video mới"];
-        $r['waiting'] > 0 && $parts[] = "{$r['waiting']} đang chờ ghi xong";
-        $r['duplicate'] > 0 && $parts[] = "{$r['duplicate']} trùng video đã có";
+        $r['waiting'] > 0 && $parts[] = "{$r['waiting']} đang được ghi dở";
+        $r['duplicate'] > 0 && $parts[] = "{$r['duplicate']} trùng video đã có (đã đánh dấu)";
         $r['gone'] > 0 && $parts[] = "{$r['gone']} không còn file";
         $r['folders_missing'] > 0 && $parts[] = "{$r['folders_missing']} thư mục không mở được";
 
         return back()->with('flash.success', 'Đã quét Kho riêng: '.implode(', ', $parts).'.');
+    }
+
+    /**
+     * Quét nhanh cho trang đang mở (trang gọi mỗi ~10 giây): tối đa một lượt quét thật mỗi ~8 giây trên toàn app (khoá bộ nhớ đệm),
+     * lần gọi dày hơn chỉ trả dấu hiệu danh sách hiện tại. Không bao giờ ngủ chờ.
+     */
+    public function quickScan(Request $request): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $scanned = false;
+        $new = 0;
+
+        if (Cache::add('fork-rieng:quick', 1, self::QUICK_SECONDS)) {
+            set_time_limit(120);
+            $r = app(RiengScanner::class)->scan();
+            $scanned = $r['busy'] === 0;
+            $new = $r['new'];
+
+            if ($scanned) {
+                Cache::forever('fork-rieng:last-scan', now()->toIso8601String());
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'scanned' => $scanned,
+            'new' => $new,
+            'total' => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->count(),
+            'sig' => $this->signature(),
+        ]);
+    }
+
+    // ------------------------------------------------------------------ Giỏ chờ đăng
+
+    /** @return list<array{id: int, file_name: string, duration: ?float, duplicate: ?string}> */
+    private function queueItems(string $owner): array
+    {
+        $ids = RiengQueueItem::idsFor($owner);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $videos = AutoVideo::query()->whereIn('id', $ids)->get(['id', 'file_name', 'duration', 'source', 'meta'])->keyBy('id');
+        $dups = (new RiengInfo)->duplicates($videos);
+
+        return array_values(array_filter(array_map(
+            fn (int $id): ?array => isset($videos[$id])
+                ? ['id' => $id, 'file_name' => $videos[$id]->file_name, 'duration' => $videos[$id]->duration, 'duplicate' => $dups[$id]['text'] ?? null]
+                : null,
+            $ids,
+        )));
+    }
+
+    public function queueAdd(Request $request): JsonResponse
+    {
+        $owner = $this->authorizeOwner($request);
+        $in = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:1000'], 'ids.*' => ['integer']]);
+
+        $ok = $this->onlySelectable(AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereIn('id', $in['ids']))->pluck('id');
+
+        foreach ($ok as $id) {
+            RiengQueueItem::query()->firstOrCreate(['owner' => $owner, 'auto_video_id' => (int) $id]);
+        }
+
+        return response()->json(['ok' => true, 'added' => $ok->count(), 'queue' => $this->queueItems($owner)]);
+    }
+
+    public function queueRemove(Request $request): JsonResponse
+    {
+        $owner = $this->authorizeOwner($request);
+        $in = $request->validate(['ids' => ['sometimes', 'array', 'max:1000'], 'ids.*' => ['integer'], 'all' => ['sometimes', 'boolean']]);
+
+        RiengQueueItem::query()->where('owner', $owner)
+            ->when(! ($in['all'] ?? false), fn ($q) => $q->whereIn('auto_video_id', $in['ids'] ?? []))
+            ->delete();
+
+        return response()->json(['ok' => true, 'queue' => $this->queueItems($owner)]);
     }
 
     // ------------------------------------------------------------------ File
@@ -328,7 +422,7 @@ final class RiengController extends Controller
     {
         $file = $video->files_deleted_at === null ? realpath((string) $video->path) : false;
 
-        if ($file === false || strtolower(pathinfo($file, PATHINFO_EXTENSION)) !== 'mp4' || ! is_file($file)) {
+        if ($file === false || ! RiengReady::isVideoName($file) || ! is_file($file)) {
             return null;
         }
 

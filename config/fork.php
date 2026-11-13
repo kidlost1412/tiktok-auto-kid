@@ -53,6 +53,9 @@ return [
         'jitter_minutes' => 7,
         // Bỏ qua file vừa được ghi trong vòng ngần này giây (hub có thể đang ghi dở).
         'settle_seconds' => 20,
+        // Kho riêng: file mới được nhận ngay khi đã ghi xong (kích thước đứng yên giữa hai lần đo cách nhau ngần này mili giây
+        // và đọc được thời lượng), không phải chờ settle_seconds.
+        'rieng_gap_ms' => 1500,
         // Kho chuẩn mới: hub bỏ video sẵn sàng đăng vào <hub>/kho-dang/. Xem KHO-CHUAN.md.
         'kho_dir' => 'kho-dang',
         'done_dir' => 'da-dang',

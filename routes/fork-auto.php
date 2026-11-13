@@ -63,6 +63,11 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::post('chon-thu-muc', [RiengController::class, 'pickFolder'])->middleware('throttle:20,1')->name('folders.pick');
         Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
         Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');
+        // Quét nhanh cho trang đang mở (tự giới hạn ~8 giây/lần bằng khoá bộ nhớ đệm, không ngủ chờ).
+        Route::post('quet-nhanh', [RiengController::class, 'quickScan'])->middleware('throttle:60,1')->name('scan.quick');
+        // "Giỏ chờ đăng": video riêng chọn sẵn để đăng sau (khác giỏ hàng TikTok Shop).
+        Route::post('gio-cho/them', [RiengController::class, 'queueAdd'])->middleware('throttle:60,1')->name('queue.add');
+        Route::post('gio-cho/bo', [RiengController::class, 'queueRemove'])->middleware('throttle:60,1')->name('queue.remove');
         Route::get('video/{video}/thumb', [RiengController::class, 'thumb'])->whereNumber('video')->name('thumb');
         Route::post('anh-bia/tai-len', [RiengController::class, 'coverUpload'])->middleware('throttle:60,1')->name('cover.upload');
         Route::get('anh-bia/tam/{token}', [RiengController::class, 'coverTemp'])->name('cover.temp');

@@ -42,6 +42,8 @@ final class Readiness
 
     public const string LEGACY = 'legacy';
 
+    public const string RIENG = 'rieng';
+
     /** @var array<string, array{auto: AutoAccount, name: string}>|null */
     private ?array $eligible = null;
 
@@ -133,6 +135,11 @@ final class Readiness
     {
         if ($v->source === 'ra') {
             return $this->result(self::LEGACY, 'muted', 'Bản ghi cũ, app không đăng video này');
+        }
+
+        // Video riêng không đi theo luồng sản phẩm hub: sản phẩm được chọn lúc đăng (đăng hàng loạt), nên không kiểm sản phẩm hub.
+        if ($v->isRieng()) {
+            return $this->result(self::RIENG, 'muted', 'Chưa gắn sản phẩm — chọn khi đăng');
         }
 
         $product = $this->products()[$v->product_code] ?? null;

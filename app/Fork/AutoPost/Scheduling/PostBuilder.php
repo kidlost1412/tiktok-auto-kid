@@ -118,7 +118,18 @@ final class PostBuilder
                 ]);
 
                 // Chép file vào kho media, hàng media thuộc về bài.
-                $storedPath = 'medias/'.Str::uuid().'.mp4';
+                // Giữ đúng định dạng của file nguồn (mp4, mov, webm) để tiện ích Chrome gửi đúng tên + MIME lên TikTok;
+                // m4v là mp4 đổi đuôi nên lưu và gửi như mp4.
+                $sourceExt = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                $ext = in_array($sourceExt, ['mov', 'webm'], true) ? $sourceExt : 'mp4';
+                $mime = ['mp4' => 'video/mp4', 'mov' => 'video/quicktime', 'webm' => 'video/webm'][$ext];
+                $displayName = (string) $video->file_name;
+
+                if ($sourceExt === 'm4v') {
+                    $displayName = pathinfo($displayName, PATHINFO_FILENAME).'.mp4';
+                }
+
+                $storedPath = 'medias/'.Str::uuid().'.'.$ext;
                 $stream = fopen($path, 'rb');
 
                 if ($stream === false) {
@@ -140,8 +151,8 @@ final class PostBuilder
                     'collection' => Media::COLLECTION_MEDIA,
                     'type' => MediaType::Video,
                     'path' => $storedPath,
-                    'original_filename' => mb_scrub((string) $video->file_name, 'UTF-8'),
-                    'mime_type' => 'video/mp4',
+                    'original_filename' => mb_scrub($displayName, 'UTF-8'),
+                    'mime_type' => $mime,
                     'size' => (int) filesize($path),
                     'order' => 0,
                     'meta' => VideoDurationProbe::mergeInto([], VideoDurationProbe::fromFile($path)),

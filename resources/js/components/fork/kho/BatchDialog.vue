@@ -3,7 +3,9 @@
 import { router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
+import type { BatchItem } from '@/components/fork/kho/rieng';
 import Callout from '@/components/fork/shared/Callout.vue';
+import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -24,6 +26,8 @@ interface ProductOption {
     name: string;
     tags: string[];
     cover_count: number;
+    /** Ảnh sản phẩm TikTok Shop đã gắn giỏ (nếu có). */
+    image?: string | null;
 }
 
 type CoverMode = 'product' | 'upload' | 'frame';
@@ -48,6 +52,7 @@ interface PlanRow {
     file_name: string | null;
     status: 'ok' | 'warn' | 'error' | 'skip';
     messages: string[];
+    duplicate?: string | null;
     at: string | null;
     cover?: { kind: string; url: string | null; note: string };
     result?: 'done' | 'error' | 'skip';
@@ -68,12 +73,16 @@ interface Plan {
 
 const props = defineProps<{
     open: boolean;
-    items: { id: number; file_name: string }[];
+    items: BatchItem[];
     accounts: BatchAccount[];
     limits: { min_lead_minutes: number; gap_minutes: number; caption_max: number };
 }>();
 
-const emit = defineEmits<{ 'update:open': [value: boolean]; done: [] }>();
+const emit = defineEmits<{
+    'update:open': [value: boolean];
+    done: [];
+    step: [value: 'form' | 'preview' | 'result'];
+}>();
 
 const usable = computed(() => props.accounts.filter((a) => a.usable));
 const accountId = ref('');
@@ -104,6 +113,11 @@ const frameDur = ref<Record<number, number>>({});
 const account = computed(() => usable.value.find((a) => a.id === accountId.value) ?? null);
 const optionKey = (o: ProductOption) => `${o.code}|${o.quy_cach ?? ''}`;
 const product = computed(() => account.value?.products.find((o) => optionKey(o) === productKey.value) ?? null);
+// Video trùng nội dung với video đã có: vẫn đăng được, nhưng phải cảnh báo rõ để chủ app không đăng trùng nhầm.
+const dupItems = computed(() => props.items.filter((i) => i.duplicate));
+
+watch(step, (s) => emit('step', s));
+
 const captionLen = computed(() => caption.value.length + (tags.value ? tags.value.length + 2 : 0));
 
 watch(
@@ -375,7 +389,7 @@ const close = () => {
 
     if (finished) {
         emit('done');
-        router.reload({ only: ['videos', 'counts', 'selectable', 'days', 'folders'] });
+        router.reload({ only: ['videos', 'counts', 'selectable', 'days', 'folders', 'queue', 'scan_sig'] });
     }
 };
 
@@ -435,15 +449,43 @@ const areaCls =
                                     </option>
                                 </NativeSelect>
                             </label>
-                            <label class="flex flex-col gap-1.5 text-sm font-medium">
+                            <div class="flex flex-col gap-1.5 text-sm font-medium">
                                 Sản phẩm gắn giỏ hàng
-                                <NativeSelect v-model="productKey" :class="selectCls" data-testid="fork-rieng-product">
-                                    <option v-for="o in account?.products ?? []" :key="optionKey(o)" :value="optionKey(o)">
-                                        {{ o.label }}
-                                    </option>
-                                </NativeSelect>
-                            </label>
+                                <span v-if="product" class="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 font-normal" data-testid="fork-rieng-product-chosen">
+                                    <ProductThumb :src="product.image" class="size-8" />
+                                    <span class="min-w-0 truncate">{{ product.label }}</span>
+                                </span>
+                            </div>
                         </div>
+
+                        <!-- Chọn sản phẩm: ảnh + tên (danh sách có thể cuộn) -->
+                        <div class="-mt-2 grid max-h-56 gap-1.5 overflow-y-auto rounded-lg border p-1.5 sm:grid-cols-2" role="radiogroup" aria-label="Sản phẩm gắn giỏ hàng" data-testid="fork-rieng-product">
+                            <button
+                                v-for="o in account?.products ?? []"
+                                :key="optionKey(o)"
+                                type="button"
+                                role="radio"
+                                :aria-checked="optionKey(o) === productKey"
+                                :class="cn('flex items-center gap-2.5 rounded-md border p-2 text-left text-sm transition', optionKey(o) === productKey ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'hover:bg-muted/50')"
+                                :data-testid="`fork-rieng-product-opt-${o.code}`"
+                                @click="productKey = optionKey(o)"
+                            >
+                                <ProductThumb :src="o.image" class="size-10" />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-medium">{{ o.name }}</span>
+                                    <span v-if="o.label !== o.name" class="block truncate text-xs text-muted-foreground">{{ o.label }}</span>
+                                </span>
+                            </button>
+                        </div>
+
+                        <Callout v-if="dupItems.length" tone="warn" data-testid="fork-rieng-dup-warning">
+                            <div>
+                                Có {{ dupItems.length }} video trùng với video đã có. Bạn vẫn đăng được, nhưng hãy kiểm tra để khỏi đăng trùng:
+                                <ul class="mt-1.5 list-disc pl-5 text-sm font-normal">
+                                    <li v-for="d in dupItems" :key="d.id"><b>{{ d.file_name }}</b>: {{ d.duplicate }}</li>
+                                </ul>
+                            </div>
+                        </Callout>
 
                         <div class="flex flex-col gap-1.5">
                             <label class="text-sm font-medium" for="rieng-caption">Caption chung cho cả lượt</label>
@@ -604,6 +646,7 @@ const areaCls =
                                     {{ { ok: 'Ổn', warn: 'Trùng giờ', error: 'Không hẹn được', skip: 'Để lại' }[r.status] }}
                                 </span>
                             </div>
+                            <p v-if="r.duplicate" class="text-xs text-amber-800 dark:text-amber-300">{{ r.duplicate }}</p>
                             <p v-for="m in r.messages" :key="m" class="text-xs text-muted-foreground">{{ m }}</p>
                         </li>
                     </ul>

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 // Khung xem video dùng chung cho mọi trang: phát video, caption + hashtag, sản phẩm, giỏ hàng, kênh, giờ đăng, số liệu.
 // ←/→ chuyển video trong danh sách đang xem, Esc đóng. File đã dọn thì hiện ảnh bìa + "Mở trên TikTok".
+import { Link } from '@inertiajs/vue3';
 import {
+    IconAlertTriangle,
+    IconCalendarEvent,
+    IconCalendarPlus,
+    IconCheck,
     IconChevronLeft,
     IconChevronRight,
     IconCopy,
@@ -11,6 +16,7 @@ import {
     IconMessageCircle,
     IconBookmark,
     IconMovieOff,
+    IconPlaylistAdd,
     IconShare3,
     IconShoppingCart,
 } from '@tabler/icons-vue';
@@ -26,7 +32,7 @@ import {
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { fmtNum, toneClasses } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
-import { stepVideo, viewer } from '@/components/fork/viewer';
+import { stepVideo, viewer, viewerActions } from '@/components/fork/viewer';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -82,6 +88,36 @@ watch(
 
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
+// Tên hiển thị: video riêng chưa gắn sản phẩm thì dùng tên file (không có "sản phẩm hub").
+const title = computed(() => {
+    const v = video.value;
+
+    if (!v) {
+        return 'Video';
+    }
+
+    return v.rieng
+        ? (v.rieng_product?.name ?? v.file_name)
+        : (v.product ?? 'Video');
+});
+
+// Nút "Đăng / hẹn giờ" và "Thêm vào giỏ chờ" chỉ có ở video riêng chưa hẹn giờ, khi trang Kho riêng đang mở.
+const canAct = computed(
+    () =>
+        !!video.value?.rieng &&
+        !!video.value.rieng_selectable &&
+        !!viewerActions.post,
+);
+
+const postThis = () => {
+    const id = video.value?.id;
+
+    if (id !== undefined && viewerActions.post) {
+        viewer.open = false;
+        viewerActions.post(id);
+    }
+};
+
 const timeRow = computed<[string, string] | null>(() => {
     const v = video.value;
 
@@ -129,7 +165,7 @@ const statLine = computed(() => {
             data-testid="fork-kho-dialog"
         >
             <DialogHeader class="sr-only">
-                <DialogTitle>{{ video?.product ?? 'Video' }}</DialogTitle>
+                <DialogTitle>{{ title }}</DialogTitle>
                 <DialogDescription>Chi tiết video</DialogDescription>
             </DialogHeader>
 
@@ -206,12 +242,19 @@ const statLine = computed(() => {
                 >
                     <div class="flex items-start gap-3 pr-8">
                         <ProductThumb
-                            :src="video.product_image"
+                            :src="
+                                video.rieng
+                                    ? video.rieng_product?.image
+                                    : video.product_image
+                            "
                             class="size-12 rounded-lg"
                         />
                         <div class="min-w-0 flex-1">
-                            <h2 class="truncate text-lg font-semibold">
-                                {{ video.product ?? 'Video' }}
+                            <h2
+                                class="truncate text-lg font-semibold"
+                                :title="title"
+                            >
+                                {{ title }}
                             </h2>
                             <p
                                 v-if="video.quy_cach"
@@ -221,6 +264,56 @@ const statLine = computed(() => {
                             </p>
                         </div>
                         <StatusChip :status="video.status" class="mt-0.5" />
+                    </div>
+
+                    <!-- Việc chính của video riêng -->
+                    <div
+                        v-if="canAct"
+                        class="flex flex-wrap gap-2"
+                        data-testid="fork-viewer-rieng-actions"
+                    >
+                        <Button
+                            data-testid="fork-viewer-post"
+                            @click="postThis"
+                        >
+                            <IconCalendarPlus class="size-4" />
+                            Đăng / hẹn giờ video này
+                        </Button>
+                        <Button
+                            variant="outline"
+                            data-testid="fork-viewer-queue"
+                            @click="viewerActions.toggleQueue?.(video.id)"
+                        >
+                            <IconCheck
+                                v-if="viewerActions.isQueued?.(video.id)"
+                                class="size-4"
+                            />
+                            <IconPlaylistAdd v-else class="size-4" />
+                            {{
+                                viewerActions.isQueued?.(video.id)
+                                    ? 'Đã trong giỏ chờ đăng (bấm để bỏ)'
+                                    : 'Thêm vào giỏ chờ đăng'
+                            }}
+                        </Button>
+                    </div>
+
+                    <div
+                        v-if="video.duplicate"
+                        class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                        data-testid="fork-viewer-duplicate"
+                    >
+                        <IconAlertTriangle class="mt-0.5 size-4 shrink-0" />
+                        <span>
+                            {{ video.duplicate.text }}
+                            <a
+                                v-if="video.duplicate.link"
+                                :href="video.duplicate.link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="font-medium underline"
+                                >(mở link)</a
+                            >
+                        </span>
                     </div>
 
                     <div
@@ -291,6 +384,24 @@ const statLine = computed(() => {
                     <dl
                         class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm"
                     >
+                        <template v-if="video.rieng">
+                            <dt class="text-muted-foreground">Sản phẩm</dt>
+                            <dd
+                                class="flex min-w-0 items-center gap-1.5 font-medium"
+                            >
+                                <Link
+                                    v-if="video.rieng_product"
+                                    href="/auto/gio-hang"
+                                    class="truncate text-primary-text underline-offset-4 hover:underline"
+                                    title="Xem sản phẩm trong Giỏ hàng"
+                                    @click="viewer.open = false"
+                                    >{{ video.rieng_product.name }}</Link
+                                >
+                                <span v-else class="text-muted-foreground"
+                                    >Chưa gắn sản phẩm — chọn khi đăng</span
+                                >
+                            </dd>
+                        </template>
                         <dt class="text-muted-foreground">Giỏ hàng</dt>
                         <dd
                             class="flex min-w-0 items-center gap-1.5 font-medium"
@@ -324,9 +435,16 @@ const statLine = computed(() => {
                                 {{ timeRow[1] }}
                             </dd>
                         </template>
-                        <dt class="text-muted-foreground">Góc / ngày làm</dt>
+                        <dt class="text-muted-foreground">
+                            {{
+                                video.rieng
+                                    ? 'Thư mục / ngày làm'
+                                    : 'Góc / ngày làm'
+                            }}
+                        </dt>
                         <dd class="font-medium">
-                            {{ video.goc ?? '—' }} · {{ video.ngay_lam ?? '—' }}
+                            {{ (video.rieng ? video.folder : video.goc) ?? '—' }}
+                            · {{ video.ngay_lam ?? '—' }}
                         </dd>
                     </dl>
 
@@ -451,6 +569,21 @@ const statLine = computed(() => {
                             </li>
                         </ul>
                     </div>
+
+                    <Link
+                        v-if="
+                            video.rieng &&
+                            (video.status === 'scheduled' ||
+                                video.status === 'reserved')
+                        "
+                        href="/auto"
+                        class="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+                        data-testid="fork-viewer-schedule-link"
+                        @click="viewer.open = false"
+                    >
+                        <IconCalendarEvent class="size-4" /> Xem trong Tổng quan
+                        & Lịch
+                    </Link>
 
                     <a
                         v-if="video.tiktok_link"

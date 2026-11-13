@@ -12,6 +12,8 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Rieng\RiengQueueItem;
+use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PostBuilder;
@@ -39,6 +41,13 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->hub.'/ra/2026-11-09');
     File::ensureDirectoryExists($this->own);
     config(['fork.auto.hub_path' => $this->hub, 'fork.auto.settle_seconds' => 0, 'fork.auto.hub_api.key' => '', 'trypost.self_hosted' => true]);
+
+    // Kiểm "ghi xong": giả lập đọc thời lượng (file test chỉ là chữ) và không chờ thật giữa hai lần đo kích thước.
+    $this->incomplete = [];
+    app()->instance(RiengReady::class, new RiengReady(
+        fn (string $p): ?float => in_array(basename($p), $this->incomplete, true) ? null : 5.0,
+        fn () => null,
+    ));
 
     $this->user = User::factory()->create();
     $this->workspace = Workspace::factory()->create(['user_id' => $this->user->id]);
@@ -109,42 +118,268 @@ test('scan picks up mp4 recursively, skips underscore folders, other extensions 
     expect(app(RiengScanner::class)->scan()['new'])->toBe(0)->and(AutoVideo::query()->count())->toBe(2);
 });
 
-test('scan waits until the file size is stable for settle_seconds', function () {
-    config(['fork.auto.settle_seconds' => 30]);
+test('scan takes mov, m4v and webm in any letter case, and still ignores other formats', function () {
     RiengFolder::create(['path' => $this->own]);
-    $file = $this->own.'/dang-ghi.mp4';
-    file_put_contents($file, 'part1');
-
-    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 0, 'waiting' => 1]);
-
-    // Cùng kích thước nhưng chưa đủ 30 giây.
-    expect(app(RiengScanner::class)->scan()['new'])->toBe(0);
-
-    // Đã ổn định đủ lâu.
-    Cache::put('fork-auto:size:'.sha1(str_replace('\\', '/', $file)), ['size' => 5, 'since' => time() - 60], 3600);
-    expect(app(RiengScanner::class)->scan()['new'])->toBe(1);
-
-    // Còn đang đổi kích thước thì lại chờ.
-    $file2 = $this->own.'/lon-len.mp4';
-    file_put_contents($file2, 'a');
-    app(RiengScanner::class)->scan();
-    Cache::put('fork-auto:size:'.sha1(str_replace('\\', '/', $file2)), ['size' => 1, 'since' => time() - 60], 3600);
-    file_put_contents($file2, 'aaaa');
-    expect(app(RiengScanner::class)->scan()['new'])->toBe(0);
-});
-
-test('scan dedupes by sha256: same file twice and a hub video with the same hash', function () {
-    RiengFolder::create(['path' => $this->own]);
-    File::ensureDirectoryExists($this->own.'/copy');
-    file_put_contents($this->own.'/x.mp4', 'same-content');
-    file_put_contents($this->own.'/copy/x-copy.mp4', 'same-content');
-    file_put_contents($this->own.'/hubdup.mp4', 'hub-content');
-    AutoVideo::create(['hash' => hash('sha256', 'hub-content'), 'path' => $this->hub.'/h.mp4', 'source' => 'hub', 'hub_id' => 'h1', 'batch_date' => '2026-11-09', 'file_name' => 'h.mp4', 'status' => 'new']);
+    foreach (['a.MOV', 'b.m4v', 'c.WebM', 'd.avi', 'e.mkv', 'f.txt'] as $n) {
+        file_put_contents($this->own.'/'.$n, 'x-'.$n);
+    }
 
     $r = app(RiengScanner::class)->scan();
 
-    expect($r['new'])->toBe(1)->and($r['duplicate'])->toBe(2)
-        ->and(AutoVideo::query()->where('source', 'rieng')->count())->toBe(1);
+    expect($r['new'])->toBe(3)
+        ->and(AutoVideo::query()->orderBy('file_name')->pluck('file_name')->all())->toBe(['a.MOV', 'b.m4v', 'c.WebM']);
+});
+
+test('an unfinished file waits (no readable duration) and is taken on the very next scan without any long wait', function () {
+    RiengFolder::create(['path' => $this->own]);
+    file_put_contents($this->own.'/dang-chep.mov', 'part');
+    $this->incomplete = ['dang-chep.mov'];
+
+    $started = microtime(true);
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 0, 'waiting' => 1]);
+    expect(AutoVideo::query()->count())->toBe(0);
+
+    // Chép xong (đọc được thời lượng): nhận ngay ở lượt quét kế, không phải chờ 20 giây.
+    $this->incomplete = [];
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 1, 'waiting' => 0]);
+    expect(microtime(true) - $started)->toBeLessThan(5)
+        ->and(AutoVideo::query()->firstOrFail()->duration)->toBe(5.0);
+});
+
+test('a file whose size changes between the two reads in the same scan waits', function () {
+    RiengFolder::create(['path' => $this->own]);
+    $file = $this->own.'/lon-len.mp4';
+    file_put_contents($file, 'aaaa');
+
+    // Trong lúc "chờ giữa hai lần đo" file được ghi thêm, như đang chép dở.
+    app()->instance(RiengReady::class, new RiengReady(fn (): float => 5.0, function () use ($file): void {
+        file_put_contents($file, 'bbbb', FILE_APPEND);
+    }));
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 0, 'waiting' => 1]);
+
+    // Ngừng ghi: hai lần đo bằng nhau thì nhận.
+    app()->instance(RiengReady::class, new RiengReady(fn (): float => 5.0, fn () => null));
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 1, 'waiting' => 0]);
+
+    // File rỗng không bao giờ được nhận.
+    file_put_contents($this->own.'/rong.mp4', '');
+    expect(app(RiengScanner::class)->scan()['new'])->toBe(0);
+});
+
+test('temporary download names are skipped', function () {
+    RiengFolder::create(['path' => $this->own]);
+    foreach (['video.mp4.crdownload', 'video2.mp4.part', '~$video3.mp4', 'video4.tmp.mp4', '.video5.mp4', 'tot.mp4'] as $n) {
+        file_put_contents($this->own.'/'.$n, 'x-'.$n);
+    }
+
+    $r = app(RiengScanner::class)->scan();
+
+    expect($r['new'])->toBe(1)->and($r['skipped'])->toBe(5)
+        ->and(AutoVideo::query()->pluck('file_name')->all())->toBe(['tot.mp4'])
+        ->and(RiengReady::isTempName('a.mp4.crdownload'))->toBeTrue()
+        ->and(RiengReady::isTempName('Unconfirmed 123.crdownload'))->toBeTrue()
+        ->and(RiengReady::isTempName('a.MOV'))->toBeFalse();
+});
+
+test('a duplicate is still taken in, flagged with its original, and the unique hash is kept', function () {
+    RiengFolder::create(['path' => $this->own]);
+    File::ensureDirectoryExists($this->own.'/copy');
+    file_put_contents($this->own.'/x.mp4', 'same-content');
+    touch($this->own.'/x.mp4', time() - 100);   // file cũ hơn là bản gốc, dù tên xếp sau
+    file_put_contents($this->own.'/copy/x-copy.mp4', 'same-content');
+    file_put_contents($this->own.'/hubdup.mp4', 'hub-content');
+    $hub = AutoVideo::create(['hash' => hash('sha256', 'hub-content'), 'path' => $this->hub.'/h.mp4', 'source' => 'hub', 'hub_id' => 'h1', 'batch_date' => '2026-11-09', 'file_name' => 'h.mp4', 'status' => 'scheduled', 'scheduled_for' => now()->addDay()]);
+
+    $r = app(RiengScanner::class)->scan();
+
+    // Cả ba file đều vào kho; hai file trùng được đánh dấu.
+    expect($r['new'])->toBe(3)->and($r['duplicate'])->toBe(2)
+        ->and(AutoVideo::query()->where('source', 'rieng')->count())->toBe(3);
+
+    $orig = AutoVideo::query()->where('file_name', 'x.mp4')->firstOrFail();
+    $copy = AutoVideo::query()->where('file_name', 'x-copy.mp4')->firstOrFail();
+    $hubCopy = AutoVideo::query()->where('file_name', 'hubdup.mp4')->firstOrFail();
+
+    expect($orig->hash)->toBe(hash('sha256', 'same-content'))->and($orig->meta)->not->toHaveKey('duplicate_of')
+        ->and($copy->hash)->not->toBe($orig->hash)->and($copy->content_hash)->toBe(hash('sha256', 'same-content'))
+        ->and($copy->meta['duplicate_of'])->toBe($orig->id)
+        ->and($hubCopy->meta['duplicate_of'])->toBe($hub->id)
+        ->and($hubCopy->content_hash)->toBe($hub->hash);
+
+    // Quét lại: không tạo thêm bản nào.
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['new' => 0])->and(AutoVideo::query()->count())->toBe(4);
+
+    // Thêm bản thứ ba của cùng nội dung: vẫn trùng với bản gốc đầu tiên.
+    file_put_contents($this->own.'/x3.mp4', 'same-content');
+    expect(app(RiengScanner::class)->scan()['duplicate'])->toBe(1)
+        ->and(AutoVideo::query()->where('file_name', 'x3.mp4')->firstOrFail()->meta['duplicate_of'])->toBe($orig->id);
+
+    $dups = (new \App\Fork\AutoPost\Rieng\RiengInfo)->duplicates(AutoVideo::query()->where('source', 'rieng')->get());
+    expect($dups[$hubCopy->id]['text'])->toStartWith('Trùng video #'.$hub->id.' · Kho Xưởng Video · đã hẹn ')
+        ->and($dups[$copy->id]['text'])->toBe('Trùng video #'.$orig->id.' · trùng video riêng khác')
+        ->and($dups)->not->toHaveKey($orig->id);
+
+    // Trang hiện cờ trùng, và "Chọn tất cả" biết video nào trùng.
+    $this->actingAs(ownerUser())->get('/auto/kho/rieng')->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('videos.total', 4)
+        ->where('selectable', fn ($rows) => collect($rows)->whereNotNull('duplicate')->count() === 3));
+
+    // Đã đăng thì ghi "đã đăng" kèm liên kết.
+    $hub->forceFill(['status' => 'posted', 'posted_at' => now()->subHour(), 'stats' => ['link' => 'https://www.tiktok.com/@a/video/1']])->save();
+    $info = (new \App\Fork\AutoPost\Rieng\RiengInfo)->duplicates([$hubCopy->refresh()]);
+    expect($info[$hubCopy->id]['text'])->toBe('Trùng video #'.$hub->id.' · Kho Xưởng Video · đã đăng')
+        ->and($info[$hubCopy->id]['link'])->toBe('https://www.tiktok.com/@a/video/1');
+});
+
+test('quick scan picks up new files but is throttled to one real scan per window', function () {
+    $owner = ownerUser();
+    RiengFolder::create(['path' => $this->own]);
+    file_put_contents($this->own.'/a.mp4', 'aaa');
+
+    $first = $this->actingAs($owner)->postJson('/auto/kho/rieng/quet-nhanh')->assertOk()->json();
+    expect($first)->toMatchArray(['ok' => true, 'scanned' => true, 'new' => 1, 'total' => 1]);
+
+    // Gọi dồn dập: không quét thật nữa (file mới chưa được nhặt), nhưng vẫn trả dấu hiệu hiện tại.
+    file_put_contents($this->own.'/b.mov', 'bbb');
+    $second = $this->actingAs($owner)->postJson('/auto/kho/rieng/quet-nhanh')->assertOk()->json();
+    expect($second)->toMatchArray(['scanned' => false, 'new' => 0, 'total' => 1])->and($second['sig'])->toBe($first['sig']);
+
+    // Hết khung throttle: nhặt file mới, dấu hiệu đổi (trang biết cần tải lại).
+    Cache::forget('fork-rieng:quick');
+    $third = $this->actingAs($owner)->postJson('/auto/kho/rieng/quet-nhanh')->json();
+    expect($third)->toMatchArray(['scanned' => true, 'new' => 1, 'total' => 2])->and($third['sig'])->not->toBe($first['sig']);
+
+    // Chỉ chủ app.
+    app('auth')->forgetGuards();
+    $this->postJson('/auto/kho/rieng/quet-nhanh')->assertStatus(401);
+});
+
+test('a scan already running makes a second scan back off instead of overlapping', function () {
+    RiengFolder::create(['path' => $this->own]);
+    file_put_contents($this->own.'/a.mp4', 'aaa');
+    $lock = Cache::lock('fork-rieng:scan', 60);
+    expect($lock->get())->toBeTrue();
+
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['busy' => 1, 'new' => 0]);
+
+    $lock->release();
+    expect(app(RiengScanner::class)->scan())->toMatchArray(['busy' => 0, 'new' => 1]);
+});
+
+test('the waiting basket keeps videos per owner, ignores unusable ones and empties when a video gets scheduled', function () {
+    $owner = ownerUser();
+    $account = ($this->account)();
+    $a = ($this->rieng)('a.mp4');
+    $b = ($this->rieng)('b.mp4');
+    $posted = ($this->rieng)('p.mp4', null, ['status' => 'posted']);
+    $hubVideo = AutoVideo::create(['hash' => 'hb', 'path' => '/hb', 'source' => 'hub', 'hub_id' => 'hb', 'batch_date' => '2026-11-09', 'file_name' => 'hb.mp4', 'status' => 'new']);
+
+    $r = $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/them', ['ids' => [$a->id, $b->id, $posted->id, $hubVideo->id]])->assertOk()->json();
+    expect($r['added'])->toBe(2)->and(collect($r['queue'])->pluck('id')->all())->toBe([$a->id, $b->id]);
+
+    // Thêm lần nữa không nhân đôi; trang trả giỏ trong props (sống qua tải lại).
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/them', ['ids' => [$a->id]])->assertOk();
+    $this->actingAs($owner)->get('/auto/kho/rieng')->assertInertia(fn (AssertableInertia $p) => $p
+        ->has('queue', 2)->where('queue.0.file_name', 'a.mp4'));
+
+    // Bỏ một video khỏi giỏ.
+    $r = $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/bo', ['ids' => [$b->id]])->assertOk()->json();
+    expect(collect($r['queue'])->pluck('id')->all())->toBe([$a->id]);
+
+    // Giỏ của người khác không lẫn vào.
+    expect(RiengQueueItem::idsFor('someone-else'))->toBe([]);
+
+    // Thêm lại b; hẹn giờ a thì a rời giỏ, b ở lại.
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/them', ['ids' => [$b->id]])->assertOk();
+    $done = ($this->batch)()->commit(($this->input)($account, [$a]), false, $this->now);
+    expect($done['done'])->toBe(1);
+    $this->actingAs($owner)->get('/auto/kho/rieng')->assertInertia(fn (AssertableInertia $p) => $p
+        ->has('queue', 1)->where('queue.0.id', $b->id));
+
+    // Xoá cả giỏ.
+    $r = $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/bo', ['all' => true])->assertOk()->json();
+    expect($r['queue'])->toBe([])->and(RiengQueueItem::query()->count())->toBe(0);
+
+    // Video bị xoá khỏi app thì dòng trong giỏ tự mất (khoá ngoại).
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/gio-cho/them', ['ids' => [$b->id]])->assertOk();
+    $b->delete();
+    expect(RiengQueueItem::query()->count())->toBe(0);
+});
+
+test('a private video detail shows a neutral hint, never the hub product error', function () {
+    $owner = ownerUser();
+    $v = ($this->rieng)('chua-san-pham.mp4');
+
+    $json = $this->actingAs($owner)->getJson('/auto/kho/video/'.$v->id.'/info')->assertOk()->json();
+
+    expect($json['rieng'])->toBeTrue()
+        ->and($json['readiness']['reason'])->toBe('Chưa gắn sản phẩm — chọn khi đăng')
+        ->and($json['readiness']['severity'])->toBe('muted')
+        ->and(json_encode($json, JSON_UNESCAPED_UNICODE))->not->toContain('đang tắt hoặc không còn trong hub')
+        ->and($json['rieng_selectable'])->toBeTrue()->and($json['duplicate'])->toBeNull();
+
+    // Kể cả khi dùng bộ đánh giá chung: không có kiểm tra sản phẩm hub cho video riêng.
+    $assessed = app(\App\Fork\AutoPost\Scheduling\Readiness::class)->assess(collect([$v]));
+    expect($assessed[$v->id]['reason'])->not->toContain('đang tắt');
+
+    // Video hub vẫn bị kiểm sản phẩm hub như cũ.
+    $hub = AutoVideo::create(['hash' => 'hh', 'path' => '/hh', 'source' => 'hub', 'hub_id' => 'hh', 'batch_date' => '2026-11-09', 'file_name' => 'hh.mp4', 'status' => 'new']);
+    $hubJson = $this->actingAs($owner)->getJson('/auto/kho/video/'.$hub->id.'/info')->json();
+    expect($hubJson['readiness']['reason'])->toContain('đang tắt hoặc không còn trong hub');
+
+    // Sau khi hẹn giờ, chi tiết có sản phẩm kèm ảnh.
+    $account = ($this->account)();
+    ShopProduct::query()->update(['cover_url' => 'https://example.test/a.jpg']);
+    ($this->batch)()->commit(($this->input)($account, [$v]), false, $this->now);
+    $after = $this->actingAs($owner)->getJson('/auto/kho/video/'.$v->id.'/info')->json();
+    expect($after['rieng_product']['name'])->toBe('NanoĐồng')->and($after['rieng_product']['image'])->toStartWith('/auto/anh-san-pham/');
+});
+
+test('batch product options carry the product image and the preview carries the duplicate note', function () {
+    $account = ($this->account)();
+    ShopProduct::query()->update(['cover_url' => 'https://example.test/a.jpg']);
+
+    $options = ($this->batch)()->productOptions($account->id);
+    expect($options)->toHaveCount(1)->and($options[0]['image'])->toStartWith('/auto/anh-san-pham/');
+
+    RiengFolder::create(['path' => $this->own]);
+    $orig = ($this->rieng)('o.mp4', 'same');
+    $dup = ($this->rieng)('d.mp4', 'same', ['hash' => 'derived-hash', 'content_hash' => hash('sha256', 'same'), 'meta' => ['folder_id' => 1, 'duplicate_of' => $orig->id]]);
+
+    $preview = ($this->batch)()->preview(($this->input)($account, [$orig, $dup]), $this->now);
+    expect($preview['rows'][0]['duplicate'])->toBeNull()
+        ->and($preview['rows'][1]['duplicate'])->toBe('Trùng video #'.$orig->id.' · trùng video riêng khác')
+        ->and($preview['rows'][1]['status'])->toBe('ok');
+});
+
+test('a mov or webm private video is posted with its own file type and an m4v goes out as mp4', function () {
+    $account = ($this->account)();
+    $mov = ($this->rieng)('quay-tay.MOV');
+    $webm = ($this->rieng)('web.webm');
+    $m4v = ($this->rieng)('apple.m4v');
+
+    $done = ($this->batch)()->commit(($this->input)($account, [$mov, $webm, $m4v]), false, $this->now);
+    expect($done['done'])->toBe(3);
+
+    $media = Post::query()->get()->mapWithKeys(fn (Post $p) => [$p->meta['fork_auto_video_id'] => \App\Models\Media::query()->where('post_id', $p->id)->firstOrFail()]);
+
+    expect($media[$mov->id]->mime_type)->toBe('video/quicktime')->and($media[$mov->id]->path)->toEndWith('.mov')
+        ->and($media[$mov->id]->original_filename)->toBe('quay-tay.MOV')
+        ->and($media[$webm->id]->mime_type)->toBe('video/webm')->and($media[$webm->id]->path)->toEndWith('.webm')
+        ->and($media[$m4v->id]->mime_type)->toBe('video/mp4')->and($media[$m4v->id]->path)->toEndWith('.mp4')
+        ->and($media[$m4v->id]->original_filename)->toBe('apple.mp4');
+});
+
+test('the preview stream answers with the right video type for mov and webm', function () {
+    $owner = ownerUser();
+    RiengFolder::create(['path' => $this->own]);
+    $mov = ($this->rieng)('a.mov');
+    $webm = ($this->rieng)('b.webm');
+    $mp4 = ($this->rieng)('c.mp4');
+
+    expect($this->actingAs($owner)->get('/auto/kho/video/'.$mov->id)->assertOk()->headers->get('Content-Type'))->toBe('video/quicktime')
+        ->and($this->actingAs($owner)->get('/auto/kho/video/'.$webm->id)->assertOk()->headers->get('Content-Type'))->toBe('video/webm')
+        ->and($this->actingAs($owner)->get('/auto/kho/video/'.$mp4->id)->assertOk()->headers->get('Content-Type'))->toBe('video/mp4');
 });
 
 test('a file removed from disk while still new is flagged and never offered, and comes back when restored', function () {

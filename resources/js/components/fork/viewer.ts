@@ -11,6 +11,16 @@ export const viewer = reactive<{
     cache: Record<number, KhoVideo | 'error'>;
 }>({ open: false, ids: [], index: 0, cache: {} });
 
+/**
+ * Việc riêng của trang đang mở (Kho riêng đăng ký lúc mở trang, gỡ khi rời): khung xem video chỉ hiện nút
+ * "Đăng / hẹn giờ" và "Thêm vào giỏ chờ" khi trang đã đăng ký.
+ */
+export const viewerActions = reactive<{
+    post: ((id: number) => void) | null;
+    toggleQueue: ((id: number) => void) | null;
+    isQueued: ((id: number) => boolean) | null;
+}>({ post: null, toggleQueue: null, isQueued: null });
+
 const inflight = new Set<number>();
 
 export const loadVideo = async (id: number, force = false): Promise<void> => {
