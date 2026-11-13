@@ -388,8 +388,25 @@ else {
         if ($asset) { $shaAsset = $rel.assets | Where-Object { $_.name -eq ($asset.name + '.sha256') } | Select-Object -First 1 }
     }
     catch {
-        if ($ThuKhong) { Thu-Khong "Không gọi được GitHub ($($_.Exception.Message)); lúc cài thật sẽ cần Internet và bản phát hành đã đăng." }
-        else { Loi "Không lấy được bản phát hành: $($_.Exception.Message). Kiểm tra Internet hoặc kho $Repo đã có Release chưa."; exit 1 }
+        # API GitHub giới hạn 60 lần/giờ cho mỗi mạng (403 khi hết lượt). Đường dẫn trang web github.com/.../releases/latest
+        # không bị giới hạn này: đọc tên bản từ chuyển hướng rồi tải thẳng file theo tên cố định.
+        $loiApi = $_.Exception.Message
+        try {
+            $req = [Net.HttpWebRequest]::Create("https://github.com/$Repo/releases/latest")
+            $req.Method = 'HEAD'; $req.AllowAutoRedirect = $false; $req.UserAgent = 'TikTokAutoKid-Installer'; $req.Timeout = 30000
+            $resp = $req.GetResponse(); $loc = $resp.Headers['Location']; $resp.Close()
+            if ($loc -notmatch '/releases/tag/(v?(\d+\.\d+\.\d+[0-9A-Za-z.\-]*))$') { throw "không đọc được tên bản ($loc)" }
+            $ver = $Matches[1]; $so = $Matches[2]
+            $ten = "tiktok-auto-kid-$so.zip"; $goc = "https://github.com/$Repo/releases/download/$ver"
+            $dai = 0; try { $h = & curl.exe -sIL --fail "$goc/$ten" 2>$null; $cl = @($h | Select-String -Pattern '^content-length:\s*(\d+)' -AllMatches)[-1]; if ($cl) { $dai = [long]$cl.Matches[0].Groups[1].Value } } catch {}
+            $asset = [pscustomobject]@{ name = $ten; size = $dai; browser_download_url = "$goc/$ten" }
+            $shaAsset = [pscustomobject]@{ name = "$ten.sha256"; size = 0; browser_download_url = "$goc/$ten.sha256" }
+            Noi "  (API GitHub tạm hết lượt, tải thẳng từ trang phát hành $ver.)"
+        }
+        catch {
+            if ($ThuKhong) { Thu-Khong "Không gọi được GitHub ($loiApi; $($_.Exception.Message)); lúc cài thật sẽ cần Internet và bản phát hành đã đăng." }
+            else { Loi "Không lấy được bản phát hành: $loiApi / $($_.Exception.Message). Kiểm tra Internet hoặc kho $Repo đã có Release chưa."; exit 1 }
+        }
     }
     if ($asset -and -not $shaAsset -and -not $ThuKhong) { Loi 'Bản phát hành thiếu file .sha256 - dừng để an toàn.'; exit 1 }
     if ($asset) {
