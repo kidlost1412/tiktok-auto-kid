@@ -1,3 +1,21 @@
 {
- "_cach_dung": "Mỗi khi đổi một gu mặc định (prompt/*.md, luat/*.md): thêm \"<tên-vai>\": {\"<VERSION mới>\": \"vì sao đổi, 1-3 câu cho chủ app không rành kỹ thuật\"}, rồi chạy: python engine/prompt_mau.py ghi-manifest"
+ "_cach_dung": "Mỗi khi đổi một gu mặc định (prompt/*.md, luat/*.md): thêm \"<tên-vai>\": {\"<VERSION mới>\": \"vì sao đổi, 1-3 câu cho chủ app không rành kỹ thuật\"}, rồi chạy: python engine/prompt_mau.py ghi-manifest",
+ "bien-kich": {
+  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu."
+ },
+ "luat-san-xuat": {
+  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu."
+ },
+ "dien-phieu": {
+  "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng."
+ },
+ "dao-dien": {
+  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng."
+ },
+ "so-tay-editor": {
+  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng."
+ },
+ "giam-khao": {
+  "1.2.13": "Giám khảo chấm thêm móc câu (hai khung đầu có giữ người xem không) và khoảng thở của bản dựng."
+ }
 }

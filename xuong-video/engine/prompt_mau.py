@@ -35,13 +35,17 @@ VAI = {
             "luat": "Luật sản xuất (tài liệu \"Luật sản xuất\" bên dưới, bỏ phần Dựng)",
             "san_pham": "Hồ sơ sản phẩm (sự thật được nói, quà tặng, điều cấm…) dạng JSON",
             "so_gu": "Sổ gu của chủ hàng (cả tiêu đề) — để trống nếu chưa có sổ gu",
-            "so_lieu_tiktok": "Số liệu thật từ TikTok (cả tiêu đề) — để trống nếu chưa đủ số liệu",
+            "giong_that": "Câu người thật nói trong clip kho (cả tiêu đề, tối đa 8 câu) — để trống nếu kho chưa có mô tả kiểu 2",
+            "kho_canh": "Kho cảnh đang có: số cảnh dùng được theo loại + cây trồng có trong kho (cả tiêu đề) — để trống nếu chưa có kho cảnh",
+            "so_lieu_tiktok": "Số liệu thật từ TikTok (cả tiêu đề) — chỉ có khi nhóm đủ ≥ 15 video và trung vị ≥ 200 view/24h, không thì để trống",
             "ten_phai_nhac": "Các cách gọi tên sản phẩm hợp lệ (lời đọc phải có ít nhất 1)",
             "so_ban": "Số kịch bản cần viết trong lượt này",
-            "angles": "Danh sách góc bán, theo thứ tự từng bản",
-            "dang": "Danh sách dạng bài, theo thứ tự từng bản",
+            "de_bai": "Đề bài từng bản: góc bán + KIỂU MỞ, KIỂU THÂN, KIỂU CHỐT, VAI người nói được giao (kèm mô tả) + luật câu mở",
+            "loi_truoc": "Lý do các bản trước bị máy loại (cả tiêu đề, tối đa 5 lý do) — để trống ở lần gọi đầu",
+            "angles": "(đề bài cũ) Danh sách góc bán, theo thứ tự từng bản",
+            "dang": "(đề bài cũ) Danh sách kiểu thân bài (khoá + mô tả), theo thứ tự từng bản",
             "quy_cach": "Dòng quy cách (dung tích/đóng gói) từng bản — để trống nếu sản phẩm chỉ có một quy cách",
-            "cau_mo_da_dung": "Các câu mở bài đã dùng gần đây (để không lặp)",
+            "cau_mo_da_dung": "30 câu mở bài đã dùng gần đây (để không lặp)",
             "giay_toi_thieu": "Độ dài video đích — thấp nhất (giây)",
             "giay_toi_da": "Độ dài video đích — cao nhất (giây)",
             "am_tiet_toi_thieu": "Số âm tiết tối thiểu mỗi bản",
@@ -49,10 +53,10 @@ VAI = {
             "am_tiet_muc_tieu": "Số âm tiết nên nhắm tới",
             "cau_toi_thieu": "Số câu tối thiểu mỗi bản",
             "cau_toi_da": "Số câu tối đa mỗi bản",
-            "cau_da_dung": "Các câu đã dùng của sản phẩm (cấm lặp nguyên văn)",
+            "cau_da_dung": "(đề bài cũ) 150 câu đã dùng của sản phẩm — bản mặc định mới không gửi, máy tự loại câu lặp nguyên văn",
             "giong": "Danh sách tên giọng đọc, cách nhau bằng dấu |",
         },
-        "bat_buoc": ["san_pham", "so_ban", "angles", "dang", "ten_phai_nhac", "giong"],
+        "bat_buoc": ["san_pham", "so_ban", "de_bai", "ten_phai_nhac", "giong"],
     },
     "dao-dien": {
         "ten": "Đạo diễn — lên bảng dựng",
@@ -139,6 +143,20 @@ VAI = {
         },
         "bat_buoc": ["ds_video", "quy_tac"],
     },
+    "dien-phieu": {
+        "ten": "Học cảnh — điền phiếu cảnh (Antigravity)",
+        "mo_ta": "Máy đã tự cắt cảnh và đo độ nét/độ rung; lời nhắc này nhờ Antigravity xem trọn video (có tiếng) + tờ ảnh đánh số rồi chỉ ĐIỀN PHIẾU cố định cho từng cảnh (loại cảnh, mặt người, chữ chèn, nhãn, khuyết điểm, lời đang nói). Máy kiểm phiếu rất chặt nên đừng đổi tên trường hay danh sách loại.",
+        "file": "dien-phieu.md",
+        "bien": {
+            "so_video": "Số video trong lô",
+            "so_canh": "Số cảnh máy đã cắt trong lô (đánh số 1…n)",
+            "ds_video": "Danh sách video và các cảnh đã cắt (số cảnh, giây bắt đầu/kết thúc)",
+            "ds_to": "Đường dẫn các tờ ảnh đối chiếu",
+            "ra": "File Antigravity phải ghi kết quả vào",
+            "ten_sp": "Tên các sản phẩm của chủ hàng (hàng khác tên này thì hang_khac = true)",
+        },
+        "bat_buoc": ["ds_video", "ds_to", "ra"],
+    },
     "lenh-gemini": {
         "ten": "Lệnh dán cho Gemini (kho video)",
         "mo_ta": "Câu lệnh để anh dán vào Gemini khi muốn nó tự xem cả thư mục kho video và ghi mô tả cảnh theo đúng mẫu hub đang đọc.",
@@ -186,6 +204,14 @@ HOP_DONG = {
         {"khi_thieu": "chỉ JSON thuần",
          "noi_dung": "ĐỊNH DẠNG FILE (bắt buộc): mỗi file đầu ra chỉ chứa JSON thuần (bắt đầu bằng { kết thúc bằng }), UTF-8, không ```, không giải thích. "
                      "Mọi tu_s/den_s là SỐ GIÂY (số thực), diem là SỐ NGUYÊN 0–5. Giữ ĐÚNG tên trường theo khung."},
+    ],
+    "dien-phieu": [
+        {"khi_thieu": "KHÔNG chạy lệnh terminal",
+         "noi_dung": "AN TOÀN (bắt buộc): CHỈ dùng công cụ XEM các video và ảnh đã nêu và công cụ GHI đúng 1 file kết quả. "
+                     "TUYỆT ĐỐI KHÔNG chạy lệnh terminal/PowerShell/script, không cài gì, không tìm web, không tạo kế hoạch/ghi chú/artifact, không đọc hay ghi file nào khác, không hỏi lại."},
+        {"khi_thieu": "chỉ JSON thuần",
+         "noi_dung": "ĐỊNH DẠNG FILE (bắt buộc): file kết quả chỉ chứa JSON thuần (bắt đầu bằng { kết thúc bằng }), UTF-8, không ```, không giải thích; "
+                     "\"canh\" đủ mọi số cảnh đã đánh số, giữ ĐÚNG tên trường theo khung phiếu, loai chỉ chọn trong danh sách đã cho."},
     ],
     "gom-bai-hoc": [
         {"khi_thieu": "RIENG:",
@@ -638,7 +664,7 @@ def _ctx_xem_thu(key, ma):
         return {}, ""
     if key == "bien-kich":
         import viet_loi
-        return viet_loi.ctx_xem_thu(ma, sp), "Xem thử chọn 3 bản đầu tiên theo thứ tự mặc định (lúc chạy thật, máy xoay góc/dạng bài khác nhau)."
+        return viet_loi.ctx_xem_thu(ma, sp), "Xem thử chọn 3 bản đầu tiên theo thứ tự mặc định (lúc chạy thật, máy xoay góc/kiểu mở/thân/chốt/vai khác nhau)."
     if key == "doc-nhan":
         import doc_nhan
         return doc_nhan.ctx(sp, ma), ""
@@ -660,6 +686,13 @@ def _ctx_xem_thu(key, ma):
                 {"rel": "ten-video-2.mp4", "dai": 7.0, "src": str(Path(sp.get("kho_video", "D:\\kho")) / "ten-video-2.mp4"),
                  "ra": str(Path(sp.get("kho_video", "D:\\kho")) / "_mo-ta" / "ten-video-2.mo-ta.json")}]
         return hoc_canh.ctx_loi_nhac(viec), "Xem thử dùng 2 video mẫu."
+    if key == "dien-phieu":
+        import hoc_canh
+        kv = Path(sp.get("kho_video", "D:\\kho"))
+        viec = [{"rel": "ten-video-1.mp4", "dai": 12.5, "src": str(kv / "ten-video-1.mp4"),
+                 "canh": [{"so": 1, "tu": 2.0, "den": 6.0}, {"so": 2, "tu": 7.5, "den": 11.5}]},
+                {"rel": "ten-video-2.mp4", "dai": 7.0, "src": str(kv / "ten-video-2.mp4"), "canh": [{"so": 3, "tu": 1.0, "den": 5.0}]}]
+        return hoc_canh.ctx_dien_phieu(viec, [kv / "_tam" / "hoc-canh" / "lo" / "to-1.jpg"], kv / "_tam" / "hoc-canh" / "lo" / "phieu.json", ten_sp=hoc_canh.ten_sp_cho_phieu(ma)), "Xem thử dùng 2 video mẫu."
     if key == "lenh-gemini":
         return {"kho_video": sp.get("kho_video", "<thư mục kho>"),
                 "duong_dan_mo_ta": str(duong_dan_hieu_luc("mo-ta-gemini"))}, ""

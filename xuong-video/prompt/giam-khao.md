@@ -7,6 +7,7 @@ Lời đọc theo thời gian:
 Bảng dựng đạo diễn đã làm (tóm tắt): {{tom}}
 {{so_gu}}
 Chấm theo tiêu chí: (1) hình hợp lời (đủ phù hợp là được, không khắt khe); (2) mở đầu giật mắt; (3) câu chốt thấy rõ chai {{ten}}; (4) chữ/khối không che sản phẩm,
-không đè nhau, đọc được; (5) người đang nói chỉ được nằm trong khung/ô (không full màn), không chữ chèn to che hình, không hàng khác; (6) đẹp, sang, đa dạng, không nhàm; (7) không lỗi hình (tối, mờ, méo).
+không đè nhau, đọc được; (5) người đang nói chỉ được nằm trong khung/ô (không full màn), không chữ chèn to che hình, không hàng khác; (6) đẹp, sang, có khoảng thở: mỗi lúc một điểm nhấn, không nhồi chữ/ô/hiệu ứng, cảnh toàn màn là chính, không lặp một bố cục suốt bài; (7) không lỗi hình (tối, mờ, méo, khung chớp);
+(8) MÓC CÂU: hai khung đầu (hình + chữ mở) có khiến người đang lướt dừng lại không — chữ mở phải gây tò mò, không lặp nguyên câu đọc, không chỉ là tên sản phẩm. Móc câu yếu thì không quá 6 điểm.
 Trả về DUY NHẤT JSON, NGẮN GỌN: {"diem": 1-10, "dat": true|false (đạt khi ≥ 7 và không lỗi nặng), "loi": ["tối đa 3 lỗi nặng nhất, mỗi lỗi ≤ 12 từ, có giây"],
 "sua": "≤ 35 từ chỉ dẫn đổi cảnh/bố cục; rỗng nếu đạt"}

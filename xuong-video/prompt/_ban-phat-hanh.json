@@ -4,16 +4,16 @@
   "ver": "1.2.4"
  },
  "bien-kich": {
-  "hash": "58a423245b075afe",
-  "ver": "1.2.4"
+  "hash": "630a01425cf26f33",
+  "ver": "1.2.13"
  },
  "dao-dien": {
-  "hash": "e4433fccf166e65a",
-  "ver": "1.2.4"
+  "hash": "053405b7f4c1ea86",
+  "ver": "1.2.13"
  },
  "giam-khao": {
-  "hash": "45e92086ef50b4b9",
-  "ver": "1.2.4"
+  "hash": "aa68f8f29a027673",
+  "ver": "1.2.13"
  },
  "soat-kho": {
   "hash": "48096f703b33257a",
@@ -31,17 +31,21 @@
   "hash": "ea3314ca40fe5514",
   "ver": "1.2.4"
  },
+ "dien-phieu": {
+  "hash": "764d4ef190d157db",
+  "ver": "1.2.13"
+ },
  "lenh-gemini": {
   "hash": "f2e8b6f720331967",
   "ver": "1.2.4"
  },
  "luat-san-xuat": {
-  "hash": "4ce07f2b7555be81",
-  "ver": "1.2.4"
+  "hash": "fe36762b5b4a6057",
+  "ver": "1.2.13"
  },
  "so-tay-editor": {
-  "hash": "79cb4264bd1e2197",
-  "ver": "1.2.4"
+  "hash": "adcd09ef058b6932",
+  "ver": "1.2.13"
  },
  "mo-ta-gemini": {
   "hash": "4eb3d7fb6012b234",

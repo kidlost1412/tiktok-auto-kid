@@ -6,6 +6,7 @@ from pathlib import Path
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, ghi_json, KHOA_DANH_GIA
+from su_kien import khoa_tep
 
 
 def tu_duyet(log=print):
@@ -37,16 +38,20 @@ def tu_duyet(log=print):
         elif bo_duoi and diem < bo_duoi:
             moi[v.name] = {"ket_qua": "bo", "gop_y": "", "luc": luc, "tu_dong": f"điểm {diem} < {bo_duoi:g}"}
     if moi:
-        with KHOA_DANH_GIA:                    # đọc lại ngay trước khi ghi: quyết định tay của anh (✅/❌) luôn thắng
-            hien = doc()
-            for ten, x in moi.items():
-                if ten in hien:
-                    continue
-                hien[ten] = x
-                if x["ket_qua"] == "dat": n_dat += 1
-                else: n_bo += 1
-            if n_dat or n_bo:
-                ghi_json(f, hien, indent=1)
+        try:                                   # khoá luồng + KHOÁ HĐH trên file: bấm tay ✅/❌ ở app (tiến trình khác) cũng chờ cùng khoá
+            with KHOA_DANH_GIA, khoa_tep(f, 10):
+                hien = doc()                   # đọc lại ngay trước khi ghi: quyết định tay của anh (✅/❌) luôn thắng
+                for ten, x in moi.items():
+                    if ten in hien:
+                        continue
+                    hien[ten] = x
+                    if x["ket_qua"] == "dat": n_dat += 1
+                    else: n_bo += 1
+                if n_dat or n_bo:
+                    ghi_json(f, hien, indent=1)
+        except TimeoutError:
+            n_dat = n_bo = 0
+            log("  (tự duyệt: file đánh giá đang bận — để lô sau)")
     if n_dat or n_bo:
         log(f"  ✅ Tự duyệt theo điểm: {n_dat} video đạt (≥ {dat_tu:g})" + (f", {n_bo} video bỏ (< {bo_duoi:g})" if n_bo else ""))
     return n_dat + n_bo

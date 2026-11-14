@@ -93,6 +93,8 @@ def nhac_phu():
                     d = thoi_luong(p)
                 except Exception:
                     d = 0.0
+                if d <= 0:                    # đo lỗi (file còn đang chép, ffprobe lỗi) → KHÔNG nhớ 0 s: lần sau đo lại
+                    continue
                 c = cache[k] = sig + [round(d, 2)]
                 doi = True
             if c[2] > 0:

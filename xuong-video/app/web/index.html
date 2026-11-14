@@ -480,6 +480,46 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 @media (max-width:900px){.pm-wrap{grid-template-columns:minmax(0,1fr)}.pm-list{position:static;max-height:none}}
 @keyframes mucSang{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}30%{box-shadow:0 0 0 4px rgba(139,92,246,.55)}}
 .muc-sang{animation:mucSang 1.6s ease 2;border-radius:14px}
+
+/* ---------- Học cảnh: một nút, một dòng trạng thái; cửa sổ "Máy đã học được gì" */
+.hc-khu{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.hc-dong{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.45;color:var(--ink)}
+.hc-dong.bad{color:var(--red)}
+.hc-phu{margin:-4px 0 0}
+.hc-act{gap:10px;margin-top:6px}
+.hc-lai{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hc-loi{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:var(--panel)}
+.hc-loi ul{list-style:none;margin:10px 0 2px;padding:0;display:flex;flex-direction:column;gap:8px}
+.hc-loi li{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink2)}
+.hc-loi li span{flex:1;min-width:0}
+.hc-tuy{border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
+.hc-tuy-b{display:flex;flex-direction:column;gap:14px;margin-top:12px}
+.hcbox{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-lg);width:min(1000px,96vw);height:min(92vh,900px);display:flex;flex-direction:column;padding:22px 24px;gap:16px}
+.hcbox .ch{margin:0;align-items:center}
+.hcbox .ch .t{flex:1}
+.hc-xem{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:20px;padding-right:4px}
+.hc-tong{display:flex;gap:28px;flex-wrap:wrap;align-items:baseline}
+.hc-tong b{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hc-tong span{display:block;font-size:13px;color:var(--mute)}
+.hc-loai{display:flex;gap:8px;flex-wrap:wrap}
+.hc-l{display:flex;flex-direction:column;gap:2px;min-width:104px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:12.5px;color:var(--mute)}
+.hc-l b{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.hc-l.it{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 28%,transparent);color:var(--w-ink)}
+.hc-l.it b{color:var(--w-ink)}
+.hc-loc{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hc-loc button.on{background:var(--pri-soft);color:var(--pri-ink);border-color:color-mix(in srgb,var(--pri) 30%,var(--line2))}
+.hc-loc input{max-width:240px;height:32px;margin-left:auto}
+.hc-v{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--card);display:flex;flex-direction:column;gap:8px}
+.hc-v-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.hc-v-h .ten{font-weight:600;font-size:14px;word-break:break-all;flex:1;min-width:160px}
+.hc-q{font-size:13px;color:var(--ink2);font-style:italic;line-height:1.55;margin:0;padding-left:10px;border-left:2px solid var(--line2)}
+.hc-v details>summary{font-size:13px}
+.hc-cs{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.hc-c{display:flex;gap:12px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--ink2)}
+.hc-c img{flex:none;width:45px;height:80px;object-fit:cover;border-radius:6px;background:var(--sec)}
+.hc-c-b{min-width:0;display:flex;flex-direction:column;gap:3px}
+.hc-c-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hc-trang{display:flex;gap:10px;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
@@ -758,32 +798,30 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
         <div class="row nowrap" style="gap:10px"><input type="text" id="spKho" class="pick" style="flex:1;min-width:0"><button class="btn ghost" id="btnSKho"><svg class="i"><use href="#i-folder"/></svg>Chọn thư mục</button></div>
       </div>
       <div class="card mt">
-        <div class="ch"><span class="chip b"><svg class="i"><use href="#i-layers"/></svg></span><div class="t"><h3 style="margin:0">Cảnh trong kho</h3><p class="sub">Học cảnh → Chuẩn bị kho → sẵn sàng làm video</p></div></div>
-        <div class="row nowrap" style="gap:16px;align-items:flex-start"><span id="khoAnh" class="hidden"></span><div id="khoInfo" class="note" style="min-width:0;flex:1">Đang tải…</div></div>
-        <div class="row" style="margin-top:18px;gap:8px"><button class="btn go" id="btnHoc"><svg class="i"><use href="#i-cap"/></svg>Học cảnh</button>
-          <button class="btn ghost" id="btnKho"><svg class="i"><use href="#i-layers"/></svg>Chuẩn bị kho (nạp cảnh + AI soát)</button>
-          <button class="btn ghost" id="btnKiem"><svg class="i"><use href="#i-shield"/></svg>Kiểm định dạng</button>
-          <button class="btn ghost sm" id="btnAgy2" title="Trạng thái Antigravity / model"><svg class="i"><use href="#i-cog"/></svg>Antigravity</button></div>
-        <div id="hocBox" class="hidden" style="margin-top:14px"><div class="bar"><i id="hocFill"></i></div>
-          <p class="note" id="hocText" style="margin:8px 0 0"></p></div>
-        <div id="hocSetup" class="hidden khung" style="margin-top:14px">
-          <div class="row nowrap" style="gap:10px"><b id="agyTt" style="flex:1">Antigravity: …</b>
-            <button class="btn ghost sm hidden" id="btnAgyMo">Mở Antigravity</button>
-            <select id="hsModel" title="Model học cảnh" style="max-width:190px;height:32px"></select>
-            <button class="btn ghost sm ic-only" id="btnHsDong" title="Thu gọn"><svg class="i"><use href="#i-x"/></svg></button></div>
+        <div class="ch"><span class="chip b"><svg class="i"><use href="#i-layers"/></svg></span><div class="t"><h3 style="margin:0">Cảnh trong kho</h3><p class="sub">Máy xem từng video và ghi lại từng cảnh để dựng video về sau.</p></div></div>
+        <span id="khoAnh" class="hidden"></span><div id="khoInfo" class="note" style="min-width:0">Đang tải…</div>
+        <div id="hcKhu" class="hc-khu hidden">
+          <div id="hcDong" class="hc-dong"></div>
+          <div id="hcBar" class="hidden"><div class="bar"><i id="hcFill"></i></div></div>
+          <div id="hcPhu" class="note hc-phu"></div>
+          <div class="row hc-act"><button class="btn go big" id="btnHoc"><svg class="i"><use href="#i-cap"/></svg>Học cảnh</button>
+            <button class="btn ghost" id="btnHcXem"><svg class="i"><use href="#i-eye"/></svg>Máy đã học được gì</button></div>
+          <div id="hcLai" class="hc-lai hidden"><button class="btn ghost sm" id="btnHcLai"></button>
+            <span class="note">Bản mô tả cũ được cất trong thư mục sao lưu, kho vẫn dùng bình thường trong lúc học lại.</span></div>
+          <div id="hocCanhBao"></div>
+          <div id="hocQuyen" class="hidden"></div>
+          <details id="hocLoiBox" class="hc-loi hidden"></details>
+          <details class="hc-tuy"><summary>Tuỳ chọn</summary>
+            <div class="hc-tuy-b">
+              <div><label for="hsModel">Máy xem video dùng model</label><select id="hsModel" style="max-width:320px"></select></div>
+              <div class="row" style="gap:8px"><button class="btn ghost sm" id="btnKho"><svg class="i"><use href="#i-layers"/></svg>Nạp lại cảnh vào kho</button>
+                <button class="btn ghost sm" id="btnKiem"><svg class="i"><use href="#i-shield"/></svg>Kiểm tra file mô tả</button>
+                <a href="#" id="linkTay" class="note">Làm tay bằng Antigravity</a></div>
+              <div id="kdBox" class="hidden khung"></div>
+              <details class="hc-nk"><summary class="note">Nhật ký nạp kho</summary><div class="log" id="khoLog" style="height:140px;margin-top:8px"></div></details>
+            </div>
+          </details>
         </div>
-        <div id="hocQuyen" class="note hidden" style="margin-top:10px"></div>
-        <div id="hocCanhBao" class="note" style="margin-top:6px"></div>
-        <div id="hocLoi" class="note" style="margin-top:6px"></div>
-        <div id="kdBox" class="hidden khung" style="margin-top:14px"></div>
-        <ol class="note buoc-ds">
-          <li><b>Học cảnh</b>: Antigravity (phải đang mở) tự xem các video chưa có mô tả (gộp 5–10 video mỗi cuộc trò chuyện, 2 cuộc cùng lúc, nằm trong Project của kho nếu có), xong hub tự chuẩn bị kho. Học cảnh chạy song song, không chặn làm video (đang làm video thì học nhường máy, chỉ 1 lô một lúc). Bấm Dừng là huỷ thật việc đang làm ở Antigravity trong vài giây; video đang dở sẽ học lại lần sau. Dừng giữa chừng hay bị lỗi thì bấm lại — chỉ làm tiếp video chưa có mô tả, phần đã học được giữ.
-            <a href="#" id="linkTay">Làm tay bằng Antigravity</a> (chép lệnh dán cho Antigravity).</li>
-          <li><b>Chuẩn bị kho</b>: nạp cảnh đã mô tả vào kho và cho AI soát lại. Học cảnh xong hub tự chạy bước này; bấm tay khi anh làm tay bằng Antigravity hoặc tự sửa mô tả.</li>
-          <li><b>Kiểm định dạng</b>: soát các bản mô tả, báo file hỏng / video thiếu mô tả và đề nghị sửa (giữ bản gốc). Dùng khi chuẩn bị kho báo lỗi.</li>
-        </ol>
-        <div class="note" id="khoBuoc" style="margin-top:14px"></div>
-        <div class="log" id="khoLog" style="height:160px;margin-top:8px"></div>
       </div>
     </div>
 
@@ -957,6 +995,11 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <div class="note" id="tmInfo"></div>
   <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="tmDong">Đóng</button>
     <button class="btn go" id="tmChon" disabled><svg class="i"><use href="#i-check"/></svg>Chọn thư mục này</button></div>
+</div></div>
+<div class="modal" id="hcModal"><div class="hcbox">
+  <div class="ch"><span class="chip b"><svg class="i"><use href="#i-eye"/></svg></span><div class="t"><h2 style="margin:0">Máy đã học được gì</h2></div>
+    <button class="btn ghost sm" id="hcXemDong"><svg class="i"><use href="#i-x"/></svg>Đóng</button></div>
+  <div class="hc-xem" id="hcXem"></div>
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -1556,7 +1599,7 @@ async function taiHq() {
 function ctMo(k) {
   SPV.ct = k;
   document.querySelectorAll('#spTabs [data-ct]').forEach(b => { b.classList.toggle('on', b.dataset.ct === k); b.setAttribute('aria-selected', b.dataset.ct === k); });
-  $('#ctTt').classList.toggle('hidden', k !== 'tt'); $('#ctKc').classList.toggle('hidden', k !== 'kc'); $('#ctShop').classList.toggle('hidden', k !== 'shop'); $('#ctHq').classList.toggle('hidden', k !== 'hq'); if (k === 'hq') taiHq();
+  $('#ctTt').classList.toggle('hidden', k !== 'tt'); $('#ctKc').classList.toggle('hidden', k !== 'kc'); $('#ctShop').classList.toggle('hidden', k !== 'shop'); $('#ctHq').classList.toggle('hidden', k !== 'hq'); if (k === 'hq') taiHq(); if (k === 'kc') taiKho();
   $('#btnLuuSp').classList.toggle('hidden', k === 'shop' || k === 'hq');          // ảnh đổi là lưu ngay, không cần nút Lưu
 }
 function moChiTiet(ma, k, ten) {
@@ -1617,81 +1660,256 @@ Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video
 }
 $('#btnTqMoi').onclick = () => taiTongQuan(true);
 const spCtHien = () => SPV.xem === 'ct' && !$('#sp').classList.contains('hidden');
-async function taiKho() {
-  const k = await api('/api/kho/' + $('#spSua').value);
-  $('#khoInfo').innerHTML = !k.kho ? `<div class="warnbox">${ic('alert')} Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.</div>`
-    : !k.kho_ton_tai ? `<div class="errbox">${ic('alert')} Không tìm thấy thư mục: ${esc(k.kho)}</div>`
-    : `<div class="kpath">${ic('folder')}${esc(k.kho)}</div><div class="kinfo">
-        <span class="k">${ic('video')}<b>${k.so_video}</b> video</span><span class="k">${ic('file')}<b>${k.so_mo_ta}</b> bản mô tả</span>
-        <span class="k">${ic('layers')}<b>${k.so_canh}</b> cảnh</span><span class="k">${ic('eye')}AI đã soát <b>${k.so_soat}</b></span></div>` +
-      (k.so_video > k.so_mo_ta ? `<div class="warnbox" style="margin-top:12px">${k.so_video - k.so_mo_ta} video chưa có mô tả cảnh → bấm "Học cảnh" (Antigravity tự xem, xong hub tự chuẩn bị kho).</div>` : '');
-  $('#btnKho').disabled = k.dang_chay || !k.kho_ton_tai || !k.so_mo_ta; $('#btnKho').innerHTML = k.dang_chay ? ic('loader') + 'Đang chuẩn bị kho…' : ic('layers') + 'Chuẩn bị kho (nạp cảnh + AI soát)';
-  const BUOC = ['', 'Bước 1/3: kiểm định dạng mô tả', 'Bước 2/3: nạp cảnh vào kho', 'Bước 3/3: AI soát cảnh'];
-  $('#khoBuoc').innerHTML = k.dang_chay && k.buoc >= 1 && k.buoc <= 3
-      ? `${ic('loader')} ${BUOC[k.buoc]}<div class="bar" style="margin-top:8px"><i style="width:${Math.round((k.buoc - 1) / 3 * 100 + 8)}%"></i></div>`
-    : !k.dang_chay && k.buoc === 4 ? `<span class="pill g">${ic('check')} Chuẩn bị kho xong (3/3)</span>`
-    : !k.dang_chay && k.buoc >= 1 && k.buoc <= 3 ? `<span class="pill r">${ic('alert')} Dừng ở ${BUOC[k.buoc]} — xem nhật ký bên dưới</span>` : '';
-  $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)'; taiHoc();
-  if (k.dang_chay && spCtHien()) setTimeout(taiKho, 4000);           // chỉ tự làm mới khi đang mở trang chi tiết
+// ---------- Học cảnh: một nút + một dòng trạng thái. Việc nạp cảnh vào kho (chuẩn bị kho) chạy tiếp ngay trên cùng dòng đó.
+const HOC = {t: null, ma: '', h: null, k: null, s: null, chay: false, nap: false, nho: 0, moLuc: 0, bam: false, loiKhoa: ''};
+const HC_LOAI = {chai_ro: 'Chai rõ nhãn', nhan_sau: 'Mặt sau nhãn', pha_rot: 'Pha, rót', phun_tuoi: 'Phun, tưới', re_goc: 'Rễ, gốc', cay_benh: 'Cây bệnh',
+  ket_qua: 'Cây khoẻ, kết quả', vuon_rong: 'Toàn cảnh vườn', nguoi_lam: 'Người làm vườn', nguoi_noi: 'Người nói vào máy', kho_hang: 'Kho hàng', khac: 'Khác'};
+const HC_CO = {toan: 'Toàn cảnh', toan_canh: 'Toàn cảnh', trung: 'Trung cảnh', trung_canh: 'Trung cảnh', can: 'Cận cảnh', can_canh: 'Cận cảnh'};
+const hcTen = x => String(x || '').split(/[\/\\]/).pop();
+const hcGio = s => { s = Math.max(0, Math.round(Number(s) || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const kcHien = () => spCtHien() && !$('#ctKc').classList.contains('hidden') && !document.hidden;
+function hcMaMoi() {
+  const ma = $('#spSua').value;
+  if (HOC.ma !== ma) { clearTimeout(HOC.t); Object.assign(HOC, {ma, h: null, k: null, s: null, chay: false, nap: false, nho: 0, moLuc: 0, bam: false, loiKhoa: ''}); }
+  return ma;
 }
-$('#linkTay').onclick = async e => { e.preventDefault(); const r = await api('/api/lenh-gemini/' + $('#spSua').value); try { await navigator.clipboard.writeText(r.lenh); toast('Đã chép lệnh — dán vào Antigravity, làm xong bấm Chuẩn bị kho'); } catch (x) { toast('Không chép được — thử lại'); } };
-const HOC = {t: null, h: null, xongBao: null, moTay: false, ra: null};
+async function hcTaiTong() {                                  // số video đã học / chưa học / kiểu cũ (nhẹ: không kèm từng video)
+  const ma = HOC.ma; if (!ma) return;
+  try { const r = await api('/api/hoc-canh-ket-qua/' + encodeURIComponent(ma) + '?gon=1'); if (HOC.ma !== ma) return; HOC.s = r.ok ? r : null; } catch (e) { /* giữ số cũ */ }
+  hcVe();
+}
+async function taiKho() { hcMaMoi(); hcTaiTong(); return taiHoc(); }
 async function taiHoc() {
   clearTimeout(HOC.t);
-  const ma = $('#spSua').value; if (!ma) return;
-  const h = await api('/api/hoc-canh/' + ma); if (h.loi || !h.agy) return;
-  HOC.h = h; const j = h.job, mo = h.agy.mo, chay = !!(j && j.dang_chay);
-  $('#agyTt').textContent = mo ? '✓ Antigravity đang mở' + (h.agy.phien_ban ? ' · ' + h.agy.phien_ban : '') : '✗ Antigravity chưa mở';
-  $('#agyTt').style.color = mo ? '' : 'var(--red)';
-  $('#btnAgyMo').classList.toggle('hidden', mo);
+  const ma = hcMaMoi(); if (!ma) return;
+  let h, k;
+  try { [h, k] = await Promise.all([api('/api/hoc-canh/' + ma), api('/api/kho/' + ma)]); }
+  catch (e) { if (kcHien()) HOC.t = setTimeout(taiHoc, 5000); return; }
+  if (HOC.ma !== ma || !h || h.loi || !h.agy || !k || !k.log) return;
+  const j = h.job, chay = !!(j && j.dang_chay), nap = !!k.dang_chay;
+  if (HOC.chay && !chay) {                                    // vừa học xong: hub sắp tự nạp kho → giữ dòng "đang nạp" vài giây cho khỏi chớp
+    hcTaiTong();
+    if (j && j.trang_thai === 'xong' && j.tong > 0) HOC.nho = Date.now() + 15000;
+  }
+  if (HOC.nap && !nap) hcTaiTong();
+  if (nap) HOC.nho = 0;
+  if (h.agy.mo) HOC.moLuc = 0;
+  HOC.h = h; HOC.k = k; HOC.chay = chay; HOC.nap = nap;
+  hcVe();
+  if (!kcHien()) return;                                      // rời mục Kho cảnh: ngừng hỏi, mở lại sẽ tự tải tiếp
+  const dangMo = HOC.moLuc && Date.now() - HOC.moLuc < 90000;
+  if (chay || nap || h.kho_cho || dangMo || HOC.nho > Date.now()) HOC.t = setTimeout(taiHoc, 2000);
+  else if (!h.agy.mo) HOC.t = setTimeout(taiHoc, 5000);       // Antigravity chưa mở → tự kiểm lại để nút đổi lại khi anh mở xong
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && kcHien()) taiHoc(); });
+function hcVe() {
+  const h = HOC.h, k = HOC.k; if (!h || !k) return;
+  const khu = $('#hcKhu');
+  if (!k.kho || !k.kho_ton_tai) {
+    $('#khoInfo').innerHTML = !k.kho ? `<div class="warnbox">${ic('alert')} Chưa có thư mục kho video — điền ô "Thư mục kho video" rồi Lưu.</div>`
+      : `<div class="errbox">${ic('alert')} Không tìm thấy thư mục: ${esc(k.kho)}</div>`;
+    khu.classList.add('hidden'); return;
+  }
+  $('#khoInfo').innerHTML = ''; khu.classList.remove('hidden');
+  const j = h.job, mo = h.agy.mo, S = HOC.s, L = (j && j.loi) || [];
+  const chay = !!(j && j.dang_chay), dung = !!(j && j.dang_dung), nap = !!k.dang_chay, cho = !!h.kho_cho, nho = HOC.nho > Date.now();
+  const dangMo = !!(HOC.moLuc && Date.now() - HOC.moLuc < 90000 && !mo);
+  let dong = '', phu = '', xau = false, pc = null, nut = ic('cap') + 'Học cảnh', lop = 'go', tat = false, lai = false;
+  if (dung) {
+    dong = 'Đang dừng…'; phu = 'Máy đang huỷ việc ở Antigravity, vài giây nữa là xong.'; nut = ic('loader') + 'Đang dừng…'; tat = true;
+    pc = j.tong ? Math.round(100 * j.xong / j.tong) : 0;
+  } else if (chay) {
+    dong = {cat: 'Máy đang cắt cảnh…', hoc: 'Antigravity đang xem video và điền phiếu…', ghi: 'Đang ghi kết quả…'}[j.giai_doan] || 'Đang chuẩn bị…';
+    pc = j.tong ? Math.round(100 * j.xong / j.tong) : 0;
+    if (j.tong) {
+      phu = `Đã học ${j.xong}/${j.tong} video`;
+      if (j.hien_tai) phu += ' · đang xem: ' + (j.hien_tai.length > 70 ? j.hien_tai.slice(0, 70) + '…' : j.hien_tai);
+      const m = (h.models || []).find(x => x.v === j.model); if (m) phu += ' · model ' + m.t.replace(/\s*\(mặc định\)/, '');
+      if (j.xong >= 1 && j.tong > j.xong && j.bat_dau) {      // ước lượng thô, chỉ khi đã xong ít nhất 1 video
+        const con = (Date.now() / 1000 - j.bat_dau) / j.xong * (j.tong - j.xong);
+        phu += ' · còn khoảng ' + (con < 60 ? 'chưa tới 1 phút' : Math.round(con / 60) + ' phút');
+      }
+    } else phu = j.thong_bao || 'Đang kiểm kho…';
+    nut = ic('stop', 'f') + 'Dừng'; lop = 'stop';
+  } else if (nap || cho || nho) {
+    dong = cho && !nap ? 'Đang đợi hub làm xong video để nạp cảnh vào kho…' : 'Đang nạp cảnh vào kho…';
+    pc = nap && k.buoc >= 1 && k.buoc <= 3 ? Math.round((k.buoc - 1) / 3 * 100 + 8) : 8;
+    nut = ic('loader') + 'Đang nạp kho…'; tat = true;
+  } else if (h.job_khac) {
+    dong = 'Máy đang học cảnh cho sản phẩm khác, anh đợi xong nhé.'; tat = true;
+  } else if (!mo) {
+    if (dangMo) { dong = 'Đang mở Antigravity… đợi vài giây là xong.'; nut = ic('loader') + 'Đang mở…'; tat = true; }
+    else { dong = h.agy_thong_bao || 'Antigravity chưa mở. Bấm nút bên dưới, mở xong máy sẽ tự báo.'; nut = ic('play') + 'Mở Antigravity'; }
+  } else if (!S) {
+    dong = 'Đang xem kho…';
+  } else if (!(S.tong && S.tong.video_tong)) {
+    dong = 'Kho chưa có video nào — anh bỏ video vào thư mục kho nhé.'; tat = true;
+  } else {
+    const cl = S.tong ? S.tong.chua_hoc : 0, t = S.tong || {};
+    dong = cl > 0 ? `Còn ${cl} video chưa học.` : `Kho đã học đủ: ${t.kieu1 + t.kieu2} video · ${t.canh_tong} cảnh.`;
+    if (t.kieu1 > 0) { lai = true; $('#btnHcLai').textContent = `Học lại kiểu mới (${t.kieu1} video)`; }
+  }
+  if (!chay && !dung && j && j.thong_bao && !(nap || cho || nho)) {   // lời nhắn thật của lần học vừa rồi (dừng / hết lượt / lỗi / xong)
+    if (['dung', 'het_luot', 'loi'].includes(j.trang_thai) || (j.trang_thai === 'can_mo' && !mo)) { phu = j.thong_bao; xau = j.trang_thai !== 'dung'; }
+    else if (j.trang_thai === 'xong' && j.thong_bao !== 'Kho đã đủ mô tả.') phu = j.thong_bao;
+  }
+  $('#hcDong').textContent = dong;
+  $('#hcBar').classList.toggle('hidden', pc === null); $('#hcFill').style.width = (pc || 0) + '%';
+  const bp = $('#hcPhu'); bp.textContent = phu; bp.style.color = xau ? 'var(--red)' : ''; bp.classList.toggle('hidden', !phu);
+  const b = $('#btnHoc'); b.className = 'btn big ' + lop; b.innerHTML = nut; b.disabled = tat || HOC.bam;
+  $('#hcLai').classList.toggle('hidden', !lai || !mo || tat || chay);
+  $('#btnHcLai').disabled = HOC.bam;
+  $('#hocCanhBao').innerHTML = j && j.canh_bao ? `<div class="warnbox">${ic('alert')} ${esc(j.canh_bao)}</div>` : '';
+  // video bị lỗi: danh sách gập lại, mỗi dòng có "Thử lại"
+  const lb = $('#hocLoiBox'), khoa = JSON.stringify(L) + '|' + (chay || !mo ? 1 : 0);
+  lb.classList.toggle('hidden', !L.length);
+  if (L.length && HOC.loiKhoa !== khoa) {
+    HOC.loiKhoa = khoa; const tatThu = chay || !mo ? ' disabled' : '';
+    lb.innerHTML = `<summary>${L.length} video có lỗi</summary><ul>` + L.map((x, i) => `<li><span><b>${esc(hcTen(x.video))}</b> — ${esc(x.loi)}</span>
+      <button class="btn ghost sm" data-thu="${i}"${tatThu}>Thử lại</button></li>`).join('') + '</ul>'
+      + (L.length > 1 ? `<button class="btn ghost sm" data-thu="all"${tatThu}>Thử lại tất cả</button>` : '');
+  } else if (!L.length) HOC.loiKhoa = '';
+  const q = h.quyen, bq = $('#hocQuyen');
+  if (q && q.bat && !q.ok) {
+    bq.classList.remove('hidden');
+    bq.innerHTML = `<div class="warnbox">${ic('alert')} Antigravity có thể hỏi "Accept" khi máy học cảnh. <button class="btn ghost sm" id="btnQuyen">Bật tự duyệt cho kho này</button></div>`;
+  } else bq.classList.add('hidden');
   const sel = $('#hsModel');
   if (sel.dataset.m !== h.model || !sel.options.length) {
-    sel.innerHTML = h.models.map(m => `<option value="${esc(m.v)}">${esc(m.t)}</option>`).join(''); sel.value = h.model; sel.dataset.m = h.model;
+    sel.innerHTML = (h.models || []).map(m => `<option value="${esc(m.v)}">${esc(m.t)}</option>`).join(''); sel.value = h.model; sel.dataset.m = h.model;
   }
-  if (!mo || HOC.moTay) $('#hocSetup').classList.remove('hidden'); else $('#hocSetup').classList.add('hidden');
-  $('#btnAgy2').classList.toggle('hidden', !$('#hocSetup').classList.contains('hidden'));
-  let hien = false;
-  if (j && (chay || (j.thong_bao && j.trang_thai !== 'nghi'))) {
-    hien = true; const pc = j.tong ? Math.round(100 * j.xong / j.tong) : (j.trang_thai === 'xong' ? 100 : 0);
-    $('#hocFill').style.width = pc + '%';
-    let t = j.thong_bao || '';
-    if (chay && j.tong) t = `Đã học ${j.xong}/${j.tong} video` + (j.hien_tai ? ' — đang xem: ' + j.hien_tai.slice(0, 70) : '');
-    if (j.loi && j.loi.length) t += ` · ${j.loi.length} video lỗi (bỏ qua, lần Học cảnh sau sẽ thử lại)`;
-    $('#hocLoi').innerHTML = (j.loi || []).length ? '<details><summary>Xem lỗi từng video</summary><ul style="margin:6px 0 0 18px;padding:0">' + j.loi.map(x => `<li><b>${esc(String(x.video).split(/[\/]/).pop())}</b>: ${esc(x.loi)}</li>`).join('') + '</ul></details>' : '';
-    $('#hocText').textContent = t;
-    $('#hocText').style.color = ['het_luot', 'can_mo', 'loi'].includes(j.trang_thai) ? 'var(--red)' : '';
-    if (j.trang_thai === 'xong' && HOC.xongBao !== j.bat_dau) { HOC.xongBao = j.bat_dau; taiKho(); }
-  }
-  $('#hocBox').classList.toggle('hidden', !hien);
-  const dung = !!(j && j.dang_dung);
-  const hb = $('#btnHoc'); hb.innerHTML = dung ? ic('loader') + 'Đang dừng…' : chay ? ic('stop', 'f') + 'Dừng học' : ic('cap') + 'Học cảnh'; hb.disabled = !!h.job_khac || dung;
-  hb.title = dung ? 'Đang huỷ việc ở Antigravity, vài giây nữa là xong' : (h.dang_chay_lo && chay ? 'Học cảnh chạy song song với làm video (nhường máy: 1 lô một lúc)' : '');
-  if (dung) $('#hocText').textContent = 'Đang dừng… (huỷ việc đang làm ở Antigravity)';
-  const q = h.quyen, bq = $('#hocQuyen');
-  if (q && q.bat) {
-    bq.classList.remove('hidden');
-    bq.innerHTML = q.ok ? `<span class="pill g">${ic('check')} Antigravity tự duyệt (Turbo) cho kho này — học cảnh chạy không hỏi Accept</span>`
-      : `<div class="warnbox">${ic('alert')} Antigravity có thể hỏi "Accept" khi học cảnh. <button class="btn ghost sm" id="btnQuyen">Bật tự duyệt (Turbo) cho kho này</button>
-         <div style="margin-top:6px">Bấm 1 lần: hub tạo một "Project" riêng trong Antigravity, chỉ gồm thư mục kho video này, cho phép Antigravity tự đọc video và ghi file mô tả ở đó, tự chạy lệnh, không hỏi lại. Không đổi gì các Project/thư mục khác. Hub cũng tự làm việc này khi bấm Học cảnh.</div></div>`;
-    const bb = $('#btnQuyen'); if (bb) bb.onclick = async () => { const r = await api('/api/hoc-canh-quyen/' + $('#spSua').value, {}); toast(r.ok ? 'Đã bật tự duyệt — nếu Antigravity còn hỏi, đóng rồi mở lại Antigravity 1 lần' : (r.loi || 'Không bật được')); taiHoc(); };
-  } else bq.classList.add('hidden');
-  const cb = $('#hocCanhBao'); cb.innerHTML = j && j.canh_bao ? `<div class="warnbox">${ic('alert')} ${esc(j.canh_bao)}</div>` : '';
-  if (!spCtHien()) return;                                          // rời trang chi tiết: ngừng hỏi, mở lại sẽ tự tải tiếp
-  if (dung) HOC.t = setTimeout(taiHoc, 1000);
-  else if (chay) HOC.t = setTimeout(taiHoc, 3000); else if (!mo) HOC.t = setTimeout(taiHoc, 5000);   // chưa mở → tự kiểm lại 5 giây/lần
+  const bk = $('#btnKho'); bk.disabled = nap || !k.so_mo_ta;
+  $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)';
+}
+async function hcChay(body, loiNhan) {                       // bắt đầu học (cả kho / học lại kiểu mới / chỉ vài video)
+  const ma = HOC.ma; if (!ma || HOC.bam) return {ok: false};
+  HOC.bam = true; hcVe();
+  let r = {ok: false};
+  try { r = await api('/api/hoc-canh/' + ma, body); toast(r.ok ? (loiNhan || 'Bắt đầu học cảnh…') : (r.loi || 'Không bắt đầu được')); }
+  catch (e) { toast('Không làm được — thử lại'); }
+  HOC.bam = false; taiHoc(); return r;
 }
 $('#btnHoc').onclick = async () => {
-  const h = HOC.h || {}, chay = h.job && h.job.dang_chay, ma = $('#spSua').value;
-  if (chay) { if (h.job.dang_dung) return; await api('/api/hoc-canh-dung', {}); toast('Đang dừng… (huỷ việc đang làm ở Antigravity, vài giây)'); return taiHoc(); }
-  if (!h.agy || !h.agy.mo) { HOC.moTay = true; $('#hocSetup').classList.remove('hidden'); toast('Mở Antigravity trước rồi bấm Học cảnh'); return taiHoc(); }
-  const r = await api('/api/hoc-canh/' + ma, {});
-  if (!r.ok) { toast(r.loi || 'Không bắt đầu được'); if (r.can) HOC.moTay = true; return taiHoc(); }
-  toast('Bắt đầu học cảnh…'); taiHoc();
+  const h = HOC.h; if (!h || HOC.bam) return;
+  const j = h.job;
+  if (j && j.dang_chay) {
+    if (j.dang_dung) return;
+    HOC.bam = true; hcVe();
+    try { await api('/api/hoc-canh-dung', {}); toast('Đang dừng…'); } catch (e) { toast('Không dừng được — thử lại'); }
+    HOC.bam = false; return taiHoc();
+  }
+  if (!h.agy.mo) {
+    HOC.bam = true; hcVe();
+    try { const r = await api('/api/agy-mo', {}); if (r.ok) { HOC.moLuc = Date.now(); toast('Đang mở Antigravity…'); } else toast(r.loi || 'Không mở được Antigravity'); } catch (e) { toast('Không mở được — thử lại'); }
+    HOC.bam = false; return taiHoc();
+  }
+  hcChay({});
 };
-$('#btnHsDong').onclick = () => { HOC.moTay = false; $('#hocSetup').classList.add('hidden'); $('#btnAgy2').classList.remove('hidden'); };
-$('#btnAgy2').onclick = () => { HOC.moTay = true; taiHoc(); };
-$('#btnAgyMo').onclick = async () => { const r = await api('/api/agy-mo', {}); toast(r.ok ? 'Đang mở Antigravity…' : (r.loi || 'Không mở được')); taiHoc(); };
+$('#btnHcLai').onclick = () => hcChay({lai: true}, 'Bắt đầu học lại theo kiểu mới…');
+$('#hocLoiBox').onclick = e => {
+  const b = e.target.closest('[data-thu]'); if (!b || b.disabled) return;
+  const L = (HOC.h && HOC.h.job && HOC.h.job.loi) || [];
+  const ds = b.dataset.thu === 'all' ? L.map(x => x.video) : [(L[+b.dataset.thu] || {}).video];
+  const chi = ds.filter(Boolean); if (chi.length) hcChay({chi}, 'Thử lại ' + chi.length + ' video…');
+};
+$('#hocQuyen').onclick = async e => {
+  if (!e.target.closest('#btnQuyen')) return;
+  const r = await api('/api/hoc-canh-quyen/' + $('#spSua').value, {}); toast(r.ok ? 'Đã bật tự duyệt — nếu Antigravity còn hỏi, đóng rồi mở lại Antigravity 1 lần' : (r.loi || 'Không bật được')); taiHoc();
+};
+$('#linkTay').onclick = async e => { e.preventDefault(); const r = await api('/api/lenh-gemini/' + $('#spSua').value); try { await navigator.clipboard.writeText(r.lenh); toast('Đã chép lệnh — dán vào Antigravity, làm xong bấm Nạp lại cảnh vào kho'); } catch (x) { toast('Không chép được — thử lại'); } };
 $('#hsModel').onchange = async () => { const r = await api('/api/hoc-canh-model', {model: $('#hsModel').value}); toast(r.ok ? 'Đã lưu model' : r.loi); };
+
+// ---------- "Máy đã học được gì": tổng, loại cảnh còn thiếu, từng video và từng cảnh
+const HCX = {ma: '', d: null, loc: '', tim: '', trang: 0, ds: []};
+const HC_TRANG = 60;
+function hcXemDong() { $('#hcModal').classList.remove('on'); }
+function hcXemMo() {
+  HCX.loc = ''; HCX.tim = ''; HCX.trang = 0;
+  $('#hcModal').classList.add('on'); $('#hcXem').innerHTML = '<div class="note">Đang tải…</div>';
+  hcXemTai();
+}
+async function hcXemTai() {
+  const ma = HOC.ma; let r;
+  try { r = await api('/api/hoc-canh-ket-qua/' + encodeURIComponent(ma)); } catch (e) { r = {ok: false, loi: 'Không tải được — thử lại.'}; }
+  if (HOC.ma !== ma) return;
+  if (!r.ok) { $('#hcXem').innerHTML = `<div class="warnbox">${esc(r.loi || 'Không xem được kho này.')}</div>`; return; }
+  HCX.ma = ma; HCX.d = r; hcXemVe();
+}
+function hcXemVe() {
+  const d = HCX.d, t = d.tong, tl = d.theo_loai || {}, hoc = t.kieu1 + t.kieu2;
+  let loai;
+  if (t.kieu2 > 0) {
+    const it = Object.keys(HC_LOAI).filter(l => (tl[l] || 0) <= 2);
+    loai = '<div class="hc-loai">' + Object.keys(HC_LOAI).map(l => { const n = tl[l] || 0, th = n <= 2;
+      return `<div class="hc-l${th ? ' it' : ''}"><span>${esc(HC_LOAI[l])}</span><b>${n}</b>${th ? '<span>đang thiếu</span>' : ''}</div>`; }).join('') + '</div>'
+      + (it.length ? '<div class="note">Ô màu vàng là loại cảnh đang ít (từ 0 đến 2 cảnh) — kho nên có thêm video có loại cảnh đó.</div>' : '');
+  } else loai = '<div class="note">Chưa có video nào học theo kiểu mới nên chưa chia được loại cảnh.</div>';
+  const loc = (v, ten, n) => `<button class="btn ghost sm${HCX.loc === v ? ' on' : ''}" data-loc="${v}">${ten} (${n})</button>`;
+  $('#hcXem').innerHTML = `<div class="hc-tong"><div><b>${t.video_tong}</b><span>video trong kho</span></div>
+      <div><b>${hoc}</b><span>video đã học${t.kieu1 ? ` · ${t.kieu2} kiểu mới, ${t.kieu1} kiểu cũ` : ''}</span></div>
+      <div><b>${t.canh_tong}</b><span>cảnh</span></div>${t.chua_hoc ? `<div><b>${t.chua_hoc}</b><span>chưa học</span></div>` : ''}</div>
+    ${loai}
+    <div class="hc-loc hc-loc-nut">${loc('', 'Tất cả', t.video_tong)}${loc('2', 'Đã học', t.kieu2)}${t.kieu1 ? loc('1', 'Kiểu cũ', t.kieu1) : ''}${t.chua_hoc ? loc('0', 'Chưa học', t.chua_hoc) : ''}
+      <input type="text" id="hcTim" placeholder="Tìm theo tên video" value="${esc(HCX.tim)}"></div>
+    <div id="hcDs" style="display:flex;flex-direction:column;gap:12px"></div>`;
+  hcXemDs();
+}
+function hcXemDs() {
+  const q = HCX.tim.trim().toLowerCase();
+  const ds = HCX.d.video.filter(v => (HCX.loc === '' || String(v.kieu) === HCX.loc) && (!q || v.video.toLowerCase().includes(q)));
+  HCX.ds = ds;
+  const tr = Math.max(1, Math.ceil(ds.length / HC_TRANG)); HCX.trang = Math.min(HCX.trang, tr - 1);
+  const a = HCX.trang * HC_TRANG;
+  const pg = tr > 1 ? `<div class="hc-trang"><button class="btn ghost sm" data-tr="-1"${HCX.trang ? '' : ' disabled'}>Trang trước</button><span class="note">Trang ${HCX.trang + 1}/${tr} · ${ds.length} video</span>
+      <button class="btn ghost sm" data-tr="1"${HCX.trang < tr - 1 ? '' : ' disabled'}>Trang sau</button></div>` : '';
+  $('#hcDs').innerHTML = ds.length ? pg + ds.slice(a, a + HC_TRANG).map((v, i) => hcVideoHtml(v, a + i)).join('') + pg : '<div class="note">Không có video nào khớp.</div>';
+  document.querySelectorAll('#hcXem .hc-loc-nut [data-loc]').forEach(b => b.classList.toggle('on', b.dataset.loc === HCX.loc));
+}
+function hcVideoHtml(v, i) {
+  const badge = v.kieu === 2 ? '<span class="pill g">Đã học</span>' : v.kieu === 1 ? '<span class="pill y">Kiểu cũ</span>' : '<span class="pill">Chưa học</span>';
+  const thu = HOC.chay || !(HOC.h && HOC.h.agy.mo);
+  const mac = v.kieu === 0 ? 'Học video này' : 'Học lại video này';
+  const th = v.video.includes('/') ? `<span class="note">${esc(v.video.slice(0, v.video.lastIndexOf('/')))}</span>` : '';
+  return `<div class="hc-v"><div class="hc-v-h"><span class="ten">${esc(hcTen(v.video))}</span>${th}${badge}
+      ${v.canh.length ? `<span class="note">${v.canh.length} cảnh</span>` : ''}
+      <button class="btn ghost sm" data-lai="${i}"${thu ? ' disabled title="Mở Antigravity và đợi máy học xong việc đang làm"' : ''}>${mac}</button></div>
+    ${v.tom_tat ? `<div class="note">${esc(v.tom_tat)}</div>` : ''}
+    ${(v.loi_hay || []).map(q => `<p class="hc-q">“${esc(q)}”</p>`).join('')}
+    ${v.canh.length ? `<details data-i="${i}"><summary>Xem ${v.canh.length} cảnh</summary><div class="hc-cs"></div></details>` : ''}</div>`;
+}
+function hcCanhHtml(v) {
+  return v.canh.map(c => {
+    const t = ((Number(c.tu) || 0) + (Number(c.den) || 0)) / 2;
+    const src = `/api/hoc-canh-khung/${encodeURIComponent(HCX.ma)}?v=${encodeURIComponent(v.video)}&t=${t.toFixed(1)}`;
+    const co = HC_CO[c.co_canh] || '';
+    return `<div class="hc-c"><img loading="lazy" alt="" width="45" height="80" src="${src}" onerror="this.style.visibility='hidden'">
+      <div class="hc-c-b"><div class="hc-c-h"><b>${hcGio(c.tu)}–${hcGio(c.den)}</b>
+        ${c.loai ? `<span class="pill p">${esc(HC_LOAI[c.loai] || c.loai)}</span>` : ''}${co ? `<span class="note">${co}</span>` : ''}
+        ${c.loi ? `<span class="pill y">Khuyết điểm: ${esc(c.loi)}</span>` : ''}
+        ${c.dep != null ? `<span class="pill${c.dep >= 4 ? ' g' : c.dep < 3 ? ' y' : ''}">Điểm ${esc(c.dep)}/5</span>` : ''}</div>
+        <div>${esc(c.ta)}</div>${c.noi ? `<div class="note">Đang nói về: ${esc(c.noi)}</div>` : ''}</div></div>`;
+  }).join('');
+}
+$('#btnHcXem').onclick = hcXemMo;
+$('#hcXemDong').onclick = hcXemDong;
+$('#hcModal').addEventListener('click', e => { if (e.target === $('#hcModal')) hcXemDong(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#hcModal').classList.contains('on')) hcXemDong(); });
+$('#hcXem').addEventListener('toggle', e => {                  // cảnh của từng video chỉ dựng khi anh mở ra (kho lớn vẫn nhẹ)
+  const d = e.target; if (!d.matches || !d.matches('details[data-i]') || !d.open) return;
+  const cs = d.querySelector('.hc-cs'); if (cs.dataset.xong) return;
+  cs.dataset.xong = '1'; cs.innerHTML = hcCanhHtml(HCX.ds[+d.dataset.i]);
+}, true);
+$('#hcXem').addEventListener('click', async e => {
+  const l = e.target.closest('[data-loc]'); if (l) { HCX.loc = l.dataset.loc; HCX.trang = 0; return hcXemDs(); }
+  const p = e.target.closest('[data-tr]'); if (p) { HCX.trang += +p.dataset.tr; hcXemDs(); $('#hcXem').scrollTop = 0; return; }
+  const b = e.target.closest('[data-lai]');
+  if (b && !b.disabled) {
+    const v = HCX.ds[+b.dataset.lai]; if (!v) return;
+    const r = await hcChay({chi: [v.video]}, 'Bắt đầu học ' + (v.kieu === 0 ? '' : 'lại ') + 'video này…');
+    if (r.ok) hcXemDong();
+  }
+});
+$('#hcXem').addEventListener('input', e => { if (e.target.id === 'hcTim') { HCX.tim = e.target.value; HCX.trang = 0; hcXemDs(); } });
 const KD_T = {t: null};
 function kdVe(b, dangChay, tien) {
   const box = $('#kdBox'); box.classList.remove('hidden');
@@ -1720,7 +1938,7 @@ async function kdTai() {
 }
 async function kdChay(sua) { const r = await api('/api/kiem-dinh/' + $('#spSua').value, {sua}); if (!r.ok) toast(r.loi); kdVe(null, true); setTimeout(kdTai, 600); }
 $('#btnKiem').onclick = () => kdChay(false);
-$('#btnKho').onclick = async () => { const r = await api('/api/chuan-bi-kho/' + $('#spSua').value, {}); toast(r.ok ? 'Đang chuẩn bị kho (vài phút)…' : r.loi); taiKho(); };
+$('#btnKho').onclick = async () => { const r = await api('/api/chuan-bi-kho/' + $('#spSua').value, {}); toast(r.ok ? 'Đang nạp cảnh vào kho (vài phút)…' : r.loi); taiHoc(); };
 // ---------- CHỌN SẢN PHẨM TỪ TIKTOK SHOP (ảnh thật; dữ liệu lấy từ app TikTok Auto Kid)
 const SHOP = {ds: null, loi: '', dang: false};
 const VE_SHOP = [];

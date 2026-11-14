@@ -671,10 +671,11 @@ def hoc_canh_trang_thai(ma):
         quyen = hoc_canh.trang_thai_quyen(hoc_canh.km._kho_cua(ma))
     except Exception:
         quyen = None
-    return {"agy": hoc_canh.trang_thai_agy(), "model": hoc_canh.doc_model(),
+    agy = hoc_canh.trang_thai_agy()
+    return {"agy": agy, "agy_thong_bao": hoc_canh.MSG_AGY_VO if agy.get("vo") else "", "model": hoc_canh.doc_model(),
             "models": [{"v": k, "t": t} for k, t in hoc_canh.MODELS.items()],
             "job": j if j.get("ma") == ma else None, "job_khac": bool(j.get("dang_chay") and j.get("ma") != ma),
-            "dang_chay_lo": bool(dang_chay()), "quyen": quyen}
+            "dang_chay_lo": bool(dang_chay()), "quyen": quyen, "kho_cho": ma in KHO_CHO}
 
 
 def hoc_canh_quyen(ma):
@@ -690,32 +691,99 @@ def hoc_canh_quyen(ma):
     return r
 
 
+KHO_CHO = set()                  # mã sản phẩm đã học xong nhưng đang đợi hub rảnh để nạp kho
+
+
 def _chuan_bi_kho_sau_hoc(ma):
     """Học cảnh xong thì chuẩn bị kho; nếu hub đang làm video thì ĐỢI lô xong rồi mới chạy (tránh 2 việc nặng + Claude cùng lúc)."""
     if not dang_chay():
         return chuan_bi_kho(ma)
 
     def doi():
-        for _ in range(2880):                                   # tối đa ~8 giờ, 10 giây một lần
-            time.sleep(10)
-            if not dang_chay():
-                chuan_bi_kho(ma)
-                return
+        try:
+            for _ in range(2880):                               # tối đa ~8 giờ, 10 giây một lần
+                time.sleep(10)
+                if not dang_chay():
+                    chuan_bi_kho(ma)
+                    return
+        finally:
+            KHO_CHO.discard(ma)
+    KHO_CHO.add(ma)                                             # giao diện thấy "đang đợi hub làm xong video để nạp kho"
     threading.Thread(target=doi, daemon=True, name="chuan-bi-kho-sau-hoc").start()
     return {"ok": True, "doi": True}
 
 
-def hoc_canh_bat_dau(ma):
+def hoc_canh_ket_qua(ma, gon=False):
+    """Chỉ đọc: kết quả học từng video của kho + tổng + số cảnh theo loại (giao diện xem kho còn thiếu kiểu cảnh nào). gon=True: chỉ tổng + số cảnh theo loại."""
+    import hoc_canh
+    try:
+        kho = hoc_canh.km._kho_cua(ma)
+    except Exception:
+        return {"ok": False, "loi": "Sản phẩm này chưa có thư mục kho video."}
+    if not kho.exists():
+        return {"ok": False, "loi": "Không tìm thấy thư mục kho."}
+    r = hoc_canh.ket_qua_kho(kho)
+    if gon:
+        r.pop("video", None)
+    r["ok"] = True
+    return r
+
+
+_KHUNG = __import__("collections").OrderedDict()          # (mã, video, giây) → bytes JPEG; giữ ~300 khung gần nhất
+_KHUNG_LOCK = threading.Lock()
+KHUNG_TOI_DA = 300
+
+
+def hoc_canh_khung(ma, video, giay):
+    """Chỉ đọc: 1 khung hình JPEG nhỏ (180×320) của 1 video trong kho để xem trước cảnh. Chỉ nhận video có trong kho của sản phẩm. → bytes hoặc None."""
+    import hoc_canh
+    try:
+        kho = hoc_canh.km._kho_cua(ma).resolve()
+        giay = max(0.0, min(float(giay), 36000.0))
+    except Exception:
+        return None
+    rel = str(video or "").replace("\\", "/")
+    if not rel or not kho.is_dir():
+        return None
+    khoa = (ma, rel, round(giay, 1))
+    with _KHUNG_LOCK:
+        if khoa in _KHUNG:
+            _KHUNG.move_to_end(khoa)
+            return _KHUNG[khoa]
+    p = hoc_canh.km.liet_ke_video(kho).get(rel)             # phải là video có trong danh sách của kho (không nhận đường dẫn tuỳ ý)
+    if p is None:
+        return None
+    try:
+        p = p.resolve()
+        p.relative_to(kho)
+        import cv2, cat_canh
+        ok, buf = cv2.imencode(".jpg", cat_canh.khung(str(p), giay, 180, 320), [cv2.IMWRITE_JPEG_QUALITY, 78])
+    except Exception:
+        return None
+    if not ok:
+        return None
+    b = bytes(buf)
+    with _KHUNG_LOCK:
+        _KHUNG[khoa] = b
+        while len(_KHUNG) > KHUNG_TOI_DA:
+            _KHUNG.popitem(last=False)
+    return b
+
+
+def hoc_canh_bat_dau(ma, lai=False, chi=None):
+    """lai=True: học lại theo kiểu mới cả các video còn mô tả kiểu cũ (bản cũ được cất ở _mo-ta/_cu). chi=[video…]: chỉ học lại đúng các video này."""
     import hoc_canh
     k = KHO_JOB.get(ma)
     if k and k.poll() is None:
         return {"ok": False, "loi": "Đang chuẩn bị kho."}
-    if not hoc_canh.trang_thai_agy()["mo"]:
-        return {"ok": False, "loi": "Antigravity chưa mở — bấm Mở Antigravity.", "can": "mo"}
+    agy = hoc_canh.trang_thai_agy()
+    if not agy["mo"]:
+        return {"ok": False, "loi": hoc_canh.MSG_AGY_VO if agy.get("vo") else "Antigravity chưa mở — bấm Mở Antigravity.", "can": "mo"}
     if hoc_canh.JOB.get("dang_chay"):
         return {"ok": False, "loi": "Đang học rồi."}
     # Học cảnh là làn riêng: KHÔNG chặn làm video (và ngược lại). Đang làm video thì học nhường máy: chỉ 1 lô một lúc.
-    return hoc_canh.bat_dau_nen(ma, khi_xong=lambda kq: _chuan_bi_kho_sau_hoc(ma), ban_san_xuat=dang_chay)
+    return hoc_canh.bat_dau_nen(ma, khi_xong=lambda kq: _chuan_bi_kho_sau_hoc(ma), ban_san_xuat=dang_chay, lai=bool(lai),
+                                 chi=[str(x) for x in chi] if isinstance(chi, list) and chi else None)
 
 
 _TQ = {"t": 0, "v": None}
@@ -1277,6 +1345,21 @@ class H(BaseHTTPRequestHandler):
                 return self._json(hoc_canh_trang_thai(u.path.split("/")[-1]))
             except Exception as e:
                 return self._json({"loi": str(e)[:200]})
+        if u.path.startswith("/api/hoc-canh-khung/"):
+            try:
+                b = hoc_canh_khung(unquote(u.path.split("/")[-1]), q.get("v", [""])[0], q.get("t", ["0"])[0])
+            except Exception:
+                b = None
+            if b is None:
+                return self.send_error(404)
+            self.send_response(200); self.send_header("Content-Type", "image/jpeg"); self.send_header("Content-Length", str(len(b)))
+            self.send_header("Cache-Control", "private, max-age=86400"); self.end_headers(); self.wfile.write(b)
+            return
+        if u.path.startswith("/api/hoc-canh-ket-qua/"):
+            try:
+                return self._json(hoc_canh_ket_qua(u.path.split("/")[-1], gon=q.get("gon", ["0"])[0] == "1"))
+            except Exception as e:
+                return self._json({"ok": False, "loi": str(e)[:200]})
         if u.path.startswith("/api/kiem-dinh/"):
             return self._json(KD.get(u.path.split("/")[-1]) or {"dang_chay": False, "bao_cao": None})
         if u.path.startswith("/api/kho/"):
@@ -1425,7 +1508,7 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"loi": str(e)[:200]})
         if u.path.startswith("/api/hoc-canh/"):
-            return self._json(hoc_canh_bat_dau(u.path.split("/")[-1]))
+            return self._json(hoc_canh_bat_dau(u.path.split("/")[-1], lai=bool(b.get("lai")), chi=b.get("chi")))
         if u.path == "/api/hoc-canh-dung":
             import hoc_canh; return self._json(hoc_canh.dung())
         if u.path.startswith("/api/hoc-canh-quyen/"):
@@ -1591,6 +1674,10 @@ def main():
         sys.path.insert(0, str(CODE / "engine")); import prompt_mau; prompt_mau.ghim_tat_ca()
     except Exception as e:
         print("Không ghim được bản gốc prompt:", e)
+    try:                                         # lần trước tắt giữa lúc học cảnh → huỷ gọn cuộc trò chuyện Antigravity còn mở, dọn file tạm
+        import hoc_canh; hoc_canh.khoi_phuc()
+    except Exception as e:
+        print("Không khôi phục được trạng thái học cảnh:", e)
     if "--log" in sys.argv:
         i = sys.argv.index("--log")
         if i + 1 < len(sys.argv):

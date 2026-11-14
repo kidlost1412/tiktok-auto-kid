@@ -13,9 +13,12 @@ CFG = cfg_hub()
 
 def log(msg):
     line = f"[{datetime.datetime.now():%H:%M:%S}] {msg}"
-    print(line, flush=True)
-    with open(HUB / "lich-su" / "nhat-ky.txt", "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    try:
+        print(line, flush=True)
+    except Exception:                      # console đóng / mã hoá lạ → vẫn ghi sổ
+        pass
+    from su_kien import noi_them           # nhật ký không bao giờ làm sập lô (file bị khoá → ghi tạm .cho-ghi); quá 1,5 MB → giữ 8000 dòng cuối
+    noi_them(HUB / "lich-su" / "nhat-ky.txt", line + "\n", giu_dong=8000, toi_da_byte=1_500_000)
 
 
 def music_pick(group, rng):

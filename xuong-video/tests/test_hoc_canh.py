@@ -6,8 +6,12 @@ from pathlib import Path
 TMP = tempfile.mkdtemp(prefix="xv-test-")
 os.environ.setdefault("XUONG_DATA", TMP)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hoc_canh as hc  # noqa: E402
 import kiem_mo_ta as km  # noqa: E402
+import _gia_phieu as gia  # noqa: E402
+
+GIA = dict(cat=gia.cat_gia(2), to_anh=gia.to_anh_gia)          # video thử chỉ là file rỗng → máy cắt cảnh giả, không gọi OpenCV/Antigravity
 
 
 def _kho(n=1):
@@ -20,11 +24,6 @@ def _kho(n=1):
 class HocCanhTest(unittest.TestCase):
     def setUp(self):
         hc.JOB.update(dang_chay=False, dung=False, dang_dung=False, canh_bao="", trang_thai="nghi")
-        self._chn = km.chuan_hoa_noi_dung
-        km.chuan_hoa_noi_dung = lambda text, dai, rel: ({"a": 1}, [], [])       # bỏ kiểm định dạng: chỉ thử luồng
-
-    def tearDown(self):
-        km.chuan_hoa_noi_dung = self._chn
 
     # ---- dừng thật
     def test_chay_lo_dung_huy_cuoc_va_don_file(self):
@@ -50,7 +49,7 @@ class HocCanhTest(unittest.TestCase):
         try:
             kq = {}
             th = threading.Thread(target=lambda: kq.update(hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 5.0, kiem_mo=lambda: True,
-                                                                         project=False, ten="t")))
+                                                                         project=False, ten="t", **GIA)))
             th.start(); self.assertTrue(bat_dau.wait(10))
             t = time.time(); self.assertTrue(hc.dung()["dang_dung"])
             self.assertTrue(hc.JOB["dang_dung"])
@@ -62,16 +61,13 @@ class HocCanhTest(unittest.TestCase):
             hc.huy_cuoc_tro_chuyen = orig
         # video đã dừng học lại được
         def gui2(model, prompt, td, project=None):
-            for f in (kho / "_tam" / "hoc-canh").parent.rglob("*"):
-                pass
-            import re
-            for m in re.finditer(r"GHI JSON vào file: '([^']+)'", prompt):
-                Path(m.group(1)).write_text("{}", encoding="utf-8")
+            ra = gia.ra_tu_prompt(prompt); ra.parent.mkdir(parents=True, exist_ok=True)
+            ra.write_text(json.dumps(gia.phieu_tu_prompt(prompt), ensure_ascii=False), encoding="utf-8")
             return "cid-y"
         hc.CHU_KY_S, ck = 0.05, hc.CHU_KY_S
         try:
             r = hc.hoc_kho(str(kho), runner=lambda *a, **k: hc.chay_lo(*a, gui=gui2, ngu=lambda s: time.sleep(0.05), **k),
-                           do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t")
+                           do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t", **GIA)
         finally:
             hc.CHU_KY_S = ck
         self.assertEqual(r["da_hoc"], 2, r)
@@ -86,11 +82,11 @@ class HocCanhTest(unittest.TestCase):
             time.sleep(0.3)
             with kl:
                 dang["n"] -= 1
-            return list(outs)
+            return gia.runner_gia([])(model, prompt, outs, td, khi_co, **k)
         old = hc.doc_cau_hinh
         hc.doc_cau_hinh = lambda: {"lo": 1}
         try:
-            r = hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t", song_song=2, ban_san_xuat=lambda: True)
+            r = hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t", song_song=2, ban_san_xuat=lambda: True, **GIA)
         finally:
             hc.doc_cau_hinh = old
         self.assertEqual(dang["max"], 1)
@@ -105,11 +101,11 @@ class HocCanhTest(unittest.TestCase):
             time.sleep(0.3)
             with kl:
                 dang["n"] -= 1
-            return list(outs)
+            return gia.runner_gia([])(model, prompt, outs, td, khi_co, **k)
         old = hc.doc_cau_hinh
         hc.doc_cau_hinh = lambda: {"lo": 1}
         try:
-            hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t", song_song=2)
+            hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 5.0, kiem_mo=lambda: True, project=False, ten="t", song_song=2, **GIA)
         finally:
             hc.doc_cau_hinh = old
         self.assertEqual(dang["max"], 2)

@@ -102,21 +102,50 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
     return {"props": str(work_dir / "props.json"), "frames": str(work_dir / "chu"), "base": str(base), "sfx": ev, "total": total}, info
 
 
-def dung_lo(jobs, public_dir, log=print):
-    """jobs: [{"props","frames","base","out"}] → Remotion dựng lớp chữ cả lô, FFmpeg ghép. Trả về danh sách file xong."""
-    public_dir = Path(public_dir); public_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REMOTION / "public" / "DTPhudu-Black.otf", public_dir / "DTPhudu-Black.otf")
-    jf = public_dir / "_jobs.json"
-    jf.write_text(json.dumps([{"props": j["props"], "frames": j["frames"]} for j in jobs], ensure_ascii=False), encoding="utf-8")
-    p = subprocess.Popen(["node", "scripts/render_hub.mjs", str(jf), str(public_dir)], cwd=str(REMOTION),
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    ok_frames = set(); la = []
-    for line in p.stdout:
-        line = line.strip()
-        if not line.startswith("{"):
-            la.append(line); la = la[-6:]                  # giữ vài dòng lỗi không phải JSON để báo khi node chết
-            continue
-        if line.startswith("{"):
+class RemotionQuaGio(RuntimeError):
+    """Remotion/node chạy quá hạn → đã diệt cả cây tiến trình."""
+
+
+def han_remotion(tong_giay_video):
+    """Hạn chót cho cả lượt dựng lớp chữ: config remotion_han_co_so (mặc định 300 s) + remotion_han_moi_giay (mặc định 20 s) × tổng giây video."""
+    return float(CFG.get("remotion_han_co_so", 300)) + float(CFG.get("remotion_han_moi_giay", 20)) * float(tong_giay_video)
+
+
+def diet_cay(p):
+    """Diệt tiến trình + mọi tiến trình con (node bật Chrome). Windows: taskkill /T /F."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True, timeout=30)
+        else:
+            p.kill()
+    except Exception:
+        pass
+    try:
+        p.kill()
+    except Exception:
+        pass
+
+
+def _dong_ong(p):
+    try:
+        p.stdout.close()
+    except Exception:
+        pass
+
+
+def chay_node(cmd, cwd, han_s, ok_frames, log=print):
+    """Chạy node, đọc từng dòng JSON tiến độ ở luồng riêng; quá han_s giây → diệt cả cây tiến trình và ném RemotionQuaGio (tiếng Việt).
+    ok_frames (set) được điền dần: caller biết video nào đã xong trước lúc treo."""
+    import threading
+    p = subprocess.Popen(cmd, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    la = []
+
+    def doc():
+        for line in p.stdout:
+            line = line.strip()
+            if not line.startswith("{"):
+                la.append(line); del la[:-6]               # giữ vài dòng lỗi không phải JSON để báo khi node chết
+                continue
             try:
                 r = json.loads(line)
             except Exception:
@@ -124,9 +153,31 @@ def dung_lo(jobs, public_dir, log=print):
             if "ok" in r:
                 ok_frames.add(r["ok"])
             log(f"    lớp chữ: {r.get('s', '')} s {'OK' if 'ok' in r else r}")
+    th = threading.Thread(target=doc, daemon=True); th.start()
+    th.join(han_s)
+    if th.is_alive():
+        diet_cay(p)
+        th.join(10)
+        _dong_ong(p)
+        raise RemotionQuaGio(f"Dựng lớp chữ (Remotion) quá {int(han_s)} giây không xong — đã dừng tiến trình, các video chưa xong lớp chữ bị bỏ.")
     p.wait()
+    _dong_ong(p)
     if p.returncode not in (0, None) and la:
         log(f"    lớp chữ: node lỗi (mã {p.returncode}): {' | '.join(la)[-300:]}")
+
+
+def dung_lo(jobs, public_dir, log=print):
+    """jobs: [{"props","frames","base","out"}] → Remotion dựng lớp chữ cả lô, FFmpeg ghép. Trả về danh sách file xong."""
+    public_dir = Path(public_dir); public_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REMOTION / "public" / "DTPhudu-Black.otf", public_dir / "DTPhudu-Black.otf")
+    jf = public_dir / "_jobs.json"
+    jf.write_text(json.dumps([{"props": j["props"], "frames": j["frames"]} for j in jobs], ensure_ascii=False), encoding="utf-8")
+    han = han_remotion(sum(float(j.get("total") or 30) for j in jobs))
+    ok_frames = set()
+    try:
+        chay_node(["node", "scripts/render_hub.mjs", str(jf), str(public_dir)], REMOTION, han, ok_frames, log)
+    except RemotionQuaGio as e:        # treo → đã diệt node; video nào đã ra đủ lớp chữ vẫn ghép tiếp, video còn lại bị bỏ (lô sau làm bù)
+        log(f"    ⚠ {e} Còn {len(ok_frames)}/{len(jobs)} video có lớp chữ.")
 
     def ghep_an_toan(j):        # 1 video ghép lỗi không làm hỏng cả đợt (lỗi rà soát #3)
         try:

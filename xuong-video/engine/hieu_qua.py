@@ -6,7 +6,7 @@ TikTok Auto gửi số liệu từng video về cổng /trypost/so-lieu → lich
   • nhóm nào (góc / dạng bài / đạo diễn / công thức / giọng) ra view cao hơn trung bình — chỉ khi đủ mẫu;
   • câu mở của các video ăn khách nhất / kém nhất của CHÍNH sản phẩm đó.
 Chưa đủ số liệu thì trả "" (prompt giữ nguyên như cũ). Tắt bằng config "hieu_qua": {"bat": false}."""
-import csv, json, re, statistics, threading
+import csv, json, re, statistics, threading, time
 from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
@@ -16,6 +16,7 @@ from duong_dan import DATA as HUB, cfg as cfg_hub, glob_kem  # noqa: E402
 LS = HUB / "lich-su"
 CHIEU = {"goc": "góc bán", "dang": "dạng bài", "dao_dien": "gu đạo diễn", "cong_thuc": "công thức dựng", "giong": "giọng đọc"}
 _lock = threading.Lock()
+_khong_ho_so = {}              # id video chưa có hồ sơ cục bộ → giờ tìm lần cuối (nhớ 10 phút)
 
 
 def _cai():
@@ -87,8 +88,11 @@ def cap_nhat():
         for vid, s in sl.items():
             r = db.get(vid)
             if r is None:
+                if time.time() - _khong_ho_so.get(vid, 0) < 600:
+                    continue                      # vừa tìm không thấy hồ sơ → 10 phút sau mới glob lại (khỏi quét ổ đĩa mỗi lượt gọi AI)
                 hs = _ho_so(vid, ra)
                 if not hs:
+                    _khong_ho_so[vid] = time.time()
                     continue                      # video không do hub này làm / hồ sơ đã mất → bỏ
                 r = db[vid] = hs; doi = True
             for k in ("xem24", "xem72", "tuong_tac", "kenh"):

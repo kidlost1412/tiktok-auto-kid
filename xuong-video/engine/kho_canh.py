@@ -10,6 +10,7 @@ from pathlib import Path
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
+from phieu import VAI_TU_LOAI
 
 VAI_TRO = [   # vai trò chung (từ khoá trong mô tả + thẻ)
     ("chai_ro", ["cầm chai", "cam_chai", "chai_", "nhãn", "nhan_doc_ro", "can_canh_san_pham", "xoay chai", "xoay_chai"]),
@@ -39,6 +40,7 @@ def nap(ma):
     bo_file = set(sp.get("loai_tru", {}).get("file", []))
     rieng = sp.get("vai_tro_rieng", [])          # [[vai, [từ khoá]]] riêng sản phẩm
     da_xem = set()
+    file_kieu2 = set()           # video đã học kiểu 2 (phiếu): cảnh kiểu cũ còn sót của các video này sẽ bị thay
     shots, bo = [], {"diem": 0, "chu_chen": 0, "hang_khac": 0, "nguoi_noi": 0, "khong_file": 0, "trung": 0}
     for mt in sorted(x for x in (kho / "_mo-ta").rglob("*.mo-ta.json")
                      if not any(part.startswith("_") for part in x.relative_to(kho / "_mo-ta").parts[:-1])):   # bỏ _goc-gemini (bản sao lưu)
@@ -59,6 +61,8 @@ def nap(ma):
                 f = str(alt)
             else:
                 bo["khong_file"] += 1; continue
+        if d.get("kieu") == 2:
+            file_kieu2.add(f)
         khac = [s for s in d.get("san_pham_thay", []) if isinstance(s, dict) and s.get("la_san_pham_khac")]
         # đoạn Gemini báo vấn đề nặng: nghi AI tạo, watermark, lật gương, ảnh ghép, logo kênh khác → không dùng
         nang = [v for v in d.get("van_de", []) if isinstance(v, dict) and v.get("loai") in
@@ -89,33 +93,51 @@ def nap(ma):
             the = [str(t) for t in c.get("the", [])]
             blob = (hinh + " " + " ".join(the) + " " + _text(c.get("san_pham", ""))).lower()
             co_noi = any(k in blob for k in NOI) or "nguoi_noi_vao_may" in the   # Kid: cảnh người nói vẫn tốt → giữ, máy đặt vào khung
-            vai = [v for v, kws in VAI_TRO + rieng if any(k.lower() in blob for k in kws)] or ["vuon"]
+            ph = c.get("phieu") if isinstance(c.get("phieu"), dict) and d.get("kieu") == 2 else None
+            vai = [v for v, kws in VAI_TRO + rieng if any(k.lower() in blob for k in kws)]
+            if ph:                                           # kiểu 2: vai trò theo loại cảnh AI điền (cộng thêm từ khoá)
+                vai = list(dict.fromkeys(VAI_TU_LOAI.get(ph.get("loai"), []) + vai))
+                co_noi = co_noi or ph.get("mat") == 2 or ph.get("loai") == "nguoi_noi"
+            else:
+                vai = vai or ["vuon"]
             kd = c.get("khung_dep_nhat") or [a, b]
             try:
                 kd = [max(a, float(kd[0])), min(b, float(kd[1]))]
             except Exception:
                 kd = [a, b]
             sid = f"{len(shots):04d}"
-            shots.append({"id": sid, "file": f, "tu": round(a + (0.3 if a < 0.3 else 0), 2), "den": round(b, 2),
+            shot = {"id": sid, "file": f, "tu": round(a + (0.3 if a < 0.3 else 0), 2), "den": round(b, 2),
                           "dai": round(b - a - (0.3 if a < 0.3 else 0), 2), "crop": sp.get("cat_khung", {}).get(f),
                           "vai_tro": vai, "diem": c.get("diem"), "co_canh": c.get("co_canh"), "mo_ta": hinh[:220],
                           "the": the[:10], "cay": d.get("cay_trong", []), "dep": [round(x, 2) for x in kd],
-                          "chu_ghi": chu_ghi, "noi_ghi": co_noi})
+                          "chu_ghi": chu_ghi, "noi_ghi": co_noi}
+            if ph:                                           # AI đã điền phiếu → ghi thẳng kết quả soát (soat_kho.py bỏ qua cảnh đã có soat)
+                shot.update(kieu=2, loai=ph.get("loai"), noi=ph.get("dang_noi_ve") or "", loi=ph.get("loi") or "",
+                            soat={"mat": 2 if ph.get("loai") == "nguoi_noi" else ph.get("mat", 0), "chu_muc": ph.get("chu_chen", 0),
+                                  "hang_khac": bool(ph.get("hang_khac")), "dep": c.get("diem"), "nhan": ph.get("nhan"), "ghi": _text(c.get("hinh", ""))[:80]})
+            shots.append(shot)
     f_cu = sp_dir / "canh.json"
     if f_cu.exists():
         cu = json.loads(f_cu.read_text(encoding="utf-8"))
         theo_khoa = {(x["file"], round(x["tu"], 1)): x for x in cu}
         so = max([int(x["id"]) for x in cu] + [-1]) + 1
-        # cảnh cũ: bỏ nếu file gốc không còn hoặc đã đưa vào loai_tru (lỗi rà soát #9)
-        gop = [x for x in cu if x["file"] not in bo_file and ((kho / x["file"]).exists() or Path(x["file"]).is_absolute() and Path(x["file"]).exists())]
+        moi_khoa = {(x["file"], round(x["tu"], 1)) for x in shots}
+        # cảnh cũ: bỏ nếu file gốc không còn hoặc đã đưa vào loai_tru (lỗi rà soát #9); video đã học kiểu 2 thì chỉ giữ cảnh có trong mô tả mới
+        gop = [x for x in cu if x["file"] not in bo_file and ((kho / x["file"]).exists() or Path(x["file"]).is_absolute() and Path(x["file"]).exists())
+               and (x["file"] not in file_kieu2 or (x["file"], round(x["tu"], 1)) in moi_khoa)]
+        vi_tri = {(x["file"], round(x["tu"], 1)): i for i, x in enumerate(gop)}
         for x in shots:
-            if (x["file"], round(x["tu"], 1)) in theo_khoa:
+            k = (x["file"], round(x["tu"], 1))
+            if k in theo_khoa:
+                if x.get("kieu") == 2 and k in vi_tri:       # cảnh kiểu 2 đã có: cập nhật nội dung theo phiếu, giữ id
+                    x["id"] = gop[vi_tri[k]]["id"]; gop[vi_tri[k]] = x
                 continue
             x["id"] = f"{so:04d}"; so += 1; gop.append(x)
             cu_anh = sp_dir / "_khung" / f"{x['id']}.jpg"
             if cu_anh.exists():
                 cu_anh.unlink()                         # ảnh khung còn sót của id cũ → cắt lại cho đúng cảnh mới
-        print(f"  giữ {len(cu)} cảnh cũ (id + kết quả soát), thêm {len(gop) - len(cu)} cảnh mới")
+        id_cu = {y["id"] for y in cu}
+        print(f"  giữ {sum(1 for x in gop if x['id'] in id_cu)} cảnh cũ (id + kết quả soát), cảnh mới: {sum(1 for x in gop if x['id'] not in id_cu)}, bỏ {len(cu) - sum(1 for x in gop if x['id'] in id_cu)}")
         shots = gop
     f_cu.write_text(json.dumps(shots, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{ma}: {len(shots)} cảnh dùng được; bỏ {bo}")

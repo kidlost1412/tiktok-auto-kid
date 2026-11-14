@@ -26,7 +26,8 @@ tôn trọng sản phẩm, gọn, có chủ đích, mỗi khung hình đều có
 
 ## 6. Chân thật, đa dạng, chống reup
 - Dùng người thật đang dùng sản phẩm (AFF) — đặt trong khung/ô, không để miệng nói lệch lời đọc full màn.
-- Đa dạng bố cục: chia 2, lưới, ô chèn bầu trời, khung mờ, phóng cắt; không để 1 khung gốc toàn màn quá 2,8 s.
+- Cảnh toàn màn là chính; máy tự phóng, cúp, đổi tốc độ nhẹ để không trùng khung gốc. Chia 2, lưới, ô chèn, khung mờ chỉ dùng khi có lý do, không quá 1/3 số đoạn.
+- Có khoảng thở: ít nhất một đoạn hình sạch không khối chữ; hiệu ứng, tiếng động, chữ nhấn dùng ít mà đúng chỗ — thà thiếu một hiệu ứng còn hơn thừa.
 - Ô chèn (picture-in-picture) đặt GIỮA và đủ to; không nhét ô nhỏ vào góc — bố cục phải cân, có chủ đích.
 
 ## 7. Chất lượng hình và màu

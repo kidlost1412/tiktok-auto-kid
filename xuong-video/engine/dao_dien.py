@@ -1,13 +1,13 @@
 """Ê-kíp AI: ĐẠO DIỄN (lên bảng dựng từng câu, NHÌN ảnh cảnh) + GIÁM KHẢO (xem bản dựng, chấm, yêu cầu sửa).
 Máy dựng (dung.py / dung_remotion.py) chỉ làm theo bảng dựng; mọi lựa chọn AI đều được máy kiểm lại."""
-import json, re, subprocess
+import datetime, json, re, subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ai import goi, lay_json
 import prompt_mau
-from bo_cuc import SO_PHU, la_chai
-from cong_thuc import RECIPES, DATA_SPEC
+from bo_cuc import SO_PHU, la_chai, ep_bo_cuc
+from cong_thuc import RECIPES, DATA_SPEC, ct_cho_dao_dien
 from dung import sentence_times, MENU as MENU_NEN
 from soat_kho import bad, nguoi_noi
 
@@ -36,32 +36,211 @@ BO_CUC_MO_TA = {
 }
 
 
+# ---------------------------------------------------------------- mệt cảnh (chống lặp cảnh qua video)
+KHO_NHO = 80              # kho riêng < 80 cảnh dùng được = "kho nhỏ": hạn mức ứng viên chặt hơn, kho chung được thêm rộng hơn
+TOI_DA_MOI_CAU = 6        # ứng viên mỗi câu (gồm cả cảnh kho chung)
+TRAN_KHO_NHO = 0.60       # kho nhỏ: tổng ứng viên riêng của 1 video ≤ 60% kho
+TY_BO_MET = 0.35          # bỏ tối đa 35% cảnh MỆT NHẤT khỏi ứng viên (miễn mọi vai trò của cảnh còn đủ cảnh thay)
+W_MET = 1.5               # 1 đơn vị mệt = trừ 1,5 điểm liên quan
+PHAT_ANH_EM = 6.0         # video anh em (cùng lời) đã dùng cảnh này
+PHAT_MO_CHOT = 30.0       # cảnh trùng cảnh mở/chốt của 6 video gần nhất
+SO_VIDEO_MO_CHOT = 6
+TY_ANH_EM = 0.30          # 2 video cùng lời đọc: tối đa 30% cảnh chung
+TY_KHO_THEM_NHO = 0.45    # kho riêng nhỏ: kho chung được chiếm tới 45% (thay vì 30%) số cảnh + ô phụ
+TOI_DA_TO = 32            # 1 tờ ứng viên 8 cột × 4 hàng ô 190×338 (≤ 1520 px: model không thu nhỏ → ô ≥ 180 px); tối đa 2 tờ
+MAX_ANH = 2 * TOI_DA_TO
+
+
+def _ls_dir(hub=None):
+    return Path(hub or HUB) / "lich-su"
+
+
+def doc_lich_su(ma, hub=None):
+    """Sổ cảnh đã dùng của sản phẩm, cũ → mới: [{"ngay": date|None, "ids": [cảnh chính], "phu": [cảnh ô phụ]}].
+    canh-da-dung-<ma>.txt: mỗi dòng 1 video, KHÔNG có ngày (coi là "cũ"). canh-da-dung-<ma>.jsonl: bản ghi CÓ NGÀY (ghi_lich_su_canh), kèm cả ô phụ.
+    Hai sổ cùng được ghi mỗi video: N dòng cuối .txt đã nằm trong .jsonl (N = số bản ghi .jsonl); phần còn lại là sổ không ngày."""
+    d = _ls_dir(hub); moi, dong = [], []
+    f = d / f"canh-da-dung-{ma}.jsonl"
+    if f.exists():
+        for l in f.read_text(encoding="utf-8").splitlines():
+            try:
+                o = json.loads(l); moi.append({"ngay": datetime.date.fromisoformat(o["ngay"]), "ids": list(o.get("ids") or []), "phu": list(o.get("phu") or [])})
+            except Exception:
+                continue
+    f = d / f"canh-da-dung-{ma}.txt"
+    if f.exists():
+        dong = [l.split() for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [{"ngay": None, "ids": x, "phu": []} for x in dong[:max(0, len(dong) - len(moi))]] + moi
+
+
+def id_canh_chinh(segs):
+    return [sg["shot"]["id"] for sg in segs or []]
+
+
+def id_canh_phu(segs):
+    return [p["id"] for sg in segs or [] for p in sg.get("phu_shots", [])]
+
+
+def ghi_lich_su_canh(ma, segs, ma_viec="", hub=None, ngay=None):
+    """Thêm 1 bản ghi CÓ NGÀY (cảnh chính + ô phụ) vào canh-da-dung-<ma>.jsonl. Gọi ngay cạnh chỗ ekip ghi dòng .txt của video đó."""
+    d = _ls_dir(hub); d.mkdir(parents=True, exist_ok=True)
+    o = {"ngay": (ngay or datetime.date.today()).isoformat(), "ids": id_canh_chinh(segs), "phu": id_canh_phu(segs), "viec": ma_viec}
+    with open(d / f"canh-da-dung-{ma}.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(o, ensure_ascii=False) + "\n")
+
+
+def tinh_met(ls, today=None, tranh=(), anh_em=(), hom_nay=()):
+    """Độ MỆT của từng cảnh = số lần dùng trong 7 ngày qua (hôm nay ×3, 3 ngày gần ×2, cũ hơn ×1; sổ không ngày: 14 video gần nhất, ×1)
+    + PHAT_ANH_EM nếu video anh em đã dùng + hom_nay (id đã dùng ở lô này, mỗi lần ×3). `tranh` (tập cũ) chỉ nâng sàn lên 1.
+    (Phạt "đã dùng trong cùng video" áp lúc chọn: cảnh đã dùng không được chọn lại.) → {id: mệt}."""
+    today = today or datetime.date.today(); met = {}
+    cong = lambda i, w: met.__setitem__(i, met.get(i, 0) + w)
+    for r in [r for r in ls if r["ngay"] is None][-14:]:
+        for i in r["ids"]:
+            cong(i, 1)
+    for r in ls:
+        if r["ngay"] is None:
+            continue
+        tuoi = (today - r["ngay"]).days
+        w = 3 if tuoi <= 0 else 2 if tuoi <= 3 else 1 if tuoi <= 7 else 0
+        if w:
+            for i in r["ids"] + r["phu"]:
+                cong(i, w)
+    for i in tranh:
+        met[i] = max(met.get(i, 0), 1)
+    for i in hom_nay:
+        cong(i, 3)
+    for i in set(anh_em):
+        cong(i, PHAT_ANH_EM)
+    return met
+
+
+def mo_chot_gan(ls, n=SO_VIDEO_MO_CHOT):
+    """(tập cảnh mở, tập cảnh chốt) của n video gần nhất."""
+    g = [r for r in ls if r["ids"]][-n:]
+    return {r["ids"][0] for r in g}, {r["ids"][-1] for r in g}
+
+
+def boi_canh(ma, tranh=(), anh_em=None, hub=None, today=None):
+    """Lịch sử dùng cảnh gom 1 chỗ → {"met", "mo", "chot", "anh_em"}.
+    tranh: list (có lặp) = cảnh đã dùng ở LÔ này (mỗi lần ×3); set = kiểu cũ (chỉ nâng sàn mệt lên 1).
+    anh_em: list CÓ THỨ TỰ cảnh chính của video anh em (hoặc set: mất thứ tự → chỉ phạt cảnh)."""
+    ls = doc_lich_su(ma, hub)
+    mo, chot = mo_chot_gan(ls)
+    anh = list(anh_em or [])
+    if isinstance(anh_em, (list, tuple)) and anh:
+        mo.add(anh[0]); chot.add(anh[-1])
+    soft, lo = (tranh, []) if isinstance(tranh, (set, frozenset)) else ((), list(tranh or []))
+    return {"met": tinh_met(ls, today, soft, anh, lo), "mo": sorted(mo), "chot": sorted(chot), "anh_em": anh}
+
+
+def loc_met(ds, met, ty_bo=TY_BO_MET, toi_thieu=6):
+    """Bỏ bớt cảnh MỆT NHẤT (≤ ty_bo kho), chỉ khi MỌI vai trò của cảnh đó còn > toi_thieu cảnh → kho nhỏ không bị vét cạn."""
+    ds = list(ds); han = int(len(ds) * ty_bo)
+    vai = lambda s: set(s.get("vai_tro") or ["_"])
+    dem = {}
+    for s in ds:
+        for v in vai(s):
+            dem[v] = dem.get(v, 0) + 1
+    giu, bo = list(ds), 0
+    for s in sorted(ds, key=lambda s: -met.get(s["id"], 0)):
+        if bo >= han or met.get(s["id"], 0) <= 0:
+            break
+        if all(dem[v] > toi_thieu for v in vai(s)):
+            giu.remove(s); bo += 1
+            for v in vai(s):
+                dem[v] -= 1
+    return giu
+
+
 # ---------------------------------------------------------------- ứng viên cảnh cho từng câu
+VAI_TU = {    # vai trò (tên ASCII trong kho) → từ khoá trong lời tiếng Việt có dấu (review #17: trước đây so "chai_ro" với câu có dấu → không bao giờ khớp)
+    "chai_ro": ["chai", "gói", "sản phẩm", "nhãn", "bao bì", "chính hãng"], "chai_mo": ["chai", "sản phẩm", "bao bì"],
+    "nhan_can": ["nhãn", "thành phần", "công dụng", "hàm lượng", "hướng dẫn", "ghi trên"], "pha_rot": ["pha", "rót", "đổ", "đong", "tỉ lệ", "tỷ lệ", "liều", "bình"],
+    "phun": ["phun", "xịt", "tưới", "bình bơm", "sương"], "re": ["rễ", "bộ rễ", "kích rễ"], "cay_con": ["cây con", "cây giống", "giâm", "đọt non", "bầu"],
+    "van_de": ["bệnh", "vàng lá", "còi", "chết", "thối", "héo", "nấm", "rụng", "úa", "sâu"], "vuon": ["vườn", "ruộng", "rẫy", "đồi", "cây", "lá"],
+    "ket_qua": ["kết quả", "xanh", "tốt", "phát triển", "bung", "đẹp", "năng suất", "sai quả"], "kho_hang": ["kho", "thùng", "kệ", "đóng gói", "giao hàng"],
+    "cong_viec": ["làm", "chăm", "nhà vườn", "bà con"], "nguoi_noi": ["chia sẻ", "kể", "người dùng", "khách"], "qua_tang": ["tặng", "quà", "kèm", "biếu"],
+}
+
+
 def _diem_lien_quan(shot, sent, y_canh):
     q = (sent + " " + (y_canh or "")).lower()
-    blob = ((shot.get("soat") or {}).get("ghi", "") + " " + shot.get("mo_ta", "") + " " + " ".join(shot.get("the", []))).lower()
+    blob = ((shot.get("soat") or {}).get("ghi", "") + " " + shot.get("mo_ta", "") + " " + " ".join(shot.get("the", [])) + " " + (shot.get("noi") or "")).lower()
     toks = {t for t in re.findall(r"\w+", q) if len(t) > 2}
     s = sum(1 for t in toks if t in blob)
-    s += 2 * sum(1 for v in shot.get("vai_tro", []) if v.replace("_", " ") in q or v in q)
+    s += 2 * sum(1 for v in shot.get("vai_tro", []) if v.replace("_", " ") in q or v in q or any(k in q for k in VAI_TU.get(v, ())))
     return s + ((shot.get("soat") or {}).get("dep") or 3) * 0.5
 
 
-def ung_vien(sents, y_canh, shots, rng, n_moi_cau=9, tranh=(), dem_dung=None):
-    """Mỗi câu ~9 cảnh: phần lớn liên quan nhất + vài cảnh đẹp ngẫu nhiên để AI có lựa chọn bất ngờ."""
-    dung_duoc = [s for s in shots if s.get("soat") and not bad(s) and s["id"] not in tranh] or [s for s in shots if not bad(s)]
-    chon, per = {}, []
-    for k, st in enumerate(sents):
-        yc = y_canh[k] if k < len(y_canh) else ""
-        dd = dem_dung or {}
-        xep = sorted(dung_duoc, key=lambda s: -_diem_lien_quan(s, st["text"], yc) + 1.5 * dd.get(s["id"], 0) - rng.random() * 1.5)
-        top = [s for s in xep[:n_moi_cau * 3] if s["id"] not in chon][:n_moi_cau - 2] or xep[:n_moi_cau - 2]   # kho nhỏ: cho dùng lại ứng viên
-        con = [s for s in dung_duoc if s["id"] not in chon and s not in top]
-        them = rng.sample(con, k=min(2, len(con)))           # kho nhỏ: có thể không còn cảnh để thêm
-        ids = [s["id"] for s in top + them]
-        for s in top + them:
-            chon[s["id"]] = s
+def ung_vien(sents, y_canh, shots, rng, n_moi_cau=TOI_DA_MOI_CAU, tranh=(), dem_dung=None, met=None, mo_gan=(), chot_gan=()):
+    """Ứng viên cho từng câu, xếp theo (liên quan − mệt). KHÔNG còn lọc cứng "đã dùng": cảnh mệt nhất bị loại khỏi danh sách đưa đạo diễn miễn là
+    còn đủ cảnh cùng vai trò; mỗi câu ≤ n_moi_cau (n−1 hợp nhất + 1 bất ngờ); kho nhỏ (<80 cảnh) cả video chỉ thấy ≤ 60% kho;
+    câu mở không lấy cảnh mở của 6 video gần nhất, câu chốt không lấy cảnh chốt gần nhất.
+    met: {id: mệt} (boi_canh). Không có → suy từ dem_dung (đếm cũ, chặn ở 3) + tranh (mệt ≥ 1) cho tương thích."""
+    if met is None:
+        met = {i: min(c, 3) for i, c in (dem_dung or {}).items()}
+        for i in tranh:
+            met[i] = max(met.get(i, 0), 1)
+    sach = [s for s in shots if s.get("soat") and not bad(s)] or [s for s in shots if not bad(s)] or list(shots)     # không bao giờ rỗng nếu còn cảnh (review #21)
+    n, mo_gan, chot_gan = len(sents), set(mo_gan), set(chot_gan)
+    if not sach or not n:
+        return [[] for _ in sents], {}
+    yc = lambda k: y_canh[k] if k < len(y_canh) else ""
+    ok = loc_met(sach, met)
+    rel = [{s["id"]: _diem_lien_quan(s, st["text"], yc(k)) for s in ok} for k, st in enumerate(sents)]
+    if len(sach) < KHO_NHO:                                  # kho nhỏ: chọn trước "bể" ≤ 60% kho cho cả video rồi mới chia theo câu
+        tran = max(int(TRAN_KHO_NHO * len(sach)), min(len(sach), n_moi_cau))
+        if tran < len(ok):
+            g = {s["id"]: 0.6 * max(r[s["id"]] for r in rel) + 0.4 * sum(r[s["id"]] for r in rel) / n - W_MET * met.get(s["id"], 0) + rng.random() * 1.5 for s in ok}
+            ok = sorted(ok, key=lambda s: -g[s["id"]])
+            chai = [s for s in ok if la_chai(s) and s["id"] not in chot_gan][:3] or [s for s in ok if la_chai(s)][:3]    # luôn giữ vài cảnh chai cho câu chốt
+            ok = (chai + [s for s in ok if s not in chai])[:tran]
+    chon, per, hien = {}, [], {}
+    for k in range(n):
+        def diem(s):
+            i = s["id"]
+            d = rel[k].get(i, 0) - W_MET * met.get(i, 0) - 1.2 * hien.get(i, 0) - rng.random()
+            return d - (PHAT_MO_CHOT if (k == 0 and i in mo_gan) or (k == n - 1 and i in chot_gan) else 0)
+        xep = sorted(ok, key=lambda s: -diem(s))
+        top = xep[:max(1, n_moi_cau - 1)]
+        con = [s for s in xep[len(top):] if met.get(s["id"], 0) <= 1 and not ((k == 0 and s["id"] in mo_gan) or (k == n - 1 and s["id"] in chot_gan))]
+        ids = []
+        for s in top + rng.sample(con, k=min(1, len(con))):      # 1 cảnh bất ngờ; kho nhỏ có thể không còn gì để thêm
+            if s["id"] not in ids:
+                ids.append(s["id"]); chon[s["id"]] = s; hien[s["id"]] = hien.get(s["id"], 0) + 1
         per.append(ids)
     return per, chon
+
+
+def chon_ung_vien(ma, sents, y_canh, shots, rng, tranh=(), anh_em=None, qua=None, chung=None, hub=None, today=None):
+    """Toàn bộ khâu chọn ứng viên (không gọi AI, không ghi file) → (per, chon, boi). per[k] = id ứng viên câu k; chon = {id: cảnh}.
+    Cảnh kho chung (V-…) thêm 1 cảnh/câu, kho riêng nhỏ (<80 cảnh dùng được) thêm 2 cảnh/câu; tổng ≤ 6/câu. Tổng ảnh ≤ MAX_ANH (2 tờ)."""
+    boi = boi_canh(ma, tranh, anh_em, hub, today)
+    met, mo, chot = boi["met"], set(boi["mo"]), set(boi["chot"])
+    chung = [x for x in (chung or []) if not bad(x)]
+    nho = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-"))) < KHO_NHO
+    nc = (2 if nho else 1) if chung else 0
+    per, chon = ung_vien(sents, y_canh, shots, rng, TOI_DA_MOI_CAU - nc, met=met, mo_gan=mo, chot_gan=chot)
+    n, hien = len(sents), {}
+    for k, st in enumerate(sents):
+        yc = y_canh[k] if k < len(y_canh) else ""
+        def diem(x):
+            d = _diem_lien_quan(x, st["text"], yc) - W_MET * met.get(x["id"], 0) - 1.2 * hien.get(x["id"], 0) - rng.random()
+            return d - (PHAT_MO_CHOT if (k == 0 and x["id"] in mo) or (k == n - 1 and x["id"] in chot) else 0)
+        for x in sorted(chung, key=lambda x: -diem(x))[:nc]:
+            chon[x["id"]] = x; per[k].append(x["id"]); hien[x["id"]] = hien.get(x["id"], 0) + 1
+    for k, st in enumerate(sents):                      # câu nhắc tới quà (vd. "tặng gói kali bo") → cho đạo diễn cảnh quà thật
+        for tu_khoa, ds in (qua or {}).items():
+            cau = st["text"].lower()
+            if tu_khoa in cau and re.search(r"tặng|quà|kèm|biếu", cau):          # chỉ câu nói về QUÀ (lỗi rà soát #7)
+                for x in rng.sample(ds, k=min(3, len(ds))):
+                    chon[x["id"]] = x; per[k].append(x["id"])
+    if len(chon) > MAX_ANH:                             # quá nhiều ảnh: bỏ cảnh MỆT NHẤT (không bỏ quà Q-) cho vừa 2 tờ
+        for i in sorted([i for i in chon if not str(i).startswith("Q-")], key=lambda i: -met.get(i, 0))[:len(chon) - MAX_ANH]:
+            del chon[i]
+        per = [[i for i in p if i in chon] for p in per]
+    return per, chon, boi
 
 
 ANH_RIENG = {}
@@ -155,24 +334,37 @@ def gioi_han_kho_them(segs, shots, used, ty_le=None):
 
 
 def to_ung_vien(ma, ids, out, cols=8):
+    """Tờ ảnh ứng viên cho đạo diễn. Ô ≥ 180 px rộng (sàn, không thu nhỏ thêm): ≤ 32 ô/tờ (8×4, 1520×1352 px), nhiều hơn thì tách tối đa 2 tờ.
+    Trả LIST đường dẫn tờ (tờ 1 = out, tờ 2 = <out>-2.jpg); danh sách id rỗng → []. Thiếu file ảnh 1 cảnh → ô xám có số id (không sập)."""
     d = HUB / "san-pham" / ma / "_khung"
-    tw, th = 200, 356
-    rows = (len(ids) + cols - 1) // cols
-    sheet = Image.new("RGB", (cols * tw, rows * th), "black")
+    ids = list(ids)[:MAX_ANH]
+    if not ids:
+        return []
+    tw, th = 190, 338
     try:
         font = ImageFont.truetype("arialbd.ttf", 30)
     except Exception:
         font = ImageFont.load_default()
-    dr = ImageDraw.Draw(sheet)
-    for i, sid in enumerate(ids):
-        x, y = (i % cols) * tw, (i // cols) * th
-        f_anh = ANH_RIENG.get(sid) or (d / f"{sid}.jpg")          # cảnh quà tặng lấy từ kho sản phẩm khác
-        sheet.paste(Image.open(f_anh).resize((tw, th)), (x, y))
-        nhan = sid if len(sid) <= 6 else sid.replace("Q-", "Q:").replace("V-", "V:")
-        rong = min(tw - 2, int(dr.textlength(nhan, font=font)) + 12)
-        dr.rectangle([x, y, x + rong, y + 38], fill="black"); dr.text((x + 6, y + 3), nhan, fill="yellow", font=font)
-    sheet.save(out, quality=85)
-    return out
+    outs = []
+    for t in range(0, len(ids), TOI_DA_TO):
+        nhom = ids[t:t + TOI_DA_TO]
+        rows = (len(nhom) + cols - 1) // cols
+        sheet = Image.new("RGB", (cols * tw, rows * th), "black")
+        dr = ImageDraw.Draw(sheet)
+        for i, sid in enumerate(nhom):
+            x, y = (i % cols) * tw, (i // cols) * th
+            f_anh = ANH_RIENG.get(sid) or (d / f"{sid}.jpg")          # cảnh quà tặng lấy từ kho sản phẩm khác
+            try:
+                sheet.paste(Image.open(f_anh).convert("RGB").resize((tw, th)), (x, y))
+            except Exception:
+                dr.rectangle([x, y, x + tw - 1, y + th - 1], fill=(70, 70, 70))
+            nhan = sid if len(sid) <= 6 else sid.replace("Q-", "Q:").replace("V-", "V:")
+            rong = min(tw - 2, int(dr.textlength(nhan, font=font)) + 12)
+            dr.rectangle([x, y, x + rong, y + 38], fill="black"); dr.text((x + 6, y + 3), nhan, fill="yellow", font=font)
+        f_out = Path(out) if t == 0 else Path(out).with_name(Path(out).stem + f"-{t // TOI_DA_TO + 1}" + Path(out).suffix)
+        sheet.save(f_out, quality=85)
+        outs.append(f_out)
+    return outs
 
 
 # ---------------------------------------------------------------- ĐẠO DIỄN
@@ -187,30 +379,40 @@ def bai_hoc_cho(ma):
     return "\n".join(chung + (["Riêng sản phẩm này:"] + rieng if rieng else []))
 
 
-def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), qua=None, chung=None):
-    """Dữ liệu điền vào mẫu prompt/dao-dien.md → (ctx, sents, total, ids cảnh ứng viên). Không ghi file, không gọi AI."""
+COT_DS = "Cột: id | vai trò | cỡ cảnh | mô tả | nói: lời người trong clip lúc đó (chỉ để hiểu cảnh) | dài (s)"
+
+
+def dong_ds(i, s):
+    """1 dòng cảnh ứng viên gửi đạo diễn: id | vai trò[ | NGƯỜI NÓI…] | cỡ cảnh (nếu biết) | mô tả[ | nói: …] | dài.
+    Cảnh học kiểu 2 (có phiếu): mô tả đầy đủ ≤ 90 ký tự + lời đang nói; cảnh cũ giữ cách ghi cũ."""
+    kieu2 = s.get("kieu") == 2
+    mo = (s.get("mo_ta") or "")[:90] if kieu2 and s.get("mo_ta") else ((s.get("soat") or {}).get("ghi") or s.get("mo_ta", "")[:60])
+    cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | NGƯỜI NÓI (chỉ đặt trong khung/ô)" if nguoi_noi(s) else "")]
+    if s.get("co_canh"):
+        cot.append(str(s["co_canh"]))
+    cot.append(mo)
+    if kieu2 and s.get("noi"):
+        cot.append("nói: " + str(s["noi"])[:80])
+    cot.append(str(s["dai"]))
+    return " | ".join(cot)
+
+
+def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None, ra_boi=None):
+    """Dữ liệu điền vào mẫu prompt/dao-dien.md → (ctx, sents, total, ids cảnh ứng viên). Không ghi file, không gọi AI.
+    tranh: list cảnh đã dùng ở lô này (hoặc set kiểu cũ). anh_em: list có thứ tự cảnh chính của video anh em cùng lời. used_sigs: chữ ký công thức hôm nay
+    (đạo diễn không được mời 2 công thức dùng nhiều nhất). ra_boi (dict) nhận {met, mo, chot, anh_em} để segs_tu_bang dùng cùng số liệu (qua edl["_boi"])."""
     sents = sentence_times(voice["text"], voice["words"])
     total = round(max(voice["dur"] + 0.6, khung_giay(sp)[0] + 0.3), 2)      # khớp dung.render (độ dài đích theo sản phẩm)
-    f_dd = HUB / "lich-su" / f"canh-da-dung-{ma}.txt"
-    dem_dung = {}
-    if f_dd.exists():
-        for i in f_dd.read_text(encoding="utf-8").split():
-            dem_dung[i] = dem_dung.get(i, 0) + 1
-    per, chon = ung_vien(sents, script.get("y_canh", []), shots, rng, tranh=tranh, dem_dung=dem_dung)
-    if chung:                                           # cảnh vườn dùng chung: mỗi câu thêm 2 cảnh vườn hợp ý nhất
-        yc = script.get("y_canh", [])
-        for k, st in enumerate(sents):
-            xep = sorted([x for x in chung if x["id"] not in chon and x["id"] not in tranh],
-                         key=lambda x: -_diem_lien_quan(x, st["text"], yc[k] if k < len(yc) else "") - rng.random())
-            for x in xep[:2]:
-                chon[x["id"]] = x; per[k].append(x["id"])
-    for k, st in enumerate(sents):                      # câu nhắc tới quà (vd. "tặng gói kali bo") → cho đạo diễn cảnh quà thật
-        for tu_khoa, ds in (qua or {}).items():
-            cau = st["text"].lower()
-            if tu_khoa in cau and re.search(r"tặng|quà|kèm|biếu", cau):          # chỉ câu nói về QUÀ (lỗi rà soát #7)
-                for x in rng.sample(ds, k=min(3, len(ds))):
-                    chon[x["id"]] = x; per[k].append(x["id"])
+    per, chon, boi = chon_ung_vien(ma, sents, script.get("y_canh", []), shots, rng, tranh, anh_em, qua, chung)
+    if not chon:
+        raise ValueError("kho không có cảnh dùng được để đưa đạo diễn")
+    if ra_boi is not None:
+        ra_boi.update(boi)
     ids = list(chon)
+    try:                                       # công thức đưa đạo diễn: bỏ 2 công thức dùng nhiều nhất hôm nay
+        ct_ds = ct_cho_dao_dien(list(used_sigs or []))
+    except RuntimeError:
+        ct_ds = list(RECIPES)
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     so_gu = so_gu_f.read_text(encoding="utf-8")[-4000:].strip() if so_gu_f.exists() else ""
     so_gu = f"=== SỔ GU CỦA CHỦ HÀNG (bắt buộc tôn trọng) ===\n{so_gu}\n\n" if so_gu else ""      # chưa có sổ gu → không gửi khung trống
@@ -224,12 +426,11 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
         gu=GU[gu_key], so_gu=so_gu, bai_hoc=bai_hoc_cho(ma), so_tay=SO_TAY(), sp=json.dumps(sp_ngan, ensure_ascii=False),
         cau="\n".join(f"[{k}] {s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for k, s in enumerate(sents)),
         total=total, nhan=script.get("nhan_tu", []),
-        ds="\n".join(f"{i} | {','.join(chon[i]['vai_tro'])}{' | NGƯỜI NÓI (chỉ đặt trong khung/ô)' if nguoi_noi(chon[i]) else ''} | {(chon[i].get('soat') or {}).get('ghi') or chon[i]['mo_ta'][:60]} | {chon[i]['dai']}"
-                     for i in ids),
+        ds=COT_DS + "\n" + "\n".join(dong_ds(i, chon[i]) for i in ids),
         goi_y=json.dumps({k: v for k, v in enumerate(per)}),
         bo_cuc=json.dumps(BO_CUC_MO_TA, ensure_ascii=False),
         ct=json.dumps({k: {"ten": r["ten"], "mo": r["mo"], "giua": r["giua"], "chot": r["chot"], "phu_de": r.get("phu_de"), "sfx": r.get("sfx")}
-                       for k, r in RECIPES.items()}, ensure_ascii=False),
+                       for k, r in RECIPES.items() if k in ct_ds}, ensure_ascii=False),
         data_spec=DATA_SPEC, phu_de=["to_dan", "mo_sang", "o_nhay", "gach_chay", "nhich_len", "hop_mo", "quet_mau", "vien_day"],
         mau_nhan=["vang", "xanh_la", "cam", "do", "xanh_duong"], chuyen_canh=MENU_NEN["chuyen_canh"], chuyen_dong=MENU_NEN["chuyen_dong"],
         mau=list(MENU_NEN["mau"]), sfx=["gon", "vua", "soi_dong", "mo_dau_am"],
@@ -240,15 +441,18 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
     return ctx, sents, total, ids
 
 
-def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None):
-    ctx, sents, total, ids = ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y, tranh, qua, chung)
+def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None):
+    boi = {}
+    ctx, sents, total, ids = ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y, tranh, qua, chung, anh_em, used_sigs, boi)
     anh = to_ung_vien(ma, ids, Path(work) / f"ung-vien-{gu_key}.jpg")
     p = prompt_mau.dien("dao-dien", **ctx)
-    txt, _ = goi(f"đạo diễn {gu_key}", p, anh=[anh])
+    txt, _ = goi(f"đạo diễn {gu_key}", p, anh=anh)
     edl = lay_json(txt)
     if not isinstance(edl, dict):
         raise ValueError("bảng dựng không phải đối tượng JSON")
     edl["gu"] = gu_key
+    edl["_boi"] = {"met": {i: v for i, v in boi.get("met", {}).items() if v > 0}, "mo": boi.get("mo", []), "chot": boi.get("chot", []),
+                   "anh_em": boi.get("anh_em", [])}          # segs_tu_bang dùng lại để chọn/đổi cảnh theo cùng độ mệt
     return edl, sents, total
 
 
@@ -269,7 +473,17 @@ def segs_tu_bang(edl, sents, total, shots):
         a = 0.0 if k == 0 else (sents[k - 1]["e"] + s["s"]) / 2
         b = total if k == len(sents) - 1 else (s["e"] + sents[k + 1]["s"]) / 2
         bounds.append((a, b))
-    plan = {int(d.get("cau", -1)): d.get("canh", []) for d in edl.get("doan", []) if isinstance(d, dict)}
+    plan = {}
+    for d in edl.get("doan", []):                    # đạo diễn trả rác (cau không phải số, canh null) → bỏ đoạn đó, không sập (review #1)
+        try:
+            plan[int(d.get("cau", -1))] = d.get("canh") or []
+        except Exception:
+            continue
+    boi = edl.get("_boi") or {}
+    met = boi.get("met") or {}
+    mo_gan, chot_gan, anh = set(boi.get("mo") or []), set(boi.get("chot") or []), list(boi.get("anh_em") or [])
+    phat = lambda s: met.get(s["id"], 0) + (PHAT_ANH_EM if s["id"] in anh else 0)
+    dep_ = lambda s: (s.get("soat") or {}).get("dep") or 3
     used, segs, sua = set(), [], []
     for k, (a, b) in enumerate(bounds):
         items = [c for c in plan.get(k, []) if isinstance(c, dict) and k_id(c.get("id", "")) in by]
@@ -279,6 +493,7 @@ def segs_tu_bang(edl, sents, total, shots):
         if not items:   # AI bỏ sót / chọn sai → máy chọn cảnh chai rõ chưa dùng
             sp_shots = [s for s in shots if not str(s["id"]).startswith(("Q-", "V-"))]       # dự phòng chỉ lấy cảnh của chính sản phẩm
             alt = [s for s in sp_shots if not bad(s) and s["id"] not in used and la_chai(s)] or [s for s in sp_shots if not bad(s)] or shots
+            alt = sorted(alt, key=lambda s: (phat(s) + (PHAT_MO_CHOT if (k == 0 and s["id"] in mo_gan) or (k == len(sents) - 1 and s["id"] in chot_gan) else 0), -dep_(s)))
             items = [{"id": alt[0]["id"], "bo_cuc": "khung_mo"}]; sua.append(f"câu {k}: thiếu cảnh hợp lệ")
         dur = span / len(items)
         for c in items:
@@ -304,61 +519,95 @@ def segs_tu_bang(edl, sents, total, shots):
     # Câu chốt PHẢI thấy chai sản phẩm (giám khảo bắt lỗi này nhiều nhất): đoạn cuối không phải cảnh chai → đổi sang cảnh chai đẹp chưa dùng
     if segs and not la_chai(segs[-1]["shot"]):
         sp_chai = sorted([s for s in shots if not str(s["id"]).startswith(("Q-", "V-")) and la_chai(s) and not bad(s) and s["id"] not in used
-                          and not nguoi_noi(s)], key=lambda s: -((s.get("soat") or {}).get("dep") or 3))
+                          and not nguoi_noi(s)], key=lambda s: (phat(s) + (PHAT_MO_CHOT if s["id"] in chot_gan else 0), -dep_(s)))
         if sp_chai:
             sh = sp_chai[0]; used.add(sh["id"]); cu = segs[-1]
             mid = (sh["dep"][0] + sh["dep"][1]) / 2
             cu.update(shot=sh, src_start=round(min(max(sh["tu"], mid - cu["dur"] / 2), max(sh["tu"], sh["den"] - cu["dur"])), 2),
                       bo_cuc="khung_mo" if cu["bo_cuc"] in ("pip_troi", "pip_giua", "luoi_4") else cu["bo_cuc"], phu_shots=[])
             sua.append("câu chốt: đổi sang cảnh chai rõ")
-    segs, sua2 = _bu_bo_cuc(segs, shots, used)
-    segs, sua3 = gioi_han_kho_them(segs, shots, used)          # kho phụ chỉ là cảnh phụ (≤ 30%)
+    sua += _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh)
+    segs, sua2 = _bu_bo_cuc(segs, shots, used, met)
+    own = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-")))
+    segs, sua3 = gioi_han_kho_them(segs, shots, used, None if own >= KHO_NHO else TY_KHO_THEM_NHO)   # kho riêng nhỏ: kho chung được nhiều hơn
     return segs, sua + sua2 + sua3
 
 
-def _bu_bo_cuc(segs, shots, used):
-    """Máy bù nếu đạo diễn dùng quá nhiều toàn màn: ≥ 1/3 đoạn là khung/ô/chia, ≥ 1 chia 2/lưới, ≥ 1 ô trời khi có cảnh vườn."""
+def _dat_canh(sg, moi):
+    """Gán cảnh mới cho đoạn (giữ độ dài), sửa bố cục nếu cảnh mới không hợp (ô trời trên chai; người nói full màn)."""
+    mid = (moi["dep"][0] + moi["dep"][1]) / 2
+    sg["src_start"] = round(min(max(moi["tu"], mid - sg["dur"] / 2), max(moi["tu"], moi["den"] - sg["dur"])), 2)
+    sg["shot"] = moi
+    if sg["bo_cuc"] in ("pip_troi", "pip_giua") and la_chai(moi):
+        sg["bo_cuc"] = "khung_mo"; sg["phu_shots"] = []
+    if nguoi_noi(moi) and sg["bo_cuc"] in ("day", "day_zoom", "pip_troi", "pip_giua"):
+        sg["bo_cuc"] = "khung_nho"; sg["phu_shots"] = []
+
+
+def _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh):
+    """Máy kiểm lại SAU đạo diễn (đạo diễn chỉ thấy gợi ý): (1) cảnh mở không trùng cảnh mở của 6 video gần nhất / bản anh em,
+    (2) cảnh chốt (vẫn phải là chai) không trùng cảnh chốt gần nhất, (3) 2 bản anh em chung ≤ 30% cảnh (ưu tiên đổi cảnh trùng đúng vị trí).
+    Chỉ đổi khi có cảnh thay cùng vai trò (chai↔chai, ngoài chai↔ngoài chai); không có thì giữ nguyên (kho quá nhỏ). Trả ghi chú."""
+    sua, n, anh_s = [], len(segs), set(anh)
+    if not n:
+        return sua
+    cung = lambda a, b: la_chai(a) == la_chai(b) and (not a.get("vai_tro") or not b.get("vai_tro") or bool(set(a["vai_tro"]) & set(b["vai_tro"])) or la_chai(a))
+    muc = lambda s: met.get(s["id"], 0) + (PHAT_ANH_EM if s["id"] in anh_s else 0) - 0.5 * ((s.get("soat") or {}).get("dep") or 3)
+
+    def thay(i, cam):
+        cu = segs[i]["shot"]
+        pool = [s for s in shots if s["id"] not in used and s["id"] not in cam and not bad(s) and cung(cu, s)
+                and (nguoi_noi(s) <= nguoi_noi(cu))]
+        if i == n - 1:
+            pool = [s for s in pool if la_chai(s) and not nguoi_noi(s)]
+        if not pool:
+            return False
+        moi = min(pool, key=muc)
+        used.add(moi["id"]); sua.append(f"đoạn {i}: đổi {cu['id']}→{moi['id']} (chống lặp)")
+        _dat_canh(segs[i], moi)
+        return True
+    if segs[0]["shot"]["id"] in mo_gan:
+        thay(0, mo_gan | anh_s | {segs[-1]["shot"]["id"]})
+    if n > 1 and segs[-1]["shot"]["id"] in chot_gan:
+        thay(n - 1, chot_gan | anh_s | {segs[0]["shot"]["id"]})
+    if anh_s:
+        han = int(TY_ANH_EM * n + 1e-9)
+        chung = [i for i, sg in enumerate(segs) if sg["shot"]["id"] in anh_s]
+        chung.sort(key=lambda i: (not (i < len(anh) and anh[i] == segs[i]["shot"]["id"]), i == 0 or i == n - 1))   # trùng đúng vị trí trước
+        for i in chung:
+            if sum(sg["shot"]["id"] in anh_s for sg in segs) <= han:
+                break
+            thay(i, anh_s | (mo_gan if i == 0 else set()) | (chot_gan if i == n - 1 else set()))
+    return sua
+
+
+def _bu_bo_cuc(segs, shots, used, met=None):
+    """Một lượt ép trần/sàn bố cục lên bảng dựng (bo_cuc.ep_bo_cuc): ≤ 45% khung-trên-nền-mờ, ≥ 35% toàn màn, ≤ 2 đoạn liền cùng kiểu,
+    người nói không full màn; bù chia/ô trời/≥ 1/3 không toàn màn chỉ trong giới hạn đó. Ô phụ lấy cảnh ÍT MỆT trước và được ghi vào `used`."""
     import random as _r
     rng = _r.Random(len(segs) * 7 + sum(sum(map(ord, str(sg["shot"]["id"]))) for sg in segs))
-    sua = []
-    toan = ("day", "day_zoom")
-    chai = {"chai_ro", "nhan_can", "kho_hang"}
+    met = met or {}
     phu_pool = [s for s in shots if not bad(s, chinh=False) and s["id"] not in used and not str(s["id"]).startswith("Q-")]   # không chèn chai quà vào ô phụ ngẫu nhiên
     nguoi = [s for s in phu_pool if nguoi_noi(s)]
 
-    def lay_phu(n, main):
+    def lay_phu(sg, n):
         out = []
         for _ in range(n):
-            pool = [s for s in (nguoi if rng.random() < 0.5 and nguoi else phu_pool) if s["file"] != main["file"] and s["id"] not in used]
+            ds = nguoi if rng.random() < 0.4 and nguoi else phu_pool
+            pool = [s for s in ds if s["file"] != sg["shot"]["file"] and s["id"] not in used]
+            if la_chai(sg["shot"]):
+                pool = [s for s in pool if not la_chai(s)] or pool
             if not pool:
                 break
-            x = rng.choice(pool); used.add(x["id"]); out.append(x)
+            x = min(pool, key=lambda s: met.get(s["id"], 0) + rng.random() * 2)
+            used.add(x["id"]); out.append(x)
         return out
-
-    def doi(sg, L):
-        need = SO_PHU[L] - len(sg.get("phu_shots", []))
-        sg["phu_shots"] = (sg.get("phu_shots", []) + lay_phu(max(0, need), sg["shot"]))[:SO_PHU[L]]
-        if len(sg["phu_shots"]) < SO_PHU[L]:
-            return False
-        sua.append(f"bù bố cục: {sg['bo_cuc']}→{L}"); sg["bo_cuc"] = L
-        return True
-    co = lambda Ls: any(sg["bo_cuc"] in Ls for sg in segs)
-    ung = [sg for sg in segs[1:-1] if sg["bo_cuc"] in toan]          # giữ câu mở + câu chốt gọn
-    rng.shuffle(ung)
-    if not co(("chia_doi", "chia_ngang", "luoi_4")):
-        for sg in ung:
-            if sg["dur"] >= 1.5 and doi(sg, "chia_doi" if rng.random() < 0.6 else "chia_ngang"):
-                break
-    if not co(("pip_troi", "pip_giua")):
-        for sg in ung:
-            if sg["bo_cuc"] in toan and not la_chai(sg["shot"]) and not nguoi_noi(sg["shot"]) and doi(sg, rng.choice(["pip_troi", "pip_giua"])):
-                break
-    for sg in ung:
-        if sum(1 for x in segs if x["bo_cuc"] not in toan) >= len(segs) / 3:
-            break
-        if sg["bo_cuc"] in toan:
-            doi(sg, rng.choice(["khung_mo", "khung_nho", "chia_doi"] if sg["dur"] >= 1.5 else ["khung_mo", "khung_nho"]))
-    return segs, sua
+    L, sua = ep_bo_cuc(segs, [sg["bo_cuc"] for sg in segs], rng, lay_phu)
+    for sg, k in zip(segs, L):
+        if k != sg["bo_cuc"]:
+            sg["bo_cuc"] = k
+        sg["phu_shots"] = list(sg.get("phu_shots", []))[:SO_PHU[k]]
+    return segs, ["bù bố cục: " + x for x in sua]
 
 
 # ---------------------------------------------------------------- GIÁM KHẢO

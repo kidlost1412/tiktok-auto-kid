@@ -1,27 +1,39 @@
-"""HỌC CẢNH TỰ ĐỘNG bằng Google Antigravity (ứng dụng máy tính, đã đăng nhập sẵn) — không dùng khoá API.
+"""HỌC CẢNH (kiểu 2: máy đo, AI chỉ điền phiếu) bằng Google Antigravity (ứng dụng máy tính, đã đăng nhập sẵn) — không dùng khoá API.
+MÁY cắt cảnh (cat_canh.py, OpenCV, không AI) → mốc giây, độ nét, độ rung. Antigravity xem TRỌN video (có tiếng) + các tờ ảnh đánh số rồi điền phiếu cố định
+(phieu.py) cho đúng các cảnh máy đã cắt; hub kiểm phiếu chặt, cảnh sai được hỏi lại 1 lần, rồi ghi _mo-ta/<video>.mo-ta.json theo khung cũ + kieu=2.
 Antigravity mở thì nó ghi %USERPROFILE%\\.gemini\\antigravity\\daemon\\hub_<cổng>.json {pid, httpPort, csrfToken…}. Hub gọi
-language_server.exe agentapi (new-conversation) với 2 biến môi trường ANTIGRAVITY_LS_ADDRESS / ANTIGRAVITY_CSRF_TOKEN, dặn "tác tử" xem video
-ở đường dẫn tuyệt đối rồi GHI JSON ra 1 file tạm; hub chờ file đó (ổn định 2 lần kiểm) → kiem_mo_ta chuẩn hoá/kiểm → ghi đúng chỗ kho_canh.py đọc
-(_mo-ta/<thư mục con>/<video>.mo-ta.json). Chạy tối đa `hoc_canh.song_song` video cùng lúc (mặc định 2). Mỗi lần chạy kiểm lại kho nên bấm lại là làm tiếp.
-agentapi không cho đọc trạng thái lỗi/hết lượt (metadata chỉ có cấu hình) → quá hạn chờ thì báo lỗi video; 2 video liền quá hạn thì dừng cả lô."""
-import ctypes, hashlib, json, os, shutil, subprocess, sys, threading, time, urllib.request, uuid
+language_server.exe agentapi (new-conversation) với 2 biến môi trường ANTIGRAVITY_LS_ADDRESS / ANTIGRAVITY_CSRF_TOKEN; AI GHI JSON ra 1 file tạm
+trong <kho>/_tam/hoc-canh/<lô>/ và hub chờ file đó (ổn định 2 lần kiểm). Mỗi lô ≤ 24 cảnh (2 tờ ảnh) và ≤ 5 video. Mỗi lần chạy kiểm lại kho nên bấm lại là làm tiếp.
+Trạng thái việc học + mã cuộc trò chuyện đang mở được ghi ở lich-su/hoc-canh-job.json: hub khởi động lại giữa chừng thì khoi_phuc() huỷ gọn việc dở.
+agentapi không cho đọc trạng thái lỗi/hết lượt (metadata chỉ có cấu hình) → quá hạn chờ thì báo lỗi; 2 lô liền không có phiếu thì dừng cả việc."""
+import ctypes, hashlib, json, os, shutil, socket, subprocess, sys, threading, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kiem_mo_ta as km
+import cat_canh
+import phieu
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
 import prompt_mau
 LS = HUB / "lich-su"
-MODELS = {"flash": "Flash (mặc định)", "pro": "Pro", "flash_lite": "Flash Lite"}
-MODEL_MAC_DINH = "flash"
+MODELS = {"gemini-4-hydrogen-high": "Gemini 4 Hydrogen · High (mặc định)", "gemini-3.8-flash-high": "Gemini 3.8 Flash · High",
+          "gemini-3.8-flash-medium": "Gemini 3.8 Flash · Medium"}      # id thật của Antigravity (agentapi tự rơi về bậc flash nếu id không có)
+MODEL_MAC_DINH = "gemini-4-hydrogen-high"
 SONG_SONG_MAC_DINH = 2
-HAN_MOI_VIDEO_S = 240      # hạn chờ của 1 lô = 4 phút × số video
+HAN_MOI_VIDEO_S = 150      # hạn chờ của 1 lô = 150 giây × số video + 60 giây
+HAN_THEM_S = 60
 HAN_LO_TOI_DA_S = 2400     # tối đa 40 phút/lô
 CHU_KY_S = 3
+SO_CANH_LO = 24            # mỗi lô tối đa 24 cảnh (2 tờ ảnh 4×3) và 5 video
+SO_VIDEO_LO = 5
+MAX_CANH_VIDEO = 24        # video cắt ra nhiều hơn thì lấy 24 cảnh rải đều (để vừa 1 lô)
+MSG_AGY_VO = "Antigravity đang mở nhưng chưa sẵn sàng — bấm Mở Antigravity và đợi vài giây."
+MSG_AGY_CHUA_MO = "Antigravity chưa mở — bấm Mở Antigravity rồi Học cảnh lại."
+TEN_TIEN_TRINH_AGY = ("language_server.exe", "antigravity.exe")
 
 
 def _thu_muc_he_thong(csidl, dflt):
@@ -56,7 +68,7 @@ class Huy(Exception):
 
 
 # Mỗi lần học có 1 sự kiện "huy" + danh sách cuộc trò chuyện Antigravity đã mở (để Dừng thật sự huỷ được việc đang chạy ở Antigravity).
-_RUN = {"huy": threading.Event(), "conv": set(), "proc": set()}
+_RUN = {"huy": threading.Event(), "conv": set(), "proc": set(), "kho": ""}
 _RUN_LOCK = threading.Lock()
 GRACE_DUNG_S = 3          # đang gửi việc cho Antigravity mà bấm Dừng: chờ tối đa chừng này giây lấy mã cuộc trò chuyện để huỷ, quá thì giết tiến trình
 
@@ -73,7 +85,28 @@ def _giet_cay(pid):
 
 
 # ----------------------------------------------------------------------------------------------- Antigravity: trạng thái / mở / gọi
+def _ten_anh(pid):
+    """Tên file chương trình (chữ thường) của tiến trình `pid`; "" nếu không đọc được."""
+    try:
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        k.OpenProcess.restype = ctypes.c_void_p
+        k.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        k.QueryFullProcessImageNameW.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_ulong)]
+        k.CloseHandle.argtypes = [ctypes.c_void_p]
+        h = k.OpenProcess(0x1000, 0, int(pid))                      # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(1040); n = ctypes.c_ulong(1040)
+            return os.path.basename(buf.value).lower() if k.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) else ""
+        finally:
+            k.CloseHandle(h)
+    except Exception:
+        return ""
+
+
 def _song(pid):
+    """Tiến trình còn sống VÀ đúng là Antigravity (language_server.exe / Antigravity.exe) — số PID cũ trong hub_*.json có thể đã bị Windows cấp cho chương trình khác."""
     try:
         h = ctypes.windll.kernel32.OpenProcess(0x1000, 0, int(pid))
         if not h:
@@ -81,51 +114,95 @@ def _song(pid):
         code = ctypes.c_ulong()
         ok = ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
         ctypes.windll.kernel32.CloseHandle(h)
-        return bool(ok) and code.value == 259          # STILL_ACTIVE
+        return bool(ok) and code.value == 259 and _ten_anh(pid) in TEN_TIEN_TRINH_AGY          # STILL_ACTIVE
     except Exception:
         return False
 
 
-def tim_hub():
-    """→ dict {pid, httpPort, csrfToken, lsVersion} của Antigravity đang mở (file hub_*.json mới nhất có tiến trình còn sống), hoặc None."""
+def _cong_mo(port, han=0.5):
+    """Cổng http của Antigravity có đang nhận kết nối không (127.0.0.1)."""
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=han):
+            return True
+    except Exception:
+        return False
+
+
+_HUB_NHO = {"t": 0.0, "h": None}
+
+
+def tim_hub(song=None, cong=None):
+    """→ dict {pid, httpPort, csrfToken, lsVersion} của Antigravity đang mở, hoặc None. File hub_*.json mới nhất chỉ tính khi PID còn sống, đúng là
+    Antigravity VÀ cổng http nhận kết nối. Kết quả có (mặc định) nhớ 3 giây để hỏi trạng thái liên tục không tốn. song/cong: hàm kiểm thay thế khi thử (không nhớ tạm)."""
+    mac_dinh = song is None and cong is None
+    if mac_dinh and _HUB_NHO["h"] and time.time() - _HUB_NHO["t"] < 3:
+        return _HUB_NHO["h"]
+    song, cong = song or _song, cong or _cong_mo
+    tim = None
     try:
         fs = sorted(DAEMON_DIR.glob("hub_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
     except Exception:
-        return None
+        fs = []
     for f in fs:
         try:
             j = json.loads(f.read_text(encoding="utf-8"))
-            if j.get("httpPort") and j.get("csrfToken") and _song(j.get("pid")):
-                return j
+            if j.get("httpPort") and j.get("csrfToken") and song(j.get("pid")) and cong(j.get("httpPort")):
+                tim = j
+                break
         except Exception:
             continue
-    return None
+    if mac_dinh:
+        _HUB_NHO.update(t=time.time(), h=tim)
+    return tim
+
+
+_AGY_EXE = {"t": 0.0, "v": False}
+
+
+def _agy_exe_chay():
+    """Antigravity.exe có đang chạy (dù dịch vụ chưa sẵn sàng) không — dò tên tiến trình bằng tasklist, nhớ 5 giây."""
+    if time.time() - _AGY_EXE["t"] < 5:
+        return _AGY_EXE["v"]
+    v = False
+    try:
+        r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq Antigravity.exe", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=5,
+                           creationflags=NO_WIN, errors="replace")
+        v = "antigravity.exe" in (r.stdout or "").lower()
+    except Exception:
+        v = False
+    _AGY_EXE.update(t=time.time(), v=v)
+    return v
 
 
 def trang_thai_agy():
-    """{mo, phien_ban} — chỉ đọc file + kiểm tiến trình, không gọi mô hình."""
+    """{mo, phien_ban, vo} — mo: dịch vụ Antigravity sẵn sàng; vo: Antigravity.exe đang chạy nhưng dịch vụ chưa lên (mới mở / đang kẹt). Không gọi mô hình."""
     h = tim_hub()
-    return {"mo": bool(h), "phien_ban": (h or {}).get("lsVersion")}
+    return {"mo": bool(h), "phien_ban": (h or {}).get("lsVersion"), "vo": False if h else _agy_exe_chay()}
+
+
+def _msg_chua_mo():
+    return MSG_AGY_VO if _agy_exe_chay() else MSG_AGY_CHUA_MO
 
 
 def mo_antigravity():
-    """Mở Antigravity tách rời hub (đóng hub không tắt nó)."""
+    """Mở Antigravity tách rời hub (đóng hub không tắt nó). Antigravity.exe đang chạy mà dịch vụ chưa lên thì vẫn gọi mở (nó tự đưa bản đang chạy lên)."""
     if tim_hub():
         return {"ok": True, "da_mo": True}
     if not AGY_EXE.exists():
         return {"ok": False, "loi": "Không thấy Antigravity ở máy này."}
+    vo = _agy_exe_chay()
     try:
         subprocess.Popen([str(AGY_EXE)], close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          creationflags=0x00000008 | 0x00000200)          # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     except Exception as e:
         return {"ok": False, "loi": str(e)[:150]}
-    return {"ok": True}
+    return {"ok": True, "vo": vo}
 
 
 def _agentapi(*args, timeout=60, project=None):
     h = tim_hub()
     if not h:
-        raise ChuaMo("Antigravity chưa mở — bấm Mở Antigravity rồi Học cảnh lại.")
+        raise ChuaMo(_msg_chua_mo())
     if not LS_EXE.exists():
         raise ChuaMo("Không thấy language_server.exe của Antigravity.")
     huy = _RUN["huy"]
@@ -391,6 +468,7 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     if cid:
         with _RUN_LOCK:
             _RUN["conv"].add(cid)
+        _luu()
     cu = {o: -1 for o in outs}; on = {o: 0 for o in outs}; xong = []
     t = 0
     try:
@@ -420,16 +498,88 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
             if cid:
                 huy_cuoc(cid)
             don()
+        elif cid:                                            # nhận đủ phiếu rồi: bảo Antigravity dừng cuộc trò chuyện này để không còn gì chạy ngầm
+            try:
+                huy_cuoc(cid)
+            except Exception:
+                pass
         if cid:
             with _RUN_LOCK:
                 _RUN["conv"].discard(cid)
+            _luu()
     return xong
 
 
-# ----------------------------------------------------------------------------------------------- tiến độ + vòng học
+# ----------------------------------------------------------------------------------------------- lời nhắc điền phiếu (cả lô)
+def ctx_dien_phieu(viec, to, ra, ten_sp=""):
+    """Dữ liệu điền vào mẫu prompt/dien-phieu.md. viec: [{rel, src (tuyệt đối), dai, canh: [{so, tu, den}]}]; to: các file tờ ảnh; ra: file kết quả."""
+    ds, n = [], 0
+    for i, v in enumerate(viec, 1):
+        ds.append(f"VIDEO {i}: {v['src']}")
+        for c in v["canh"]:
+            ds.append(f"   cảnh {c['so']}: từ giây {c['tu']} đến giây {c['den']}")
+        n += len(v["canh"])
+    return {"so_video": len(viec), "so_canh": n, "ds_video": "\n".join(ds), "ds_to": "\n".join(f"- {t}" for t in to), "ra": str(ra),
+            "ten_sp": ten_sp or "sản phẩm của chủ hàng"}
+
+
+def loi_nhac_phieu(viec, to, ra, ten_sp=""):
+    return prompt_mau.dien("dien-phieu", **ctx_dien_phieu(viec, to, ra, ten_sp))
+
+
+# ----------------------------------------------------------------------------------------------- tiến độ + trạng thái lưu bền
 JOB = {"dang_chay": False, "ma": None, "tong": 0, "xong": 0, "hien_tai": "", "loi": [], "trang_thai": "nghi", "thong_bao": "",
-       "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": ""}
+       "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": "", "giai_doan": "", "model": "", "canh_tong": 0, "canh_xong": 0}
 _LOCK = threading.Lock()
+_LUU_LOCK = threading.Lock()
+FILE_JOB = "hoc-canh-job.json"
+MSG_KHOI_PHUC = "Xưởng vừa khởi động lại giữa lúc học — đã dừng gọn việc dở. Bấm Học cảnh để làm tiếp (video đã học được giữ)."
+
+
+def _luu():
+    """Ghi lich-su/hoc-canh-job.json (nguyên tử): JOB + mã các cuộc trò chuyện Antigravity đang mở + kho — để khởi động lại hub vẫn huỷ được việc dở. Không bao giờ ném lỗi."""
+    try:
+        with _RUN_LOCK:
+            conv = sorted(_RUN["conv"]); kho = _RUN.get("kho") or ""
+        with _LUU_LOCK:
+            f = LS / FILE_JOB
+            f.parent.mkdir(parents=True, exist_ok=True)
+            tmp = f.with_name(f.name + f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps({"job": dict(JOB, loi=list(JOB.get("loi") or [])), "conv": conv, "kho": str(kho), "luc": time.time()}, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(f)
+    except Exception:
+        pass
+
+
+def cap_nhat(**kw):
+    """JOB.update + lưu bền."""
+    JOB.update(**kw)
+    _luu()
+
+
+def khoi_phuc():
+    """Gọi 1 lần lúc hub khởi động. File trạng thái còn ghi "đang học" mà tiến trình này không học gì = hub vừa bị tắt giữa chừng → huỷ các cuộc trò chuyện Antigravity
+    còn mở, dọn <kho>/_tam/hoc-canh, đặt JOB về "dung" kèm lời nhắn. → số cuộc trò chuyện đã huỷ, hoặc None nếu không có gì để dọn."""
+    if JOB.get("dang_chay"):
+        return None
+    try:
+        d = json.loads((LS / FILE_JOB).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    job = d.get("job") or {}
+    if not isinstance(job, dict) or not (job.get("dang_chay") or job.get("trang_thai") == "dang_chay"):
+        return None
+    conv = [str(c) for c in (d.get("conv") or []) if c]
+    for c in conv:
+        huy_cuoc_tro_chuyen(c)
+    if d.get("kho"):
+        shutil.rmtree(Path(d["kho"]) / "_tam" / "hoc-canh", ignore_errors=True)
+    with _RUN_LOCK:
+        _RUN["conv"].clear(); _RUN["kho"] = str(d.get("kho") or "")
+    JOB.update(job)
+    JOB.update(dang_chay=False, dung=True, dang_dung=False, trang_thai="dung", thong_bao=MSG_KHOI_PHUC, hien_tai="", giai_doan="")
+    _luu()
+    return len(conv)
 
 
 def doc_cau_hinh():
@@ -439,9 +589,13 @@ def doc_cau_hinh():
         return {}
 
 
+def chuan_model(m):
+    """Giá trị lạ/cũ (flash, pro, flash_lite, gemini-… đã bỏ) → model mặc định."""
+    return m if m in MODELS else MODEL_MAC_DINH
+
+
 def doc_model():
-    m = str(doc_cau_hinh().get("model") or "")
-    return m if m in MODELS else MODEL_MAC_DINH          # giá trị cũ (gemini-*) → flash
+    return chuan_model(str(doc_cau_hinh().get("model") or ""))
 
 
 def doc_song_song():
@@ -451,13 +605,13 @@ def doc_song_song():
         return SONG_SONG_MAC_DINH
 
 
-def co_lo(so_viec):
-    """Số video mỗi cuộc trò chuyện: hoc_canh.lo nếu đặt; không thì 5 (kho ≤ 30 video cần học) hoặc 10 (nhiều hơn)."""
+def co_lo(so_viec=0):
+    """Số video tối đa mỗi cuộc trò chuyện: hoc_canh.lo nếu đặt (1–5); không thì 5."""
     try:
         v = int(doc_cau_hinh().get("lo") or 0)
     except Exception:
         v = 0
-    return max(1, min(20, v)) if v else (5 if so_viec <= 30 else 10)
+    return max(1, min(SO_VIDEO_LO, v)) if v else SO_VIDEO_LO
 
 
 def ten_san_pham(ma):
@@ -466,6 +620,19 @@ def ten_san_pham(ma):
         return str(d.get("ten_ngan") or d.get("ten_goi") or ma)[:40]
     except Exception:
         return str(ma)[:40]
+
+
+def ten_sp_cho_phieu(ma):
+    """Tên sản phẩm của chủ hàng để AI biết thế nào là "hàng khác" (hang_khac)."""
+    try:
+        d = json.loads((HUB / "san-pham" / str(ma) / "san-pham.json").read_text(encoding="utf-8"))
+        ten = [str(d.get("ten_goi") or "").strip()] + [str(x).strip() for x in d.get("nhan_cung_san_pham", [])]
+        ten = [t for t in ten if t]
+        if ten:
+            return "; ".join(dict.fromkeys(ten))
+    except Exception:
+        pass
+    return "sản phẩm của chủ hàng"
 
 
 def _ghi_ket_qua(kho, rel, file_cu, obj):
@@ -480,169 +647,344 @@ def _ghi_ket_qua(kho, rel, file_cu, obj):
     km.ghi_mo_ta(md, obj, goc)
 
 
+def sao_luu_cu(kho, file_cu):
+    """Chép mô tả kiểu cũ sang _mo-ta/_cu/<cùng đường dẫn> TRƯỚC khi học lại đè lên. Chỉ chép 1 lần (không đè bản sao đã có). → True nếu có chép."""
+    if not file_cu:
+        return False
+    src = kho / "_mo-ta" / file_cu
+    dst = kho / "_mo-ta" / "_cu" / file_cu
+    if not src.exists() or dst.exists():
+        return False
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return True
+
+
+def doc_mo_ta_kho(kho):
+    """{video (đường dẫn tương đối): (kieu, file mô tả tương đối _mo-ta, nội dung)} — kieu 2 = đã học bằng phiếu, 1 = mô tả kiểu cũ. Video chưa có mô tả không có mặt.
+    Một video có nhiều file mô tả: kiểu 2 thắng. Chỉ đọc."""
+    kq = {}
+    videos = km.liet_ke_video(kho)
+    for mt in km.liet_ke_mo_ta(kho):
+        try:
+            d = json.loads(km._doc_byte(mt)[0].decode("utf-8-sig", errors="replace"))
+        except Exception:
+            try:
+                d = km.doc_json_long(km._doc_byte(mt)[0])[0]
+            except Exception:
+                continue
+        try:
+            d = km._boc_goi(d, [])
+        except Exception:
+            pass
+        rel, _ = km._video_cua_file(kho, mt, d, videos)
+        if rel is None:
+            continue
+        k = 2 if isinstance(d, dict) and d.get("kieu") == 2 else 1
+        f = mt.relative_to(kho / "_mo-ta").as_posix()
+        if rel not in kq or (k == 2 and kq[rel][0] != 2):
+            kq[rel] = (k, f, d if isinstance(d, dict) else {})
+    return kq
+
+
+def kieu_kho(kho):
+    """{video: (kieu, file mô tả)} — như doc_mo_ta_kho nhưng không kèm nội dung."""
+    return {r: (k, f) for r, (k, f, _d) in doc_mo_ta_kho(kho).items()}
+
+
+def ket_qua_kho(kho):
+    """Kết quả học của cả kho để giao diện xem (chỉ đọc): từng video {video, kieu 0|1|2, hoc_luc, model, tom_tat, loi_hay, canh[…]}, tổng số, và số cảnh theo loại
+    (đủ 12 loại, loại chưa có = 0 → biết kho còn thiếu kiểu cảnh nào)."""
+    mo = doc_mo_ta_kho(kho)
+    ra, theo_loai = [], {l: 0 for l in phieu.LOAI}
+    tong = {"video_tong": 0, "kieu2": 0, "kieu1": 0, "chua_hoc": 0, "canh_tong": 0}
+    for rel in sorted(km.liet_ke_video(kho)):
+        tong["video_tong"] += 1
+        k, _f, d = mo.get(rel, (0, None, {}))
+        v = {"video": rel, "kieu": k, "hoc_luc": d.get("hoc_luc"), "model": d.get("model"), "tom_tat": d.get("tom_tat") or "",
+             "loi_hay": list(d.get("loi_hay") or []), "canh": []}
+        for c in (d.get("canh_quay") or []) if isinstance(d.get("canh_quay"), list) else []:
+            if not isinstance(c, dict):
+                continue
+            p = c.get("phieu") if isinstance(c.get("phieu"), dict) else {}
+            loai = p.get("loai") if k == 2 else None
+            v["canh"].append({"tu": c.get("tu_s"), "den": c.get("den_s"), "loai": loai, "co_canh": c.get("co_canh"), "ta": c.get("hinh") or "",
+                              "noi": p.get("dang_noi_ve") or "", "loi": p.get("loi") or "", "dep": c.get("diem"), "mat": p.get("mat"),
+                              "chu_chen": p.get("chu_chen"), "hang_khac": p.get("hang_khac")})
+            if loai in theo_loai:
+                theo_loai[loai] += 1
+        tong["kieu2" if k == 2 else "kieu1" if k == 1 else "chua_hoc"] += 1
+        tong["canh_tong"] += len(v["canh"])
+        ra.append(v)
+    return {"video": ra, "tong": tong, "theo_loai": theo_loai}
+
+
+
+def chia_lo(muc, toi_da_video=None):
+    """muc: [(video, [chỉ số cảnh])] → các lô: mỗi lô ≤ SO_CANH_LO cảnh và ≤ toi_da_video video (giữ thứ tự)."""
+    tv = toi_da_video or SO_VIDEO_LO
+    cac, hien, n = [], [], 0
+    for v, idxs in muc:
+        if hien and (len(hien) >= tv or n + len(idxs) > SO_CANH_LO):
+            cac.append(hien); hien, n = [], 0
+        hien.append((v, idxs)); n += len(idxs)
+    if hien:
+        cac.append(hien)
+    return cac
+
+
+def _rai_deu(canh, toi_da):
+    """Chọn `toi_da` cảnh rải đều (giữ thứ tự) khi video cắt ra quá nhiều."""
+    if len(canh) <= toi_da:
+        return list(canh)
+    return [canh[round(i * (len(canh) - 1) / (toi_da - 1))] for i in range(toi_da)]
+
+
+# ----------------------------------------------------------------------------------------------- vòng học
 def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi_xong=None, song_song=None, kiem_mo=None, project=False, ten=None,
-            ban_san_xuat=None):
-    """Học mọi video chưa có mô tả/hỏng của kho, gộp theo lô (mỗi lô 1 cuộc trò chuyện Antigravity). Chạy đồng bộ (gọi trong luồng nền).
-    Video chưa đạt sau lô được học lại 1 lần trong lô nhỏ riêng. khi_xong(ket_qua) chạy khi học xong TRỌN VẸN.
-    project=False: không đặt Project (thử máy giả); None/True: tự tìm Project theo kho.
-    ban_san_xuat(): True khi hub đang làm video → Học cảnh chỉ chạy 1 lô một lúc (nhường máy), hết bận thì chạy đủ song_song lô. Học cảnh KHÔNG chặn làm video."""
+            ban_san_xuat=None, lai=False, cat=None, to_anh=None, chi=None):
+    """Học mọi video chưa có mô tả/hỏng của kho (lai=True: cả video còn mô tả kiểu cũ → học lại theo kiểu mới). Chạy đồng bộ (gọi trong luồng nền).
+    1) MÁY cắt cảnh từng video (cat_canh.cat); 2) gộp thành lô ≤ 24 cảnh/≤ 5 video, mỗi lô 1 cuộc trò chuyện Antigravity điền phiếu; 3) kiểm phiếu chặt, cảnh sai
+    được hỏi lại 1 lần trong lô riêng; 4) ghi _mo-ta/<video>.mo-ta.json kiểu 2. Video xong thì giữ nguyên dù việc bị dừng giữa chừng.
+    khi_xong(ket_qua) chạy khi học xong TRỌN VẸN. project=False: không đặt Project (thử máy giả); None/True: tự tìm Project theo kho.
+    chi=[đường dẫn video tương đối]: chỉ học lại ĐÚNG các video này (dù đang kiểu nào; kiểu cũ được sao lưu như lai), bỏ qua phần còn lại của kho.
+    ban_san_xuat(): True khi hub đang làm video → chỉ chạy 1 lô một lúc (nhường máy). cat/to_anh: thay thế khi thử (mặc định cat_canh.cat / cat_canh.to_anh)."""
     kho = km._kho_cua(ma_hoac_kho) if not Path(str(ma_hoac_kho)).is_absolute() else Path(ma_hoac_kho)
-    model = model or doc_model()
+    ma = None if Path(str(ma_hoac_kho)).is_absolute() else str(ma_hoac_kho)
+    model = chuan_model(model or doc_model())
     song_song = song_song or doc_song_song()
     kiem_mo = kiem_mo or (lambda: trang_thai_agy()["mo"])
     ten = ten or ten_san_pham(ma_hoac_kho)
     ban_san_xuat = ban_san_xuat or (lambda: False)
+    cat = cat or cat_canh.cat
+    to_anh = to_anh or cat_canh.to_anh
     with _LOCK:
         if JOB["dang_chay"]:
             return {"ok": False, "loi": "Đang học rồi."}
         huy = threading.Event()
         with _RUN_LOCK:
-            _RUN.update(huy=huy, conv=set())
+            _RUN.update(huy=huy, conv=set(), kho=str(kho))
         JOB.update(dang_chay=True, ma=str(ma_hoac_kho), tong=0, xong=0, hien_tai="", loi=[], trang_thai="dang_chay", thong_bao="Đang kiểm kho…",
-                   bat_dau=time.time(), dung=False, dang_dung=False, canh_bao="")
-    kq = {"ok": True, "da_hoc": 0, "loi": [], "tat_ca_xong": False, "chi_tiet": [], "lo": 0, "project": None}
-    st = {"qua_han_lien": 0, "dung_vi": None, "lo_dang": 0}
+                   bat_dau=time.time(), dung=False, dang_dung=False, canh_bao="", giai_doan="cat", model=model, canh_tong=0, canh_xong=0)
+    _luu()
+    kq = {"ok": True, "da_hoc": 0, "loi": [], "tat_ca_xong": False, "chi_tiet": [], "lo": 0, "project": None, "canh": 0, "model": model}
+    st = {"qua_han_lien": 0, "dung_vi": None, "lo_dang": 0, "kieu1_ghi": 0}
     kl = threading.Lock()
     dang = {}                     # tên video đang xem → số lô
+    cac_video = []
 
-    def xong_video(rel, ok, giay, loi=None):
+    def xong_video(v_hoac_rel, ok, giay, loi=None, canh=0):
+        rel = v_hoac_rel["rel"] if isinstance(v_hoac_rel, dict) else v_hoac_rel
         with kl:
+            if isinstance(v_hoac_rel, dict):
+                v_hoac_rel["xong"] = True
             JOB["xong"] += 1
-            kq["chi_tiet"].append({"video": rel, "ok": ok, "giay": giay})
+            kq["chi_tiet"].append({"video": rel, "ok": ok, "giay": giay, "canh": canh})
             if ok:
-                kq["da_hoc"] += 1
-            else:
-                JOB["loi"].append({"video": rel, "loi": str(loi)[:200]}); kq["loi"].append(rel)
+                kq["da_hoc"] += 1; kq["canh"] += canh; JOB["canh_xong"] += canh
+            if loi:
+                JOB["loi"].append({"video": rel, "loi": str(loi)[:240]}); kq["loi"].append(rel)
+        _luu()
 
-    def chay_mot_lo(ds, so, tong_lo, pj, lan):
-        """ds: [{rel, file_cu, dai, ghi_chu}] → trả danh sách video chưa đạt [{..., ghi_chu}] (lan 1) hoặc ghi lỗi cuối (lan 2)."""
+    def ghi_video(v):
+        """Ghi mô tả kiểu 2 từ các cảnh đã có phiếu hợp lệ. → số cảnh đã ghi."""
+        dd = sorted(v["kq"])
+        obj = phieu.mo_ta_tu_phieu(v["rel"], v["dai"], [v["canh"][i] for i in dd], [v["kq"][i] for i in dd], v.get("info") or {}, model)
+        obj, _g, _cb = km.chuan_hoa_noi_dung(obj, v["dai"], v["rel"], la_obj=True)
+        if v.get("kieu_cu") == 1:
+            sao_luu_cu(kho, v.get("file_cu"))
+        _ghi_ket_qua(kho, v["rel"], v.get("file_cu"), obj)
+        if v.get("kieu_cu") == 1:
+            with kl:
+                st["kieu1_ghi"] += 1
+        return len(dd)
+
+    def ket_thuc_video(v, cuoi):
+        """Video đủ phiếu → ghi + xong. cuoi=True (đã hỏi lại rồi): thiếu cảnh vẫn ghi phần đã có và báo lỗi các cảnh còn lại."""
+        if v.get("xong"):
+            return
+        giay = round(time.time() - v["t0"])
+        thieu = [i for i in range(len(v["canh"])) if i not in v["kq"]]
+        if not thieu:
+            try:
+                xong_video(v, True, giay, canh=ghi_video(v))
+            except Exception as e:
+                xong_video(v, False, giay, f"Không ghi được mô tả: {type(e).__name__} {str(e)[:150]}")
+            return
+        if not cuoi:
+            return
+        ly = next((v["loi_canh"][i] for i in thieu if i in v["loi_canh"]), "Antigravity không ghi phiếu cho video này")
+        if v["kq"]:
+            try:
+                n = ghi_video(v)
+                xong_video(v, True, giay, f"Mới học {n}/{len(v['canh'])} cảnh (cảnh thứ {', '.join(str(i + 1) for i in thieu)} lỗi: {ly})", canh=n)
+            except Exception as e:
+                xong_video(v, False, giay, f"Không ghi được mô tả: {type(e).__name__} {str(e)[:150]}")
+        else:
+            xong_video(v, False, giay, ly + " — bấm Học cảnh để thử lại.")
+
+    def chay_mot_lo(lo, so, tong_lo, pj, lan):
+        """lo: [(video, [chỉ số cảnh cần điền])]. Gửi 1 cuộc trò chuyện, kiểm phiếu, ghi các video đủ cảnh. Cảnh sai ghi lý do để hỏi lại (lan 1)."""
         while True:                                     # đang làm video thì chỉ chạy 1 lô một lúc (nhường máy)
             with kl:
                 if huy.is_set() or st["dung_vi"]:
-                    return list(ds) if lan == 1 else []
+                    return
                 if not (st["lo_dang"] >= 1 and ban_san_xuat()):
                     st["lo_dang"] += 1
-                    for v in ds:
+                    for v, _ in lo:
                         dang[Path(v["rel"]).name] = so
                     JOB.update(hien_tai=", ".join(dang))
                     break
             huy.wait(2)
-        t0 = time.time()
-        sau = []
         try:
             if not kiem_mo():
-                raise ChuaMo("Antigravity chưa mở — bấm Mở Antigravity rồi Học cảnh lại.")
-            tam = kho / "_tam" / "hoc-canh"
-            viec = []
-            for v in ds:
-                h = hashlib.sha1(v["rel"].encode("utf-8")).hexdigest()[:10]
-                ra = (tam / f"{h}{'' if lan == 1 else '-2'}.json").resolve()
-                src = (kho / v["rel"]).resolve()
-                viec.append(dict(v, src=str(src), ra=str(ra)))
-            theo_ra = {Path(v["ra"]): v for v in viec}
+                raise ChuaMo(_msg_chua_mo())
+            id_lo = f"{so:02d}{'' if lan == 1 else 'b'}-" + hashlib.sha1("|".join(v["rel"] for v, _ in lo).encode("utf-8")).hexdigest()[:6]
+            thu_muc = kho / "_tam" / "hoc-canh" / id_lo
+            thu_muc.mkdir(parents=True, exist_ok=True)
+            dem, phang, viec, vao_anh = 0, [], [], []
+            for v, idxs in lo:                         # đánh số cảnh 1..n trong lô
+                cs = []
+                for i in idxs:
+                    dem += 1; c = v["canh"][i]
+                    phang.append((dem, v, i)); cs.append({"so": dem, "tu": c["tu"], "den": c["den"]})
+                    vao_anh.append((dem, str((kho / v["rel"]).resolve()), c["giua"]))
+                viec.append({"rel": v["rel"], "src": str((kho / v["rel"]).resolve()), "dai": v["dai"], "canh": cs})
+            to = to_anh(vao_anh, str(thu_muc / "to"))
+            ra = (thu_muc / "phieu.json").resolve()
             ket = {}
 
-            def khi_co(ra, text):
-                v = theo_ra[Path(ra)]
-                if huy.is_set():
-                    return
-                try:
-                    obj, _g, _cb = km.chuan_hoa_noi_dung(text, v["dai"], v["rel"])
-                    obj["video"] = v["rel"]
-                    _ghi_ket_qua(kho, v["rel"], v.get("file_cu"), obj)
-                    ket[v["rel"]] = True
-                    with kl:
-                        dang.pop(Path(v["rel"]).name, None); JOB.update(hien_tai=", ".join(dang))
-                    xong_video(v["rel"], True, round(time.time() - t0))
-                except km.Hong as e:
-                    ket[v["rel"]] = "JSON không dùng được: " + str(e)[:200]
-                except Exception as e:
-                    ket[v["rel"]] = f"{type(e).__name__}: {str(e)[:160]}"
-            tieu_de = f"Xưởng Video · {ten} · lô {so}/{tong_lo}" + ("" if lan == 1 else " (làm lại)")
+            def khi_co(f, text):
+                if not huy.is_set():
+                    ket["text"] = text
+            tieu_de = f"Xưởng Video · {ten} · lô {so}/{tong_lo}" + ("" if lan == 1 else " (làm lại cảnh lỗi)")
             kw = {"project": pj} if pj else {}
-            nhan = runner(model, loi_nhac_lo(viec), [Path(v["ra"]) for v in viec], tieu_de, khi_co, **kw)
-            for v in viec:
-                if ket.get(v["rel"]) is True:
-                    continue
-                if lan == 1:
-                    sau.append(dict(v, ghi_chu=ket.get(v["rel"]) if isinstance(ket.get(v["rel"]), str) else None))
+            han = min(HAN_LO_TOI_DA_S, HAN_MOI_VIDEO_S * len(lo) + HAN_THEM_S)
+            nhan = runner(model, loi_nhac_phieu(viec, to, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+            if huy.is_set():
+                return
+            text = ket.get("text")
+            if text is None and nhan and ra.exists():
+                text = ra.read_text(encoding="utf-8", errors="replace")
+            ly_chung = None
+            if text is None:
+                ly_chung = "Antigravity không ghi phiếu (có thể hết lượt model hoặc video khó đọc)"
+                ok, hong, info = {}, [], {}
+            else:
+                ok, hong = phieu.kiem_phieu(text, len(lo), [n for n, _, _ in phang])
+                info = phieu.doc_phieu_video(text, len(lo))
+            ly = dict(hong)
+            for n, v, i in phang:
+                if n in ok:
+                    v["kq"][i] = ok[n]; v["loi_canh"].pop(i, None)
                 else:
-                    xong_video(v["rel"], False, round(time.time() - t0), ket.get(v["rel"]) if isinstance(ket.get(v["rel"]), str) else
-                               "Antigravity không ghi kết quả cho video này (có thể hết lượt model hoặc video khó đọc) — bấm Học cảnh để thử lại.")
+                    v["loi_canh"][i] = ly_chung or ly.get(n, "phiếu thiếu")
+            for k, (v, _) in enumerate(lo, 1):
+                inf = info.get(k)
+                if inf and (not v.get("info") or not v["info"].get("tom_tat")):
+                    v["info"] = inf
             with kl:
-                st["qua_han_lien"] = st["qua_han_lien"] + 1 if (not nhan and lan == 1 and not huy.is_set()) else 0
+                st["qua_han_lien"] = st["qua_han_lien"] + 1 if (text is None and lan == 1) else 0
                 if st["qua_han_lien"] >= 2:
-                    st["dung_vi"] = ("het_luot", "Antigravity không trả lời 2 lô liền (có thể hết lượt model) — đợi một lúc rồi bấm Học cảnh làm tiếp (tiến độ đã giữ).")
+                    st["dung_vi"] = ("het_luot", "Antigravity không trả lời 2 lô liền (có thể hết lượt model) — đợi một lúc rồi bấm Học cảnh làm tiếp (video đã học được giữ).")
+            for v, _ in lo:
+                ket_thuc_video(v, lan == 2)
         except Huy:
-            sau = list(ds) if lan == 1 else []
+            pass
         except ChuaMo as e:
             with kl:
                 st["dung_vi"] = ("can_mo", str(e))
-            sau = list(ds) if lan == 1 else []
         except Exception as e:                                          # lỗi 1 lô không được làm sập cả kho
             m = str(e)[:200] if isinstance(e, LoiTam) else f"{type(e).__name__}: {str(e)[:160]}"
-            if lan == 1:
-                sau = [dict(v, ghi_chu=None) for v in ds]
-            else:
-                for v in ds:
-                    xong_video(v["rel"], False, round(time.time() - t0), m)
+            for v, idxs in lo:
+                for i in idxs:
+                    if i not in v["kq"]:
+                        v["loi_canh"][i] = m
+                ket_thuc_video(v, lan == 2)
         finally:
             with kl:
                 st["lo_dang"] -= 1
-                for v in ds:
+                for v, _ in lo:
                     dang.pop(Path(v["rel"]).name, None)
                 JOB.update(hien_tai=", ".join(dang))
-        return sau
 
-    def chay_cac_lo(dsv, lan, pj):
-        lo = co_lo(len(dsv)) if lan == 1 else max(1, min(3, co_lo(len(dsv))))
-        cac = [dsv[i:i + lo] for i in range(0, len(dsv), lo)]
+    def chay_cac_lo(muc, lan, pj):
+        cac = chia_lo(muc, co_lo())
         kq["lo"] += len(cac)
-        con = []
         with ThreadPoolExecutor(max_workers=song_song) as ex:
             fs = [ex.submit(chay_mot_lo, c, i + 1, len(cac), pj, lan) for i, c in enumerate(cac)]
             for f in fs:
-                con += f.result()
-        return con
+                f.result()
 
+    ten_sp = ten_sp_cho_phieu(ma) if ma else "sản phẩm của chủ hàng"
     try:
         def _td(i, n, ten_f):
             if huy.is_set():
                 raise Huy()
         rep = km.kiem_kho(kho, sua=True, do_dai=do_dai, tien_do=_td)         # chuẩn hoá cái đã có + biết video nào thiếu/hỏng
-        viec = [(x["video"] if isinstance(x, dict) else x, None) for x in rep["thieu_mo_ta"]]
-        viec += [(h["video"], h["file"]) for h in rep["hong"] if h.get("video")]
-        JOB.update(tong=len(viec), thong_bao="Đang học cảnh…")
+        viec = [(x["video"] if isinstance(x, dict) else x, None, 0) for x in rep["thieu_mo_ta"]]
+        viec += [(h["video"], h["file"], 0) for h in rep["hong"] if h.get("video")]
+        if chi is not None:                                                  # học lại đúng các video được chọn
+            ton = km.liet_ke_video(kho); cu = kieu_kho(kho); hong = {h["video"]: h["file"] for h in rep["hong"] if h.get("video")}
+            viec = []
+            for r in dict.fromkeys(str(x).replace("\\", "/") for x in chi):
+                if r in ton:
+                    k, f = cu.get(r) or (0, hong.get(r))
+                    viec.append((r, f, 1 if k == 1 else 0))
+        elif lai:                                                            # học lại mọi video chưa phải kiểu 2
+            co = {r for r, _f, _k in viec}
+            viec += [(r, f, 1) for r, (k, f) in sorted(kieu_kho(kho).items()) if k != 2 and r not in co]
+        cap_nhat(tong=len(viec), thong_bao="Đang cắt cảnh bằng máy…" if viec else "Đang kiểm kho…")
         if viec and not kiem_mo():
-            st["dung_vi"] = ("can_mo", "Antigravity chưa mở — bấm Mở Antigravity rồi Học cảnh lại.")
+            st["dung_vi"] = ("can_mo", _msg_chua_mo())
         elif viec:
-            ds = []
-            for rel, fc in viec:
+            def cat_mot(it):
                 if huy.is_set():
-                    raise Huy()
-                d = do_dai(kho / rel)
-                if not d:
-                    xong_video(rel, False, 0, "Không đo được độ dài video (file hỏng?).")
-                else:
-                    ds.append({"rel": rel, "file_cu": fc, "dai": d})
-            pj = tim_project(kho) if project is not False else None
-            kq["project"] = pj
-            con = chay_cac_lo(ds, 1, pj)
-            if con and not st["dung_vi"] and not huy.is_set():
-                JOB.update(thong_bao=f"Làm lại {len(con)} video chưa đạt…")
-                chay_cac_lo(con, 2, pj)
+                    return it, None
+                try:
+                    return it, cat(str(kho / it[0]))
+                except Exception:
+                    return it, {}
+            with ThreadPoolExecutor(max_workers=max(1, min(4, os.cpu_count() or 2))) as ex:
+                for k, (it, r) in enumerate(ex.map(cat_mot, viec), 1):
+                    if huy.is_set():
+                        raise Huy()
+                    rel, fc, kc = it
+                    canh = _rai_deu((r or {}).get("canh") or [], MAX_CANH_VIDEO)
+                    if not canh:
+                        xong_video(rel, False, 0, "Video quá ngắn hoặc không đọc được")
+                        continue
+                    cac_video.append({"rel": rel, "file_cu": fc, "kieu_cu": kc, "dai": float((r or {}).get("dai") or 0) or max(c["den"] for c in canh),
+                                      "canh": canh, "kq": {}, "loi_canh": {}, "info": None, "t0": time.time(), "xong": False})
+                    cap_nhat(thong_bao=f"Đang cắt cảnh bằng máy… {k}/{len(viec)} video", canh_tong=sum(len(x["canh"]) for x in cac_video))
+            if not cac_video:
+                pass
+            else:
+                cap_nhat(giai_doan="hoc", thong_bao=f"Antigravity đang điền phiếu {JOB['canh_tong']} cảnh của {len(cac_video)} video…")
+                pj = tim_project(kho) if project is not False else None
+                kq["project"] = pj
+                chay_cac_lo([(v, list(range(len(v["canh"])))) for v in cac_video], 1, pj)
+                con = [(v, [i for i in range(len(v["canh"])) if i not in v["kq"]]) for v in cac_video if not v["xong"]]
+                if con and not st["dung_vi"] and not huy.is_set():
+                    cap_nhat(thong_bao=f"Hỏi lại {sum(len(i) for _, i in con)} cảnh chưa đạt…")
+                    chay_cac_lo(con, 2, pj)
+        cap_nhat(giai_doan="ghi")
+        if lai and ma and st["kieu1_ghi"] and not st["dung_vi"] and not huy.is_set():
+            _cat_lich_su_canh(ma)
+        con_lai = len(viec) - kq["da_hoc"]
         if st["dung_vi"]:
-            JOB.update(trang_thai=st["dung_vi"][0], thong_bao=st["dung_vi"][1])
+            cap_nhat(trang_thai=st["dung_vi"][0], thong_bao=f"{st['dung_vi'][1]} Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
         elif huy.is_set() and JOB["xong"] < len(viec):
-            JOB.update(trang_thai="dung", thong_bao="Đã dừng — bấm Học cảnh để làm tiếp.")
+            cap_nhat(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
         else:
             kq["tat_ca_xong"] = True
-            JOB.update(trang_thai="xong", thong_bao="Kho đã đủ mô tả." if not viec else f"Học xong {kq['da_hoc']} video" +
-                       (f", {len(kq['loi'])} video lỗi" if kq["loi"] else "") + ".")
+            cap_nhat(trang_thai="xong", thong_bao="Kho đã đủ mô tả." if not viec else
+                     (f"Học xong {kq['da_hoc']} video ({kq['canh']} cảnh)" if kq["da_hoc"] else "Chưa học được video nào") +
+                     (f", {len(kq['loi'])} video có lỗi" if kq["loi"] else "") + ".")
     except Huy:
-        JOB.update(trang_thai="dung", thong_bao="Đã dừng — bấm Học cảnh để làm tiếp.")
+        cap_nhat(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {max(0, JOB['tong'] - kq['da_hoc'])} video chưa học.")
     except Exception as e:
-        JOB.update(trang_thai="loi", thong_bao=f"Lỗi: {str(e)[:200]}"); kq.update(ok=False, tat_ca_xong=False)
+        cap_nhat(trang_thai="loi", thong_bao=f"Lỗi: {str(e)[:200]}"); kq.update(ok=False, tat_ca_xong=False)
     finally:
         with _RUN_LOCK:
             con_cuoc = list(_RUN["conv"]); _RUN["conv"].clear()
@@ -650,17 +992,34 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             for c in con_cuoc:                                  # còn cuộc trò chuyện nào chưa huỷ thì huỷ nốt
                 huy_cuoc_tro_chuyen(c)
         shutil.rmtree(kho / "_tam" / "hoc-canh", ignore_errors=True)
-        JOB.update(dang_chay=False, dang_dung=False, hien_tai="")
+        cap_nhat(dang_chay=False, dang_dung=False, hien_tai="", giai_doan="")
     if kq.get("tat_ca_xong") and khi_xong:
         try:
             khi_xong(kq)
         except Exception as e:
-            JOB["thong_bao"] += f" (không tự chuẩn bị kho được: {str(e)[:80]})"
+            cap_nhat(thong_bao=JOB["thong_bao"] + f" (không tự chuẩn bị kho được: {str(e)[:80]})")
     return kq
 
 
+def _cat_lich_su_canh(ma):
+    """Học lại kiểu mới làm mã cảnh của các video đã học lại đổi (id mới được cấp tiếp, id cũ không bao giờ dùng lại) → cất sổ cảnh đã dùng sang canh-da-dung-<ma>.cu-<ngày>.txt."""
+    f = LS / f"canh-da-dung-{ma}.txt"
+    try:
+        if not f.is_file() or not f.read_text(encoding="utf-8").strip():
+            return None
+        import datetime
+        dst = f.with_name(f"canh-da-dung-{ma}.cu-{datetime.date.today():%Y%m%d}.txt")
+        n = 1
+        while dst.exists():
+            dst = f.with_name(f"canh-da-dung-{ma}.cu-{datetime.date.today():%Y%m%d}-{n}.txt"); n += 1
+        f.replace(dst)
+        return dst
+    except Exception:
+        return None
+
+
 def bat_dau_nen(ma, khi_xong=None, **kw):
-    """Bắt đầu học ở luồng nền (mỗi lần 1 việc)."""
+    """Bắt đầu học ở luồng nền (mỗi lần 1 việc). kw: lai=True → học lại cả video còn mô tả kiểu cũ."""
     if JOB["dang_chay"]:
         return {"ok": False, "loi": "Đang học rồi."}
     kw.setdefault("project", None)
@@ -679,7 +1038,7 @@ def dung():
     if not JOB["dang_chay"]:
         return {"ok": True, "dang_dung": False}
     huy = _RUN["huy"]
-    JOB.update(dung=True, dang_dung=True, thong_bao="Đang dừng…")
+    cap_nhat(dung=True, dang_dung=True, thong_bao="Đang dừng…")
     huy.set()
     with _RUN_LOCK:
         cac = list(_RUN["conv"])
@@ -690,3 +1049,5 @@ def dung():
     if cac:
         threading.Thread(target=lam, daemon=True, name="hoc-canh-huy").start()
     return {"ok": True, "dang_dung": True}
+
+

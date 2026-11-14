@@ -179,33 +179,83 @@ TAT_CA = {"phu_de": ["to_dan", "mo_sang", "o_nhay", "gach_chay", "nhich_len", "h
           "sfx": ["gon", "vua", "soi_dong", "mo_dau_am"]}
 
 
-def chuan_hoa(st, rng, used_sigs, tu_do=False):
-    """Ép phương án AI vào đúng công thức + chống trùng chữ ký trong ngày. Trả st mới (có ep_mo/ep_chot/sfx).
-    tu_do=True (AI đạo diễn): giữ công thức + lựa chọn của AI nếu hợp lệ, không xoay vòng ép đổi."""
-    st = dict(st)
-    key = st.get("cong_thuc") if st.get("cong_thuc") in RECIPES else rng.choice(list(RECIPES))
-    counts = {k: 0 for k in RECIPES}                 # xoay vòng: không để 1 công thức áp đảo trong ngày
+CT_HOP = {   # dạng bài (THAN trong viet_loi.py) → các công thức hợp (tiện nhất đứng trước); không biết dạng → mọi công thức
+    "van_de_giai_phap": ["tin_nhanh", "ke_chuyen", "soi_dong", "tvc_sang"], "truoc_sau": ["so_sanh", "ke_chuyen", "tvc_sang", "soi_dong"],
+    "chuyen_that_bai": ["ke_chuyen", "tin_nhanh", "soi_dong"], "ba_sai_lam": ["danh_sach", "tin_nhanh", "soi_dong"],
+    "hoai_nghi": ["so_sanh", "ke_chuyen", "tvc_sang"], "phep_tinh": ["con_so", "danh_sach", "so_sanh"],
+    "tung_buoc": ["danh_sach", "ke_chuyen", "tvc_sang"], "khach_hoi": ["ke_chuyen", "so_sanh", "tin_nhanh"],
+    "soi_nhan": ["tvc_sang", "danh_sach", "so_sanh", "con_so"], "dau_hieu": ["danh_sach", "tin_nhanh", "ke_chuyen"],
+    "khang_dinh": ["tvc_sang", "soi_dong", "qua_tang"],
+}
+
+
+def ct_hop(dang=None, goc=None):
+    """Công thức hợp với kịch bản (dạng bài + góc bán). Góc nhắc quà → thêm qua_tang. Trống/không biết → tất cả."""
+    ds = list(CT_HOP.get(str(dang or ""), []))
+    if re.search(r"qua|tang|gift", str(goc or "").lower()) and "qua_tang" not in ds:
+        ds.append("qua_tang")
+    return ds or list(RECIPES)
+
+
+def dem_cong_thuc(used_sigs):
+    """Số chữ ký (≈ số video) đã dùng của từng công thức trong ngày."""
+    counts = {k: 0 for k in RECIPES}
     for s in used_sigs:
-        counts[s.split("|")[0]] = counts.get(s.split("|")[0], 0) + 1
+        k = str(s).split("|")[0]
+        if k in counts:
+            counts[k] += 1
+    return counts
+
+
+def ct_cho_dao_dien(used_sigs, bo=2):
+    """Danh sách công thức đưa đạo diễn chọn: bỏ `bo` công thức DÙNG NHIỀU NHẤT trong ngày (nếu thật sự nhiều hơn công thức ít nhất)."""
+    c = dem_cong_thuc(used_sigs); low = min(c.values())
+    nhieu = [k for k in sorted(c, key=lambda k: (-c[k], k))[:bo] if c[k] > low]
+    return [k for k in RECIPES if k not in nhieu]
+
+
+def chuan_hoa(st, rng, used_sigs, tu_do=False, dang=None, goc=None):
+    """Ép phương án AI vào đúng công thức + chống trùng chữ ký trong ngày. Trả st mới (có ep_mo/ep_chot/sfx).
+    tu_do=True (AI đạo diễn): tôn trọng công thức AI chọn CHỈ KHI nó không bị dùng quá tay hôm nay (số dùng ≤ ít nhất + 1);
+    quá tay → đổi sang công thức ít dùng nhất hợp kịch bản (dang/goc: xem ct_hop) và các lựa chọn theo công thức cũ được bốc lại.
+    Chống trùng chữ ký (mở/đóng/phụ đề/sfx) luôn chạy."""
+    st = dict(st)
+    hop = ct_hop(dang, goc)
+    counts = dem_cong_thuc(used_sigs)
     low = min(counts.values())
-    if counts.get(key, 0) > low and not tu_do:
-        key = rng.choice([k for k, v in counts.items() if v == low])
+    key0 = st.get("cong_thuc") if st.get("cong_thuc") in RECIPES else None
+    ap_dung = (lambda ks: [k for k in ks if counts[k] == min(counts[x] for x in ks)])
+    if key0 is None:
+        key = rng.choice(ap_dung(hop))
+    elif tu_do:
+        key = key0
+        if counts[key0] > low + 1:
+            thay = ap_dung(hop)
+            key = rng.choice(thay) if counts[thay[0]] < counts[key0] else key0
+    else:
+        key = key0
+        if counts[key0] > low:
+            thap = [k for k, v in counts.items() if v == low]
+            key = rng.choice([k for k in thap if k in hop] or thap)
+    doi = key != key0
+    if doi:
         st["khoi"] = [k for k in st.get("khoi", []) if k.get("loai") in RECIPES[key]["mo"] + RECIPES[key]["giua"] + RECIPES[key]["chot"]]
     R = RECIPES[key]
     st["cong_thuc"] = key
+    tu = tu_do and not doi                           # đổi công thức → các lựa chọn của AI thuộc công thức cũ, bốc lại theo công thức mới
     for k in ("phu_de", "chuyen_canh", "chuyen_dong", "mau", "nhac"):
-        if tu_do and st.get(k) and (k != "phu_de" or st[k] in TAT_CA["phu_de"]):
+        if tu and st.get(k) and (k != "phu_de" or st[k] in TAT_CA["phu_de"]):
             continue
         if st.get(k) not in R[k]:
             st[k] = rng.choice(R[k])
     st["nhip"] = R["nhip"]
-    ok_sfx = TAT_CA["sfx"] if tu_do else R["sfx"]
+    ok_sfx = TAT_CA["sfx"] if tu else R["sfx"]
     st["sfx"] = st.get("sfx") if st.get("sfx") in ok_sfx or st.get("sfx") == "em" else rng.choice(R["sfx"])
     ai_mo = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in R["mo"]]
     ai_chot = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in R["chot"]]
     st["ep_mo"] = ai_mo[0] if ai_mo else rng.choice(R["mo"])
     st["ep_chot"] = ai_chot[0] if ai_chot else rng.choice(R["chot"])
-    for _ in range(0 if tu_do else 12):          # đổi dần cho tới khi không trùng video nào trong ngày
+    for _ in range(12):                          # đổi dần cho tới khi không trùng video nào trong ngày (luôn chạy, kể cả tu_do)
         sig = chu_ky({"cong_thuc": key, "hook": st["ep_mo"], "phu_de": st["phu_de"], "chot": st["ep_chot"], "sfx": st["sfx"]})
         if sig not in used_sigs:
             break

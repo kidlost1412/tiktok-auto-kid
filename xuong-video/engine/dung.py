@@ -70,6 +70,49 @@ def motion_filter(kind, dur, rng):
     return kind, f"{sc},{cr}"
 
 
+def _khung_xam(path, t, vf, rong, cao):
+    """Một khung ở giây t → bytes xám (0–255, full range) đã thu nhỏ rong×cao; b'' nếu không đọc được."""
+    r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(t, 0):.3f}", "-i", str(path), "-frames:v", "1", "-vf",
+                        f"{vf}scale={rong}:{cao}:in_range=tv:out_range=pc,format=gray", "-f", "rawvideo", "-"], capture_output=True)
+    return r.stdout if len(r.stdout) == rong * cao else b""
+
+
+def _zoomin_xau(clip, d):
+    """zoomin phóng VÀO GIỮA đoạn ra: giữa khung trắng (chai trắng) hay đen thì ra khung trắng/đen ngay sát điểm cắt (review (e))."""
+    b = _khung_xam(clip, d - 0.25, "crop=iw*0.5:ih*0.5,", 16, 28)
+    return bool(b) and (sum(b) / len(b) >= 200 or sum(b) / len(b) <= 28)
+
+
+def kiem_chop(path, cuts=None, quanh=0.3, fps=30):
+    """Kiểm rẻ khung nháy/ma sát các điểm cắt: lấy mọi khung trong ±quanh s quanh mỗi điểm cắt (cuts = giây; None → tự dò bằng đổi cảnh),
+    cờ khi (a) độ sáng TB > 235 (trắng) hoặc < 12 (đen), hoặc (b) khung khác hẳn CẢ khung trước LẪN sau trong khi 2 khung kia giống nhau (nháy 1 khung).
+    Trả [{"t": giây, "loai": "trang"|"den"|"nhay", "sang": độ sáng TB}] (rỗng = sạch). Không gọi AI; 1 lần giải mã video thu nhỏ."""
+    rong, cao = 36, 64
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale={rong}:{cao}:in_range=tv:out_range=pc,format=gray",
+                        "-f", "rawvideo", "-"], capture_output=True)
+    n_px = rong * cao
+    kh = [r.stdout[k * n_px:(k + 1) * n_px] for k in range(len(r.stdout) // n_px)]
+    if len(kh) < 3:
+        return []
+    mean = [sum(f) / n_px for f in kh]
+    mad = lambda a, b: sum(abs(x - y) for x, y in zip(kh[a], kh[b])) / n_px
+    if cuts is None:                                   # tự dò điểm cắt: khung đổi mạnh so với khung trước, hoặc khung "nhảy" (ngoại lệ)
+        cuts = [k / fps for k in range(1, len(kh)) if mad(k - 1, k) > 40]
+    ra, da = [], set()
+    for c in cuts:
+        for k in range(max(0, int((c - quanh) * fps)), min(len(kh), int((c + quanh) * fps) + 1)):
+            if k in da:
+                continue
+            loai = "trang" if mean[k] > 235 else "den" if mean[k] < 12 else None
+            if not loai and 0 < k < len(kh) - 1:
+                a, b, ab = mad(k, k - 1), mad(k, k + 1), mad(k - 1, k + 1)
+                if a > 45 and b > 45 and ab < 0.5 * min(a, b):
+                    loai = "nhay"
+            if loai:
+                da.add(k); ra.append({"t": round(k / fps, 2), "loai": loai, "sang": round(mean[k], 1)})
+    return ra
+
+
 def render(plan, voice, shots, kho, out_path, music=None):
     rng = random.Random(plan.get("seed", 0))
     st = plan["phong_cach"]
@@ -82,24 +125,31 @@ def render(plan, voice, shots, kho, out_path, music=None):
     if "curves" in grade:
         grade = "eq=contrast=1.10:saturation=1.15:brightness=0.01"  # tránh khung tối
     td = 0.0 if trans == "cat" else 0.28
+    # đoạn ngắn hơn 3× thời gian chuyển → cắt thẳng (xfade đè lên cả đoạn gây nháy); tds[i] = chuyển cảnh giữa đoạn i và i+1
+    tds = [0.0 if (td == 0 or segs[i]["dur"] < 3 * td or segs[i + 1]["dur"] < 3 * td) else td for i in range(len(segs) - 1)]
     cmd = ["ffmpeg", "-v", "error", "-y"]
     # chống reup: gán bố cục cho từng đoạn (toàn màn / ô trên trời / khung mờ / chia đôi / lưới 4)
     layouts = BC.chon_bo_cuc(segs, rng, st.get("nhip", "vua")) if not plan.get("khong_bo_cuc") else ["day"] * len(segs)
     layouts = [sg.get("bo_cuc") or L for sg, L in zip(segs, layouts)]
     used_phu = {(sg["shot"]["file"], int(sg["shot"]["tu"])) for sg in segs}
-    fc, used_motion, nin, pops, acc0 = [], [], 0, [], 0.0
+    if not plan.get("khong_bo_cuc"):       # trần/sàn bố cục áp lên mọi lựa chọn (đạo diễn hay máy) — xem bo_cuc.ep_bo_cuc
+        layouts, _ = BC.ep_bo_cuc(segs, layouts, rng, lambda sg, n: [p["shot"] for p in BC.chon_phu(sg, n, shots, rng, used_phu)])
+    fc, used_motion, nin, pops, acc0, clips, chuyen_doi = [], [], 0, [], 0.0, [], []
     seg_dir = Path(out_path).parent / f"_{Path(out_path).stem}_doan"; seg_dir.mkdir(parents=True, exist_ok=True)
     for i, sg in enumerate(segs):
         # dựng TỪNG đoạn ra file riêng (ít luồng giải mã cùng lúc → không hết RAM), rồi mới nối + chuyển cảnh
-        extra = td if i < len(segs) - 1 else 0
+        extra = tds[i] if i < len(segs) - 1 else 0
         d = sg["dur"] + extra
-        L = layouts[i]; opt = BC.tuy_chon(rng)
+        L = layouts[i]; opt = BC.tuy_chon(rng, sg["shot"])
         scmd, k = ["ffmpeg", "-v", "error", "-y"], 0
         sh_ = sg["shot"]; con = float(sh_.get("den", sh_["tu"] + sh_["dai"])) - float(sg["src_start"])   # phần cảnh còn được dùng
         if 0.3 < con < d - 0.1:              # không đọc lố sang đoạn đã loại (lỗi rà soát #16): quay chậm ≤ 1,6 lần, thiếu nữa thì giữ khung cuối
             opt["cham"] = round(min(1.6, d / con), 3); doc = con
         else:
             doc = d + 0.05
+            v = float(opt.get("toc_do") or 1.0)      # cảnh còn dài hơn cần → đổi tốc độ 0,92–1,08 (khác nhịp với đoạn cùng cảnh ở video khác)
+            if v != 1.0 and con >= d * v + 0.1:
+                opt["cham"] = round(1 / v, 3); doc = d * v + 0.05
         scmd += ["-threads", "2", "-ss", str(sg["src_start"]), "-t", f"{doc:.3f}", "-i", str(Path(kho) / sg["shot"]["file"])]
         main_idx = k; k += 1
         phu = [{"shot": ps, "src_start": round(min(max(ps["tu"], (ps["dep"][0] + ps["dep"][1]) / 2 - d / 2), max(ps["tu"], ps["den"] - d)), 2)}
@@ -114,14 +164,19 @@ def render(plan, voice, shots, kho, out_path, music=None):
             scmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{d + 0.05:.3f}", "-i", str(BC.mask(mw, mh))]
             mask_idx.append(k); k += 1
         kind, mf = motion_filter(mot, d, rng)
+        if kind == "dung" and L in BC.NEN_RO and d > 1.8:     # toàn màn mà đứng yên >1,8 s → trôi/zoom chậm (chống "khung tĩnh kéo quá lâu")
+            kind, mf = motion_filter(rng.choice(["zoom_vao", "lia_trai", "lia_phai"]), d, rng)
         used_motion.append(kind)
-        lines, times = BC.loc(i, L, d, main_idx, phu_idx, mask_idx, grade, mf, opt, sg["shot"], [ph["shot"] for ph in phu])
+        lines, times = BC.loc(i, L, d, main_idx, phu_idx, mask_idx, grade, mf, opt, sg["shot"], [ph["shot"] for ph in phu],
+                              an_tu=(tds[i - 1] + 0.05) if i > 0 and tds[i - 1] else 0.0)
         clip = seg_dir / f"d{i:02d}.mp4"
         scmd += ["-filter_threads", "2", "-filter_complex", ";".join(lines), "-map", f"[v{i}]", "-t", f"{d:.3f}", "-an",
                  "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-threads", "4", str(clip)]
         subprocess.run(scmd, check=True)
         cmd += ["-threads", "1", "-i", str(clip)]   # nối nhiều đoạn: 1 luồng giải mã/đoạn để không hết RAM
-        fc.append(f"[{nin}:v]setpts=PTS-STARTPTS,setsar=1,fps={FPS},tpad=stop_mode=clone:stop_duration=1,trim=duration={d:.3f},setpts=PTS-STARTPTS[v{i}]")
+        clips.append(clip)
+        dpad = d + (0.1 if extra else 0)             # chuyển cảnh: đoạn kéo dài thêm ~3 khung (khung cuối nhân bản) để xfade luôn có hình tới hết offset+duration
+        fc.append(f"[{nin}:v]setpts=PTS-STARTPTS,setsar=1,fps={FPS},tpad=stop_mode=clone:stop_duration=1,trim=duration={dpad:.3f},setpts=PTS-STARTPTS[v{i}]")
         nin += 1
         pops += [round(acc0 + t, 2) for t in times]
         sg["bo_cuc"] = L; sg["phu"] = [ph["shot"]["file"][:12] for ph in phu]; sg["opt"] = opt; sg["t0"] = acc0
@@ -132,14 +187,20 @@ def render(plan, voice, shots, kho, out_path, music=None):
         cmd += ["-ss", str(music["start"]), "-i", music["file"]]
     if len(segs) == 1:
         fc.append("[v0]null[vc]")
-    elif td == 0:
+    elif not any(tds):
         fc.append("".join(f"[v{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=1:a=0[vc]")
     else:
         prev, acc = "v0", segs[0]["dur"]
         for i in range(1, len(segs)):
             t = trans if trans != "hon_hop" else rng.choice(["fade", "slideleft", "slideup", "zoomin", "smoothleft"])
             outl = "vc" if i == len(segs) - 1 else f"x{i}"
-            fc.append(f"[{prev}][v{i}]xfade=transition={t}:duration={td}:offset={acc:.3f}[{outl}]")
+            if not tds[i - 1]:
+                fc.append(f"[{prev}][v{i}]concat=n=2:v=1:a=0,settb=1/{FPS},fps={FPS}[{outl}]")
+            else:
+                if t == "zoomin" and _zoomin_xau(clips[i - 1], segs[i - 1]["dur"] + tds[i - 1]):
+                    t = "fade"; chuyen_doi.append(i)          # zoomin phóng vào giữa cảnh trắng/đen → khung trắng/đen sát điểm cắt
+                off = round(acc * FPS) / FPS               # offset trùng lưới khung hình (khỏi lệch nửa khung)
+                fc.append(f"[{prev}][v{i}]xfade=transition={t}:duration={tds[i - 1]}:offset={off:.4f}[{outl}]")
             prev, acc = outl, acc + segs[i]["dur"]
     fc.append(f"[vc]tpad=stop_mode=clone:stop_duration=3,trim=duration={total}[vout]")   # chỉ dựng nền; chữ do Remotion làm rồi ghép sau
     if music:
@@ -165,7 +226,7 @@ def render(plan, voice, shots, kho, out_path, music=None):
     for s_ in segs[:-1]:
         acc += s_["dur"]; cuts.append(round(acc, 2))
     return {"thoi_luong": total, "chuyen_canh": trans, "chuyen_dong": mot, "mau": st.get("mau"), "cuts": cuts, "pops": pops,
-            "bo_cuc": [s["bo_cuc"] for s in segs], "td": td,
+            "bo_cuc": [s["bo_cuc"] for s in segs], "td": td, "tds": tds, "doi_zoomin": chuyen_doi,
             "doan": [{"t0": s["t0"], "t1": s["t0"] + s["dur"], "bo_cuc": s["bo_cuc"], "opt": s.get("opt"),
-                      "nhan": (s["shot"].get("soat") or {}).get("nhan")} for s in segs],
+                      "nhan": BC.nhan_hieu_dung(s["bo_cuc"], s.get("opt"), (s["shot"].get("soat") or {}).get("nhan"))} for s in segs],
             "canh": [f"{s['shot']['file'][:24]}@{s['src_start']}+{s['dur']:.1f}" for s in segs]}
