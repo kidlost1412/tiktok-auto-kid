@@ -2,6 +2,7 @@
 // Dựng renderer + camera phối cảnh (đi dạo cùng Kid hoặc toàn cảnh), ghép nhà/vườn/nhân vật/mèo, vòng lặp vẽ, chọn bằng chuột, dọn sạch khi rời trang.
 import * as THREE from 'three';
 
+import { Caller } from '@/components/fork/nha3d/call';
 import { reactTo } from '@/components/fork/nha3d/react';
 
 import { noi } from '../nha/loi-thoai';
@@ -53,6 +54,8 @@ export interface NhaWorldOptions {
 
 export interface NhaWorld {
     update(data: NhaData): void;
+    /** "Gọi về gấp": nhân vật của `vai` chạy tới chỗ Kid đứng và báo cáo. */
+    call(vai: string): void;
     /** Nhân vật của `vai` phản ứng với một việc vừa làm trong popup (xem ban/bus.ts). */
     react(vai: string, viec: string): void;
     dispose(): void;
@@ -395,6 +398,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
 
             return;
         }
+        caller.onOpened(h.key);
         o.onGo(h.key);
     };
     // ---------------------------------------------------------------- Kid (chủ xưởng) + hai chế độ camera
@@ -526,6 +530,18 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         pond,
     });
 
+    const caller = new Caller({
+        host,
+        scene,
+        A,
+        owl,
+        kidActor,
+        director,
+        camera,
+        getGrid: () => ctx.grid,
+        now,
+        motion,
+    });
     const modeBtn = document.createElement('button');
     modeBtn.type = 'button';
     modeBtn.className = 'n3-mode';
@@ -669,6 +685,18 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             e.metaKey ||
             e.altKey
         ) {
+            return;
+        }
+        if (e.type === 'keydown' && e.code === 'KeyG') {
+            e.preventDefault();
+            caller.toggle();
+
+            return;
+        }
+        if (e.type === 'keydown' && e.code === 'Escape' && caller.opened) {
+            e.preventDefault();
+            caller.close();
+
             return;
         }
         if (interact.key(e)) {
@@ -1026,6 +1054,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             rig.update(dt, fa ? camFocus : kidActor.root.position);
             updateNear();
             interact.update(dt);
+            caller.update(dt);
             saveAt -= dt;
             if (saveAt <= 0) {
                 saveAt = 5;
@@ -1363,6 +1392,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         update(data: NhaData) {
             if (!failed) {
                 director.update(data);
+                caller.setData(data);
                 const counts: Record<string, number> = {};
                 for (const [vai, v] of Object.entries(data.viec ?? {})) {
                     counts[vai === 'daodien' ? 'daodienA' : vai] = v.so;
@@ -1370,8 +1400,18 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
                 overlay.setCounts(counts);
             }
         },
+        call(vai: string) {
+            if (!failed) {
+                caller.call(vai);
+            }
+        },
         react(vai: string, viec: string) {
             if (!failed) {
+                if (viec === 'mo') {
+                    caller.onOpened(vai);
+                } else if (viec === 'dong') {
+                    caller.onClosed(vai);
+                }
                 reactTo(
                     {
                         A,
@@ -1404,6 +1444,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             window.removeEventListener('keydown', onKey);
             window.removeEventListener('keyup', onKey);
             window.removeEventListener('blur', onBlur);
+            caller.dispose();
             modeBtn.remove();
             promptBtn.remove();
             controls.dispose();

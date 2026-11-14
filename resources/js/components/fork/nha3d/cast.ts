@@ -143,6 +143,10 @@ export class Owl implements Talker {
     private flap = 0;
     private outline: THREE.MeshBasicMaterial;
     sleeping = false;
+    callText: string | null = null;
+    callAlert = false;
+    /** Độ cao đậu/bay (mặc định chỗ đậu; "Gọi về gấp" nâng theo chỗ Kid đứng). */
+    yBase = FA + 1.05;
 
     constructor(
         kit: Kit,
@@ -287,7 +291,14 @@ export class Owl implements Talker {
     }
 
     say(text: string, d = 4) {
-        if (this.speech && !this.speech.allow('cu', text, 'chat')) {
+        if (this.callText !== null && text !== this.callText) {
+            return;
+        }
+        if (
+            this.callText === null &&
+            this.speech &&
+            !this.speech.allow('cu', text, 'chat')
+        ) {
             return;
         }
         this.sayText = text;
@@ -340,13 +351,12 @@ export class Owl implements Talker {
             this.wingL.rotation.z = -0.3 - Math.abs(f);
             this.wingR.rotation.z = 0.3 + Math.abs(f);
             this.root.position.y =
-                FA +
-                1.05 +
+                this.yBase +
                 Math.sin((Math.max(0, this.flap) * Math.PI) / 1.2) * 0.25;
         } else {
             this.wingL.rotation.z = motion ? Math.sin(t * 1.5) * 0.05 : 0;
             this.wingR.rotation.z = -this.wingL.rotation.z;
-            this.root.position.y = FA + 1.05;
+            this.root.position.y = this.yBase;
         }
         this.root.scale.y = 1 + (motion ? Math.sin(t * 2) * 0.015 : 0);
     }

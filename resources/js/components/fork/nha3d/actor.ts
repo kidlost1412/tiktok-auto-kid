@@ -69,6 +69,8 @@ export interface Talker {
     /** Số giây bong bóng còn hiện (để mờ dần). */
     bubbleLeft?(): number;
     alertUntil: number;
+    /** Đang được "Gọi về gấp": dấu "!" hiện màu vàng. */
+    callAlert?: boolean;
     root: THREE.Object3D;
 }
 
@@ -316,9 +318,23 @@ export class Actor implements Talker {
     }
 
     /** Nói một câu (qua người điều phối: có thể bị bỏ nếu vừa nói hoặc cả xưởng đang ồn). */
+    /** Đang được gọi: chỉ nói đúng câu báo cáo này (không để câu chào ngẫu nhiên đè lên). */
+    callText: string | null = null;
+    callAlert = false;
+
     say(text: string, d?: number, prio?: Prio): boolean {
         if (!text) {
             return false;
+        }
+        if (this.callText !== null) {
+            if (text !== this.callText) {
+                return false;
+            }
+            this.sayText = text;
+            this.sayStart = this.ctx.now();
+            this.sayUntil = this.sayStart + clamp(d ?? 5, 3, 6);
+
+            return true;
         }
         const p = prio ?? (this.inScene && !this.leisure ? 'work' : 'chat');
         if (this.ctx.speech && !this.ctx.speech.allow(this.key, text, p)) {

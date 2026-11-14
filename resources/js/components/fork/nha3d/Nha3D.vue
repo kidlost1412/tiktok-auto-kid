@@ -66,6 +66,11 @@ onMounted(async () => {
     }
 });
 
+defineExpose({
+    /** "Gọi về gấp" một vai từ bên ngoài. */
+    call: (vai: string) => world?.call(vai),
+});
+
 watch(
     () => props.data,
     (d) => {

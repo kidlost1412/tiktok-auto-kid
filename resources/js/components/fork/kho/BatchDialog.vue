@@ -83,6 +83,8 @@ const props = defineProps<{
     limits: { min_lead_minutes: number; gap_minutes: number; caption_max: number };
     /** Hashtag đã dùng trước đây (nhiều nhất trước) để gợi ý dưới ô "Hashtag chung". */
     hashtagSuggestions?: TagSuggestion[];
+    /** Dùng trong popup "Bàn làm việc": không tự tải lại trang, nơi gọi lo qua sự kiện `done`. */
+    inPlace?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -410,7 +412,7 @@ const close = () => {
 
     if (finished) {
         emit('done');
-        router.reload({ only: ['videos', 'counts', 'selectable', 'days', 'folders', 'queue', 'scan_sig'] });
+        if (!props.inPlace) router.reload({ only: ['videos', 'counts', 'selectable', 'days', 'folders', 'queue', 'scan_sig'] });
     }
 };
 

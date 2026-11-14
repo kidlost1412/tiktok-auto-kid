@@ -92,6 +92,11 @@
     box-shadow: 0 0 0 3px rgba(255, 79, 95, 0.35);
     animation: n3-blink 0.9s ease-in-out infinite;
 }
+.n3-alert.n3-alert-y {
+    background: #ffc93c;
+    color: #3d2f5c;
+    box-shadow: 0 0 0 3px rgba(255, 201, 60, 0.45);
+}
 @keyframes n3-blink {
     50% {
         box-shadow: 0 0 0 8px rgba(255, 79, 95, 0.12);
@@ -146,9 +151,8 @@
 }
 .n3-hint {
     position: absolute;
-    left: 14px;
-    top: 16px;
-    max-width: calc(100% - 360px);
+    right: 10px;
+    bottom: 8px;
     padding: 3px 9px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.75);
@@ -196,7 +200,7 @@
 }
 .n3-prompt {
     left: 50%;
-    bottom: 168px;
+    bottom: 132px;
     transform: translateX(-50%);
     padding: 8px 16px;
     font-size: 15px;
@@ -241,9 +245,8 @@
         font-size: 13px;
     }
     .n3-hint {
-        left: 10px;
-        top: 10px;
-        max-width: 70%;
+        max-width: 55%;
+        text-align: right;
     }
 }
 
@@ -252,7 +255,7 @@
     position: absolute;
     z-index: 3;
     left: 50%;
-    bottom: 84px;
+    bottom: 14px;
     transform: translateX(-50%);
     width: min(760px, calc(100% - 24px));
     flex-direction: column;
@@ -570,5 +573,88 @@
     .n3-av-form {
         max-height: none;
         overflow: visible;
+    }
+}
+
+/* "Gọi về gấp": nút + danh sách chữ các nhân viên */
+.n3-call {
+    left: 14px;
+    bottom: 58px;
+}
+.n3-call.on {
+    background: #fff7d6;
+    border-color: #ffd36a;
+}
+.n3-calls {
+    position: absolute;
+    z-index: 4;
+    left: 14px;
+    bottom: 100px;
+    width: 210px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 28px rgba(74, 56, 104, 0.22);
+    backdrop-filter: blur(8px);
+}
+.n3-calls-h {
+    padding: 2px 8px 4px;
+    color: #6b6380;
+    font-size: 12px;
+    font-weight: 700;
+}
+.n3-calls-r {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #3d2f5c;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+.n3-calls-r:hover,
+.n3-calls-r:focus-visible {
+    background: #f1ebff;
+    outline: none;
+}
+.n3-calls-n {
+    flex: 1;
+}
+.n3-calls-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #fbbf24;
+}
+.n3-st-working {
+    background: #10b981;
+}
+.n3-st-sleep {
+    background: #94a3b8;
+}
+.n3-calls-b {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+}
+@media (max-width: 640px) {
+    .n3-call {
+        bottom: 94px;
+    }
+    .n3-calls {
+        bottom: 136px;
     }
 }

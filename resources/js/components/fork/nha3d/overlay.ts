@@ -153,6 +153,7 @@ export class Overlay {
             }
             if (alert) {
                 s.alert.style.display = 'grid';
+                s.alert.classList.toggle('n3-alert-y', !!t.callAlert);
                 s.alert.style.transform = `translate(${Math.round(x - 15)}px, ${Math.round(y - (text ? 4 : 30))}px)`;
             } else {
                 s.alert.style.display = 'none';

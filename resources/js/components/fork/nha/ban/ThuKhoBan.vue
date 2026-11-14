@@ -1,25 +1,29 @@
 <script setup lang="ts">
-// Bàn của Thủ kho: hai tab. "Kho video" (video sẵn sàng đăng của app) và "Sản phẩm xưởng" (tab Sản phẩm của hub Xưởng Video).
-// Tab Kho giữ trạng thái đang xem (tab trạng thái, sản phẩm); nội dung ở ThuKhoKho (dựng lại khi đổi).
+// Bàn của Thủ kho: ba tab. "Kho video" (video sẵn sàng đăng của app), "Kho riêng" (video bạn tự làm) và
+// "Sản phẩm xưởng" (tab Sản phẩm của hub Xưởng Video). Mỗi tab giữ bộ lọc đang xem; nội dung ở ThuKhoKho / ThuKhoRieng
+// (dựng lại khi đổi bộ lọc).
 import { ref } from 'vue';
 
+import type { RiengLoc } from '@/components/fork/kho/rieng';
 import HubEmbed from '@/components/fork/nha/ban/HubEmbed.vue';
 import ThuKhoKho from '@/components/fork/nha/ban/ThuKhoKho.vue';
+import ThuKhoRieng from '@/components/fork/nha/ban/ThuKhoRieng.vue';
 import type { NhaData } from '@/components/fork/nha/types';
 import { cn } from '@/lib/utils';
 
 defineProps<{ data: NhaData | null }>();
 
-const main = ref<'kho' | 'san-pham'>('kho');
+const main = ref<'kho' | 'rieng' | 'san-pham'>('kho');
 // Giữ iframe hub sau lần mở đầu (đổi tab qua lại không tải lại).
 const sanPhamOpened = ref(false);
 
 const tabs = [
     { key: 'kho' as const, label: 'Kho video' },
+    { key: 'rieng' as const, label: 'Kho riêng' },
     { key: 'san-pham' as const, label: 'Sản phẩm xưởng' },
 ];
 
-const setMain = (k: 'kho' | 'san-pham') => {
+const setMain = (k: 'kho' | 'rieng' | 'san-pham') => {
     main.value = k;
 
     if (k === 'san-pham') {
@@ -30,6 +34,12 @@ const setMain = (k: 'kho' | 'san-pham') => {
 // null = tự chọn tab đầu tiên có video (như trang Kho).
 const tab = ref<string | null>(null);
 const product = ref('');
+
+// Kho riêng: bộ lọc + các video đang chọn (giữ khi đổi bộ lọc).
+const rieng = ref<RiengLoc>({ folder: 0, status: '', day: '' });
+const riengPicked = ref<
+    Record<number, { file_name: string; duplicate: string | null }>
+>({});
 </script>
 
 <template>
@@ -67,6 +77,14 @@ const product = ref('');
             :product="product"
             @tab="(k: string) => (tab = k)"
             @product="(code: string) => (product = code)"
+        />
+
+        <ThuKhoRieng
+            v-if="main === 'rieng'"
+            :key="`${rieng.folder}|${rieng.status}|${rieng.day}|${rieng.page ?? 1}`"
+            v-model:picked="riengPicked"
+            :loc="rieng"
+            @filter="(f) => (rieng = f)"
         />
 
         <div

@@ -1,6 +1,56 @@
 // Kiểu dữ liệu + hàm gọi máy chủ dùng chung của trang Kho riêng.
 
+import type { BatchAccount } from '@/components/fork/kho/BatchDialog.vue';
+
 /** Video trùng nội dung với một video đã có: `text` là câu hiển thị sẵn (do máy chủ ghép). */
+export interface Folder {
+    id: number;
+    name: string;
+    path: string;
+    exists: boolean;
+    count: number;
+}
+
+export interface Selectable {
+    id: number;
+    file_name: string;
+    duration?: number | null;
+    duplicate: string | null;
+}
+
+/** Bộ lọc đang xem của Kho riêng (dùng cho bàn Thủ kho). */
+export interface RiengLoc {
+    folder: number;
+    status: string;
+    day: string;
+    page?: number;
+}
+
+/** Props của trang Kho riêng (và của KhoRiengBody dùng chung với bàn Thủ kho). */
+export type RiengPageProps = {
+    folders: Folder[];
+    filters: { folder: number; status: string; day: string };
+    counts: Record<string, number>;
+    days: string[];
+    videos: {
+        data: RiengVideo[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
+    selectable: Selectable[];
+    queue: QueueItem[];
+    scan_sig: string;
+    accounts: BatchAccount[];
+    hashtag_suggestions?: { tag: string; uses: number }[];
+    limits: {
+        min_lead_minutes: number;
+        gap_minutes: number;
+        caption_max: number;
+    };
+    last_scan_at: string | null;
+};
+
 export interface Duplicate {
     id: number;
     where: 'hub' | 'rieng' | 'gone';

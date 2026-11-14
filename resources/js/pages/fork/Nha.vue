@@ -9,9 +9,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import BanLamViec from '@/components/fork/nha/ban/BanLamViec.vue';
 import { onMoBan } from '@/components/fork/nha/ban/bus';
 import { BAN } from '@/components/fork/nha/ban/registry';
-import ThanhViec from '@/components/fork/nha/ban/ThanhViec.vue';
 import House from '@/components/fork/nha/House.vue';
-import { recentEvents } from '@/components/fork/nha/su-kien';
 import { DICH, type NhaData } from '@/components/fork/nha/types';
 import Nha3D from '@/components/fork/nha3d/Nha3D.vue';
 import VideoViewer from '@/components/fork/shared/VideoViewer.vue';
@@ -51,39 +49,6 @@ const line = computed(() =>
         ? 'Chưa hỏi được trạng thái xưởng, đang thử lại…'
         : (data.value?.line ?? 'Đang mở cửa xưởng…'),
 );
-
-const roles: { key: string; emoji: string }[] = [
-    { key: 'bienkich', emoji: '✍️' },
-    { key: 'thuam', emoji: '🎙️' },
-    { key: 'daodien', emoji: '🎬' },
-    { key: 'thodung', emoji: '🛠️' },
-    { key: 'giamkhao', emoji: '🧐' },
-    { key: 'thukho', emoji: '📦' },
-    { key: 'chuquay', emoji: '🛒' },
-    { key: 'cu', emoji: '📊' },
-    { key: 'buuta', emoji: '📮' },
-];
-const chips = computed(() =>
-    roles.map((r) => {
-        const v = data.value?.vai[r.key];
-        const down = !data.value || data.value.mode === 'down';
-        const st = down ? 'sleep' : (v?.state ?? 'idle');
-
-        return {
-            ...r,
-            ten: DICH[r.key].ten,
-            st,
-            text:
-                st === 'sleep'
-                    ? 'Đang ngủ'
-                    : (v?.bubble ??
-                      (st === 'working' ? 'Đang làm việc' : 'Đang rảnh')),
-        };
-    }),
-);
-
-// ---- hoạt động gần đây: 8 sự kiện mới nhất của sổ sự kiện hub, mới nhất lên đầu
-const recent = computed(() => recentEvents(data.value?.events));
 
 // Bấm nhân vật / phòng: mở "Bàn làm việc" (popup) ngay tại chỗ; vai chưa có bàn thì đi tới trang như cũ.
 // ?ban=<vai> trên địa chỉ để tải lại / quay lại vẫn mở đúng bàn.
@@ -209,7 +174,6 @@ onBeforeUnmount(() => {
                     @go="go"
                     @fallback="use2d = true"
                 />
-                <ThanhViec :data="data" @open="go" />
                 <div
                     class="pointer-events-none absolute top-3 left-3 flex max-w-[min(440px,calc(100%-24px))] flex-col gap-1.5 md:top-4 md:left-5"
                 >
@@ -259,79 +223,6 @@ onBeforeUnmount(() => {
                 >
                     <House :data="data" @go="go" />
                 </div>
-            </div>
-
-            <div
-                class="mx-auto flex w-full max-w-[1240px] flex-col gap-4 px-4 py-5 md:px-8"
-            >
-                <section
-                    class="rounded-2xl border border-border bg-card px-4 py-3"
-                    aria-label="Hoạt động gần đây"
-                    data-testid="nha-recent"
-                >
-                    <h2
-                        class="mb-1.5 text-sm font-semibold text-muted-foreground"
-                    >
-                        Hoạt động gần đây
-                    </h2>
-                    <ol v-if="recent.length" class="flex flex-col gap-1">
-                        <li
-                            v-for="r in recent"
-                            :key="r.n"
-                            class="flex gap-2 text-[0.9375rem]"
-                            :class="r.bad ? 'text-destructive' : ''"
-                        >
-                            <span
-                                class="w-11 shrink-0 text-muted-foreground tabular-nums"
-                                >{{ r.time }}</span
-                            >
-                            <span class="min-w-0">{{ r.text }}</span>
-                        </li>
-                    </ol>
-                    <p v-else class="text-[0.9375rem] text-muted-foreground">
-                        Chưa có hoạt động nào gần đây.
-                    </p>
-                </section>
-
-                <ul
-                    class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                    aria-label="Các nhân vật trong xưởng"
-                >
-                    <li v-for="c in chips" :key="c.key">
-                        <button
-                            type="button"
-                            class="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors hover:border-primary/50 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                            :data-testid="`nha-chip-${c.key}`"
-                            @click="go(c.key)"
-                        >
-                            <span
-                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-xl"
-                                >{{ c.emoji }}</span
-                            >
-                            <span class="min-w-0 flex-1">
-                                <span
-                                    class="flex items-center gap-2 text-[0.9375rem] font-semibold"
-                                >
-                                    {{ c.ten }}
-                                    <span
-                                        class="inline-block size-2 rounded-full"
-                                        :class="
-                                            c.st === 'working'
-                                                ? 'bg-emerald-500'
-                                                : c.st === 'sleep'
-                                                  ? 'bg-muted-foreground/40'
-                                                  : 'bg-amber-400'
-                                        "
-                                    />
-                                </span>
-                                <span
-                                    class="block truncate text-sm text-muted-foreground"
-                                    >{{ c.text }}</span
-                                >
-                            </span>
-                        </button>
-                    </li>
-                </ul>
             </div>
         </div>
         <BanLamViec v-model:vai="ban" :data="data" />
