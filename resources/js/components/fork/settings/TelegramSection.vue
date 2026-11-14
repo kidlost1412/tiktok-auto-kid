@@ -42,14 +42,29 @@ const props = defineProps<{
     summary_time: string;
     quiet: { enabled: boolean; start: string; end: string };
     previews: Preview[];
+    /** Chạy trong popup "Bàn làm việc": ở yên trang đang mở, báo `changed` cho bàn. */
+    embedded?: boolean;
 }>();
+
+const emit = defineEmits<{ changed: [] }>();
 
 const busy = ref<string | null>(null);
 const run = (key: string, fn: (done: () => void) => void): void => {
     busy.value = key;
     fn(() => (busy.value = null));
 };
-const opts = (done: () => void) => ({ preserveScroll: true, onFinish: done });
+const opts = (done: () => void, onSuccess?: () => void) => ({
+    preserveScroll: true,
+    ...(props.embedded ? { preserveState: true } : {}),
+    onSuccess: () => {
+        onSuccess?.();
+
+        if (props.embedded) {
+            emit('changed');
+        }
+    },
+    onFinish: done,
+});
 
 const token = ref('');
 const chatId = ref('');
@@ -60,13 +75,10 @@ const saveToken = (): void =>
         router.put(
             '/settings/telegram/token',
             { token: token.value },
-            {
-                ...opts(done),
-                onSuccess: () => {
-                    token.value = '';
-                    replacingToken.value = false;
-                },
-            },
+            opts(done, () => {
+                token.value = '';
+                replacingToken.value = false;
+            }),
         ),
     );
 
@@ -80,10 +92,7 @@ const saveChat = (id: string): void =>
         router.put(
             '/settings/telegram/chat',
             { chat_id: id },
-            {
-                ...opts(done),
-                onSuccess: () => (chatId.value = ''),
-            },
+            opts(done, () => (chatId.value = '')),
         ),
     );
 

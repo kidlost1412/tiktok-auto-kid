@@ -91,7 +91,7 @@ const tip = computed(() => {
     const d = DICH[k];
     const p = rooms[k] ? ([OX + rooms[k].x + rooms[k].w / 2, rooms[k].y + 2] as [number, number]) : tipPos[k];
 
-    return { left: `${(p[0] / W) * 100}%`, top: `${(p[1] / H) * 100}%`, ten: d.ten, text: d.href ? `Bấm để tới ${d.dich}` : 'Mèo đang ngủ, bấm để nghe meo' };
+    return { left: `${(p[0] / W) * 100}%`, top: `${(p[1] / H) * 100}%`, ten: d.ten, text: 'Bấm để mở bàn làm việc' };
 });
 
 const go = (k: string) => {
@@ -255,7 +255,7 @@ const flowers = [
 
             <!-- ngoài sân -->
             <BuuTa :x="60" :y="650" :state="stateOf('buuta')" :dim="dim" @go="go('buuta')" @hover="hovered = $event" @leave="hovered = null" />
-            <Meo :x="905" :y="692" :boing="boing" :awake="meoAwake" @meo="meo" @hover="hovered = $event" @leave="hovered = null" />
+            <Meo :x="905" :y="692" :boing="boing" :awake="meoAwake" @meo="meo(); go('meo')" @hover="hovered = $event" @leave="hovered = null" />
 
             <!-- bong bóng luôn nằm trên cùng -->
             <Bubble v-for="b in bubbles" :key="b.key" :x="b.x" :y="b.y" :text="b.text" :vw="W" />

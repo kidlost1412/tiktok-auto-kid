@@ -922,6 +922,26 @@ def doc_danh_gia():
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
 
 
+_CHO_DUYET = {"khoa": None, "so": 0}
+
+
+def so_cho_duyet():
+    """Số video trong kho chưa có đánh giá ✅/❌ (kể cả tự duyệt) — đúng nghĩa "chờ anh duyệt" ở tab Kho video.
+    Nhớ đệm theo mtime từng thư mục ngày + file đánh giá: chỉ quét lại khi có video mới / đổi đánh giá. Lỗi đọc → None."""
+    try:
+        d = ra_dir()
+        ngay = [x for x in d.iterdir() if x.is_dir() and not x.name.startswith("_")] if d.exists() else []
+        f = danh_gia_f()
+        khoa = (tuple(sorted((x.name, x.stat().st_mtime_ns) for x in ngay)), f.stat().st_mtime_ns if f.exists() else 0)
+        if _CHO_DUYET["khoa"] != khoa:
+            dg = doc_danh_gia()
+            _CHO_DUYET["so"] = sum(1 for x in ngay for v in x.glob("*.mp4") if not v.name.endswith(".part.mp4") and v.name not in dg)
+            _CHO_DUYET["khoa"] = khoa
+        return _CHO_DUYET["so"]
+    except Exception:
+        return None
+
+
 TAT_CA = "tat-ca"          # giá trị "Tất cả ngày" của ô chọn ngày trong Kho video
 
 
@@ -1185,7 +1205,8 @@ class H(BaseHTTPRequestHandler):
             except Exception:
                 pass
             return self._json({"ok": True, "dang_chay": chay, "tien_do": td, "san_pham": {"ma": ma_sp, "ten": ten_sp or ma_sp},
-                               "su_kien": su_kien.doc(sau, toi_da), "bay_gio": time.time()})
+                               "su_kien": su_kien.doc(sau, toi_da), "bay_gio": time.time(),
+                               "cho_duyet": so_cho_duyet()})
         if u.path == "/api/tai-khoan-ds":
             return self._json(tai_khoan_ds("moi" in parse_qs(u.query)))
         if u.path == "/api/tai-khoan":

@@ -4,8 +4,11 @@ import * as THREE from 'three';
 
 import { DICH, type NhaData } from '@/components/fork/nha/types';
 import type { Actor, Step } from '@/components/fork/nha3d/actor';
+import type { CamRig } from '@/components/fork/nha3d/camrig';
 import type { Owl } from '@/components/fork/nha3d/cast';
+import type { Cat } from '@/components/fork/nha3d/cat';
 import type { Director } from '@/components/fork/nha3d/director';
+import type { NavGraph } from '@/components/fork/nha3d/nav';
 import {
     AGENT_R,
     levelOf,
@@ -23,6 +26,7 @@ const ROSTER = [
     'daodien',
     'bienkich',
     'thuam',
+    'meo',
 ];
 const ACTOR_KEY: Record<string, string> = { daodien: 'daodienA' };
 const HELLO = 'Dạ, anh gọi em ạ?';
@@ -63,6 +67,9 @@ export interface CallDeps {
     scene: THREE.Scene;
     A: Record<string, Actor>;
     owl: Owl;
+    cat: Cat;
+    nav: NavGraph;
+    rig: CamRig;
     kidActor: Actor;
     director: Director;
     camera: THREE.Camera;
@@ -92,6 +99,9 @@ export class Caller {
     private owlHomeZ: number;
     private owlHomeY: number;
     private flapAt = 0;
+    /** Camera Toàn cảnh lướt theo: 0 không, 1 đang lướt, 2 người dùng đã giành lại. */
+    private glide = 0;
+    private readonly mid = new THREE.Vector3();
     private readonly kidPosFn = () => this.d.kidActor.pos;
     private readonly onArrive = () => this.arrive();
 
@@ -161,6 +171,11 @@ export class Caller {
         this.owlHomeZ = d.owl.root.position.z;
         this.owlHomeY = d.owl.yBase;
         this.refresh();
+    }
+
+    /** `vai` đang được gọi / đang chờ? */
+    calling(vai: string) {
+        return this.cur?.vai === normVai(vai);
     }
 
     get opened() {
@@ -298,6 +313,15 @@ export class Caller {
                 this.d.owl.root.position.z,
             );
             this.ring.visible = this.disc.visible = false;
+            this.glideStart();
+
+            return;
+        }
+        if (vai === 'meo') {
+            this.cur = c;
+            this.ring.visible = this.disc.visible = false;
+            this.catGo();
+            this.glideStart();
 
             return;
         }
@@ -307,6 +331,7 @@ export class Caller {
         }
         this.cur = c;
         this.go(a);
+        this.glideStart();
     }
 
     /** Kid thấy được điểm (x, z) (không tường chắn) và điểm đứng được? */
@@ -402,6 +427,104 @@ export class Caller {
         a.push(...steps);
     }
 
+    /** Nút nav gần chỗ đã chọn mà Kid nhìn thấy (mèo đi theo đồ thị nav, không xuyên tường). */
+    private catGo() {
+        const kid = this.d.kidActor.pos;
+        const cat = this.d.cat;
+        this.pickSpot(null, cat.pos.x, cat.pos.z);
+        const l = levelOf(kid.y);
+        let best = '';
+        let bd = Infinity;
+        for (const n of this.d.nav.nodes.values()) {
+            if (
+                n.id.endsWith('.seat') ||
+                n.id.startsWith('st.') ||
+                levelOf(n.p.y) !== l ||
+                Math.abs(n.p.y - kid.y) > 0.6
+            ) {
+                continue;
+            }
+            const dd = Math.hypot(n.p.x - this.dest.x, n.p.z - this.dest.z);
+            if (dd < bd && this.seesKid(l, n.p.x, n.p.z, 0.1)) {
+                bd = dd;
+                best = n.id;
+            }
+        }
+        if (!best) {
+            best = this.d.nav.nearest(this.dest);
+        }
+        if (this.cur) {
+            this.cur.kx = kid.x;
+            this.cur.kz = kid.z;
+        }
+        cat.callTo(best, kid);
+    }
+
+    /** Chủ thể đang được gọi (để camera bám theo, vòng sáng đặt dưới chân). */
+    private subject(vai: string): THREE.Vector3 | null {
+        if (vai === 'cu') {
+            return this.d.owl.root.position;
+        }
+        if (vai === 'meo') {
+            return this.d.cat.root.position;
+        }
+
+        return this.actorOf(vai)?.root.position ?? null;
+    }
+
+    /** Toàn cảnh: camera lướt theo nhân vật được gọi (chế độ Nhân vật giữ nguyên). */
+    private glideStart() {
+        const rig = this.d.rig;
+        const p = this.cur ? this.subject(this.cur.vai) : null;
+        if (rig.mode === 'overview' && p) {
+            this.glide = 1;
+            rig.glideFocus = p;
+        } else {
+            this.glide = 0;
+        }
+    }
+
+    private glideTick(now: number) {
+        const rig = this.d.rig;
+        const c = this.cur;
+        if (this.glide === 0) {
+            return;
+        }
+        if (rig.mode !== 'overview' || !c) {
+            this.glideStop();
+
+            return;
+        }
+        if (rig.glideFocus === null) {
+            this.glide = 2; // người dùng kéo/xoay/cuộn: thôi bám theo ngay
+
+            return;
+        }
+        if (this.glide !== 1) {
+            return;
+        }
+        const p = this.subject(c.vai);
+        if (!p) {
+            return;
+        }
+        if (c.phase === 'run') {
+            rig.glideFocus = p;
+        } else if (now - c.t0 < 3.5) {
+            // tới nơi: khung cả hai (Kid + nhân vật)
+            this.mid.lerpVectors(this.d.kidActor.pos, p, 0.5);
+            rig.glideFocus = this.mid;
+        } else {
+            this.glideStop(); // trả quyền điều khiển
+        }
+    }
+
+    private glideStop() {
+        if (this.glide === 1) {
+            this.d.rig.glideFocus = null;
+        }
+        this.glide = 0;
+    }
+
     private arrive() {
         const c = this.cur;
         if (!c || c.phase !== 'run') {
@@ -409,7 +532,7 @@ export class Caller {
         }
         const now = this.d.now();
         const kid = this.d.kidActor.pos;
-        if (c.vai !== 'cu') {
+        if (c.vai !== 'cu' && c.vai !== 'meo') {
             const a = this.actorOf(c.vai)!;
             const far =
                 Math.hypot(a.pos.x - kid.x, a.pos.z - kid.z) > 2 ||
@@ -434,6 +557,15 @@ export class Caller {
             o.alertUntil = now + WAIT_S + 1;
             o.say(c.report, 5);
             o.hop();
+
+            return;
+        }
+        if (c.vai === 'meo') {
+            const m = this.d.cat;
+            m.callText = c.report;
+            m.callAlert = true;
+            m.alertUntil = now + WAIT_S + 1;
+            m.say(c.report, 5);
 
             return;
         }
@@ -462,6 +594,9 @@ export class Caller {
             if (c.vai === 'cu') {
                 this.d.owl.alertUntil = 0;
                 this.d.owl.callAlert = false;
+            } else if (c.vai === 'meo') {
+                this.d.cat.alertUntil = 0;
+                this.d.cat.callAlert = false;
             } else {
                 const a = this.actorOf(c.vai);
                 a?.alert(0);
@@ -487,7 +622,13 @@ export class Caller {
             return;
         }
         this.cur = null;
+        this.glideStop();
         this.ring.visible = this.disc.visible = false;
+        if (c.vai === 'meo') {
+            this.d.cat.callEnd();
+
+            return;
+        }
         if (c.vai === 'cu') {
             this.d.owl.alertUntil = 0;
             this.d.owl.callText = null;
@@ -523,11 +664,9 @@ export class Caller {
         if (this.owlBack && this.cur?.vai !== 'cu') {
             this.owlFly(dt, this.owlHomeX, this.owlHomeZ, this.owlHomeY, true);
         }
+        this.glideTick(now);
         if (this.ring.visible && this.cur) {
-            const p =
-                this.cur.vai === 'cu'
-                    ? this.d.owl.root.position
-                    : this.actorOf(this.cur.vai)!.root.position;
+            const p = this.subject(this.cur.vai)!;
             const y = this.cur.vai === 'cu' ? this.d.kidActor.pos.y : p.y;
             this.ring.position.set(p.x, y + 0.03, p.z);
             this.disc.position.set(p.x, y + 0.025, p.z);
@@ -543,6 +682,11 @@ export class Caller {
         const kid = this.d.kidActor.pos;
         if (c.vai === 'cu') {
             this.tickOwl(c, dt, now);
+
+            return;
+        }
+        if (c.vai === 'meo') {
+            this.tickCat(c, now);
 
             return;
         }
@@ -574,6 +718,36 @@ export class Caller {
                 a.callText = c.report;
                 a.say(c.report, 5, 'reply');
                 a.act('wave', 1.2, 'happy');
+            }
+        } else if (now - c.t0 > OPEN_S) {
+            this.end();
+        }
+    }
+
+    private tickCat(c: Cur, now: number) {
+        const kid = this.d.kidActor.pos;
+        const cat = this.d.cat;
+        if (c.phase === 'run') {
+            if (cat.callWaiting || now - c.t0 > 22) {
+                this.arrive();
+            } else if (
+                now > c.chkAt &&
+                Math.hypot(kid.x - c.kx, kid.z - c.kz) > 1.8
+            ) {
+                c.chkAt = now + 0.7;
+                this.catGo();
+            }
+
+            return;
+        }
+        if (c.phase === 'wait') {
+            if (now - c.t0 > WAIT_S) {
+                this.end();
+            } else if (now > c.sayAt) {
+                c.sayAt = now + 9;
+                c.report = this.reportOf(c.vai);
+                cat.callText = c.report;
+                cat.say(c.report, 5);
             }
         } else if (now - c.t0 > OPEN_S) {
             this.end();

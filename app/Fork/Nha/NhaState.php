@@ -184,7 +184,7 @@ final class NhaState
      * Số việc đang chờ chủ app theo vai (chỉ vai có việc). Hàm thuần: số đếm do nơi gọi truy vấn rồi đưa vào.
      *
      * @param  array{chrome_online?: bool|null}  $app
-     * @param  array{loi?: int, gio_tam_dung?: int, kho?: int|null}  $dem  loi = bài lỗi 24h qua; gio_tam_dung = giỏ bị tạm dừng; kho = số video còn chờ đăng (null = không có kênh bật)
+     * @param  array{loi?: int, gio_tam_dung?: int, chua_gio?: int, kho?: int|null, kho_thap?: bool, cho_duyet?: int|null, cap_nhat?: string|null}  $dem  loi = bài lỗi 24h qua; gio_tam_dung = giỏ bị tạm dừng; chua_gio = sản phẩm có video chờ mà chưa chọn giỏ; kho = số video còn chờ đăng (null = không có kênh bật); cho_duyet = video hub chưa Ưng/Bỏ (null = hub cũ/không biết); cap_nhat = số phiên bản mới (đã có sẵn, không gọi mạng)
      * @return array<string, array{so: int, tom_tat: string}>
      */
     public static function viec(array $app, array $dem): array
@@ -195,22 +195,37 @@ final class NhaState
         if ($loi > 0) {
             $viec['buuta'] = ['so' => $loi, 'tom_tat' => $loi.' bài đăng lỗi, cần xem lại'];
         }
-        if (($app['chrome_online'] ?? null) === false) {
-            $them = isset($viec['buuta']) ? $viec['buuta']['so'] : 0;
-            $viec['buuta'] = [
-                'so' => $them + 1,
-                'tom_tat' => ($them > 0 ? $viec['buuta']['tom_tat'].' · ' : '').'Chrome chưa kết nối',
-            ];
-        }
 
+        $chua = (int) ($dem['chua_gio'] ?? 0);
         $gio = (int) ($dem['gio_tam_dung'] ?? 0);
-        if ($gio > 0) {
-            $viec['chuquay'] = ['so' => $gio, 'tom_tat' => $gio.' giỏ hàng đang tạm dừng'];
+        if ($chua + $gio > 0) {
+            $viec['chuquay'] = ['so' => $chua + $gio, 'tom_tat' => implode(' · ', array_filter([
+                $chua > 0 ? $chua.' sản phẩm chưa chọn giỏ' : null,
+                $gio > 0 ? $gio.' giỏ tạm dừng' : null,
+            ]))];
         }
 
         $kho = $dem['kho'] ?? null;
         if ($kho !== null && ($dem['kho_thap'] ?? false)) {
             $viec['thukho'] = ['so' => 1, 'tom_tat' => 'Kho còn '.(int) $kho.' video'];
+        }
+
+        $duyet = (int) ($dem['cho_duyet'] ?? 0);
+        if ($duyet > 0) {
+            $viec['giamkhao'] = ['so' => $duyet, 'tom_tat' => $duyet.' video chờ anh duyệt'];
+        }
+
+        // Mèo = quản gia cài đặt: Chrome mất kết nối, có bản cập nhật mới.
+        $meo = [];
+        if (($app['chrome_online'] ?? null) === false) {
+            $meo[] = 'Chrome chưa kết nối';
+        }
+        $cn = (string) ($dem['cap_nhat'] ?? '');
+        if ($cn !== '') {
+            $meo[] = 'Có bản cập nhật '.$cn;
+        }
+        if ($meo !== []) {
+            $viec['meo'] = ['so' => count($meo), 'tom_tat' => implode(' · ', $meo)];
         }
 
         return $viec;

@@ -115,5 +115,5 @@ export const DICH: Record<string, Dich> = {
         ten: 'Bảng việc',
         dich: 'Xưởng Video › Sản xuất',
     },
-    meo: { href: null, ten: 'Mèo', dich: '' },
+    meo: { href: '/settings', ten: 'Mèo quản gia', dich: 'Cài đặt' },
 };

@@ -151,14 +151,29 @@ test('state exposes the event feed, batch reels and finished message', function 
 test('viec lists only the roles that have something waiting', function (): void {
     expect(NhaState::viec(['chrome_online' => true], []))->toBe([]);
 
-    $v = NhaState::viec(['chrome_online' => false], ['loi' => 2, 'gio_tam_dung' => 3, 'kho' => 4, 'kho_thap' => true]);
-    expect($v['buuta']['so'])->toBe(3)
-        ->and($v['buuta']['tom_tat'])->toContain('2 bài đăng lỗi')->toContain('Chrome')
-        ->and($v['chuquay'])->toBe(['so' => 3, 'tom_tat' => '3 giỏ hàng đang tạm dừng'])
+    $v = NhaState::viec(['chrome_online' => false], ['loi' => 2, 'gio_tam_dung' => 1, 'chua_gio' => 2, 'kho' => 4, 'kho_thap' => true, 'cho_duyet' => 5, 'cap_nhat' => '1.3.0']);
+    expect($v['buuta'])->toBe(['so' => 2, 'tom_tat' => '2 bài đăng lỗi, cần xem lại'])
+        ->and($v['chuquay'])->toBe(['so' => 3, 'tom_tat' => '2 sản phẩm chưa chọn giỏ · 1 giỏ tạm dừng'])
         ->and($v['thukho'])->toBe(['so' => 1, 'tom_tat' => 'Kho còn 4 video'])
-        ->and($v)->not->toHaveKey('giamkhao');
+        ->and($v['giamkhao'])->toBe(['so' => 5, 'tom_tat' => '5 video chờ anh duyệt'])
+        ->and($v['meo'])->toBe(['so' => 2, 'tom_tat' => 'Chrome chưa kết nối · Có bản cập nhật 1.3.0']);
 
-    expect(NhaState::viec(['chrome_online' => null], ['kho' => 40, 'kho_thap' => false]))->toBe([]);
+    expect(NhaState::viec(['chrome_online' => null], ['kho' => 40, 'kho_thap' => false, 'cho_duyet' => null, 'cap_nhat' => null]))->toBe([])
+        ->and(NhaState::viec(['chrome_online' => true], ['gio_tam_dung' => 1])['chuquay']['tom_tat'])->toBe('1 giỏ tạm dừng');
+});
+
+test('state endpoint carries cho_duyet from the hub as the giamkhao work', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response([...nhaHub([]), 'cho_duyet' => 7])]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+    expect($j['viec']['giamkhao'])->toBe(['so' => 7, 'tom_tat' => '7 video chờ anh duyệt']);
+
+});
+
+test('an older hub without cho_duyet gives no giamkhao work', function (): void {
+    Http::fake(['127.0.0.1:8765/api/su-kien*' => Http::response(nhaHub([]))]);
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->json();
+    expect($j['viec'])->not->toHaveKey('giamkhao');
 });
 
 test('state endpoint always carries a viec map', function (): void {

@@ -48,7 +48,11 @@ const props = defineProps<{
     rollback_version: string;
     launcher_pending: boolean;
     job: Job | null;
+    /** Chạy trong popup "Bàn làm việc": ở yên trang đang mở, báo `changed` cho bàn. */
+    embedded?: boolean;
 }>();
+
+const emit = defineEmits<{ changed: [] }>();
 
 const busy = ref<string | null>(null);
 const live = ref<Job | null>(props.job);
@@ -61,8 +65,16 @@ const run = (key: string, fn: (done: () => void) => void): void => {
     fn(() => (busy.value = null));
 };
 
-const opts = (done: () => void) => ({
+const opts = (done: () => void, onSuccess?: () => void) => ({
     preserveScroll: true,
+    ...(props.embedded ? { preserveState: true } : {}),
+    onSuccess: () => {
+        onSuccess?.();
+
+        if (props.embedded) {
+            emit('changed');
+        }
+    },
     onFinish: done,
 });
 
@@ -134,13 +146,10 @@ const install = (): void => {
         router.post(
             '/settings/cap-nhat/install',
             {},
-            {
-                ...opts(done),
-                onSuccess: () => {
-                    sawBusy = true;
-                    start();
-                },
-            },
+            opts(done, () => {
+                sawBusy = true;
+                start();
+            }),
         ),
     );
 };
@@ -156,13 +165,10 @@ const rollback = (): void => {
         router.post(
             '/settings/cap-nhat/rollback',
             {},
-            {
-                ...opts(done),
-                onSuccess: () => {
-                    sawBusy = true;
-                    start();
-                },
-            },
+            opts(done, () => {
+                sawBusy = true;
+                start();
+            }),
         ),
     );
 };

@@ -14,7 +14,8 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
-const props = defineProps<{ account: AccountRow }>();
+const props = defineProps<{ account: AccountRow; inPlace?: boolean }>();
+const emit = defineEmits<{ changed: [] }>();
 const open = defineModel<boolean>('open', { default: false });
 
 interface Draft {
@@ -67,8 +68,13 @@ const save = () => {
     busy.value = true;
     router.patch(`/auto/accounts/${props.account.id}`, changed, {
         preserveScroll: true,
+        ...(props.inPlace ? { preserveState: true } : {}),
         onSuccess: () => {
             open.value = false;
+
+            if (props.inPlace) {
+                emit('changed');
+            }
         },
         onFinish: () => {
             busy.value = false;
@@ -80,6 +86,12 @@ const applyHours = () => {
     busy.value = true;
     router.post(`/auto/accounts/${props.account.id}/apply-hours`, {}, {
         preserveScroll: true,
+        ...(props.inPlace ? { preserveState: true } : {}),
+        onSuccess: () => {
+            if (props.inPlace) {
+                emit('changed');
+            }
+        },
         onFinish: () => {
             busy.value = false;
         },

@@ -19,12 +19,22 @@ const props = defineProps<{
     today: LichChannel['today'] | undefined;
     chrome?: HealthChannel;
     blockedCount: number;
+    /** Dùng trong popup "Bàn làm việc": giữ nguyên trang đang mở (preserveState) và báo `changed`. */
+    inPlace?: boolean;
 }>();
+
+const emit = defineEmits<{ changed: [] }>();
 
 const busy = ref(false);
 const editing = ref(false);
 const opts = {
     preserveScroll: true,
+    ...(props.inPlace ? { preserveState: true } : {}),
+    onSuccess: () => {
+        if (props.inPlace) {
+            emit('changed');
+        }
+    },
     onFinish: () => {
         busy.value = false;
     },
@@ -149,6 +159,6 @@ const summary = computed(() => {
             </Link>
         </div>
 
-        <ChannelSettingsDialog v-model:open="editing" :account="account" />
+        <ChannelSettingsDialog v-model:open="editing" :account="account" :in-place="inPlace" @changed="emit('changed')" />
     </div>
 </template>

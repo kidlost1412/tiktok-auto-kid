@@ -106,7 +106,25 @@ const props = defineProps<{
     serverUrl: string;
     hasWorkspace: boolean;
     backgroundMode?: { chrome: boolean | null; edge: boolean | null };
+    /** Chạy trong popup "Bàn làm việc": ở yên trang đang mở, báo `changed` / `refresh` cho bàn. */
+    embedded?: boolean;
 }>();
+
+const emit = defineEmits<{ changed: []; refresh: [only: string[]] }>();
+
+const base = (done: () => void, onSuccess?: () => void) => ({
+    preserveScroll: true,
+    ...(props.embedded ? { preserveState: true } : {}),
+    onSuccess: () => {
+        onSuccess?.();
+
+        if (props.embedded) {
+            emit('changed');
+        }
+    },
+    onFinish: done,
+});
+
 
 /** So sánh phiên bản dạng số (1.4.10 > 1.4.9): âm nếu a < b. */
 function compareVersions(a: string, b: string): number {
@@ -142,7 +160,19 @@ const only = [
     'telegram',
     'backgroundMode',
 ];
-usePoll(5000, { only });
+// Trang thật: tự làm mới bằng Inertia. Popup: bàn tải lại dữ liệu (emit `refresh`) vì trang đang mở là /nha.
+usePoll(5000, { only }, { autoStart: !props.embedded });
+
+const refresh = (): void => {
+    if (props.embedded) {
+        emit('refresh', only);
+    } else {
+        router.reload({ only });
+    }
+};
+
+let embeddedPoll: ReturnType<typeof setInterval> | null = null;
+
 
 const busy = ref<string | null>(null);
 
@@ -176,9 +206,18 @@ watch(
 
 onMounted(() => {
     timer = setInterval(tick, 1000);
+
+    if (props.embedded) {
+        embeddedPoll = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                refresh();
+            }
+        }, 5000);
+    }
 });
 onBeforeUnmount(() => {
     if (timer) clearInterval(timer);
+    if (embeddedPoll) clearInterval(embeddedPoll);
 });
 
 const countdown = computed(() => {
@@ -198,18 +237,14 @@ const paired = computed(() => connectedClients.value.length > 0);
 // pairProgress.value?.start({ mode: 'create', profile, browser }) sau khi app đã yêu cầu mở Chrome.
 const pairProgress = ref<InstanceType<typeof PairProgress> | null>(null);
 
-const onPairChanged = (): void => router.reload({ only });
+const onPairChanged = (): void => refresh();
 
 const makeCode = (): void =>
     run('pair', (done) =>
         router.post(
             '/settings/chrome/pair-code',
             {},
-            {
-                preserveScroll: true,
-                onSuccess: () => pairProgress.value?.start({ mode: 'code' }),
-                onFinish: done,
-            },
+            base(done, () => pairProgress.value?.start({ mode: 'code' })),
         ),
     );
 
@@ -245,7 +280,7 @@ const saveProfile = (
         router.patch(
             `/settings/chrome/clients/${client.id}`,
             { chrome_profile_dir: value, chrome_browser: browser },
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 };
@@ -260,17 +295,14 @@ const telegramTest = (): void =>
         router.post(
             '/settings/chrome/telegram-test',
             {},
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 
 const revoke = (client: ChromeClient): void => {
     if (!window.confirm(`Thu hồi kết nối "${client.label}"?`)) return;
     run(`revoke-${client.id}`, (done) =>
-        router.delete(`/settings/chrome/clients/${client.id}`, {
-            preserveScroll: true,
-            onFinish: done,
-        }),
+        router.delete(`/settings/chrome/clients/${client.id}`, base(done)),
     );
 };
 
@@ -279,7 +311,7 @@ const toggle = (account: TikTokAccount): void =>
         router.post(
             `/settings/chrome/accounts/${account.id}/toggle`,
             {},
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 
@@ -288,7 +320,7 @@ const addFromClient = (client: ChromeClient): void =>
         router.post(
             `/settings/chrome/accounts/from-client/${client.id}`,
             {},
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 
@@ -297,7 +329,7 @@ const setKeepAlive = (client: ChromeClient, value: boolean): void =>
         router.post(
             `/settings/chrome/clients/${client.id}/keep-alive`,
             { keep_alive: value },
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 
@@ -306,7 +338,7 @@ const openNow = (client: ChromeClient): void =>
         router.post(
             `/settings/chrome/clients/${client.id}/open-now`,
             {},
-            { preserveScroll: true, onFinish: done },
+            base(done),
         ),
     );
 
@@ -1112,7 +1144,7 @@ const chromeOnlyCandidates = computed(() => {
                 <Button
                     variant="outline"
                     size="sm"
-                    @click="router.reload({ only })"
+                    @click="refresh()"
                 >
                     <IconRefresh class="size-4" />
                     Làm mới

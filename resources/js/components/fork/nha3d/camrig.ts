@@ -60,7 +60,10 @@ export class CamRig {
         c.maxPolarAngle = 1.45;
         c.zoomToCursor = true;
         c.screenSpacePanning = true;
-        c.addEventListener('start', () => (this.touched = true));
+        c.addEventListener('start', () => {
+            this.touched = true;
+            this.glideFocus = null;
+        });
         c.addEventListener('change', () => {
             const t = c.target;
             const cx = clamp(t.x, PLOT.x0 + 4, PLOT.x1 - 4);
@@ -277,6 +280,9 @@ export class CamRig {
     /** Khi sếp đang nói chuyện với ai: xoay camera chéo sang để thấy cả hai (người dùng kéo chuột là thôi). */
     yawTo: number | null = null;
 
+    /** "Gọi về gấp" (Toàn cảnh): điểm camera lướt theo; người dùng kéo/xoay/cuộn là huỷ ngay. */
+    glideFocus: THREE.Vector3 | null = null;
+
     drag(dx: number, dy: number) {
         this.yawTo = null;
         this.yaw -= dx * 0.006;
@@ -303,6 +309,22 @@ export class CamRig {
                     this.reset = -1;
                     this.touched = false;
                 }
+            }
+            const g = this.glideFocus;
+            if (g) {
+                // lướt mượt: dời cả camera lẫn tâm nhìn cùng một đoạn (giữ nguyên góc nhìn)
+                const k = this.motion ? 1 - Math.exp(-dt * 2.6) : 1;
+                const t = this.controls.target;
+                const dx = (g.x - t.x) * k;
+                const dy = (g.y + 1 - t.y) * k;
+                const dz = (g.z - t.z) * k;
+                t.x += dx;
+                t.y += dy;
+                t.z += dz;
+                this.camera.position.x += dx;
+                this.camera.position.y += dy;
+                this.camera.position.z += dz;
+                this.touched = true;
             }
             this.controls.update();
 

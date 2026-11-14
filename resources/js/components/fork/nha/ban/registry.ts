@@ -115,6 +115,14 @@ export const BAN: Record<string, BanDef> = {
         full: DICH.thuam.href,
         component: lazy(() => import('./ThuAmBan.vue')),
     },
+    meo: {
+        ten: 'Mèo quản gia',
+        mo_ta: 'Cài đặt, tiện ích Chrome, Telegram, cập nhật',
+        emoji: '🐱',
+        mau: 'from-slate-400 to-zinc-600',
+        full: '/settings',
+        component: lazy(() => import('./MeoBan.vue')),
+    },
 };
 
 /** Thứ tự trên thanh avatar (giai đoạn 3). */
@@ -129,4 +137,5 @@ export const BAN_THU_TU = [
     'daodien',
     'bienkich',
     'thuam',
+    'meo',
 ];

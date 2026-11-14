@@ -347,7 +347,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             return null;
         }
         if (h.kind === 'cat') {
-            return ['Mèo', 'Bấm để nghe meo~'];
+            return ['Mèo quản gia', 'Bấm để mở bàn làm việc'];
         }
         if (h.kind === 'place') {
             return [h.name, 'Chỗ nghỉ ngơi của cả nhà'];
@@ -381,6 +381,8 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         }
         if (h.kind === 'cat') {
             cat.poke(noi('meo'));
+            caller.onOpened('meo');
+            o.onGo('meo');
 
             return;
         }
@@ -535,6 +537,9 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         scene,
         A,
         owl,
+        cat,
+        nav,
+        rig,
         kidActor,
         director,
         camera,
@@ -1409,6 +1414,9 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             if (!failed) {
                 if (viec === 'mo') {
                     caller.onOpened(vai);
+                    if (vai === 'meo' && !caller.calling('meo')) {
+                        cat.poke(noi('meo'));
+                    }
                 } else if (viec === 'dong') {
                     caller.onClosed(vai);
                 }

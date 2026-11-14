@@ -25,9 +25,11 @@ import type { Butterfly } from './world';
 type Mode = 'idle' | 'walk' | 'curl' | 'rub' | 'jump' | 'chase' | 'sit';
 
 interface Task {
-    kind: 'path' | 'curl' | 'rub' | 'jump' | 'chase' | 'sit' | 'do';
+    kind: 'path' | 'curl' | 'rub' | 'jump' | 'chase' | 'sit' | 'do' | 'hold';
     to?: string;
     run?: boolean;
+    /** Tốc độ riêng (m/s), ưu tiên hơn `run`. */
+    speed?: number;
     d?: number;
     from?: THREE.Vector3;
     dest?: THREE.Vector3;
@@ -41,6 +43,11 @@ export class Cat implements Talker {
     readonly root = new THREE.Group();
     readonly pos = new THREE.Vector3();
     alertUntil = 0;
+    /** "Gọi về gấp": dấu "!" vàng + chỉ nói đúng câu báo cáo. */
+    callAlert = false;
+    callText: string | null = null;
+    /** Đang chờ ở chỗ được gọi, quay mặt về điểm này (null = không bị gọi). */
+    private callLook: THREE.Vector3 | null = null;
     favourite: Actor | null = null;
     private favUntil = 0;
     private rot = 0;
@@ -314,7 +321,14 @@ export class Cat implements Talker {
     }
 
     say(text: string, d = 2.2, prio: Prio = 'chat') {
-        if (this.speech && !this.speech.allow('meo', text, prio)) {
+        if (this.callText !== null && text !== this.callText) {
+            return;
+        }
+        if (
+            this.callText === null &&
+            this.speech &&
+            !this.speech.allow('meo', text, prio)
+        ) {
             return;
         }
         this.sayText = text;
@@ -452,6 +466,28 @@ export class Cat implements Talker {
             { kind: 'path', to: node, run: true },
             { kind: 'sit', d },
         ];
+    }
+
+    /** "Gọi về gấp": chạy tới nút nav `node`, quay mặt về `look`, ngồi chờ tới khi `callEnd()`. */
+    callTo(node: string, look: THREE.Vector3) {
+        this.rider = null;
+        this.onDesk = null;
+        this.task = null;
+        this.nodeId = this.nav.nearest(this.pos);
+        this.callLook = look;
+        this.tasks = [{ kind: 'path', to: node, speed: 5 }, { kind: 'hold' }];
+    }
+
+    /** Đã tới chỗ được gọi và đang chờ? */
+    get callWaiting() {
+        return this.task?.kind === 'hold';
+    }
+
+    callEnd() {
+        this.callLook = null;
+        this.callText = null;
+        this.callAlert = false;
+        this.alertUntil = 0;
     }
 
     /** (Gỡ lỗi) đi tìm ngay người được chọn để làm nũng. */
@@ -637,7 +673,7 @@ export class Cat implements Talker {
         switch (t.kind) {
             case 'path': {
                 this.mode = 'walk';
-                if (this.follow(dt, t.run ? 2.4 : 1.4)) {
+                if (this.follow(dt, t.speed ?? (t.run ? 2.4 : 1.4))) {
                     this.task = null;
                 }
                 break;
@@ -652,6 +688,17 @@ export class Cat implements Talker {
                     this.task = null; // người kia đứng dậy → mèo cũng dậy
                 }
                 if (this.taskT > (t.d ?? 20)) {
+                    this.task = null;
+                }
+                break;
+            case 'hold':
+                this.mode = 'sit';
+                if (this.callLook) {
+                    this.targetRot = Math.atan2(
+                        this.callLook.x - this.pos.x,
+                        this.callLook.z - this.pos.z,
+                    );
+                } else {
                     this.task = null;
                 }
                 break;

@@ -10,11 +10,13 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeClient;
+use App\Fork\Update\LauncherClient;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,8 +52,11 @@ final class NhaController extends Controller
         $now = CarbonImmutable::now();
 
         $app = $this->appFacts($now);
-        $state = NhaState::build($this->hub(), $app, $now);
-        $state['viec'] = NhaState::viec($app, $this->dem($now));
+        $hub = $this->hub();
+        $state = NhaState::build($hub, $app, $now);
+        $dem = $this->dem($now);
+        $dem['cho_duyet'] = isset($hub['cho_duyet']) ? (int) $hub['cho_duyet'] : null;
+        $state['viec'] = NhaState::viec($app, $dem);
         // Địa chỉ hub để bấm cuộn phim mở video (trình duyệt gọi thẳng hub như khung Xưởng Video).
         $state['hub']['url'] = rtrim((string) config('fork.xuong.url'), '/');
 
@@ -76,6 +81,8 @@ final class NhaController extends Controller
                     'san_pham' => (array) $r->json('san_pham', []),
                     'su_kien' => (array) $r->json('su_kien', []),
                     'bay_gio' => (float) $r->json('bay_gio', 0),
+                    // Số video chờ anh duyệt (hub mới mới có; hub cũ không có thì bỏ qua).
+                    'cho_duyet' => is_numeric($r->json('cho_duyet')) ? (int) $r->json('cho_duyet') : null,
                 ];
             }
             $r = Http::timeout(3)->connectTimeout(1)->acceptJson()->get($base.'/api/trang-thai');
@@ -92,14 +99,23 @@ final class NhaController extends Controller
     /**
      * Số đếm rẻ cho "việc chờ" của từng vai (chỉ đọc, có index theo status).
      *
-     * @return array{loi: int, gio_tam_dung: int, kho: int|null, kho_thap: bool}
+     * @return array{loi: int, gio_tam_dung: int, chua_gio: int, kho: int|null, kho_thap: bool, cap_nhat: string|null}
      */
     private function dem(CarbonImmutable $now): array
     {
-        $dem = ['loi' => 0, 'gio_tam_dung' => 0, 'kho' => null, 'kho_thap' => false];
+        $dem = ['loi' => 0, 'gio_tam_dung' => 0, 'chua_gio' => 0, 'kho' => null, 'kho_thap' => false, 'cap_nhat' => null];
         try {
             $dem['loi'] = AutoVideo::query()->where('status', AutoVideo::FAILED)->where('updated_at', '>=', $now->subDay())->count();
             $dem['gio_tam_dung'] = ProductLink::query()->whereNotNull('paused_reason')->where('paused_reason', '!=', '')->count();
+
+            // Sản phẩm (mã x quy cách) đang có video chờ mà chưa chọn giỏ trên kênh nào (cùng ý với CartRules::forAccount).
+            $linked = ProductLink::query()->get(['auto_product_id', 'quy_cach'])
+                ->mapWithKeys(fn (ProductLink $l): array => [$l->auto_product_id.'|'.($l->quy_cach ?? '') => true])->all();
+            $dem['chua_gio'] = AutoVideo::query()->notRieng()->where('status', AutoVideo::NEW)->whereNotNull('product_code')
+                ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+                ->select('product_code', 'quy_cach')->distinct()->get()
+                ->filter(fn (AutoVideo $v): bool => ! isset($linked[$v->product_code.'|'.(filled($v->quy_cach) ? $v->quy_cach : '')]))
+                ->count();
 
             $perDay = (int) AutoAccount::query()->where('enabled', true)->sum('daily_cap');
             if ($perDay > 0) {
@@ -118,8 +134,36 @@ final class NhaController extends Controller
         } catch (Throwable) {
             // thiếu bảng/dữ liệu thì không báo việc
         }
+        $dem['cap_nhat'] = $this->capNhat();
 
         return $dem;
+    }
+
+    /**
+     * Phiên bản mới (nếu có) theo kết quả kiểm tra launcher đã giữ sẵn; không hỏi GitHub. Đệm 5 phút để không gọi launcher mỗi lần poll.
+     */
+    private function capNhat(): ?string
+    {
+        try {
+            $v = Cache::remember('nha.cap-nhat', 300, function (): string {
+                if (! LauncherClient::repoConfigured()) {
+                    return '';
+                }
+                $st = LauncherClient::status();
+
+                return ($st['update_available'] ?? false) === true ? (string) ($st['latest']['version'] ?? '') : '';
+            });
+        } catch (Throwable) {
+            return null;
+        }
+
+        // Đệm còn ghi bản mới nhưng app vừa cập nhật lên bản đó rồi: thôi báo.
+        $cur = trim((string) @file_get_contents((string) config('fork-update.version_file')));
+        if ($v !== '' && $cur !== '' && version_compare(ltrim($v, 'v'), ltrim($cur, 'v'), '<=')) {
+            return null;
+        }
+
+        return $v !== '' ? $v : null;
     }
 
     /**
