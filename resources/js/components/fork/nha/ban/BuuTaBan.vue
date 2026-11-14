@@ -51,15 +51,12 @@ const {
     loading,
     error,
     reload,
-} = useInertiaProps<AutoProps>('/auto', 'fork/Auto', [
-    'products',
-    'stock',
-    'accounts',
-    'health',
-    'lich',
-    'recent',
-    'failed_recent',
-]);
+} = useInertiaProps<AutoProps>(
+    '/auto',
+    'fork/Auto',
+    // Đúng các prop bàn dùng (không xin health, upcoming, trend, insights... nên máy chủ không tính).
+    ['products', 'stock', 'accounts', 'lich', 'recent', 'failed_recent'],
+);
 
 // Đồng hồ nội bộ để "còn x phút" tự chạy; làm mới số liệu mỗi 30 giây khi popup đang mở.
 const now = ref(dayjs());

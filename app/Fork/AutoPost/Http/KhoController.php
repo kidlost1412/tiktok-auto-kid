@@ -106,28 +106,42 @@ final class KhoController extends Controller
         $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
         $dayExpr = $this->dayExpression($tab);
 
-        // Số trên tab KHÔNG phụ thuộc sản phẩm đang chọn; số trên chip sản phẩm tính trong tab đang chọn.
-        $statusCounts = $base()
-            ->selectRaw(AutoVideo::effectiveStatusSql().' as eff, count(*) as total')->groupByRaw('eff')->pluck('total', 'eff');
-        $counts = ['all' => (int) $statusCounts->sum()];
+        // Mỗi prop nặng nằm trong closure (Inertia chỉ chạy closure của prop được xin ở partial reload của bàn Thủ kho);
+        // phần dùng chung giữa các prop (đếm, sản phẩm, đánh giá sẵn sàng, danh sách video) tính một lần (memo).
+        $memo = [];
+        $once = function (string $key, callable $make) use (&$memo): mixed {
+            if (! array_key_exists($key, $memo)) {
+                $memo[$key] = $make();
+            }
 
-        foreach (self::TABS as $key => $statuses) {
-            $counts[$key] = (int) collect($statuses)->sum(fn (string $s): int => (int) ($statusCounts[$s] ?? 0));
-        }
+            return $memo[$key];
+        };
+
+        // Số trên tab KHÔNG phụ thuộc sản phẩm đang chọn; số trên chip sản phẩm tính trong tab đang chọn.
+        $counts = fn (): array => $once('counts', function () use ($base): array {
+            $statusCounts = $base()
+                ->selectRaw(AutoVideo::effectiveStatusSql().' as eff, count(*) as total')->groupByRaw('eff')->pluck('total', 'eff');
+            $counts = ['all' => (int) $statusCounts->sum()];
+
+            foreach (self::TABS as $key => $statuses) {
+                $counts[$key] = (int) collect($statuses)->sum(fn (string $s): int => (int) ($statusCounts[$s] ?? 0));
+            }
+
+            return $counts;
+        });
 
         // Số theo sản phẩm tính trong tab đang chọn .
-        $productCounts = $base()
+        $productCounts = fn () => $once('productCounts', fn () => $base()
             ->tap(fn ($q) => $this->applyTab($q, $tab))
-            ->select('product_code', DB::raw('count(*) as total'))->groupBy('product_code')->pluck('total', 'product_code');
+            ->select('product_code', DB::raw('count(*) as total'))->groupBy('product_code')->pluck('total', 'product_code'));
 
-        $legacyCount = AutoVideo::query()->where('source', 'ra')->count();
+        $products = fn () => $once('products', fn () => AutoProduct::query()->orderBy('short_name')->get()->keyBy('code'));
+        $images = fn () => $once('images', fn () => ProductImages::lookup());
+        $readiness = app(Readiness::class);
+        $waiting = fn () => $once('waiting', fn () => $base()->where('status', AutoVideo::NEW)->get());
+        $assessed = fn () => $once('assessed', fn () => $readiness->assess($waiting()));
 
-        // Các ngày để chọn trong bộ lọc ngày (mặc định "Tất cả ngày" = không lọc).
-        $days = $base()->tap(fn ($q) => $this->applyTab($q, $tab))
-            ->selectRaw($dayExpr.' as d')->whereRaw($dayExpr.' is not null')->groupByRaw($dayExpr)->orderByRaw($dayExpr.' desc')->limit(120)->pluck('d')
-            ->map(fn ($d): string => (string) $d)->values()->all();
-
-        $videos = $base()
+        $videos = fn () => $once('videos', fn () => $base()
             ->with('socialAccount:id,username,display_name,avatar_url')
             ->tap(fn ($q) => $this->applyTab($q, $tab))
             ->when($day !== '', fn ($q) => $q->whereRaw($dayExpr.' = ?', [$day]))
@@ -142,17 +156,10 @@ final class KhoController extends Controller
             )
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE)
-            ->withQueryString();
-
-        $products = AutoProduct::query()->orderBy('short_name')->get()->keyBy('code');
-
-        $images = ProductImages::lookup();
-        $readiness = app(Readiness::class);
-        $waiting = $base()->where('status', AutoVideo::NEW)->get();
-        $assessed = $readiness->assess($waiting);
+            ->withQueryString());
 
         return Inertia::render('fork/Kho', [
-            'kho' => [
+            'kho' => fn (): array => [
                 'path' => $kho->khoPath(),
                 'done_path' => $kho->donePath(),
                 'error_path' => $kho->khoPath().'/_loi',
@@ -160,7 +167,7 @@ final class KhoController extends Controller
                 'legacy_ra' => (bool) config('fork.auto.legacy_ra', true),
                 ...$kho->folderCounts(),
             ],
-            'retention' => [
+            'retention' => fn (): array => [
                 'value' => $kho->retention(),
                 'options' => [
                     ['value' => 'xoa_ngay', 'label' => 'Xoá file ngay khi đã đăng (chỉ giữ kết quả)'],
@@ -169,27 +176,34 @@ final class KhoController extends Controller
                     ['value' => 'vinh_vien', 'label' => 'Giữ vĩnh viễn'],
                 ],
             ],
-            'hub' => $this->hubStatus(false),
-            'matrix' => $this->matrix($products, $images),
-            'products' => $products->map(fn (AutoProduct $p): array => [
+            'hub' => fn (): array => $this->hubStatus(false),
+            'matrix' => fn (): array => $this->matrix($products(), $images()),
+            'products' => fn (): array => $products()->map(fn (AutoProduct $p): array => [
                 'code' => $p->code,
                 'name' => $p->short_name,
-                'image' => $images->forCode($p->code),
-                'count' => (int) ($productCounts[$p->code] ?? 0),
+                'image' => $images()->forCode($p->code),
+                'count' => (int) ($productCounts()[$p->code] ?? 0),
             ])->values()->all(),
             'filters' => ['tab' => $tab, 'product' => $product, 'legacy' => $showLegacy, 'sort' => $sort, 'q' => $search, 'day' => $day],
-            'days' => $days,
+            // Các ngày để chọn trong bộ lọc ngày (mặc định "Tất cả ngày" = không lọc).
+            'days' => fn (): array => $base()->tap(fn ($q) => $this->applyTab($q, $tab))
+                ->selectRaw($dayExpr.' as d')->whereRaw($dayExpr.' is not null')->groupByRaw($dayExpr)->orderByRaw($dayExpr.' desc')->limit(120)->pluck('d')
+                ->map(fn ($d): string => (string) $d)->values()->all(),
             'counts' => $counts,
-            'legacy_count' => $legacyCount,
-            'blockers' => $readiness->summarize($assessed, $waiting),
-            'videos' => [
-                'data' => $videos->getCollection()->map(fn (AutoVideo $v): array => $this->videoRow($v, $products, $assessed[$v->id] ?? $this->singleAssessment($readiness, $v), $images))->values()->all(),
-                'current_page' => $videos->currentPage(),
-                'last_page' => $videos->lastPage(),
-                'total' => $videos->total(),
-            ],
+            'legacy_count' => fn (): int => AutoVideo::query()->where('source', 'ra')->count(),
+            'blockers' => fn (): array => $readiness->summarize($assessed(), $waiting()),
+            'videos' => function () use ($videos, $products, $assessed, $images, $readiness): array {
+                $page = $videos();
+
+                return [
+                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->videoRow($v, $products(), $assessed()[$v->id] ?? $this->singleAssessment($readiness, $v), $images()))->values()->all(),
+                    'current_page' => $page->currentPage(),
+                    'last_page' => $page->lastPage(),
+                    'total' => $page->total(),
+                ];
+            },
             'updated_at' => now()->toIso8601String(),
-            'last_ingest_at' => Cache::get(VideoLibrary::LAST_INGEST_CACHE_KEY),
+            'last_ingest_at' => fn (): mixed => Cache::get(VideoLibrary::LAST_INGEST_CACHE_KEY),
         ]);
     }
 

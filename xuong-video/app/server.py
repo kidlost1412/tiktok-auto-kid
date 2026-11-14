@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 import anh_sp
+import luong
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
@@ -1106,6 +1107,25 @@ def mo_dang_nhap():
     return {"ok": True}
 
 
+def _luong_tinh():
+    import su_kien
+    return {"n": luong.n_cuoi(su_kien._file()), "cho_duyet": so_cho_duyet(), "chay": bool(dang_chay())}
+
+
+def _luong_bam():
+    _CHO_DUYET["khoa"] = None      # watcher báo kho/đánh giá đổi → lần tính tới quét lại, khỏi tin mtime cũ
+
+
+def _ra_an_toan():
+    try:
+        return ra_dir()
+    except Exception:
+        return None
+
+
+PHAT = luong.Phat(_luong_tinh, _ra_an_toan(), LS, bam=_luong_bam)
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -1123,6 +1143,37 @@ class H(BaseHTTPRequestHandler):
         b = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code); self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+
+    def _luong(self):
+        origin = self.headers.get("Origin")
+        try:
+            ds = cfg().get("nhung_tu", NHUNG_MAC_DINH)
+        except Exception:
+            ds = NHUNG_MAC_DINH
+        if not PHAT.vao():
+            return self._json({"ok": False, "loi": "Quá nhiều kết nối"}, 503)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Accel-Buffering", "no")
+            self.send_header("Connection", "close")
+            if origin and origin in ds:        # CORS: chỉ origin của app (cùng danh sách nhúng khung)
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+            self.end_headers()
+            self.close_connection = True
+            ver, anh = PHAT.hien_tai()
+            if anh is None:
+                PHAT._tinh_va_phat(); ver, anh = PHAT.hien_tai()
+            self.wfile.write(luong.khung_sse(anh or {})); self.wfile.flush()
+            while True:
+                ver, anh = PHAT.cho(ver, luong.PING_GIAY)
+                self.wfile.write(luong.khung_sse(anh) if anh is not None else luong.PING); self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass
+        finally:
+            PHAT.ra_khoi()
 
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -1183,6 +1234,8 @@ class H(BaseHTTPRequestHandler):
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
+        if u.path == "/api/luong":             # SSE: đẩy tin tức thì cho trang Khu Tự Trị (xem luong.py)
+            return self._luong()
         if u.path == "/api/su-kien":           # trang "Khu Tự Trị": sự kiện sản xuất mới + trạng thái hiện tại (chỉ đọc)
             sys.path.insert(0, str(CODE / "engine"))
             import su_kien
@@ -1567,6 +1620,10 @@ def main():
     except Exception as e:
         print("Không gom được file kèm:", e)
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), H)
+    try:
+        PHAT.bat_dau()
+    except Exception as e:
+        print("Không bật được luồng tin tức thì:", e)
     try:                                   # tự động giữ kho video
         from tu_dong import bat_dau
         bat_dau(dang_chay, chay, lambda: (RUN["proc"].poll() if RUN["proc"] else None))      # mã thoát lô vừa rồi: khác 0 = lô lỗi → nghỉ lùi dần

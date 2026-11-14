@@ -27,18 +27,25 @@ type SettingsProps = {
     telegram: InstanceType<typeof TelegramSection>['$props'];
     update: InstanceType<typeof UpdateSection>['$props'];
 };
-type AutoProps = { accounts: AccountRow[]; health: Health; lich: Lich };
+type AutoProps = { accounts: AccountRow[]; health?: Health; lich?: Lich };
 
 const {
     props: st,
     error,
     reload,
-} = useInertiaProps<SettingsProps>('/settings', 'fork/Settings');
+} = useInertiaProps<SettingsProps>('/settings', 'fork/Settings', [
+    'chrome',
+    'telegram',
+    'update',
+]);
 const { props: au, reload: reloadAuto } = useInertiaProps<AutoProps>(
     '/auto',
     'fork/Auto',
-    ['accounts', 'health', 'lich'],
+    ['accounts'],
 );
+
+// Thẻ kênh (tab Tự động & kênh) cần thêm lịch và Chrome của từng kênh; tab khác chỉ cần danh sách kênh.
+const AUTO_KENH = ['accounts', 'health', 'lich'];
 
 onMounted(() => {
     reload();
@@ -54,6 +61,14 @@ const tabs: { key: Tab; label: string }[] = [
     { key: 'cap-nhat', label: 'Cập nhật' },
 ];
 
+const openTab = (t: Tab) => {
+    tab.value = t;
+
+    if (t === 'kenh') {
+        reloadAuto(AUTO_KENH);
+    }
+};
+
 // Mỗi lần lưu xong: tải lại phần đã đổi và báo cho nhân vật trong cảnh.
 const saved = (only: string[], auto = false) => {
     if (only.length) {
@@ -61,7 +76,7 @@ const saved = (only: string[], auto = false) => {
     }
 
     if (auto) {
-        reloadAuto();
+        reloadAuto(tab.value === 'kenh' ? AUTO_KENH : undefined);
     }
 
     banBao('meo', 'luu');
@@ -88,7 +103,7 @@ const update = computed(() => st.value?.update ?? null);
 
 // Video đã duyệt nhưng bị giữ vì chưa chọn giỏ, theo từng kênh (hiện ở thẻ kênh).
 const blockedOf = (id: string) =>
-    (au.value?.lich.channels[id]?.blocked ?? []).reduce(
+    (au.value?.lich?.channels[id]?.blocked ?? []).reduce(
         (s, g) => s + g.count,
         0,
     );
@@ -220,7 +235,7 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
                                 : 'text-muted-foreground hover:text-foreground',
                         )
                     "
-                    @click="tab = t.key"
+                    @click="openTab(t.key)"
                 >
                     {{ t.label }}
                 </button>
@@ -243,7 +258,7 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
                     Bật / tắt tự động đăng và chỉnh hạn mức, khung giờ, số ngày
                     hẹn trước cho từng kênh (bấm Chỉnh trên thẻ kênh).
                 </p>
-                <Skeleton v-if="!au" class="h-40 rounded-[14px]" />
+                <Skeleton v-if="!au?.lich" class="h-40 rounded-[14px]" />
                 <EmptyState
                     v-else-if="!channels.length"
                     title="Chưa có kênh TikTok nào"
@@ -254,8 +269,10 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
                         v-for="a in channels"
                         :key="a.id"
                         :account="a"
-                        :today="au?.lich.channels[a.id]?.today"
-                        :chrome="au?.health.channels.find((c) => c.id === a.id)"
+                        :today="au?.lich?.channels[a.id]?.today"
+                        :chrome="
+                            au?.health?.channels.find((c) => c.id === a.id)
+                        "
                         :blocked-count="blockedOf(a.id)"
                         in-place
                         @changed="saved([], true)"

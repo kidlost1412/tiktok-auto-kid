@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Nội dung bàn Cú cho MỘT khoảng ngày: đọc /auto/so-lieu?range=…&cm=mua (chỉ bình luận hỏi mua).
-// KPI, biểu đồ lượt xem theo ngày, video nổi bật, bình luận hỏi mua. Đổi khoảng ngày: CuBan dựng lại component này.
+// KPI, biểu đồ lượt xem theo ngày, video nổi bật, bình luận hỏi mua. Đổi khoảng ngày: địa chỉ đổi theo `range`, tự tải lại.
 import {
     IconArrowDownRight,
     IconArrowUpRight,
@@ -55,7 +55,7 @@ const {
     error,
     reload,
 } = useInertiaProps<SoLieuProps>(
-    `/auto/so-lieu?range=${props.range}&cm=mua`,
+    () => `/auto/so-lieu?range=${props.range}&cm=mua`,
     'fork/SoLieu',
     ['filters', 'options', 'kpis', 'daily', 'top', 'collected_at', 'comments'],
 );

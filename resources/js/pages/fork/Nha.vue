@@ -11,6 +11,7 @@ import { onMoBan } from '@/components/fork/nha/ban/bus';
 import { BAN } from '@/components/fork/nha/ban/registry';
 import House from '@/components/fork/nha/House.vue';
 import { DICH, type NhaData } from '@/components/fork/nha/types';
+import { useHubLuong } from '@/components/fork/nha/useHubLuong';
 import Nha3D from '@/components/fork/nha3d/Nha3D.vue';
 import VideoViewer from '@/components/fork/shared/VideoViewer.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -84,8 +85,19 @@ let timer: number | undefined;
 let inflight = false;
 // Rời trang khi một lượt hỏi đang dở: lượt đó xong thì KHÔNG hẹn lượt mới (tránh vòng hỏi chạy ngầm mãi).
 let alive = true;
+// Hub đẩy tin tức thì (SSE): có tin thì hỏi ngay một lần; lúc đó đang có lượt dở thì hỏi lại ngay khi nó xong.
+const luong = useHubLuong(() =>
+    !demo && data.value?.hub.up ? data.value.hub.url : null,
+);
+let lai = false;
+let gop: number | undefined;
 const load = async () => {
-    if (inflight || document.hidden) {
+    if (document.hidden) {
+        return;
+    }
+    if (inflight) {
+        lai = true;
+
         return;
     }
     inflight = true;
@@ -114,9 +126,19 @@ const load = async () => {
         failed.value = true;
     } finally {
         inflight = false;
+
+        if (lai && alive) {
+            lai = false;
+            void load();
+        }
     }
 };
+const offDoi = luong.onDoi(() => {
+    window.clearTimeout(gop); // gộp nhiều tin dồn dập trong 250ms thành 1 lần hỏi
+    gop = window.setTimeout(() => void load(), 250);
+});
 // Đang làm việc thì hỏi dày (3 giây), rảnh/tắt thì thưa (10 giây); tab ẩn thì dừng hẳn.
+// Khi luồng SSE đang sống: hỏi nền 20 giây (chỉ để lấy phần dữ liệu phía app: bài đăng, Chrome, giỏ…).
 const schedule = () => {
     window.clearTimeout(timer);
     if (!alive || document.hidden) {
@@ -131,9 +153,10 @@ const schedule = () => {
             now.value = new Date();
             schedule();
         },
-        demo ? 1000 : busy ? 3000 : 10000,
+        demo ? 1000 : luong.ok.value ? 20000 : busy ? 3000 : 10000,
     );
 };
+watch(luong.ok, () => schedule());
 const onVis = () => {
     if (!document.hidden) {
         void load().then(schedule);
@@ -149,6 +172,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
     offMoBan();
+    offDoi();
+    window.clearTimeout(gop);
     alive = false;
     document.removeEventListener('visibilitychange', onVis);
     window.clearTimeout(timer);

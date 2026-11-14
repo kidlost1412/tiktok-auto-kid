@@ -554,6 +554,16 @@ func (s *Supervisor) runLoop(st *svcState) {
 				bo.Reset()
 				continue
 			}
+			if cleanRecycle(sv, code) {
+				// Thoát sạch (mã 0) của dịch vụ luôn-chạy = tự làm mới theo kế hoạch, vd php-cgi nghỉ sau
+				// PHP_FCGI_MAX_REQUESTS lượt. Không phải lỗi: chạy lại ngay, không báo cảnh báo, không tăng backoff.
+				s.log.Printf("%s: tự làm mới (thoát sạch), chạy lại ngay", sv.Name)
+				bo.Reset()
+				if !s.wait(st, recycleDelay) {
+					return
+				}
+				continue
+			}
 			st.set(StatusError, fmt.Sprintf("thoát mã %d", code))
 			s.changed()
 			s.crashNotify(sv, code)
@@ -604,6 +614,14 @@ func (s *Supervisor) crashNotify(sv Service, code int) {
 	s.lastCrash[sv.Name] = time.Now()
 	s.mu.Unlock()
 	s.notify(appTitle+" – Cảnh báo", fmt.Sprintf("Dịch vụ %s vừa dừng bất ngờ (mã %d). Chương trình đang tự chạy lại.", sv.Name, code))
+}
+
+// recycleDelay: nghỉ rất ngắn trước khi chạy lại một dịch vụ vừa tự làm mới (đủ để cổng được nhả).
+const recycleDelay = 300 * time.Millisecond
+
+// cleanRecycle: dịch vụ đặt chạy luôn ("always"/mặc định) thoát mã 0 là tự nghỉ theo kế hoạch, không phải sự cố.
+func cleanRecycle(sv Service, code int) bool {
+	return code == 0 && (sv.Restart == "" || sv.Restart == "always")
 }
 
 func containsInt(a []int, v int) bool {

@@ -27,7 +27,6 @@ const props = defineProps<{
 const emit = defineEmits<{ tab: [key: string]; product: [code: string] }>();
 
 type KhoProps = {
-    filters: { tab: string; product: string };
     counts: Record<string, number>;
     products: {
         code: string;
@@ -36,27 +35,29 @@ type KhoProps = {
         count: number;
     }[];
     videos: { data: KhoVideo[]; total: number; last_page: number };
-    kho: { waiting: number; error: number };
     last_ingest_at: string | null;
 };
 
-const q = new URLSearchParams();
-q.set('tab', props.tab ?? 'cho');
+// Địa chỉ đổi theo tab / sản phẩm đang chọn: useInertiaProps tự tải lại, dữ liệu cũ vẫn hiện trong lúc chờ.
+const url = computed(() => {
+    const q = new URLSearchParams();
+    q.set('tab', props.tab ?? 'cho');
 
-if (props.product) {
-    q.set('product', props.product);
-}
+    if (props.product) {
+        q.set('product', props.product);
+    }
+
+    return `/auto/kho?${q.toString()}`;
+});
 
 const {
     props: p,
     error,
     reload,
-} = useInertiaProps<KhoProps>(`/auto/kho?${q.toString()}`, 'fork/Kho', [
-    'filters',
+} = useInertiaProps<KhoProps>(url, 'fork/Kho', [
     'counts',
     'products',
     'videos',
-    'kho',
     'last_ingest_at',
 ]);
 

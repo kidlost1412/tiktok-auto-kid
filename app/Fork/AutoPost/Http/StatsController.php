@@ -72,53 +72,69 @@ final class StatsController extends Controller
             'cm' => $request->query('cm') === 'mua' ? 'mua' : 'all',
         ];
 
-        $base = fn () => AutoVideo::query()
-            ->with('socialAccount:id,username,display_name,timezone')
-            ->where('status', AutoVideo::POSTED)
-            ->whereNotNull('posted_at')
-            // Bài đã hẹn giờ sẵn có posted_at ở tương lai: chưa đăng, chưa có số liệu.
-            ->where('posted_at', '<=', now())
-            ->whereIn('social_account_id', $accountIds)
-            ->when($filters['channel'] !== '', fn ($q) => $q->where('social_account_id', $filters['channel']))
-            ->when($filters['product'] !== '', fn ($q) => $q->where('product_code', $filters['product']))
-            ->when($filters['goc'] !== '', fn ($q) => $q->where('goc', $filters['goc']))
-            ->when($filters['giong'] !== '', fn ($q) => $q->where('giong', $filters['giong']));
+        // Phần nặng (đọc bài đã đăng + số liệu) tính một lần và chỉ khi có prop nào cần: partial reload của bàn Cú
+        // chỉ xin vài prop nên các prop khác (bảng so sánh, video, người theo dõi...) không bị tính.
+        $stats = null;
+        $load = function () use (&$stats, $accountIds, $accounts, $filters, $from, $to, $prevFrom, $sort, $tz): array {
+            if ($stats !== null) {
+                return $stats;
+            }
 
-        $current = $base()->where('posted_at', '>=', $from->utc())->where('posted_at', '<', $to->utc())->get();
-        $previous = $base()->where('posted_at', '>=', $prevFrom->utc())->where('posted_at', '<', $from->utc())->get();
+            $base = fn () => AutoVideo::query()
+                ->with('socialAccount:id,username,display_name,timezone')
+                ->where('status', AutoVideo::POSTED)
+                ->whereNotNull('posted_at')
+                // Bài đã hẹn giờ sẵn có posted_at ở tương lai: chưa đăng, chưa có số liệu.
+                ->where('posted_at', '<=', now())
+                ->whereIn('social_account_id', $accountIds)
+                ->when($filters['channel'] !== '', fn ($q) => $q->where('social_account_id', $filters['channel']))
+                ->when($filters['product'] !== '', fn ($q) => $q->where('product_code', $filters['product']))
+                ->when($filters['goc'] !== '', fn ($q) => $q->where('goc', $filters['goc']))
+                ->when($filters['giong'] !== '', fn ($q) => $q->where('giong', $filters['giong']));
 
-        $metrics = $this->metricsFor($current->concat($previous));
+            $current = $base()->where('posted_at', '>=', $from->utc())->where('posted_at', '<', $to->utc())->get();
+            $previous = $base()->where('posted_at', '>=', $prevFrom->utc())->where('posted_at', '<', $from->utc())->get();
 
-        $rows = $current->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
-        $prevRows = $previous->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
+            $metrics = $this->metricsFor($current->concat($previous));
 
-        $products = AutoProduct::query()->orderBy('short_name')->get()->keyBy('code');
+            $rows = $current->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
+            $prevRows = $previous->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
 
-        $sorted = $this->sorted($rows, $sort);
-        $ranked = $rows->filter(fn (array $r): bool => $r['has_metrics'])->sortByDesc('views')->values();
+            $products = AutoProduct::query()->orderBy('short_name')->get()->keyBy('code');
+
+            $sorted = $this->sorted($rows, $sort);
+            $ranked = $rows->filter(fn (array $r): bool => $r['has_metrics'])->sortByDesc('views')->values();
+
+            return $stats = compact('rows', 'prevRows', 'products', 'sorted', 'ranked');
+        };
 
         return Inertia::render('fork/SoLieu', [
             'filters' => $filters,
-            'options' => $this->options($accounts, $accountIds, $products),
-            'kpis' => $this->kpis($rows, $prevRows),
-            'daily' => $this->daily($rows, $from, $days),
-            'breakdowns' => [
-                'product' => $this->group($rows, fn (array $r): string => (string) ($r['product_code'] ?? ''), fn (string $k): string => (string) ($products[$k]?->short_name ?? $k)),
-                'goc' => $this->group($rows, fn (array $r): string => (string) ($r['goc'] ?? '')),
-                'hour' => $this->group($rows, fn (array $r): string => sprintf('%02d', $r['hour']), fn (string $k): string => (int) $k.'h', 'key'),
-                'giong' => $this->group($rows, fn (array $r): string => (string) ($r['giong'] ?? '')),
-                'nhac' => $this->group($rows, fn (array $r): string => (string) ($r['nhac'] ?? '')),
-            ],
-            'videos' => $sorted->take(self::LIST_LIMIT)->values()->all(),
-            'videos_total' => $rows->count(),
-            'top' => $ranked->take(5)->values()->all(),
-            'bottom' => $ranked->count() > 5 ? $ranked->reverse()->take(5)->values()->all() : [],
-            'metrics_count' => $ranked->count(),
+            'options' => fn (): array => $this->options($accounts, $accountIds, $load()['products']),
+            'kpis' => fn (): array => $this->kpis($load()['rows'], $load()['prevRows']),
+            'daily' => fn (): array => $this->daily($load()['rows'], $from, $days),
+            'breakdowns' => function () use ($load): array {
+                $rows = $load()['rows'];
+                $products = $load()['products'];
+
+                return [
+                    'product' => $this->group($rows, fn (array $r): string => (string) ($r['product_code'] ?? ''), fn (string $k): string => (string) ($products[$k]?->short_name ?? $k)),
+                    'goc' => $this->group($rows, fn (array $r): string => (string) ($r['goc'] ?? '')),
+                    'hour' => $this->group($rows, fn (array $r): string => sprintf('%02d', $r['hour']), fn (string $k): string => (int) $k.'h', 'key'),
+                    'giong' => $this->group($rows, fn (array $r): string => (string) ($r['giong'] ?? '')),
+                    'nhac' => $this->group($rows, fn (array $r): string => (string) ($r['nhac'] ?? '')),
+                ];
+            },
+            'videos' => fn (): array => $load()['sorted']->take(self::LIST_LIMIT)->values()->all(),
+            'videos_total' => fn (): int => $load()['rows']->count(),
+            'top' => fn (): array => $load()['ranked']->take(5)->values()->all(),
+            'bottom' => fn (): array => $load()['ranked']->count() > 5 ? $load()['ranked']->reverse()->take(5)->values()->all() : [],
+            'metrics_count' => fn (): int => $load()['ranked']->count(),
             'updated_at' => now()->toIso8601String(),
-            'collected_at' => $this->collectedAt($accountIds),
-            'followers' => $this->followers($accountIds, $filters['channel'], $from, $to, $tz),
-            'comments' => $this->comments($accountIds, $filters['channel'], $filters['cm']),
-            'extension' => $this->extension($this->authorizeOwner($request)),
+            'collected_at' => fn (): ?string => $this->collectedAt($accountIds),
+            'followers' => fn (): ?array => $this->followers($accountIds, $filters['channel'], $from, $to, $tz),
+            'comments' => fn (): array => $this->comments($accountIds, $filters['channel'], $filters['cm']),
+            'extension' => fn (): array => $this->extension($this->authorizeOwner($request)),
         ]);
     }
 

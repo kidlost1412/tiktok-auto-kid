@@ -43,3 +43,4 @@ typing_extensions==4.16.0
 urllib3==2.8.0
 elevenlabs==2.76.0
 python-dotenv==1.2.4
+watchdog==7.1.0

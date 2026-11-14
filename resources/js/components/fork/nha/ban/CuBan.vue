@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Bàn của Cú thông thái: số liệu theo khoảng ngày. Giữ khoảng ngày đang chọn; nội dung ở CuSoLieu (dựng lại khi đổi khoảng).
+// Bàn của Cú thông thái: số liệu theo khoảng ngày. Giữ khoảng ngày đang chọn; nội dung ở CuSoLieu (đổi khoảng thì tự tải lại, không dựng lại).
 import { ref } from 'vue';
 
 import CuSoLieu from '@/components/fork/nha/ban/CuSoLieu.vue';
@@ -11,5 +11,5 @@ const range = ref<'today' | '7d' | '30d'>('7d');
 </script>
 
 <template>
-    <CuSoLieu :key="range" :range="range" @range="(r) => (range = r)" />
+    <CuSoLieu :range="range" @range="(r) => (range = r)" />
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Bàn của Chủ quầy: giỏ hàng TikTok Shop cho từng sản phẩm (dùng lại phần thân của trang Giỏ hàng).
-// Giữ kênh đang xem; nội dung từng kênh ở ChuQuayGio (dựng lại khi đổi kênh).
+// Giữ kênh đang xem; nội dung ở ChuQuayGio (đổi kênh thì tự tải lại, không dựng lại).
 import { ref } from 'vue';
 
 import ChuQuayGio from '@/components/fork/nha/ban/ChuQuayGio.vue';
@@ -12,9 +12,5 @@ const kenh = ref<string | null>(null);
 </script>
 
 <template>
-    <ChuQuayGio
-        :key="kenh ?? 'mac-dinh'"
-        :kenh="kenh"
-        @kenh="(id) => (kenh = id)"
-    />
+    <ChuQuayGio :kenh="kenh" @kenh="(id) => (kenh = id)" />
 </template>

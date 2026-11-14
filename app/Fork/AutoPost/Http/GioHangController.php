@@ -42,7 +42,14 @@ final class GioHangController extends Controller
 
         $selected = $channels->first(fn (SocialAccount $a): bool => $a->id === (string) $request->query('kenh')) ?? $channels->first();
 
-        $props = [
+        // Dữ liệu của kênh đang chọn (sync, products, rows, sample_hidden) tính chung một lần, và chỉ khi có prop nào cần
+        // (partial reload của bàn Chủ quầy / các prop không được xin thì không chạy).
+        $channelData = null;
+        $channel = function () use (&$channelData, $selected): array {
+            return $channelData ??= $selected !== null ? $this->channelData($selected) : [];
+        };
+
+        return Inertia::render('fork/GioHang', [
             'channels' => $channels->map(fn (SocialAccount $a): array => [
                 'id' => $a->id,
                 'username' => $a->username,
@@ -50,23 +57,17 @@ final class GioHangController extends Controller
                 'avatar_url' => $a->avatar_url,
             ])->all(),
             'selected' => $selected?->id,
-            'sync' => null,
-            'products' => [],
-            'rows' => [],
-            'sample_hidden' => false,
+            'sync' => fn (): mixed => $channel()['sync'] ?? null,
+            'products' => fn (): array => $channel()['products'] ?? [],
+            'rows' => fn (): array => $channel()['rows'] ?? [],
+            'sample_hidden' => fn (): bool => $channel()['sample_hidden'] ?? false,
             'name_short_max' => ProductNaming::SHORT_MAX,
             'name_max' => CartRules::NAME_MAX,
             // Cá nhân hoá (ảnh bìa, hashtag) theo mã sản phẩm hub, và hashtag mặc định chung.
-            'personalise' => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p)])->all(),
-            'personalise_default' => Hashtags::defaults(),
+            'personalise' => fn (): array => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p)])->all(),
+            'personalise_default' => fn (): array => Hashtags::defaults(),
             'sync_ttl_minutes' => intdiv(ShopSync::REQUEST_TTL, 60),
-        ];
-
-        if ($selected !== null) {
-            $props = [...$props, ...$this->channelData($selected)];
-        }
-
-        return Inertia::render('fork/GioHang', $props);
+        ]);
     }
 
     /** Bấm "Lấy sản phẩm từ shop": mỗi lần bấm cấp một yêu cầu MỚI; tiện ích Chrome của kênh sẽ thấy ở lần hỏi kế tiếp. */

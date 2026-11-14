@@ -497,6 +497,11 @@ watch(
     () => props.selected,
     () => {
         filter.value = 'all';
+
+        // Nháp (sản phẩm shop / tên giỏ chưa lưu) thuộc về kênh cũ: bỏ khi đổi kênh.
+        for (const k of Object.keys(draft)) {
+            delete draft[k];
+        }
     },
 );
 

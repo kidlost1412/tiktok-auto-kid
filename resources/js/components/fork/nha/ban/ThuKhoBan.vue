@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Bàn của Thủ kho: ba tab. "Kho video" (video sẵn sàng đăng của app), "Kho riêng" (video bạn tự làm) và
 // "Sản phẩm xưởng" (tab Sản phẩm của hub Xưởng Video). Mỗi tab giữ bộ lọc đang xem; nội dung ở ThuKhoKho / ThuKhoRieng
-// (dựng lại khi đổi bộ lọc).
+// (đổi bộ lọc thì tự tải lại, không dựng lại).
 import { ref } from 'vue';
 
 import type { RiengLoc } from '@/components/fork/kho/rieng';
@@ -72,7 +72,6 @@ const riengPicked = ref<
 
         <ThuKhoKho
             v-if="main === 'kho'"
-            :key="`${tab ?? 'tu-chon'}|${product}`"
             :tab="tab"
             :product="product"
             @tab="(k: string) => (tab = k)"
@@ -81,7 +80,6 @@ const riengPicked = ref<
 
         <ThuKhoRieng
             v-if="main === 'rieng'"
-            :key="`${rieng.folder}|${rieng.status}|${rieng.day}|${rieng.page ?? 1}`"
             v-model:picked="riengPicked"
             :loc="rieng"
             @filter="(f) => (rieng = f)"

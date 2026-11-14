@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// Nội dung bàn Chủ quầy cho MỘT kênh: đọc /auto/gio-hang?kenh=… rồi dùng lại CartTable (cùng phần thân với trang Giỏ hàng).
-// ChuQuayBan đặt `key` theo kênh nên đổi kênh thì component này dựng lại với địa chỉ mới.
+// Nội dung bàn Chủ quầy: đọc /auto/gio-hang?kenh=… rồi dùng lại CartTable (cùng phần thân với trang Giỏ hàng).
+// Đổi kênh: địa chỉ đổi theo `kenh`, dữ liệu tự tải lại và dữ liệu cũ vẫn hiện (mờ) trong lúc chờ.
 import { IconHash, IconPlus } from '@tabler/icons-vue';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import CartTable from '@/components/fork/gio-hang/CartTable.vue';
 import type {
@@ -38,14 +38,31 @@ type GioHangProps = {
     name_short_max?: number;
 };
 
-const url = props.kenh
-    ? `/auto/gio-hang?kenh=${encodeURIComponent(props.kenh)}`
-    : '/auto/gio-hang';
+const url = computed(() =>
+    props.kenh
+        ? `/auto/gio-hang?kenh=${encodeURIComponent(props.kenh)}`
+        : '/auto/gio-hang',
+);
+// Đúng các prop CartTable dùng (không có prop nào khác trên trang này).
+const ONLY = [
+    'channels',
+    'selected',
+    'sync',
+    'products',
+    'rows',
+    'name_max',
+    'name_short_max',
+    'sync_ttl_minutes',
+    'personalise',
+    'personalise_default',
+    'sample_hidden',
+];
 const {
     props: p,
+    loading,
     error,
     reload,
-} = useInertiaProps<GioHangProps>(url, 'fork/GioHang');
+} = useInertiaProps<GioHangProps>(url, 'fork/GioHang', ONLY);
 
 const table = ref<InstanceType<typeof CartTable> | null>(null);
 
@@ -108,6 +125,7 @@ const onChannel = (id: string) => emit('kenh', id);
 
             <CartTable
                 ref="table"
+                :class="loading && 'opacity-60 transition-opacity'"
                 embedded
                 :channels="p.channels"
                 :selected="p.selected"

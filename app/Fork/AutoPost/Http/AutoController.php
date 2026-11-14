@@ -57,62 +57,76 @@ final class AutoController extends Controller
         $chromeRows = ChromeAccount::query()->whereIn('social_account_id', $accounts->pluck('id'))->get()->keyBy('social_account_id');
         $chrome = $chromeRows->map(fn (ChromeAccount $c): bool => (bool) $c->enabled);
 
-        $shopCounts = ShopProduct::query()->whereIn('social_account_id', $accounts->pluck('id'))->where('missing', false)->where('hidden', false)
-            ->select('social_account_id', DB::raw('count(*) as total'))->groupBy('social_account_id')->pluck('total', 'social_account_id');
-        $linkCounts = ProductLink::query()->whereIn('social_account_id', $accounts->pluck('id'))
-            ->select('social_account_id', DB::raw('count(*) as total'))->groupBy('social_account_id')->pluck('total', 'social_account_id');
-        $sync = app(ShopSync::class);
+        // Mỗi prop nặng nằm trong một closure: Inertia chỉ chạy closure của prop được xin (partial reload của các bàn
+        // trong Khu Tự Trị); tải trang đầy đủ vẫn chạy hết. Phần dùng chung giữa các prop tính một lần (memo).
+        $memo = [];
+        $once = function (string $key, callable $make) use (&$memo): mixed {
+            if (! array_key_exists($key, $memo)) {
+                $memo[$key] = $make();
+            }
 
-        $rows = $accounts->map(function (SocialAccount $a) use ($autoAccounts, $chrome, $insights, $shopCounts, $linkCounts, $sync): array {
-            $auto = $autoAccounts[$a->id] ?? null;
-            $rec = $auto ? $insights->recommendHours($auto) : null;
-            $status = $sync->status($auto);
+            return $memo[$key];
+        };
+
+        $ids = fn (): array => $accounts->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        $images = fn (): ProductImageLookup => $once('images', fn (): ProductImageLookup => ProductImages::lookup($ids()));
+
+        $rows = fn (): array => $once('rows', function () use ($accounts, $autoAccounts, $chromeRows, $insights): array {
+            $chrome = $chromeRows->map(fn (ChromeAccount $c): bool => (bool) $c->enabled);
+            $shopCounts = ShopProduct::query()->whereIn('social_account_id', $accounts->pluck('id'))->where('missing', false)->where('hidden', false)
+                ->select('social_account_id', DB::raw('count(*) as total'))->groupBy('social_account_id')->pluck('total', 'social_account_id');
+            $linkCounts = ProductLink::query()->whereIn('social_account_id', $accounts->pluck('id'))
+                ->select('social_account_id', DB::raw('count(*) as total'))->groupBy('social_account_id')->pluck('total', 'social_account_id');
+            $sync = app(ShopSync::class);
+
+            return $accounts->map(function (SocialAccount $a) use ($autoAccounts, $chrome, $insights, $shopCounts, $linkCounts, $sync): array {
+                $auto = $autoAccounts[$a->id] ?? null;
+                $rec = $auto ? $insights->recommendHours($auto) : null;
+                $status = $sync->status($auto);
+
+                return [
+                    'cart' => [
+                        'sync_state' => $status['state'],
+                        'synced_at' => $status['synced_at'],
+                        'products_count' => (int) ($shopCounts[$a->id] ?? 0),
+                        'linked_count' => (int) ($linkCounts[$a->id] ?? 0),
+                    ],
+                    'id' => $a->id,
+                    'username' => $a->username,
+                    'display_name' => $a->display_name,
+                    'timezone' => $a->timezone ?: self::DEFAULT_TZ,
+                    'avatar_url' => $a->avatar_url,
+                    'chrome_enabled' => (bool) ($chrome[$a->id] ?? false),
+                    'enabled' => (bool) ($auto?->enabled ?? false),
+                    'daily_cap' => (int) ($auto?->daily_cap ?? 8),
+                    'schedule_ahead_days' => (int) ($auto?->schedule_ahead_days ?? config('fork.auto.default_schedule_ahead_days', 3)),
+                    'window_start' => (int) ($auto?->window_start ?? 6),
+                    'window_end' => (int) ($auto?->window_end ?? 23),
+                    'mode' => (string) ($auto?->mode ?? AutoAccount::EXPLORE),
+                    'preferred_hours' => array_values((array) ($auto?->preferred_hours ?? [])),
+                    'explore_ratio' => (float) ($auto?->explore_ratio ?? 0.2),
+                    'paused_reason' => $auto?->paused_reason,
+                    'recommendation' => $rec,
+                ];
+            })->values()->all();
+        });
+
+        $stock = fn (): array => $once('stock', function () use ($rows): array {
+            $dailyCap = collect($rows())->where('enabled', true)->sum('daily_cap');
+            // Chỉ đếm video thật sự giữ chỗ được (cùng bộ lọc với reserveNext và cảnh báo sắp hết kho).
+            $newTotal = AutoVideo::query()
+                ->eligibleNew()
+                ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+                ->count();
+            // Video hub đã xếp lịch/giữ chỗ nhưng chưa đăng: vẫn là "hàng trong kho" chờ đến giờ.
+            $scheduledTotal = AutoVideo::query()
+                ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED])
+                ->whereNotNull('hub_id')
+                ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+                ->count();
+            $pool = $newTotal + $scheduledTotal;
 
             return [
-                'cart' => [
-                    'sync_state' => $status['state'],
-                    'synced_at' => $status['synced_at'],
-                    'products_count' => (int) ($shopCounts[$a->id] ?? 0),
-                    'linked_count' => (int) ($linkCounts[$a->id] ?? 0),
-                ],
-                'id' => $a->id,
-                'username' => $a->username,
-                'display_name' => $a->display_name,
-                'timezone' => $a->timezone ?: self::DEFAULT_TZ,
-                'avatar_url' => $a->avatar_url,
-                'chrome_enabled' => (bool) ($chrome[$a->id] ?? false),
-                'enabled' => (bool) ($auto?->enabled ?? false),
-                'daily_cap' => (int) ($auto?->daily_cap ?? 8),
-                'schedule_ahead_days' => (int) ($auto?->schedule_ahead_days ?? config('fork.auto.default_schedule_ahead_days', 3)),
-                'window_start' => (int) ($auto?->window_start ?? 6),
-                'window_end' => (int) ($auto?->window_end ?? 23),
-                'mode' => (string) ($auto?->mode ?? AutoAccount::EXPLORE),
-                'preferred_hours' => array_values((array) ($auto?->preferred_hours ?? [])),
-                'explore_ratio' => (float) ($auto?->explore_ratio ?? 0.2),
-                'paused_reason' => $auto?->paused_reason,
-                'recommendation' => $rec,
-            ];
-        })->values()->all();
-
-        $dailyCap = collect($rows)->where('enabled', true)->sum('daily_cap');
-        $images = ProductImages::lookup($accounts->pluck('id')->map(fn ($id): string => (string) $id)->all());
-        $products = $this->productRows($images->byCode());
-        // Chỉ đếm video thật sự giữ chỗ được (cùng bộ lọc với reserveNext và cảnh báo sắp hết kho).
-        $newTotal = AutoVideo::query()
-            ->eligibleNew()
-            ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
-            ->count();
-        // Video hub đã xếp lịch/giữ chỗ nhưng chưa đăng: vẫn là "hàng trong kho" chờ đến giờ.
-        $scheduledTotal = AutoVideo::query()
-            ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED])
-            ->whereNotNull('hub_id')
-            ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
-            ->count();
-        $pool = $newTotal + $scheduledTotal;
-
-        return Inertia::render('fork/Auto', [
-            'products' => $products,
-            'stock' => [
                 'new_total' => $newTotal,
                 'scheduled_total' => $scheduledTotal,
                 'daily_cap' => (int) $dailyCap,
@@ -121,18 +135,23 @@ final class AutoController extends Controller
                 // Số liệu đọc trực tiếp từ DB lúc này; trang tự làm mới mỗi 30 giây.
                 'updated_at' => now()->toIso8601String(),
                 'last_ingest_at' => Cache::get(VideoLibrary::LAST_INGEST_CACHE_KEY),
-            ],
+            ];
+        });
+
+        return Inertia::render('fork/Auto', [
+            'products' => fn (): array => $this->productRows($images()->byCode()),
+            'stock' => $stock,
             'accounts' => $rows,
-            'health' => $this->health($accounts, $chromeRows),
+            'health' => fn (): array => $this->health($accounts, $chromeRows),
             'hub' => Inertia::defer(fn (): array => $this->hubStatus()),
-            'lich' => $this->lich($accounts, $autoAccounts, $images),
-            'upcoming' => $this->upcoming($accounts),
-            'recent' => $this->recent($accounts, $images),
-            'failed_recent' => $this->failedRecent($accounts, $images),
-            'trend' => $this->trend($accounts),
+            'lich' => fn (): array => $this->lich($accounts, $autoAccounts, $images()),
+            'upcoming' => fn (): array => $this->upcoming($accounts),
+            'recent' => fn (): array => $this->recent($accounts, $images()),
+            'failed_recent' => fn (): array => $this->failedRecent($accounts, $images()),
+            'trend' => fn (): array => $this->trend($accounts),
             // Thẻ "Bắt đầu" hỏi hub (có thể chậm vài giây) nên tải sau, cùng nhóm với hub.
-            'onboarding' => Inertia::defer(fn (): ?array => app(Onboarding::class)->forAccounts($accounts->pluck('id')->map(fn ($id): string => (string) $id)->all())),
-            'insights' => $insights->breakdowns(),
+            'onboarding' => Inertia::defer(fn (): ?array => app(Onboarding::class)->forAccounts($ids())),
+            'insights' => fn (): array => $insights->breakdowns(),
             'hasWorkspace' => (bool) $request->user()?->current_workspace_id,
         ]);
     }

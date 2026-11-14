@@ -73,58 +73,74 @@ final class RiengController extends Controller
             ->when($day !== '', fn ($q) => $q->whereDate('batch_date', $day))
             ->tap(fn ($q) => $this->applyStatus($q, $status));
 
-        $statusCounts = [];
+        // Mỗi prop nặng nằm trong closure (Inertia chỉ chạy closure của prop được xin ở partial reload của bàn Thủ kho);
+        // danh sách video, video trùng và danh sách chọn dùng chung nên tính một lần (memo).
+        $memo = [];
+        $once = function (string $key, callable $make) use (&$memo): mixed {
+            if (! array_key_exists($key, $memo)) {
+                $memo[$key] = $make();
+            }
 
-        foreach (['chua', 'hen', 'dang', 'loi'] as $key) {
-            $statusCounts[$key] = $base()->tap(fn ($q) => $this->applyStatus($q, $key))->count();
-        }
+            return $memo[$key];
+        };
 
-        $videos = $filtered()
+        $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
+        $info = new RiengInfo;
+        $videos = fn () => $once('videos', fn () => $filtered()
             ->with('socialAccount:id,username,display_name,avatar_url')
             ->orderByDesc('batch_date')
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE)
-            ->withQueryString();
-
-        $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
-        $info = new RiengInfo;
-        $selectableRows = $this->onlySelectable($filtered())
-            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration', 'source', 'meta']);
-        $pageVideos = $videos->getCollection();
-        $dups = $info->duplicates($pageVideos->concat($selectableRows));
-        $selectable = $selectableRows
-            ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration, 'duplicate' => $dups[$v->id]['text'] ?? null])->all();
-        $products = AutoProduct::query()->get()->keyBy('code');
-        $images = ProductImages::lookup();
-
-        $folderCounts = $base()->selectRaw("meta->>'folder_id' as fid, count(*) as total")->groupByRaw("meta->>'folder_id'")->pluck('total', 'fid');
+            ->withQueryString());
+        $selectableRows = fn () => $once('selectableRows', fn () => $this->onlySelectable($filtered())
+            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration', 'source', 'meta']));
+        $dups = fn (): array => $once('dups', fn (): array => $info->duplicates($videos()->getCollection()->concat($selectableRows())));
 
         return Inertia::render('fork/KhoRieng', [
-            'folders' => $folders->map(fn (RiengFolder $f): array => [
-                'id' => $f->id,
-                'name' => $f->displayName(),
-                'path' => str_replace('/', '\\', (string) $f->path),
-                'exists' => is_dir((string) $f->path),
-                'count' => (int) ($folderCounts[(string) $f->id] ?? 0),
-            ])->values()->all(),
+            'folders' => function () use ($folders, $base): array {
+                $folderCounts = $base()->selectRaw("meta->>'folder_id' as fid, count(*) as total")->groupByRaw("meta->>'folder_id'")->pluck('total', 'fid');
+
+                return $folders->map(fn (RiengFolder $f): array => [
+                    'id' => $f->id,
+                    'name' => $f->displayName(),
+                    'path' => str_replace('/', '\\', (string) $f->path),
+                    'exists' => is_dir((string) $f->path),
+                    'count' => (int) ($folderCounts[(string) $f->id] ?? 0),
+                ])->values()->all();
+            },
             'filters' => ['folder' => $folderId, 'status' => $status, 'day' => $day],
-            'counts' => $statusCounts + ['all' => $base()->count()],
-            'days' => $base()->select('batch_date')->distinct()->orderByDesc('batch_date')->limit(120)->pluck('batch_date')
+            'counts' => function () use ($base): array {
+                $statusCounts = [];
+
+                foreach (['chua', 'hen', 'dang', 'loi'] as $key) {
+                    $statusCounts[$key] = $base()->tap(fn ($q) => $this->applyStatus($q, $key))->count();
+                }
+
+                return $statusCounts + ['all' => $base()->count()];
+            },
+            'days' => fn (): array => $base()->select('batch_date')->distinct()->orderByDesc('batch_date')->limit(120)->pluck('batch_date')
                 ->map(fn ($d): string => $d->format('Y-m-d'))->values()->all(),
-            'videos' => [
-                'data' => $videos->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups[$v->id] ?? null, $info->product($v, $products, $images)))->values()->all(),
-                'current_page' => $videos->currentPage(),
-                'last_page' => $videos->lastPage(),
-                'total' => $videos->total(),
-            ],
-            'selectable' => $selectable,
-            'queue' => $this->queueItems($accountId),
-            'scan_sig' => $this->signature(),
-            'accounts' => $this->accounts($accountId),
+            'videos' => function () use ($videos, $dups, $names, $info): array {
+                $page = $videos();
+                $products = AutoProduct::query()->get()->keyBy('code');
+                $images = ProductImages::lookup();
+
+                return [
+                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups()[$v->id] ?? null, $info->product($v, $products, $images)))->values()->all(),
+                    'current_page' => $page->currentPage(),
+                    'last_page' => $page->lastPage(),
+                    'total' => $page->total(),
+                ];
+            },
+            'selectable' => fn (): array => $selectableRows()
+                ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration, 'duplicate' => $dups()[$v->id]['text'] ?? null])->all(),
+            'queue' => fn (): array => $this->queueItems($accountId),
+            'scan_sig' => fn (): string => $this->signature(),
+            'accounts' => fn (): array => $this->accounts($accountId),
             // Gợi ý hashtag cho hộp thoại đăng hàng loạt (không tính lại khi chỉ tải lại danh sách video).
             'hashtag_suggestions' => fn (): array => HashtagSuggestions::top(),
             'limits' => ['min_lead_minutes' => intdiv(Planner::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
-            'last_scan_at' => Cache::get('fork-rieng:last-scan'),
+            'last_scan_at' => fn (): mixed => Cache::get('fork-rieng:last-scan'),
         ]);
     }
 
