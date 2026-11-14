@@ -180,6 +180,42 @@ final class NhaState
         ];
     }
 
+    /**
+     * Số việc đang chờ chủ app theo vai (chỉ vai có việc). Hàm thuần: số đếm do nơi gọi truy vấn rồi đưa vào.
+     *
+     * @param  array{chrome_online?: bool|null}  $app
+     * @param  array{loi?: int, gio_tam_dung?: int, kho?: int|null}  $dem  loi = bài lỗi 24h qua; gio_tam_dung = giỏ bị tạm dừng; kho = số video còn chờ đăng (null = không có kênh bật)
+     * @return array<string, array{so: int, tom_tat: string}>
+     */
+    public static function viec(array $app, array $dem): array
+    {
+        $viec = [];
+
+        $loi = (int) ($dem['loi'] ?? 0);
+        if ($loi > 0) {
+            $viec['buuta'] = ['so' => $loi, 'tom_tat' => $loi.' bài đăng lỗi, cần xem lại'];
+        }
+        if (($app['chrome_online'] ?? null) === false) {
+            $them = isset($viec['buuta']) ? $viec['buuta']['so'] : 0;
+            $viec['buuta'] = [
+                'so' => $them + 1,
+                'tom_tat' => ($them > 0 ? $viec['buuta']['tom_tat'].' · ' : '').'Chrome chưa kết nối',
+            ];
+        }
+
+        $gio = (int) ($dem['gio_tam_dung'] ?? 0);
+        if ($gio > 0) {
+            $viec['chuquay'] = ['so' => $gio, 'tom_tat' => $gio.' giỏ hàng đang tạm dừng'];
+        }
+
+        $kho = $dem['kho'] ?? null;
+        if ($kho !== null && ($dem['kho_thap'] ?? false)) {
+            $viec['thukho'] = ['so' => 1, 'tom_tat' => 'Kho còn '.(int) $kho.' video'];
+        }
+
+        return $viec;
+    }
+
     /** Trường sự kiện gửi cho trình duyệt (đủ để diễn hoạt cảnh và dòng "hoạt động gần đây"; không gửi gì khác). */
     private const array EVENT_KEYS = ['n', 't', 'vai', 'loai', 'video', 'msg', 'so', 'tong', 'diem', 'dat', 'file', 'ngay', 'loi', 'phut', 'ten', 'so_video', 'lan', 'buoc'];
 

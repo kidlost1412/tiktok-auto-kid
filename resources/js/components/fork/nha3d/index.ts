@@ -2,6 +2,8 @@
 // Dựng renderer + camera phối cảnh (đi dạo cùng Kid hoặc toàn cảnh), ghép nhà/vườn/nhân vật/mèo, vòng lặp vẽ, chọn bằng chuột, dọn sạch khi rời trang.
 import * as THREE from 'three';
 
+import { reactTo } from '@/components/fork/nha3d/react';
+
 import { noi } from '../nha/loi-thoai';
 import { DICH, type NhaData } from '../nha/types';
 import {
@@ -51,6 +53,8 @@ export interface NhaWorldOptions {
 
 export interface NhaWorld {
     update(data: NhaData): void;
+    /** Nhân vật của `vai` phản ứng với một việc vừa làm trong popup (xem ban/bus.ts). */
+    react(vai: string, viec: string): void;
     dispose(): void;
 }
 
@@ -366,7 +370,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             return [name, 'Bấm để Kid đi tới đây'];
         }
 
-        return [name, d.href ? `Bấm để tới ${d.dich}` : ''];
+        return [name, d.href ? 'Bấm để mở bàn làm việc' : ''];
     };
     const activate = (h: Hover) => {
         if (!h) {
@@ -630,7 +634,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         if (best !== near) {
             near = best;
             if (best) {
-                promptBtn.textContent = `${coarse ? '' : 'E · '}Tới khu làm việc: ${DICH[best].ten}`;
+                promptBtn.textContent = `${coarse ? '' : 'E · '}Mở bàn làm việc: ${DICH[best].ten}`;
                 promptBtn.style.display = 'block';
             } else {
                 promptBtn.style.display = 'none';
@@ -638,6 +642,8 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         }
     };
     promptBtn.addEventListener('click', () => near && o.onGo(near));
+    // huy hiệu số việc chờ trên đầu nhân vật: bấm = bấm nhân vật
+    overlay.onBadge = (k) => o.onGo(ROLE_OF[k] ?? k);
     const typing = (t: EventTarget | null) =>
         t instanceof HTMLElement &&
         (t.isContentEditable ||
@@ -1357,6 +1363,26 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         update(data: NhaData) {
             if (!failed) {
                 director.update(data);
+                const counts: Record<string, number> = {};
+                for (const [vai, v] of Object.entries(data.viec ?? {})) {
+                    counts[vai === 'daodien' ? 'daodienA' : vai] = v.so;
+                }
+                overlay.setCounts(counts);
+            }
+        },
+        react(vai: string, viec: string) {
+            if (!failed) {
+                reactTo(
+                    {
+                        A,
+                        owl,
+                        director,
+                        camera,
+                        raiseFlag: () => world.raiseFlag(),
+                    },
+                    vai,
+                    viec,
+                );
             }
         },
         dispose() {

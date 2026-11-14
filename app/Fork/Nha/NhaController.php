@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Fork\Nha;
 
+use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Http\Controllers\Controller;
@@ -46,7 +49,9 @@ final class NhaController extends Controller
     {
         $now = CarbonImmutable::now();
 
-        $state = NhaState::build($this->hub(), $this->appFacts($now), $now);
+        $app = $this->appFacts($now);
+        $state = NhaState::build($this->hub(), $app, $now);
+        $state['viec'] = NhaState::viec($app, $this->dem($now));
         // Địa chỉ hub để bấm cuộn phim mở video (trình duyệt gọi thẳng hub như khung Xưởng Video).
         $state['hub']['url'] = rtrim((string) config('fork.xuong.url'), '/');
 
@@ -82,6 +87,39 @@ final class NhaController extends Controller
         }
 
         return ['up' => false];
+    }
+
+    /**
+     * Số đếm rẻ cho "việc chờ" của từng vai (chỉ đọc, có index theo status).
+     *
+     * @return array{loi: int, gio_tam_dung: int, kho: int|null, kho_thap: bool}
+     */
+    private function dem(CarbonImmutable $now): array
+    {
+        $dem = ['loi' => 0, 'gio_tam_dung' => 0, 'kho' => null, 'kho_thap' => false];
+        try {
+            $dem['loi'] = AutoVideo::query()->where('status', AutoVideo::FAILED)->where('updated_at', '>=', $now->subDay())->count();
+            $dem['gio_tam_dung'] = ProductLink::query()->whereNotNull('paused_reason')->where('paused_reason', '!=', '')->count();
+
+            $perDay = (int) AutoAccount::query()->where('enabled', true)->sum('daily_cap');
+            if ($perDay > 0) {
+                // Cùng cách tính "Kho đủ … ngày" ở Tổng quan: video mới + video hub đã xếp/giữ chỗ chưa đăng.
+                $con = AutoVideo::query()->eligibleNew()
+                    ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+                    ->count()
+                    + AutoVideo::query()
+                        ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED])
+                        ->whereNotNull('hub_id')
+                        ->whereIn('product_code', AutoProduct::query()->where('enabled', true)->select('code'))
+                        ->count();
+                $dem['kho'] = $con;
+                $dem['kho_thap'] = $con < $perDay;
+            }
+        } catch (Throwable) {
+            // thiếu bảng/dữ liệu thì không báo việc
+        }
+
+        return $dem;
     }
 
     /**

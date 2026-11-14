@@ -147,3 +147,24 @@ test('state exposes the event feed, batch reels and finished message', function 
         ->and($j['hub']['url'])->toBe('http://127.0.0.1:8765')
         ->and($j['app']['post_counts'])->toHaveKeys(['scheduled', 'posted']);
 });
+
+test('viec lists only the roles that have something waiting', function (): void {
+    expect(NhaState::viec(['chrome_online' => true], []))->toBe([]);
+
+    $v = NhaState::viec(['chrome_online' => false], ['loi' => 2, 'gio_tam_dung' => 3, 'kho' => 4, 'kho_thap' => true]);
+    expect($v['buuta']['so'])->toBe(3)
+        ->and($v['buuta']['tom_tat'])->toContain('2 bài đăng lỗi')->toContain('Chrome')
+        ->and($v['chuquay'])->toBe(['so' => 3, 'tom_tat' => '3 giỏ hàng đang tạm dừng'])
+        ->and($v['thukho'])->toBe(['so' => 1, 'tom_tat' => 'Kho còn 4 video'])
+        ->and($v)->not->toHaveKey('giamkhao');
+
+    expect(NhaState::viec(['chrome_online' => null], ['kho' => 40, 'kho_thap' => false]))->toBe([]);
+});
+
+test('state endpoint always carries a viec map', function (): void {
+    Http::fake(['127.0.0.1:8765/*' => Http::response([], 500)]);
+
+    $j = $this->actingAs($this->owner)->getJson('/nha/trang-thai')->assertOk()->json();
+
+    expect($j)->toHaveKey('viec')->and($j['viec'])->toBeArray();
+});

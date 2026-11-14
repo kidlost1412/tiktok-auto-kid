@@ -32,9 +32,13 @@ const props = withDefaults(
         failed?: FailedRow[];
         productName: (code: string | null) => string;
         limit?: number;
+        /** Dùng trong popup "Bàn làm việc": giữ nguyên trang đang mở (preserveState) và báo qua `retried`. */
+        inPlace?: boolean;
     }>(),
-    { failed: () => [], limit: 6 },
+    { failed: () => [], limit: 6, inPlace: false },
 );
+
+const emit = defineEmits<{ retried: [] }>();
 
 const retrying = ref<number | null>(null);
 // Bài "chưa rõ đã lên chưa": chủ app phải tự kiểm tra TikTok Studio rồi xác nhận, app mới đăng lại.
@@ -47,6 +51,8 @@ const retry = (id: number, checked = false) => {
         checked ? { da_kiem_tra: true } : {},
         {
             preserveScroll: true,
+            ...(props.inPlace ? { preserveState: true } : {}),
+            onSuccess: () => emit('retried'),
             onFinish: () => {
                 retrying.value = null;
                 confirming.value = null;
@@ -233,7 +239,9 @@ const when = (iso: string | null) => {
                         <div class="truncate text-[0.8125rem] font-medium">
                             {{ productName(r.product_code) }}
                         </div>
-                        <div class="truncate text-[0.75rem] text-muted-foreground">
+                        <div
+                            class="truncate text-[0.75rem] text-muted-foreground"
+                        >
                             {{ when(r.posted_at) }} · @{{ r.username }}
                         </div>
                     </div>

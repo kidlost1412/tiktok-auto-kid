@@ -35,6 +35,8 @@ const props = defineProps<{
     hasDraft: boolean;
     busy: boolean;
     persona?: Persona | null;
+    /** Bố cục hẹp cho popup "Bàn làm việc" (~980px): cột co giãn, không có độ rộng tối thiểu. */
+    compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -125,7 +127,10 @@ const nameLen = computed(() => [...props.name].length);
     <div
         :class="
             cn(
-                'group/row grid gap-x-5 gap-y-2 px-5 py-2.5 transition-colors lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:items-center',
+                'group/row grid gap-y-2 py-2.5 transition-colors lg:items-center',
+                compact
+                    ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
+                    : 'gap-x-5 px-5 lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
                 state === 'need' && 'bg-amber-50/70 dark:bg-amber-950/25',
                 state === 'bad' && 'bg-red-50/50 dark:bg-red-950/20',
             )
@@ -269,7 +274,10 @@ const nameLen = computed(() => [...props.name].length);
                 >{{ nameLen }}/{{ nameMax }}</span
             >
         </label>
-        <div v-else class="hidden text-[0.7812rem] text-muted-foreground lg:block">
+        <div
+            v-else
+            class="hidden text-[0.7812rem] text-muted-foreground lg:block"
+        >
             Chọn sản phẩm trước
         </div>
 

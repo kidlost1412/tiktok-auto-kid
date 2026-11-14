@@ -3,7 +3,9 @@
 // để trang quay về ngôi nhà 2D.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import type { NhaData } from '../nha/types';
+import { onBanBao } from '@/components/fork/nha/ban/bus';
+import type { NhaData } from '@/components/fork/nha/types';
+
 import './nha3d.css';
 import type { NhaWorld } from './index';
 
@@ -19,6 +21,8 @@ const host = ref<HTMLDivElement | null>(null);
 const ready = ref(false);
 let world: NhaWorld | null = null;
 let gone = false;
+// popup làm xong một việc → nhân vật tương ứng phản ứng
+const offBao = onBanBao((b) => world?.react(b.vai, b.viec));
 
 const fail = (err: unknown) => {
     console.error('[Khu Tự Trị 3D] chuyển về bản 2D:', err);
@@ -73,6 +77,7 @@ watch(
 
 onBeforeUnmount(() => {
     gone = true;
+    offBao();
     world?.dispose();
     world = null;
 });

@@ -12,6 +12,7 @@
   let th = q.get('theme');
   if (th !== 'dark' && th !== 'light') th = nhung ? 'dark' : 'light';
   if (nhung) h.dataset.nhung = '1';
+  if (nhung && q.get('gon') === '1') h.dataset.gon = '1';   // chế độ gọn (popup Bàn làm việc): ẩn thanh đầu, chỉ còn nội dung tab
   const bg = q.get('bg');                       // tuỳ chọn: ?bg=%23101418 → nền trùng hẳn màu trang cha
   // --bg chỉ áp khi hợp theme (độ sáng khớp) và bị gỡ khi đổi theme → không còn dải trắng/hộp trắng ở nền tối
   const lum = c => { let x = c.slice(1); if (x.length < 6) x = x.split('').map(d => d + d).join(''); const n = [0, 2, 4].map(i => parseInt(x.substr(i, 2), 16)); return (0.299 * n[0] + 0.587 * n[1] + 0.114 * n[2]) / 255; };
@@ -105,6 +106,9 @@ main{max-width:1880px;margin:0 auto;padding:26px 32px 80px}
 @media (min-width:1700px){body{zoom:1.06}}
 @media (min-width:2100px){body{zoom:1.14}}
 :root[data-nhung] main{padding:22px 24px 64px}
+:root[data-gon] header{display:none}
+:root[data-gon] main{padding:16px 20px 40px}
+:root[data-gon] body{zoom:1}
 
 /* ---------- tiêu đề trang, thẻ, lưới */
 .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 20px}
@@ -1251,7 +1255,7 @@ $('#pmLuu').onclick = async () => {
   if (!kq.ok) { loi.innerHTML = ic('alert') + esc(kq.loi || 'Không lưu được.'); loi.classList.remove('hidden'); return; }
   r.text = text; r.la_ban_sua = kq.la_ban_sua; PM.goc = text;
   const tr = $('#pmTrang'); tr.textContent = r.la_ban_sua ? 'Đã chỉnh' : 'Mặc định'; tr.className = 'pill ' + (r.la_ban_sua ? 'p' : '');
-  pmVeDs(); pmCapNhat(); pmTaiCu();
+  pmVeDs(); pmCapNhat(); pmTaiCu(); baoViec('bienkich', 'luu');
   toast(kq.canh_bao && kq.canh_bao.length ? 'Đã lưu — có cảnh báo chỗ điền lạ' : 'Đã lưu — lần chạy sau dùng đề bài mới');
 };
 $('#pmKp').onclick = () => { $('#pmKp').classList.add('hidden'); $('#pmKpBox').classList.remove('hidden'); };
@@ -1291,6 +1295,8 @@ async function pmTaiCu() {
 
 const TAB_TEN = {sx: 'san-xuat', kho: 'kho', sp: 'san-pham', gu: 'gu', pm: 'prompt-ai', cd: 'cai-dat'};
 const TAB_MA = Object.fromEntries(Object.entries(TAB_TEN).map(([k, v]) => [v, k]));
+// báo trang cha (chỉ khi đang nhúng): người dùng vừa làm việc chính → nhân vật 3D phản ứng
+const baoViec = (vai, viec) => { if (document.documentElement.dataset.nhung === '1' && window.parent !== window) window.parent.postMessage({type: 'xuong-video:viec', vai, viec}, '*'); };
 const CHA = /^http:\/\/(localhost|127\.0\.0\.1):8010$/;          // chỉ nghe lệnh từ TikTok Auto Kid
 function moTab(ten, bao = true) {
   const b = document.querySelector(`nav button[data-tab="${TAB_MA[ten] || ten}"]`);
@@ -1435,7 +1441,7 @@ $('#btnChay').onclick = async () => {
   if (!confirm(`Làm ${n} video cho ${$('#spChon').selectedOptions[0].text}, dài ${giay[0]}–${giay[1]} giây?`)) return;
   const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon(), giay});
   if (r.ok) { const p = spLam().find(x => x.ma === sp); if (p) p.thoi_luong = giay; }
-  toast(r.ok ? 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.' : r.loi); capNhat();
+  toast(r.ok ? 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.' : r.loi); if (r.ok) baoViec('thodung', 'bat-dau'); capNhat();
 };
 $('#btnDung').onclick = async () => { if (confirm('Dừng lô đang làm? Video đã xong vẫn giữ.')) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
 
@@ -1474,7 +1480,7 @@ $('#ngayChon').onchange = taiVideo; $('#locChon').onchange = veVideo; $('#btnTai
 $('#btnMoThuMuc').onclick = () => api('/api/mo-thu-muc', {ngay: $('#ngayChon').value});
 async function danhGia(v, kq, gy) {
   await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy}); v.danh_gia = {ket_qua: kq, gop_y: gy};
-  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : 'Đã ghi: anh bỏ ❌'); veVideo();
+  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : 'bo'); veVideo();
 }
 function moVideo(v) {
   CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
@@ -1818,7 +1824,7 @@ $('#btnLuuSp').onclick = async () => {
 };
 // ---------- GU
 async function taiGu() { const g = await api('/api/so-gu'); $('#soGu').value = g.so_gu; $('#baiHoc').textContent = g.bai_hoc || '(chưa có)'; }
-$('#btnLuuGu').onclick = async () => { await api('/api/so-gu', {so_gu: $('#soGu').value}); toast('Đã lưu sổ gu'); };
+$('#btnLuuGu').onclick = async () => { await api('/api/so-gu', {so_gu: $('#soGu').value}); toast('Đã lưu sổ gu'); baoViec('daodien', 'luu'); };
 // ---------- CÀI ĐẶT
 async function taiODia() {
   const o = await api('/api/o-dia');
@@ -1866,7 +1872,7 @@ $('#gdDs').onclick = async e => {
   const n = e.target.closest('[data-gd-nghe]'), x = e.target.closest('[data-gd-xoa]');
   if (n) {
     const g = GD.ds[+n.dataset.gdNghe]; n.disabled = true;
-    try { const r = await api('/api/giong-mau?id=' + encodeURIComponent(g.id)); if (r.nghe_thu) await gdPhat(r.nghe_thu); else toast(r.loi || 'Không có bản nghe thử'); } finally { n.disabled = false; }
+    try { const r = await api('/api/giong-mau?id=' + encodeURIComponent(g.id)); if (r.nghe_thu) { baoViec('thuam', 'nghe'); await gdPhat(r.nghe_thu); } else toast(r.loi || 'Không có bản nghe thử'); } finally { n.disabled = false; }
   } else if (x && !x.disabled) {
     const g = GD.ds[+x.dataset.gdXoa]; if (!confirm(`Bỏ giọng "${g.ten}" khỏi danh sách đang dùng? (Giọng vẫn còn trong tài khoản ElevenLabs)`)) return;
     const r = await api('/api/giong', {xoa: g.ten}); if (!r.ok) return toast(r.loi || 'Không lưu được'); GD = r; gdVe(); toast('Đã bỏ giọng');
@@ -1903,7 +1909,10 @@ $('#btnGdId').onclick = async () => {
   if (!r.ok) { $('#gdLoi').innerHTML = `<div class="errbox" style="margin-top:8px">${esc(r.loi || 'Không thêm được')}</div>`; return; }
   $('#gdLoi').innerHTML = ''; GD = r; gdVe(); $('#gdId').value = ''; toast('Đã thêm giọng');
 };
-async function taiCd() { taiNhac(); taiODia(); taiTp(); taiKg(); taiGd(); $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; taiTk(); }
+async function taiCd() { taiNhac(); taiODia(); taiTp(); taiKg(); taiGd();
+  // mở thẳng ?tab=cai-dat lúc trạng thái chưa về: chờ lấy trạng thái rồi mới điền
+  if (!ST.claude) { try { ST = await api('/api/trang-thai'); } catch (e) { return; } }
+  $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; taiTk(); }
 // ---------- NHẠC & ÂM THANH
 let NH_T = null;
 async function taiNhac() {

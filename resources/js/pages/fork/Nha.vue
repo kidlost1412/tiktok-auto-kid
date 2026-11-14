@@ -4,11 +4,17 @@
 // máy không có WebGL hoặc dựng lỗi thì tự quay về ngôi nhà 2D. `?demo=1` phát lại một lô giả (không gọi máy chủ).
 import { Head, router } from '@inertiajs/vue3';
 import { IconHome } from '@tabler/icons-vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import BanLamViec from '@/components/fork/nha/ban/BanLamViec.vue';
+import { onMoBan } from '@/components/fork/nha/ban/bus';
+import { BAN } from '@/components/fork/nha/ban/registry';
+import ThanhViec from '@/components/fork/nha/ban/ThanhViec.vue';
 import House from '@/components/fork/nha/House.vue';
-import { DICH, type NhaData, type NhaEvent } from '@/components/fork/nha/types';
+import { recentEvents } from '@/components/fork/nha/su-kien';
+import { DICH, type NhaData } from '@/components/fork/nha/types';
 import Nha3D from '@/components/fork/nha3d/Nha3D.vue';
+import VideoViewer from '@/components/fork/shared/VideoViewer.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const props = defineProps<{ avatar?: Record<string, unknown> | null }>();
@@ -77,73 +83,32 @@ const chips = computed(() =>
 );
 
 // ---- hoạt động gần đây: 8 sự kiện mới nhất của sổ sự kiện hub, mới nhất lên đầu
-const VAI_TEN: Record<string, string> = {
-    'bien-kich': 'Biên kịch',
-    giong: 'Thu âm',
-    'dao-dien': 'Đạo diễn',
-    dung: 'Thợ dựng',
-    'giam-khao': 'Giám khảo',
-    kho: 'Thủ kho',
-    'he-thong': 'Xưởng',
-};
-const videoNo = (e: NhaEvent) => {
-    const m = /-(\d+)$/.exec(e.video ?? '');
+const recent = computed(() => recentEvents(data.value?.events));
 
-    return m ? Number(m[1]) + 1 : null;
-};
-const describe = (e: NhaEvent): string | null => {
-    const v = videoNo(e);
-    const vid = v ? ` video ${v}` : '';
-    switch (`${e.vai}|${e.loai}`) {
-        case 'he-thong|bat-dau-lo':
-            return `Bắt đầu lô ${e.ten ?? ''}${e.so_video ? ` · ${e.so_video} video` : ''}`.trim();
-        case 'bien-kich|xong':
-            return `Biên kịch viết xong ${e.so ?? ''} lời`;
-        case 'giong|xong':
-            return `Thu âm xong ${e.so ?? ''} giọng`;
-        case 'dao-dien|xong':
-            return `Đạo diễn xong bảng dựng${vid}`;
-        case 'dung|xong':
-            return e.buoc === 'chu'
-                ? 'Thợ dựng xong lớp chữ'
-                : `Thợ dựng dựng xong${vid}`;
-        case 'giam-khao|diem':
-            return e.diem == null
-                ? `Giám khảo chưa chấm được${vid}`
-                : `Giám khảo chấm${vid}: ${e.diem}/10 ${e.dat ? '✓' : '✗'}${!e.dat && e.loi ? ` · ${e.loi}` : ''}`;
-        case 'kho|luu':
-            return `Nhập kho video ${e.so ?? ''}/${e.tong ?? ''}`;
-        case 'he-thong|het-han-muc':
-            return 'Hết hạn mức Claude, xưởng nghỉ';
-        case 'he-thong|ket-thuc-lo':
-            return `Xong lô ${e.so ?? ''}/${e.tong ?? ''}${e.phut ? ` · ${String(e.phut).replace('.', ',')} phút` : ''}`;
-        default:
-            return e.loai === 'loi'
-                ? `${VAI_TEN[e.vai] ?? 'Xưởng'} gặp lỗi${e.msg ? `: ${e.msg}` : ''}`
-                : null;
+// Bấm nhân vật / phòng: mở "Bàn làm việc" (popup) ngay tại chỗ; vai chưa có bàn thì đi tới trang như cũ.
+// ?ban=<vai> trên địa chỉ để tải lại / quay lại vẫn mở đúng bàn.
+const banParam = params.get('ban');
+const ban = ref<string | null>(banParam && BAN[banParam] ? banParam : null);
+watch(ban, (v) => {
+    const q = new URLSearchParams(window.location.search);
+    if (v) {
+        q.set('ban', v);
+    } else {
+        q.delete('ban');
     }
-};
-const recent = computed(() => {
-    const out: { n: number; time: string; text: string; bad: boolean }[] = [];
-    for (const e of [...(data.value?.events ?? [])].reverse()) {
-        const text = describe(e);
-        if (text && out.length < 8) {
-            out.push({
-                n: e.n,
-                time: (e.t ?? '').slice(11, 16),
-                text,
-                bad:
-                    e.loai === 'loi' ||
-                    e.loai === 'het-han-muc' ||
-                    (e.loai === 'diem' && e.dat === false),
-            });
-        }
-    }
-
-    return out;
+    const qs = q.toString();
+    window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
+    );
 });
-
 const go = (key: string) => {
+    if (BAN[key]) {
+        ban.value = key;
+
+        return;
+    }
     const href = DICH[key]?.href;
     if (href) {
         router.visit(href);
@@ -212,11 +177,13 @@ const onVis = () => {
     }
 };
 
+const offMoBan = onMoBan((v) => go(v));
 onMounted(() => {
     document.addEventListener('visibilitychange', onVis);
     void load().then(schedule);
 });
 onBeforeUnmount(() => {
+    offMoBan();
     alive = false;
     document.removeEventListener('visibilitychange', onVis);
     window.clearTimeout(timer);
@@ -242,6 +209,7 @@ onBeforeUnmount(() => {
                     @go="go"
                     @fallback="use2d = true"
                 />
+                <ThanhViec :data="data" @open="go" />
                 <div
                     class="pointer-events-none absolute top-3 left-3 flex max-w-[min(440px,calc(100%-24px))] flex-col gap-1.5 md:top-4 md:left-5"
                 >
@@ -366,5 +334,7 @@ onBeforeUnmount(() => {
                 </ul>
             </div>
         </div>
+        <BanLamViec v-model:vai="ban" :data="data" />
+        <VideoViewer />
     </AppLayout>
 </template>

@@ -8,6 +8,8 @@ interface Slot {
     el: HTMLDivElement;
     text: HTMLSpanElement;
     alert: HTMLDivElement;
+    badge: HTMLButtonElement;
+    badgeN: number;
     cur: string | null;
     w: number;
     h: number;
@@ -24,6 +26,10 @@ export class Overlay {
     private tip: HTMLDivElement;
     private slots = new Map<string, Slot>();
     private ray = new THREE.Raycaster();
+    /** Số việc chờ theo khoá nhân vật (huy hiệu đỏ trên đầu). */
+    private counts = new Map<string, number>();
+    /** Bấm huy hiệu = bấm nhân vật. */
+    onBadge: ((key: string) => void) | null = null;
 
     constructor(
         host: HTMLElement,
@@ -51,12 +57,19 @@ export class Overlay {
             const alert = document.createElement('div');
             alert.className = 'n3-alert';
             alert.textContent = '!';
+            const badge = document.createElement('button');
+            badge.type = 'button';
+            badge.className = 'n3-badge';
+            badge.addEventListener('click', () => this.onBadge?.(key));
             this.el.appendChild(el);
             this.el.appendChild(alert);
+            this.el.appendChild(badge);
             s = {
                 el,
                 text,
                 alert,
+                badge,
+                badgeN: 0,
                 cur: null,
                 w: 0,
                 h: 0,
@@ -66,10 +79,21 @@ export class Overlay {
             };
             el.style.display = 'none';
             alert.style.display = 'none';
+            badge.style.display = 'none';
             this.slots.set(key, s);
         }
 
         return s;
+    }
+
+    /** Đặt số việc chờ (khoá nhân vật → số); bỏ qua số <= 0. */
+    setCounts(counts: Record<string, number>) {
+        this.counts.clear();
+        for (const k of Object.keys(counts)) {
+            if (counts[k] > 0) {
+                this.counts.set(k, counts[k]);
+            }
+        }
     }
 
     update(talkers: Talker[], now: number, width: number, height: number) {
@@ -84,10 +108,12 @@ export class Overlay {
             const s = this.slot(t.key);
             const text = t.bubble();
             const alert = now < t.alertUntil;
-            if (!text && !alert) {
+            const n = this.counts.get(t.key) ?? 0;
+            if (!text && !alert && n === 0) {
                 if (!s.hidden) {
                     s.el.style.display = 'none';
                     s.alert.style.display = 'none';
+                    s.badge.style.display = 'none';
                     s.hidden = true;
                 }
                 continue;
@@ -110,10 +136,21 @@ export class Overlay {
             if (off || s.occluded) {
                 s.el.style.display = 'none';
                 s.alert.style.display = 'none';
+                s.badge.style.display = 'none';
                 s.hidden = true;
                 continue;
             }
             s.hidden = false;
+            if (n > 0) {
+                if (s.badgeN !== n) {
+                    s.badgeN = n;
+                    s.badge.textContent = n > 99 ? '99+' : String(n);
+                }
+                s.badge.style.display = 'grid';
+                s.badge.style.transform = `translate(${Math.round(x + 17)}px, ${Math.round(y - 6)}px)`;
+            } else {
+                s.badge.style.display = 'none';
+            }
             if (alert) {
                 s.alert.style.display = 'grid';
                 s.alert.style.transform = `translate(${Math.round(x - 15)}px, ${Math.round(y - (text ? 4 : 30))}px)`;
@@ -201,6 +238,8 @@ export class Overlay {
     dispose() {
         this.el.remove();
         this.tip.remove();
+        this.counts.clear();
+        this.onBadge = null;
         this.slots.clear();
     }
 }

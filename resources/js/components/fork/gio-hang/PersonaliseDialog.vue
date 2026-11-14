@@ -37,9 +37,16 @@ const props = defineProps<{
     code: string;
     label: string;
     state: Persona;
+    /** Dùng trong popup "Bàn làm việc": giữ nguyên trang đang mở (preserveState) và báo `saved` sau mỗi thay đổi. */
+    inPlace?: boolean;
 }>();
 
-const emit = defineEmits<{ 'update:open': [value: boolean] }>();
+const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [] }>();
+
+const inPlaceOpts = () =>
+    props.inPlace
+        ? { preserveState: true, onSuccess: () => emit('saved') }
+        : {};
 
 const isProduct = computed(() => props.scope === 'product');
 
@@ -52,9 +59,7 @@ const pick = ref(0);
 const sample = ref('');
 const busy = ref(false);
 const dragging = ref(false);
-const preview = ref<{ text: string; length: number; max: number } | null>(
-    null,
-);
+const preview = ref<{ text: string; length: number; max: number } | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 /** Ảnh đang xem trước ở chế độ ngẫu nhiên (bấm ảnh để đổi). */
 const previewFile = ref<string | null>(null);
@@ -185,6 +190,7 @@ function uploadFiles(files: File[]) {
         {
             forceFormData: true,
             preserveScroll: true,
+            ...inPlaceOpts(),
             only: ['personalise', 'flash', 'errors'],
             onFinish: () => {
                 busy.value = false;
@@ -214,6 +220,7 @@ function removeCover(file: string) {
     busy.value = true;
     router.delete(`${base.value}/covers/${file}`, {
         preserveScroll: true,
+        ...inPlaceOpts(),
         only: ['personalise', 'flash'],
         onFinish: () => {
             busy.value = false;
@@ -226,7 +233,11 @@ function save() {
     busy.value = true;
     const done = {
         preserveScroll: true,
-        onSuccess: () => emit('update:open', false),
+        ...(props.inPlace ? { preserveState: true } : {}),
+        onSuccess: () => {
+            emit('update:open', false);
+            emit('saved');
+        },
         onFinish: () => {
             busy.value = false;
         },
@@ -300,7 +311,9 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
             class="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(48rem,calc(100%-2rem))]"
             data-testid="fork-personalise-dialog"
         >
-            <DialogHeader class="shrink-0 border-b px-5 pt-5 pr-14 pb-4 sm:px-6">
+            <DialogHeader
+                class="shrink-0 border-b px-5 pt-5 pr-14 pb-4 sm:px-6"
+            >
                 <DialogTitle class="text-lg">
                     {{
                         isProduct
@@ -325,7 +338,11 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                 class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-muted/30 px-5 py-5 sm:px-6"
             >
                 <!-- 1. Ảnh bìa -->
-                <section v-if="isProduct" :class="card" class="flex flex-col gap-4">
+                <section
+                    v-if="isProduct"
+                    :class="card"
+                    class="flex flex-col gap-4"
+                >
                     <div class="flex items-start gap-3">
                         <span
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary-text"
@@ -441,10 +458,8 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     </span>
                                 </button>
                                 <span class="text-xs text-muted-foreground"
-                                    >{{ previewCover.w }}×{{
-                                        previewCover.h
-                                    }}
-                                    · bấm để phóng to</span
+                                    >{{ previewCover.w }}×{{ previewCover.h }} ·
+                                    bấm để phóng to</span
                                 >
                             </div>
 
@@ -548,7 +563,11 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                         @click="fileInput?.click()"
                                     >
                                         <IconPhotoPlus class="size-5" />
-                                        {{ covers.length ? 'Thêm ảnh' : 'Tải ảnh lên' }}
+                                        {{
+                                            covers.length
+                                                ? 'Thêm ảnh'
+                                                : 'Tải ảnh lên'
+                                        }}
                                     </button>
                                     <input
                                         ref="fileInput"
@@ -565,8 +584,8 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     class="text-sm text-muted-foreground"
                                 >
                                     Chưa có ảnh nào: bấm ô bên trên hoặc kéo ảnh
-                                    thả vào đây. Khi chưa có ảnh, bài sẽ dùng bìa
-                                    mặc định.
+                                    thả vào đây. Khi chưa có ảnh, bài sẽ dùng
+                                    bìa mặc định.
                                 </p>
                                 <p class="text-xs text-muted-foreground">
                                     jpg, png, webp · tối đa 5 MB/ảnh · nên dùng
