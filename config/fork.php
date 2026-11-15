@@ -47,6 +47,9 @@ return [
         ],
         // Tối đa bao nhiêu bài đã xếp trong tương lai (chưa đăng) mỗi kênh, chặn tải quá nhiều bài hẹn giờ lên TikTok.
         'max_future_posts' => (int) env('FORK_AUTO_MAX_FUTURE_POSTS', 100),
+        // TikTok chỉ cho mỗi kênh để chờ tối đa 50 bài hẹn giờ (quá thì báo status_code 3013021). Bài vượt mức được giữ trong
+        // app và tự hẹn lên khi có chỗ trống (bài sớm nhất trước); tới giờ mà vẫn chưa hẹn được thì Chrome đăng ngay lúc đó.
+        'tiktok_schedule_cap' => (int) env('FORK_TIKTOK_SCHEDULE_CAP', 50),
         // Số ngày xếp trước mặc định (cột schedule_ahead_days). TikTok chỉ cho hẹn tối đa 10 ngày.
         'default_schedule_ahead_days' => 3,
         'min_gap_minutes' => 20,

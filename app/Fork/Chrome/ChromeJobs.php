@@ -79,6 +79,14 @@ final class ChromeJobs
 
     public const string PAIR_CACHE_KEY = 'fork:chrome:pair';
 
+    /** TikTok từ chối vì kênh đã đủ số bài hẹn giờ tối đa ("Exceeding the scheduled post quantity"). Bài chưa lên, thử lại được. */
+    public const int SCHEDULE_QUOTA_CODE = 3013021;
+
+    /** Cache: số bài đang chờ trên TikTok lúc TikTok báo đầy (giới hạn thật có thể thấp hơn cấu hình, vd. có bài hẹn tay). */
+    public const string QUOTA_FULL_KEY = 'fork:chrome:tiktok-full:';
+
+    public const string QUOTA_HELD_TEXT = 'Đang giữ trong app: kênh đã đủ số bài hẹn giờ TikTok cho phép — app tự hẹn lên khi có chỗ trống (tới giờ mà vẫn chưa hẹn được thì đăng ngay lúc đó).';
+
     public const string NO_RESULT_TEXT = 'Chrome đã được phép đăng nhưng không báo kết quả trong 3 phút — có thể đã đăng hoặc chưa; kiểm tra TikTok trước khi thử lại';
 
     public const string CANCEL_TEXT = 'Chrome đã hủy việc trước khi đăng — chưa đăng';
@@ -317,7 +325,11 @@ final class ChromeJobs
             throw new ChromeRefusal('Chrome đã được cấp quyền hoặc đã đăng bài này (trạng thái '.$latest->state.') — không giao lại để tránh đăng trùng; kiểm tra TikTok trước.');
         }
 
-        if ((int) ChromeJob::query()->where('post_id', $post->id)->max('attempt') >= self::MAX_ATTEMPTS) {
+        // TikTok từ chối vì đầy lịch hẹn không tính là một lần thử hỏng (bài chưa lên, chỉ chờ chỗ trống).
+        $tries = ChromeJob::query()->where('post_id', $post->id)->get(['state', 'result'])
+            ->reject(fn (ChromeJob $j): bool => self::isQuotaRejection($j))->count();
+
+        if ($tries >= self::MAX_ATTEMPTS) {
             throw new ChromeRefusal('Đã thử giao cho Chrome '.self::MAX_ATTEMPTS.' lần mà chưa đăng được — kiểm tra Chrome rồi bấm thử lại bằng cách nhân bản bài.');
         }
 
@@ -421,6 +433,47 @@ final class ChromeJobs
         return ChromeJob::query()->where('post_id', $post->id)->orderByDesc('attempt')->first();
     }
 
+    public static function isQuotaRejection(?ChromeJob $j): bool
+    {
+        return $j !== null && $j->state === 'rejected'
+            && (int) data_get(is_array($j->result) ? $j->result : [], 'status_code') === self::SCHEDULE_QUOTA_CODE;
+    }
+
+    /** Số bài hẹn giờ tối đa mỗi kênh được để chờ trên TikTok (TikTok cho 50). */
+    public static function scheduleCap(): int
+    {
+        return max(1, (int) config('fork.auto.tiktok_schedule_cap', 50));
+    }
+
+    /** Số bài của kênh đang nằm chờ trên TikTok: job hẹn giờ đã lên (hoặc đang/không rõ) mà chưa tới giờ đăng. */
+    public function pendingOnTikTok(string $accountId, ?CarbonImmutable $now = null): int
+    {
+        $now ??= CarbonImmutable::now();
+
+        return (int) ChromeJob::query()
+            ->join('posts', 'posts.id', '=', 'fork_chrome_jobs.post_id')
+            ->where('fork_chrome_jobs.social_account_id', $accountId)
+            ->where('fork_chrome_jobs.mode', 'scheduled')
+            ->whereIn('fork_chrome_jobs.state', ['posted', 'authorized', 'uncertain'])
+            ->where('posts.scheduled_at', '>', $now)
+            ->distinct()
+            ->count('fork_chrome_jobs.post_id');
+    }
+
+    /** Giới hạn đang áp cho kênh: cấu hình, hạ xuống mức TikTok vừa báo đầy (nhớ 1 ngày). */
+    public function scheduleLimitFor(string $accountId): int
+    {
+        $full = Cache::get(self::QUOTA_FULL_KEY.$accountId);
+
+        return $full === null ? self::scheduleCap() : min(self::scheduleCap(), max(0, (int) $full));
+    }
+
+    /** Còn được hẹn thêm bao nhiêu bài lên TikTok cho kênh này. */
+    public function scheduleRoom(string $accountId, ?CarbonImmutable $now = null): int
+    {
+        return max(0, $this->scheduleLimitFor($accountId) - $this->pendingOnTikTok($accountId, $now));
+    }
+
     public function openJobFor(SocialAccount $a): ?ChromeJob
     {
         return ChromeJob::query()
@@ -502,6 +555,10 @@ final class ChromeJobs
             case 'rejected':
                 $code = $r['status_code'] ?? null;
                 $msg = mb_substr((string) ($r['status_msg'] ?? ''), 0, 200);
+
+                if (self::isQuotaRejection($j)) {
+                    return new ChromeOutcome(false, false, self::QUOTA_HELD_TEXT);
+                }
 
                 return new ChromeOutcome(false, false, $code !== null
                     ? 'TikTok từ chối bài đăng (status_code '.$code.($msg !== '' ? ': '.$msg : '').')'
@@ -798,6 +855,13 @@ final class ChromeJobs
 
             if ($new === 'posted' && $job->mode === 'scheduled') {
                 $this->dispatchNext((string) $job->social_account_id);
+            }
+
+            if ($new === 'rejected' && (int) ($keep['status_code'] ?? 0) === self::SCHEDULE_QUOTA_CODE) {
+                // TikTok đầy lịch hẹn: nhớ mức hiện có để không gửi thêm (tránh tải lên rồi bị từ chối lặp lại) cho tới khi bớt bài.
+                $pending = $this->pendingOnTikTok((string) $job->social_account_id);
+                Cache::put(self::QUOTA_FULL_KEY.$job->social_account_id, $pending, 86400);
+                Log::warning('chrome: TikTok báo đã đủ số bài hẹn giờ — giữ bài trong app', ['job' => $jobId, 'account' => $job->social_account_id, 'pending' => $pending]);
             }
 
             return ['duplicate' => false, 'state' => $new];

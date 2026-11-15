@@ -6,6 +6,7 @@ namespace App\Fork\Chrome\Http\Extension;
 
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\AutoPost\Stats\CommentIngest;
 use App\Fork\AutoPost\Stats\StatsIngest;
 use App\Fork\Chrome\ChromeJobs;
@@ -170,14 +171,25 @@ final class ExtensionController
         }
     }
 
-    /** K4: việc đang chờ tiện ích làm. Hiện chỉ có `sync_products` (request_id khi chủ app bấm "Lấy sản phẩm từ shop"). */
+    /**
+     * Việc đang chờ tiện ích làm: `sync_products` (K4, request_id khi chủ app bấm "Lấy sản phẩm từ shop") và
+     * `delete_scheduled` (mục 12: xoá bài đã hẹn trên TikTok để đổi giờ, rồi kiểm lại).
+     */
     public function tasks(Request $request): JsonResponse
     {
         $client = $this->client($request);
         $bound = filled($client->tiktok_user_id) ? $this->chrome->boundAccount((string) $client->tiktok_user_id) : null;
 
+        try {
+            $delete = $bound && ! $this->chrome->inConflict($client) ? app(Reschedules::class)->taskFor($client) : null;
+        } catch (\Throwable $e) {
+            report($e);
+            $delete = null;
+        }
+
         return response()->json([
             'sync_products' => $bound ? $this->shop->pendingRequest((string) $bound->social_account_id) : null,
+            'delete_scheduled' => $delete,
         ]);
     }
 

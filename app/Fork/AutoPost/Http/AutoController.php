@@ -17,6 +17,7 @@ use App\Fork\AutoPost\Onboarding;
 use App\Fork\AutoPost\Scheduling\FutureUploads;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PlanPreview;
+use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\AutoPost\Scheduling\ResultWatcher;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\Shop\CartRules;
@@ -382,12 +383,18 @@ final class AutoController extends Controller
                 ->with('post')
                 ->get();
 
-            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a): array {
+            // "Đổi giờ": bài nào đã nằm trên TikTok (job Chrome hẹn giờ đã xong), đổi giờ được không, yêu cầu gần nhất.
+            $moves = app(Reschedules::class)->calendarInfo($videos);
+
+            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves): array {
                 $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
                 $postStatus = $v->post?->status;
+                $move = $moves[$v->id] ?? ['on_tiktok' => false, 'held' => false, 'can_reschedule' => false, 'reschedule' => null];
                 $state = match (true) {
                     // Video đã hẹn giờ sẵn trên TikTok (posted_at là giờ hẹn, chưa tới): chưa đăng, chỉ là đã hẹn.
                     $v->status === AutoVideo::POSTED && $v->posted_at?->isFuture() => 'tiktok_scheduled',
+                    // Chrome đã tải bài lên TikTok dưới dạng hẹn giờ (job hẹn giờ posted), bài trong app vẫn chờ tới giờ.
+                    $v->status === AutoVideo::SCHEDULED && $move['on_tiktok'] && $postStatus === PostStatus::Scheduled => 'tiktok_scheduled',
                     $v->status === AutoVideo::POSTED => 'posted',
                     $v->status === AutoVideo::FAILED, $postStatus === PostStatus::Failed => 'failed',
                     $v->status === AutoVideo::RESERVED => 'reserved',
@@ -407,6 +414,11 @@ final class AutoController extends Controller
                     'caption' => $this->snippet($v->caption),
                     'link' => in_array($state, ['posted', 'tiktok_scheduled'], true) ? $this->safeLink(data_get($v->stats, 'link')) : null,
                     'error' => $state === 'failed' ? $v->skip_reason : null,
+                    // Bài chưa hẹn được lên TikTok vì kênh đã đủ số bài hẹn giờ: vẫn trong app, sẽ tự hẹn khi có chỗ.
+                    'note' => $state === 'scheduled' && ($move['held'] ?? false) ? ChromeJobs::QUOTA_HELD_TEXT : null,
+                    'source' => $v->source,
+                    'can_reschedule' => $move['can_reschedule'],
+                    'reschedule' => $move['reschedule'],
                 ];
             })->all();
 

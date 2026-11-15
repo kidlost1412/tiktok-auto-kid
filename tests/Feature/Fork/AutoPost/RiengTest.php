@@ -457,14 +457,58 @@ test('auto batch takes the earliest free slots and skips busy ones, never touchi
     expect($a->refresh()->status)->toBe('scheduled');
 });
 
-test('auto batch schedules what fits and reports how many are left', function () {
+test('auto batch is not limited by the hub daily cap or ahead days, only by the pending-post limit', function () {
+    // Trần bài/ngày và số ngày xếp trước là của Xưởng Video; video riêng vẫn được xếp (tràn sang ngày sau nếu cần).
     $account = ($this->account)(['daily_cap' => 2, 'window_start' => 6, 'window_end' => 23, 'schedule_ahead_days' => 1]);
     $videos = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4'), ($this->rieng)('4.mp4'), ($this->rieng)('5.mp4')];
 
     $result = ($this->batch)()->commit(($this->input)($account, $videos), false, $this->now);
+    expect($result['done'])->toBe(5)->and($result['left'])->toBe(0);
 
-    expect($result['done'])->toBeLessThan(5)->and($result['left'])->toBe(5 - $result['done'])->and($result['left'])->toBeGreaterThan(0)
-        ->and(AutoVideo::query()->where('status', 'new')->count())->toBe($result['left']);
+    config(['fork.auto.max_future_posts' => 7]);
+    $more = [($this->rieng)('6.mp4'), ($this->rieng)('7.mp4'), ($this->rieng)('8.mp4')];
+    $result = ($this->batch)()->commit(($this->input)($account, $more), false, $this->now);
+
+    expect($result['done'])->toBe(2)->and($result['left'])->toBe(1)
+        ->and(AutoVideo::query()->where('status', 'new')->count())->toBe(1);
+});
+
+test('auto times always stay inside the posting window and spill to the next day, 20 minutes apart on the same channel only', function () {
+    $account = ($this->account)(['window_start' => 6, 'window_end' => 23]);
+    $other = ($this->account)();
+    // 22:30 giờ VN: sau 45 phút đã quá 23:00 => phải sang 06:00 sáng hôm sau, không bao giờ 01:00–02:00.
+    $now = CarbonImmutable::parse('2026-11-20 22:30', 'Asia/Ho_Chi_Minh')->utc();
+    $sixAm = CarbonImmutable::parse('2026-11-21 06:00', 'Asia/Ho_Chi_Minh');
+    // Kênh khác đăng đúng 06:00: không ảnh hưởng. Cùng kênh có bài 06:30: bài kế phải cách >= 20 phút.
+    AutoVideo::create(['hash' => 'o1', 'path' => '/o1', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'o1.mp4', 'status' => 'scheduled', 'social_account_id' => $other->id, 'scheduled_for' => $sixAm->utc()]);
+    AutoVideo::create(['hash' => 'm1', 'path' => '/m1', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'm1.mp4', 'status' => 'scheduled', 'social_account_id' => $account->id, 'scheduled_for' => $sixAm->addMinutes(30)->utc()]);
+
+    $v = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4')];
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => array_map(fn ($x) => ['id' => $x->id], $v)], $now);
+    $local = array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i'), $r['rows']);
+
+    expect($r['ok'])->toBeTrue()->and($r['window'])->toBe('06:00–23:00')
+        ->and($local)->toBe(['2026-11-21 06:00', '2026-11-21 06:50', '2026-11-21 07:10']);
+});
+
+test('an edited time is kept and checked; outside the window it is refused, the others are proposed around it', function () {
+    $account = ($this->account)(['window_start' => 6, 'window_end' => 23]);
+    $now = CarbonImmutable::parse('2026-11-20 09:00', 'Asia/Ho_Chi_Minh')->utc();
+    $v = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4')];
+    $tenAm = CarbonImmutable::parse('2026-11-20 10:00', 'Asia/Ho_Chi_Minh');
+    $oneAm = CarbonImmutable::parse('2026-11-21 01:00', 'Asia/Ho_Chi_Minh');
+
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => [
+        ['id' => $v[0]->id, 'at' => $tenAm->toIso8601String()],
+        ['id' => $v[1]->id],
+        ['id' => $v[2]->id, 'at' => $oneAm->toIso8601String()],
+    ]], $now);
+    $at = fn (int $i) => CarbonImmutable::parse($r['rows'][$i]['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('H:i');
+
+    expect($r['rows'][0]['status'])->toBe('ok')->and($r['rows'][0]['edited'])->toBeTrue()->and($at(0))->toBe('10:00')
+        // Đề xuất sớm nhất là 09:45 nhưng phải cách 10:00 ít nhất 20 phút => 10:20.
+        ->and($r['rows'][1]['status'])->toBe('ok')->and($r['rows'][1]['edited'])->toBeFalse()->and($at(1))->toBe('10:20')
+        ->and($r['rows'][2]['status'])->toBe('error')->and(implode(' ', $r['rows'][2]['messages']))->toContain('Ngoài khung giờ');
 });
 
 test('the batch requires a cart product available on the channel', function () {
@@ -481,7 +525,7 @@ test('the batch requires a cart product available on the channel', function () {
 
 // ---------------------------------------------------------------- Thủ công
 
-test('manual mode refuses under the minimum lead and exact duplicates, warns on gap and other channels', function () {
+test('edited times refuse under the minimum lead and exact duplicates, warn on the same-channel gap and ignore other channels', function () {
     $a1 = ($this->account)();
     $a2 = ($this->account)();
     $t = $this->now->addHours(10)->startOfMinute();
@@ -503,8 +547,9 @@ test('manual mode refuses under the minimum lead and exact duplicates, warns on 
 
     expect($rows[0]['status'])->toBe('error')->and($rows[0]['messages'][0])->toContain('45 phút')
         ->and($rows[1]['status'])->toBe('error')->and($rows[1]['messages'][0])->toContain('đúng giờ')
-        ->and($rows[2]['status'])->toBe('warn')->and(implode(' ', $rows[2]['messages']))->toContain('Trùng giờ với bài')
-        ->and($rows[3]['status'])->toBe('warn')->and(implode(' ', $rows[3]['messages']))->toContain('@')
+        ->and($rows[2]['status'])->toBe('warn')->and(implode(' ', $rows[2]['messages']))->toContain('Gần bài')
+        // Sát giờ kênh khác: không sao (chỉ tránh bài cùng kênh).
+        ->and($rows[3]['status'])->toBe('ok')->and($rows[3]['messages'])->toBe([])
         ->and($rows[4]['status'])->toBe('ok')->and($r['needs_confirm'])->toBeTrue();
 
     // Chưa xác nhận: không ghi gì.
@@ -518,7 +563,7 @@ test('manual mode refuses under the minimum lead and exact duplicates, warns on 
         ->and($v[2]->refresh()->status)->toBe('scheduled')->and($v[4]->refresh()->status)->toBe('scheduled');
 });
 
-test('manual duplicates inside the same batch are refused', function () {
+test('edited duplicates inside the same batch are refused', function () {
     $account = ($this->account)();
     $a = ($this->rieng)('a.mp4');
     $b = ($this->rieng)('b.mp4');

@@ -4,11 +4,14 @@
 import {
     IconCalendarOff,
     IconChevronDown,
+    IconClockEdit,
     IconExternalLink,
+    IconLoader2,
     IconShoppingCart,
 } from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
 
+import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
 import type { ScheduleEntry } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import { statusOf, toneClasses } from '@/components/fork/shared/status';
@@ -78,8 +81,19 @@ const open = (e: ScheduleEntry) => {
     }
 };
 
+// "Đổi giờ": bài đã xếp mà chưa đăng (kể cả đã hẹn sẵn trên TikTok), giờ còn ở tương lai.
+const canMove = (e: ScheduleEntry) =>
+    !!e.id && !!e.can_reschedule && dayjs(e.at).isAfter(dayjs());
+const moving = (e: ScheduleEntry) => !!e.reschedule?.open;
+const moveOpen = ref(false);
+const moveEntry = ref<ScheduleEntry | null>(null);
+const startMove = (e: ScheduleEntry) => {
+    moveEntry.value = e;
+    moveOpen.value = true;
+};
+
 // Kiểu gọn: trạng thái thường gặp chỉ là một chấm màu (có chú thích ở đầu bảng); trạng thái cần chú ý mới thành nhãn.
-const QUIET = ['scheduled', 'posted', 'projected'];
+const QUIET = ['scheduled', 'tiktok_scheduled', 'posted', 'projected'];
 
 const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
 </script>
@@ -300,6 +314,18 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 {{ e.error }}
                             </p>
                             <p
+                                v-else-if="e.note"
+                                :class="
+                                    cn(
+                                        'line-clamp-2 text-[0.75rem]',
+                                        toneClasses.warn.text,
+                                    )
+                                "
+                                :title="e.note"
+                            >
+                                {{ e.note }}
+                            </p>
+                            <p
                                 v-else-if="e.caption"
                                 class="truncate text-[0.75rem] text-muted-foreground"
                                 :title="e.caption"
@@ -333,6 +359,27 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 title="Đã quá giờ hẹn mà chưa đăng xong"
                                 >Trễ</span
                             >
+                            <button
+                                v-if="canMove(e)"
+                                type="button"
+                                :class="
+                                    cn(
+                                        'flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
+                                        compact ? 'size-6' : 'size-7',
+                                        compact && !moving(e) && 'opacity-0 group-hover:opacity-100',
+                                        moving(e) && 'text-primary-text',
+                                    )
+                                "
+                                :title="moving(e) ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…' : 'Đổi giờ'"
+                                :aria-label="moving(e) ? 'Đang đổi giờ' : 'Đổi giờ'"
+                                :data-testid="`fork-auto-move-${e.id}`"
+                                @click.stop="startMove(e)"
+                                @keydown.enter.stop
+                                @keydown.space.stop
+                            >
+                                <IconLoader2 v-if="moving(e)" :class="cn('animate-spin', compact ? 'size-3.5' : 'size-4')" />
+                                <IconClockEdit v-else :class="compact ? 'size-3.5' : 'size-4'" />
+                            </button>
                             <template v-if="compact">
                                 <a
                                     v-if="e.link"
@@ -425,5 +472,6 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                 >
             </li>
         </ol>
+        <RescheduleDialog v-model:open="moveOpen" :entry="moveEntry" />
     </div>
 </template>

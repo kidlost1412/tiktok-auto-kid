@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Fork\Chrome\Http\Extension\AuthenticateExtension;
+use App\Fork\Chrome\Http\Extension\DeleteScheduledController;
 use App\Fork\Chrome\Http\Extension\ExtensionController;
 use App\Fork\Chrome\Http\Extension\ExtensionCors;
 use Illuminate\Support\Facades\Route;
@@ -32,5 +33,8 @@ Route::prefix('api/ext')->middleware(['api', ExtensionCors::class])->group(funct
         Route::post('result', [ExtensionController::class, 'result']);
         Route::post('cancel', [ExtensionController::class, 'cancel']);
         Route::get('job_state', [ExtensionController::class, 'jobState']);
+        // Mục 12: xoá bài đã hẹn trên TikTok để "Đổi giờ" (việc giao qua /tasks).
+        Route::post('delete_scheduled/claim', [DeleteScheduledController::class, 'claim']);
+        Route::post('delete_scheduled/result', [DeleteScheduledController::class, 'result']);
     });
 });

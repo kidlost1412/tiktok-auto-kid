@@ -59,6 +59,17 @@ class ScheduledDispatcher
             return 0;
         }
 
+        // TikTok chỉ cho mỗi kênh để chờ một số bài hẹn giờ (50). Đủ rồi thì giữ bài trong app; bài sớm nhất lên trước khi có chỗ trống.
+        if ($this->chrome->scheduleRoom((string) $account->id, $now) <= 0) {
+            if (Cache::add("fork:chrome:schedule-full:{$account->id}", 1, 3600)) {
+                Log::info('Kênh đã đủ số bài hẹn giờ trên TikTok — giữ bài trong app, chờ chỗ trống.', [
+                    'account' => $account->id, 'limit' => $this->chrome->scheduleLimitFor((string) $account->id),
+                ]);
+            }
+
+            return 0;
+        }
+
         $from = $now->addSeconds(ChromeJobs::SCHEDULE_LEAD + 120);
         $to = $now->addSeconds(ChromeJobs::SCHEDULE_MAX_AHEAD);
 
@@ -68,8 +79,12 @@ class ScheduledDispatcher
             ->where('social_account_id', $account->id)
             ->where('platform', Platform::TikTok)
             ->whereBetween('scheduled_at', [$from, $to])
-            // Bài đã có job (đã tải lên, đang lỗi...) không chiếm chỗ trong danh sách xét; riêng job bị thu hồi vì sửa bài thì xét lại.
-            ->whereNotIn('id', ChromeJob::query()->where('state', '!=', 'revoked')->select('post_id'))
+            // Bài đã có job (đã tải lên, đang lỗi...) không chiếm chỗ trong danh sách xét; riêng job bị thu hồi vì sửa bài
+            // và job bị TikTok từ chối vì đầy lịch hẹn thì xét lại.
+            ->whereNotIn('id', ChromeJob::query()->where('state', '!=', 'revoked')
+                ->where(fn ($q) => $q->where('state', '!=', 'rejected')->orWhereNull('result')
+                    ->orWhereRaw("coalesce(result->>'status_code', '') <> ?", [(string) ChromeJobs::SCHEDULE_QUOTA_CODE]))
+                ->select('post_id'))
             ->orderBy('scheduled_at')
             ->limit(self::CANDIDATES_PER_ACCOUNT)
             ->get();
@@ -88,6 +103,7 @@ class ScheduledDispatcher
         $latest = $this->chrome->latestForPost($post);
 
         return $latest === null
+            || ChromeJobs::isQuotaRejection($latest)
             || ($latest->state === 'revoked' && ! $latest->cancel_requested && ChromePostWatcher::isEditNote($latest->note));
     }
 
