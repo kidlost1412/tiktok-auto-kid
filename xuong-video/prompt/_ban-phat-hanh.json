@@ -5,15 +5,15 @@
  },
  "bien-kich": {
   "hash": "3826ef104dde0946",
-  "ver": "1.2.14"
+  "ver": "1.2.15"
  },
  "dao-dien": {
   "hash": "83d88397158a05f7",
-  "ver": "1.2.13"
+  "ver": "1.2.15"
  },
  "giam-khao": {
   "hash": "a8e8248372c5dafa",
-  "ver": "1.2.13"
+  "ver": "1.2.15"
  },
  "soat-kho": {
   "hash": "48096f703b33257a",
@@ -33,7 +33,7 @@
  },
  "dien-phieu": {
   "hash": "b02686087d1effc6",
-  "ver": "1.2.13"
+  "ver": "1.2.15"
  },
  "lenh-gemini": {
   "hash": "f2e8b6f720331967",
@@ -45,11 +45,11 @@
  },
  "kien-thuc-ban-hang": {
   "hash": "4ad8e39cee176164",
-  "ver": "1.2.14"
+  "ver": "1.2.15"
  },
  "so-tay-editor": {
   "hash": "5bea8606409e48f2",
-  "ver": "1.2.13"
+  "ver": "1.2.15"
  },
  "mo-ta-gemini": {
   "hash": "4eb3d7fb6012b234",
