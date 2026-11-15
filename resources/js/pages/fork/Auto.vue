@@ -264,7 +264,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
 
         <template v-else>
             <div
-                class="grid gap-6 xl:h-[max(560px,calc(100dvh-320px))] xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]"
+                class="grid gap-6 xl:h-[max(620px,calc(100dvh-230px))] xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]"
                 data-testid="fork-auto-main"
             >
                 <ScheduleBoard

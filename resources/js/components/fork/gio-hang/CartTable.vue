@@ -801,7 +801,7 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                             'hidden border-b bg-muted/40 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid',
                             embedded
                                 ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
-                                : 'px-5 lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] lg:gap-x-5',
+                                : 'px-5 lg:gap-x-3 xl:gap-x-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
                         )
                     "
                     aria-hidden="true"

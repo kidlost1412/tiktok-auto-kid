@@ -272,6 +272,7 @@ const label =
         <!-- Hôm nay -->
         <div
             class="flex items-center gap-5 p-5"
+            title="Số bài đã đăng hôm nay trên tổng chỉ tiêu các kênh đang bật. Vòng đậm = đã đăng, vòng nhạt = đã hẹn chờ giờ; chỗ trống = chỉ tiêu trừ số đã xếp."
             data-testid="fork-auto-kpi-today"
         >
             <div class="relative size-[76px] shrink-0">
@@ -347,6 +348,7 @@ const label =
         <!-- Bài kế tiếp -->
         <div
             class="flex items-center gap-4 border-t p-5 sm:border-t-0 sm:border-l"
+            title="Bài có giờ đăng sớm nhất trong tất cả kênh (đã hẹn hoặc đang đăng). Bấm ảnh bìa để xem video."
             data-testid="fork-auto-kpi-next"
         >
             <template v-if="next">
@@ -420,6 +422,7 @@ const label =
                     stock.low && 'bg-amber-50/60 dark:bg-amber-950/20',
                 )
             "
+            title="Video đã duyệt (cả chờ xếp lịch lẫn đã hẹn) của các sản phẩm đang bật. 'Đủ đăng ~N ngày' = số video đó chia chỉ tiêu bài mỗi ngày của các kênh đang bật; ngày hết là ngày dự kiến nếu không có video mới."
             data-testid="fork-auto-kpi-stock"
         >
             <div :class="cn(label, 'flex items-center justify-between')">

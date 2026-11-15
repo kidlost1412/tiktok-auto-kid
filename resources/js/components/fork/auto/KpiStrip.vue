@@ -75,13 +75,14 @@ const stockHint = computed(() => {
     return days ? `Đủ khoảng ${props.stock.days_left} ngày đăng` : 'Video đã duyệt, chưa xếp lịch';
 });
 
-const cards = computed<{ key: string; label: string; value: string; unit?: string; hint: string; tone: Tone; icon: typeof IconRobot }[]>(() => [
+const cards = computed<{ key: string; label: string; value: string; unit?: string; hint: string; tip: string; tone: Tone; icon: typeof IconRobot }[]>(() => [
     {
         key: 'today',
         label: 'Hôm nay',
         value: `${today.value.planned}/${today.value.cap}`,
         unit: 'bài',
         hint: `Đã đăng ${today.value.posted}, còn ${Math.max(0, today.value.cap - today.value.planned)} chỗ trong ngày`,
+        tip: 'Số bài đã xếp lịch hôm nay trên tổng chỉ tiêu mỗi ngày của các kênh đang bật.',
         tone: today.value.cap > 0 && today.value.planned >= today.value.cap ? 'success' : 'info',
         icon: IconCalendarEvent,
     },
@@ -91,6 +92,7 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
         value: next.value ? dayjs(next.value.at).format('HH:mm') : '—',
         unit: next.value && !dayjs(next.value.at).isSame(dayjs(), 'day') ? dayjs(next.value.at).format('DD/MM') : undefined,
         hint: next.value ? `${nextLeft.value}${next.value.username ? ` · @${next.value.username}` : ''}` : 'Chưa có bài nào được hẹn',
+        tip: 'Giờ đăng sớm nhất trong tất cả kênh (bài đã hẹn hoặc đang đăng).',
         tone: next.value ? 'info' : 'neutral',
         icon: IconClockPlay,
     },
@@ -100,6 +102,7 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
         value: props.accounts.length ? `${on.value}/${props.accounts.length}` : '0',
         unit: 'kênh đang bật',
         hint: on.value ? 'Kênh bật sẽ tự xếp và hẹn lịch' : 'Bật công tắc ở thẻ kênh để bắt đầu',
+        tip: 'Số kênh đang bật tự động đăng trên tổng số kênh đã thêm.',
         tone: on.value ? 'success' : 'danger',
         icon: IconRobot,
     },
@@ -109,6 +112,7 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
         value: String(props.stock.new_total),
         unit: 'video',
         hint: stockHint.value,
+        tip: 'Video đã duyệt chưa đăng của các sản phẩm đang bật. "Đủ đăng N ngày" = số video chia chỉ tiêu bài mỗi ngày của các kênh bật.',
         tone: props.stock.low ? 'warn' : 'neutral',
         icon: IconMovie,
     },
@@ -127,6 +131,7 @@ const cards = computed<{ key: string; label: string; value: string; unit?: strin
                     i === 0 && 'ring-1 ring-primary/15',
                 )
             "
+            :title="c.tip"
             :data-testid="`fork-auto-kpi-${c.key}`"
         >
             <div class="flex items-center gap-2.5">

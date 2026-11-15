@@ -24,6 +24,7 @@ import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import dayjs from '@/dayjs';
+import { atHandle } from '@/lib/handle';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{ data: NhaData | null }>();
@@ -347,7 +348,7 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                     <span class="truncate text-xs text-muted-foreground"
                         >{{ nextLeft
                         }}<template v-if="next.channel">
-                            · @{{ next.channel }}</template
+                            · {{ atHandle(next.channel) }}</template
                         ></span
                     >
                 </template>

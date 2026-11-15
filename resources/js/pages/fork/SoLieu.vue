@@ -551,6 +551,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             >{{ t.format(kpis[t.key].value) }}</span
                         >
                         <span
+                            v-if="kpis[t.key].delta_pct !== null"
                             :class="
                                 cn(
                                     'flex items-center gap-1 text-[0.7812rem] tabular-nums',
@@ -558,22 +559,17 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                 )
                             "
                         >
-                            <template v-if="kpis[t.key].delta_pct !== null">
-                                <component
-                                    :is="
-                                        kpis[t.key].delta_pct! >= 0
-                                            ? IconArrowUpRight
-                                            : IconArrowDownRight
-                                    "
-                                    class="size-3.5"
-                                />
-                                {{ deltaText(kpis[t.key]) }}
-                                <span class="text-muted-foreground"
-                                    >so với kỳ trước</span
-                                >
-                            </template>
-                            <span v-else class="text-muted-foreground"
-                                >Chưa có kỳ trước để so</span
+                            <component
+                                :is="
+                                    kpis[t.key].delta_pct! >= 0
+                                        ? IconArrowUpRight
+                                        : IconArrowDownRight
+                                "
+                                class="size-3.5"
+                            />
+                            {{ deltaText(kpis[t.key]) }}
+                            <span class="text-muted-foreground"
+                                >so với kỳ trước</span
                             >
                         </span>
                         <svg
@@ -597,6 +593,13 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         </svg>
                     </div>
                 </div>
+                <p
+                    v-if="!loading && primary.every((t) => kpis[t.key].delta_pct === null)"
+                    class="border-t bg-card px-5 py-2 text-[0.7812rem] text-muted-foreground sm:px-6"
+                    data-testid="fork-so-lieu-no-prev"
+                >
+                    Chưa có kỳ trước để so sánh.
+                </p>
                 <div
                     class="grid grid-cols-2 border-t bg-muted/30 sm:grid-cols-3 xl:grid-cols-6"
                 >

@@ -31,6 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{ open: []; retried: [] }>();
 
 const coverFailed = ref(false);
+const coverLoaded = ref(false);
 const line = computed(() => cardLine(props.video));
 
 // Xem trước khi rê chuột: chỉ trên thiết bị có chuột, chờ một nhịp để lướt qua không tải video.
@@ -90,13 +91,27 @@ const retry = () => {
         @mouseenter="enter"
         @mouseleave="leave"
     >
-        <div class="relative aspect-[9/16] w-full overflow-hidden bg-muted">
+        <div
+            :class="
+                cn(
+                    'relative aspect-[9/16] w-full overflow-hidden bg-muted',
+                    video.has_cover && !coverFailed && !coverLoaded && 'animate-pulse',
+                )
+            "
+        >
             <img
                 v-if="video.has_cover && !coverFailed"
                 :src="coverUrl(video.id)"
                 :alt="video.file_name"
                 loading="lazy"
-                class="size-full object-cover"
+                decoding="async"
+                :class="
+                    cn(
+                        'size-full object-cover transition-opacity duration-300',
+                        coverLoaded ? 'opacity-100' : 'opacity-0',
+                    )
+                "
+                @load="coverLoaded = true"
                 @error="coverFailed = true"
             />
             <div

@@ -12,13 +12,14 @@ import { computed, reactive, ref } from 'vue';
 
 import type { AccountRow, HealthChannel, LichChannel } from '@/components/fork/auto/types';
 import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
-import dayjs from '@/dayjs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
+import dayjs from '@/dayjs';
+import { atHandle } from '@/lib/handle';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
@@ -121,7 +122,7 @@ const percent = computed(() =>
 );
 
 const name = computed(
-    () => `@${props.account.username ?? props.account.display_name ?? '—'}`,
+    () => atHandle(props.account.username ?? props.account.display_name) || '—',
 );
 
 const recOpen = ref(false);

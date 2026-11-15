@@ -33,6 +33,7 @@ const emit = defineEmits<{
 }>();
 
 const thumbFailed = ref(false);
+const thumbLoaded = ref(false);
 const fmt = (iso: string | null) => (iso ? dayjs(iso).format('HH:mm DD/MM') : '—');
 
 const status = (): { label: string; tone: Tone } => {
@@ -94,7 +95,12 @@ const onClick = (e: MouseEvent) => {
         "
     >
         <div
-            class="relative aspect-[9/16] w-full cursor-pointer overflow-hidden bg-muted"
+            :class="
+                cn(
+                    'relative aspect-[9/16] w-full cursor-pointer overflow-hidden bg-muted',
+                    !thumbFailed && !video.gone && !thumbLoaded && 'animate-pulse',
+                )
+            "
             @click="onClick"
         >
             <img
@@ -102,8 +108,15 @@ const onClick = (e: MouseEvent) => {
                 :src="`/auto/kho/rieng/video/${video.id}/thumb`"
                 :alt="video.file_name"
                 loading="lazy"
+                decoding="async"
                 draggable="false"
-                class="size-full object-cover"
+                :class="
+                    cn(
+                        'size-full object-cover transition-opacity duration-300',
+                        thumbLoaded ? 'opacity-100' : 'opacity-0',
+                    )
+                "
+                @load="thumbLoaded = true"
                 @error="thumbFailed = true"
             />
             <div

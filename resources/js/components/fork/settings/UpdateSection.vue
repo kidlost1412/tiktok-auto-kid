@@ -18,6 +18,7 @@ import SettingsSection from '@/components/settings/SettingsSection.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { confirm as confirmDialog } from '@/composables/useConfirm';
 
 interface Job {
     state: string;
@@ -135,11 +136,14 @@ const check = (): void =>
         router.post('/settings/cap-nhat/check', {}, opts(done)),
     );
 
-const install = (): void => {
+const install = async (): Promise<void> => {
     if (
-        !window.confirm(
-            `Cập nhật lên bản ${props.latest?.version}? Ứng dụng sẽ tạm dừng vài phút, dữ liệu được sao lưu trước.`,
-        )
+        !(await confirmDialog({
+            title: `Cập nhật lên bản ${props.latest?.version}?`,
+            description:
+                'Ứng dụng sẽ tạm dừng vài phút, dữ liệu được sao lưu trước.',
+            confirmText: 'Cập nhật',
+        }))
     )
         return;
     run('install', (done) =>
@@ -154,11 +158,15 @@ const install = (): void => {
     );
 };
 
-const rollback = (): void => {
+const rollback = async (): Promise<void> => {
     if (
-        !window.confirm(
-            `Quay lại bản ${props.rollback_version}? Dữ liệu giữ nguyên, chỉ đổi mã chương trình.`,
-        )
+        !(await confirmDialog({
+            title: `Quay lại bản ${props.rollback_version}?`,
+            description:
+                'Dữ liệu giữ nguyên, chỉ đổi mã chương trình.',
+            confirmText: 'Quay lại',
+            destructive: true,
+        }))
     )
         return;
     run('rollback', (done) =>

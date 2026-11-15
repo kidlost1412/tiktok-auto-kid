@@ -29,6 +29,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { confirm as confirmDialog } from '@/composables/useConfirm';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
@@ -212,8 +213,15 @@ function onDrop(ev: DragEvent) {
     uploadFiles(Array.from(ev.dataTransfer?.files ?? []));
 }
 
-function removeCover(file: string) {
-    if (!window.confirm('Xoá ảnh bìa này?')) {
+async function removeCover(file: string) {
+    if (
+        !(await confirmDialog({
+            title: 'Xoá ảnh bìa này?',
+            description: 'Ảnh bìa sẽ bị xoá khỏi thư viện cá nhân hoá.',
+            confirmText: 'Xoá ảnh',
+            destructive: true,
+        }))
+    ) {
         return;
     }
 
@@ -681,19 +689,26 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                     <label
                         class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
                     >
-                        <span>Mỗi bài chọn ngẫu nhiên</span>
-                        <Input
-                            v-model.number="pick"
-                            type="number"
-                            min="0"
-                            :max="Math.max(tagCount, 0)"
-                            class="h-9 w-20 text-center"
-                            :disabled="tagCount === 0"
-                        />
-                        <span>hashtag</span>
-                        <span class="text-xs text-muted-foreground"
-                            >(0 = dùng tất cả {{ tagCount }} hashtag)</span
-                        >
+                        <template v-if="tagCount === 0">
+                            <span class="text-muted-foreground"
+                                >Chưa có hashtag nào. Thêm hashtag ở trên để
+                                chọn ngẫu nhiên cho từng bài.</span
+                            >
+                        </template>
+                        <template v-else>
+                            <span>Mỗi bài chọn ngẫu nhiên</span>
+                            <Input
+                                v-model.number="pick"
+                                type="number"
+                                min="0"
+                                :max="tagCount"
+                                class="h-9 w-20 text-center"
+                            />
+                            <span>hashtag</span>
+                            <span class="text-xs text-muted-foreground"
+                                >(0 = dùng tất cả {{ tagCount }} hashtag)</span
+                            >
+                        </template>
                     </label>
                 </section>
 

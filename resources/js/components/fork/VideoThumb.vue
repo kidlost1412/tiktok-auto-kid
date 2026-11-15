@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Ảnh bìa video trong kho. Chưa có ảnh (hoặc lỗi tải) thì hiện khung xám có biểu tượng.
+// Ảnh bìa video trong kho. Đang tải thì có khung nhấp nháy; chưa có ảnh (hoặc lỗi tải) thì hiện khung xám có biểu tượng.
 import { IconMovie } from '@tabler/icons-vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 import { cn } from '@/lib/utils';
 
@@ -11,17 +11,43 @@ const props = defineProps<{
 }>();
 
 const failed = ref(false);
+const loaded = ref(false);
+
+watch(
+    () => props.id,
+    () => {
+        failed.value = false;
+        loaded.value = false;
+    },
+);
 </script>
 
 <template>
-    <img
+    <span
         v-if="props.id && !failed"
-        :src="`/auto/kho/video/${props.id}/cover`"
-        alt=""
-        loading="lazy"
-        :class="cn('shrink-0 rounded-md bg-muted object-cover', props.class)"
-        @error="failed = true"
-    />
+        :class="
+            cn(
+                'relative block shrink-0 overflow-hidden rounded-md bg-muted',
+                !loaded && 'animate-pulse',
+                props.class,
+            )
+        "
+    >
+        <img
+            :src="`/auto/kho/video/${props.id}/cover`"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            :class="
+                cn(
+                    'size-full object-cover transition-opacity duration-300',
+                    loaded ? 'opacity-100' : 'opacity-0',
+                )
+            "
+            @load="loaded = true"
+            @error="failed = true"
+        />
+    </span>
     <div
         v-else
         :class="
