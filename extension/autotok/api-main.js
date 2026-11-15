@@ -495,21 +495,57 @@
     }
   }
 
-  // ---- v1.4.6 "Đổi giờ": delete ONE scheduled post, then VERIFY with item_list that it is gone (PROTOCOL.md section 12) ----
-  // The ONLY place that sends a delete to TikTok. NOT DOCUMENTED by TikTok and not captured from Studio in this repo: this is the
-  // tiktok.com web endpoint the profile page's "Delete" uses (POST /api/aweme/delete/?aweme_id=<id>&aid=1988), sent from this
-  // MAIN world so the page's own hooks can sign it. Whatever it answers, the caller decides ONLY from the item list afterwards.
-  // -> {sent, http, status_code, status_msg, endpoint, error}
-  async function deleteScheduledItemOnTikTok(itemId) {
-    const endpoint = '/api/aweme/delete/';
-    const url = endpoint + '?aweme_id=' + encodeURIComponent(itemId) + '&aid=' + AID;
-    try {
-      const r = await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'aweme_id=' + encodeURIComponent(itemId) });
-      let j = null; try { j = JSON.parse(await r.text()); } catch (_) { /* non-JSON */ }
-      return { sent: true, http: r.status, status_code: j && j.status_code != null ? Number(j.status_code) : null, status_msg: j && typeof j.status_msg === 'string' ? j.status_msg.slice(0, 120) : '', endpoint };
-    } catch (e) {
-      return { sent: true, http: null, status_code: null, status_msg: '', endpoint, error: String(e && e.message).slice(0, 120) };   // may have reached TikTok
+  // ---- v1.4.7 "Đổi giờ": delete ONE scheduled post, then VERIFY with item_list that it is gone (PROTOCOL.md section 12) ----
+  // The ONLY place that sends a delete to TikTok. Studio's own delete is `DELETE /tiktok/creator/item/delete/v1/?item_id=<id>`
+  // (studio main.js: tiktok_creator_item_delete_v1), but a hand-made request to it gets the HTML app shell back (Studio's request
+  // client adds what is needed; 1.4.6 used the guessed /api/aweme/delete/ and got HTTP 403). So we press Studio's own buttons on
+  // this /tiktokstudio/content page: row of the item (link /video/<id>) -> "⋯" -> Delete -> confirm "Delete". Checked live 15/11/2026.
+  // Whatever happens, the caller decides ONLY from the item list afterwards.
+  // -> {sent, endpoint, step, error}
+  const DEL_WORD = /^(delete|xóa|xoá)$/i;
+  const visible = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const waitFor = async (fn, ms) => { const t = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t > ms) return null; await sleep(250); } };
+  function rowOf(itemId) {
+    const a = Array.from(document.querySelectorAll('a[href*="/video/"]')).find((x) => (x.getAttribute('href') || '').split('?')[0].endsWith('/video/' + itemId));
+    if (!a) return null;
+    let row = a.closest('[data-tt="components_RowLayout_FlexRow"]');
+    if (!row) { row = a; while (row && !row.querySelector('button[data-tt="components_ActionCell_Clickable"]')) row = row.parentElement; }
+    return row && row.querySelectorAll('a[href*="/video/"]').length === 1 ? row : null;
+  }
+  async function findRow(itemId) {
+    const first = await waitFor(() => document.querySelector('a[href*="/video/"]'), 25000);
+    if (!first) return null;
+    for (let i = 0; i < 25; i++) {
+      const row = rowOf(itemId);
+      if (row) return row;
+      const links = document.querySelectorAll('a[href*="/video/"]');
+      const last = links[links.length - 1];
+      if (last) last.scrollIntoView({ block: 'end' });
+      window.scrollBy(0, 1200);
+      await sleep(1200);
     }
+    return rowOf(itemId);
+  }
+  async function deleteScheduledItemOnTikTok(itemId) {
+    const endpoint = 'studio-ui:/tiktok/creator/item/delete/v1/';
+    const fail = (step, error) => ({ sent: false, endpoint, step, error });
+    const row = await findRow(itemId);
+    if (!row) return fail('row', 'item row not found on Studio content page');
+    row.scrollIntoView({ block: 'center' });
+    await sleep(400);
+    const btns = Array.from(row.querySelectorAll('button[data-tt="components_ActionCell_Clickable"]'));
+    const more = btns[btns.length - 1];
+    if (!more) return fail('more', 'no ⋯ button in row');
+    const before = new Set(Array.from(document.querySelectorAll('*')).filter((e) => DEL_WORD.test((e.textContent || '').trim()) && e.children.length === 0));
+    more.click();
+    const item = await waitFor(() => Array.from(document.querySelectorAll('*')).find((e) => e.children.length === 0 && DEL_WORD.test((e.textContent || '').trim()) && visible(e) && !row.contains(e) && !before.has(e)), 6000);
+    if (!item) return fail('menu', 'Delete menu item not shown');
+    (item.closest('[role="menuitem"],li,button,[tabindex]') || item).click();
+    const confirm = await waitFor(() => Array.from(document.querySelectorAll('button')).find((b) => DEL_WORD.test((b.textContent || '').trim()) && visible(b) && !row.contains(b) && !b.contains(item)), 6000);
+    if (!confirm) return fail('confirm', 'confirm dialog not shown');
+    confirm.click();
+    await sleep(1500);
+    return { sent: true, endpoint, step: 'confirmed' };
   }
 
   let deleting = false;
@@ -563,10 +599,11 @@
       const pre = await scan(1);
       if (!pre.ok) return done({ outcome: 'failed', reason: 'list_failed', delete_sent: false });
       if (!pre.st.found) return done({ outcome: 'failed', reason: 'not_found', delete_sent: false, checks: pre.st.pages });
-      const chk = S.scheduledCheck(pre.st.found, expect, Math.floor(Date.now() / 1000), 600, 900);
+      const chk = S.scheduledCheck(pre.st.found, expect, Math.floor(Date.now() / 1000), 180, 900);
       if (!chk.ok) return done({ outcome: 'failed', reason: 'not_scheduled', detail: chk.reason, delete_sent: false });
-      // 4. the single delete call
+      // 4. the single delete (Studio's own buttons)
       const del = await deleteScheduledItemOnTikTok(itemId);
+      if (!del.sent) return done({ outcome: 'failed', reason: 'ui_failed', delete_sent: false, endpoint: del.endpoint, detail: (del.step || '') + ': ' + (del.error || '') });
       sent = true;
       // 5. verify: the item must be absent from a scan that reaches at least one page past where it was found
       let last = null, foundAgain = false;

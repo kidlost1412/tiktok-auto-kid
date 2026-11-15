@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Fork\AutoPost\Scheduling;
 
 use App\Enums\Post\Status as PostStatus;
-use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\Reschedule;
-use App\Fork\AutoPost\Rieng\RiengSchedule;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Listeners\ChromePostWatcher;
 use App\Fork\Chrome\Models\ChromeClient;
@@ -37,16 +35,19 @@ use Throwable;
  *     kết quả "đã xoá, đã xác minh" mới đặt giờ mới và để bộ giao bài tải lên lại. Không xác minh được thì không đổi gì:
  *     lịch cũ trên TikTok vẫn còn hiệu lực. Không bao giờ để bài thành 0 hoặc 2 bản.
  *
- * Luật giờ mới: cách bây giờ >= Planner::MIN_LEAD, không quá ChromeJobs::SCHEDULE_MAX_AHEAD, nằm trong khung giờ đăng của
- * kênh (giờ địa phương của kênh) và cách các bài khác CÙNG kênh >= Planner::gapSeconds().
+ * Luật giờ mới (chỉ luật của TikTok): cách bây giờ >= NEW_MIN_LEAD, không quá ChromeJobs::SCHEDULE_MAX_AHEAD. App KHÔNG ép
+ * khung giờ đăng hay khoảng cách giữa các bài cùng kênh; chỉ báo giờ các bài khác của kênh (channel_times) để chủ app tự quyết.
  */
 final class Reschedules
 {
     /** Bài hẹn sẵn trên TikTok phải còn cách giờ đăng cũ ít nhất ngần này mới cho xoá (xoá sát giờ có thể đụng bài đã đăng). */
-    public const int OLD_MIN_AHEAD = 60 * 60;
+    public const int OLD_MIN_AHEAD = 5 * 60;
 
     /** Việc xoá chỉ được giao/nhận khi giờ đăng cũ còn xa hơn ngần này. */
-    public const int OFFER_UNTIL = 20 * 60;
+    public const int OFFER_UNTIL = 3 * 60;
+
+    /** Giờ mới phải cách bây giờ ít nhất ngần này (TikTok đòi >= 15 phút, cộng thời gian tải video lên). */
+    public const int NEW_MIN_LEAD = 20 * 60;
 
     /** Chrome không nhận việc xoá trong ngần này giây thì yêu cầu hết hạn (không đổi gì). */
     public const int PENDING_TTL = 15 * 60;
@@ -70,7 +71,8 @@ final class Reschedules
         'not_deleted' => 'TikTok chưa xoá bài hẹn cũ (vẫn thấy trong danh sách bài) — giữ nguyên lịch cũ, chưa đổi giờ.',
         'identity' => 'Chrome đang đăng nhập một tài khoản TikTok khác — không xoá gì, giữ nguyên lịch cũ.',
         'list_failed' => 'Chrome không đọc được danh sách bài của TikTok Studio — chưa xoá gì, giữ nguyên lịch cũ.',
-        'delete_failed' => 'TikTok từ chối lệnh xoá bài hẹn cũ — giữ nguyên lịch cũ, chưa đổi giờ.',
+        'ui_failed' => 'Chrome không bấm được nút Xoá trong TikTok Studio (không thấy bài hoặc nút) — chưa xoá gì, giữ nguyên lịch cũ.',
+        'delete_failed' =>'TikTok từ chối lệnh xoá bài hẹn cũ — giữ nguyên lịch cũ, chưa đổi giờ.',
         'unknown' => 'Đã gửi lệnh xoá nhưng không kiểm lại được danh sách bài — CHƯA đổi giờ. Hãy mở TikTok Studio xem bài hẹn cũ còn hay không trước khi làm gì thêm.',
     ];
 
@@ -147,6 +149,7 @@ final class Reschedules
             'reason' => $info['reason'],
             'current_at' => ($info['post']?->scheduled_at ?? $video->scheduled_for)?->toIso8601String(),
             'rules' => $this->rules($video),
+            'channel_times' => $this->channelTimes($video, $info['post']),
             'request' => $this->latestSummary($video),
         ];
     }
@@ -154,16 +157,31 @@ final class Reschedules
     /** @return array<string, mixed> */
     public function rules(AutoVideo $video): array
     {
-        [$start, $end] = $this->window((string) $video->social_account_id);
-
         return [
             'timezone' => $this->tz((string) $video->social_account_id)->getName(),
-            'window_start' => $start,
-            'window_end' => $end,
-            'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60),
-            'min_lead_minutes' => intdiv(Planner::MIN_LEAD, 60),
+            'min_lead_minutes' => intdiv(self::NEW_MIN_LEAD, 60),
             'max_ahead_hours' => intdiv(ChromeJobs::SCHEDULE_MAX_AHEAD, 3600),
         ];
+    }
+
+    /**
+     * Giờ (ISO) các bài khác CÙNG kênh trong khoảng -2..+12 ngày quanh bây giờ, để hộp đổi giờ báo bài trước/sau.
+     *
+     * @return list<string>
+     */
+    public function channelTimes(AutoVideo $video, ?Post $post = null): array
+    {
+        $post ??= $video->post_id ? Post::query()->find($video->post_id) : null;
+        $now = CarbonImmutable::now();
+        $from = $now->subDays(2);
+        $to = $now->addSeconds(ChromeJobs::SCHEDULE_MAX_AHEAD)->addDays(2);
+
+        $ts = $post !== null
+            ? $this->busy($video, $post, $from, $to)
+            : $this->busyFor($video, null, $from, $to);
+        sort($ts);
+
+        return array_map(fn (int $t): string => CarbonImmutable::createFromTimestampUTC($t)->toIso8601String(), array_values(array_unique($ts)));
     }
 
     /**
@@ -215,49 +233,17 @@ final class Reschedules
     {
         $now ??= CarbonImmutable::now();
         $at = $at->utc()->second(0);
-        $tz = $this->tz((string) $video->social_account_id);
-        $local = $at->setTimezone($tz);
 
         if ($post->scheduled_at !== null && CarbonImmutable::instance($post->scheduled_at)->utc()->second(0)->equalTo($at)) {
             return 'Giờ mới trùng giờ hiện tại của bài.';
         }
 
-        if ($at->lessThan($now->addSeconds(Planner::MIN_LEAD))) {
-            return 'Giờ mới phải cách bây giờ ít nhất '.intdiv(Planner::MIN_LEAD, 60).' phút (Chrome cần thời gian tải video lên TikTok).';
+        if ($at->lessThan($now->addSeconds(self::NEW_MIN_LEAD))) {
+            return 'Giờ mới phải cách bây giờ ít nhất '.intdiv(self::NEW_MIN_LEAD, 60).' phút (TikTok đòi hẹn trước tối thiểu 15 phút, Chrome cần thời gian tải video lên).';
         }
 
         if ($at->greaterThan($now->addSeconds(ChromeJobs::SCHEDULE_MAX_AHEAD))) {
             return 'TikTok chỉ cho hẹn trong vòng 10 ngày — giờ mới tối đa là 9 ngày rưỡi kể từ bây giờ.';
-        }
-
-        // Cùng luật khung giờ với Kho riêng (RiengSchedule: tính cả đúng giờ kết thúc), chỉ đọc.
-        $auto = AutoAccount::query()->find((string) $video->social_account_id);
-
-        if ($auto !== null) {
-            $sched = app(RiengSchedule::class);
-
-            if (! $sched->inWindow($auto, $at->getTimestamp())) {
-                return 'Giờ mới phải nằm trong khung giờ đăng của kênh: '.$sched->windowLabel($auto).' (giờ '.$tz->getName().').';
-            }
-        } else {
-            [$start, $end] = $this->window((string) $video->social_account_id);
-            $minute = $local->hour * 60 + $local->minute;
-
-            if ($minute < $start * 60 || $minute > $end * 60) {
-                return sprintf('Giờ mới phải nằm trong khung giờ đăng của kênh: %02d:00–%02d:00 (giờ %s).', $start, $end, $tz->getName());
-            }
-        }
-
-        $gap = app(Planner::class)->gapSeconds();
-
-        foreach ($this->busy($video, $post, $at->subSeconds($gap), $at->addSeconds($gap)) as $ts) {
-            if (abs($ts - $at->getTimestamp()) < $gap) {
-                return sprintf(
-                    'Quá gần một bài khác của kênh lúc %s — hai bài cùng kênh phải cách nhau ít nhất %d phút.',
-                    CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->format('H:i d/m'),
-                    intdiv($gap, 60),
-                );
-            }
         }
 
         return null;
@@ -645,16 +631,6 @@ final class Reschedules
         return $row;
     }
 
-    /** @return array{0: int, 1: int} */
-    private function window(string $accountId): array
-    {
-        $auto = AutoAccount::query()->find($accountId);
-        $start = max(0, min(23, (int) ($auto?->window_start ?? 6)));
-        $end = max($start + 1, min(24, (int) ($auto?->window_end ?? 23)));
-
-        return [$start, $end];
-    }
-
     private function tz(string $accountId): DateTimeZone
     {
         $name = SocialAccount::query()->whereKey($accountId)->value('timezone');
@@ -673,11 +649,17 @@ final class Reschedules
      */
     private function busy(AutoVideo $video, Post $post, CarbonImmutable $from, CarbonImmutable $to): array
     {
+        return $this->busyFor($video, $post, $from, $to);
+    }
+
+    /** @return list<int> */
+    private function busyFor(AutoVideo $video, ?Post $post, CarbonImmutable $from, CarbonImmutable $to): array
+    {
         $account = (string) $video->social_account_id;
 
         $videos = AutoVideo::query()->where('social_account_id', $account)->whereKeyNot($video->id)
             ->whereIn('status', self::COUNTED)->whereBetween('scheduled_for', [$from, $to])->pluck('scheduled_for');
-        $posts = Post::query()->where('social_account_id', $account)->whereKeyNot($post->id)
+        $posts = Post::query()->where('social_account_id', $account)->when($post !== null, fn ($q) => $q->whereKeyNot($post->id))
             ->where('status', PostStatus::Scheduled)->whereBetween('scheduled_at', [$from, $to])->pluck('scheduled_at');
         $pending = Reschedule::query()->where('social_account_id', $account)->where('auto_video_id', '!=', $video->id)
             ->whereIn('state', Reschedule::OPEN)->whereBetween('new_at', [$from, $to])->pluck('new_at');

@@ -63,7 +63,10 @@ final class PostBuilder
             : ($product !== null ? app(CoverStore::class)->pick($product) : null);
         $content = HubText::compose($final['caption'], $final['hashtags']);
 
-        if ($content === '') {
+        // Kho riêng: TikTok cho hẹn giờ không caption, nên bài này được phép rỗng (cờ fork_caption_optional trong meta).
+        $optional = ($caption['source'] ?? '') === 'rieng';
+
+        if ($content === '' && ! $optional) {
             throw new CaptionRefused('Caption rỗng.');
         }
 
@@ -88,7 +91,7 @@ final class PostBuilder
         $storedPath = null;
 
         try {
-            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, &$storedPath): Post {
+            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, $optional, &$storedPath): Post {
                 $post = $workspace->posts()->forceCreate([
                     'post_group_id' => (string) Str::uuid7(),
                     'user_id' => $owner->id,
@@ -110,6 +113,7 @@ final class PostBuilder
                         'allow_stitch' => false,
                         // Khoá riêng của app: video nguồn và sản phẩm giỏ hàng.
                         'fork_auto_video_id' => $video->id,
+                        ...($optional ? ['fork_caption_optional' => true] : []),
                         'fork_shop_product_id' => (string) $link->shop_product_id,
                         'fork_shop_product_name' => $cartName,
                         // tên giỏ lấy từ đâu: 'video' (hub đặt riêng) hay 'link' (tên của liên kết) — đổi liên kết thì chỉ tên 'link' đổi theo

@@ -137,7 +137,7 @@ test('A: video Kho riêng cũng đổi giờ được', function (): void {
     expect($video->refresh()->scheduled_for->equalTo(rsAt(11)))->toBeTrue();
 });
 
-test('từ chối: Chrome đang tải lên, quá gần, ngoài khung giờ, sát bài khác cùng kênh; kênh khác thì không sao', function (): void {
+test('từ chối chỉ khi: Chrome đang tải lên, quá sát bây giờ, quá 10 ngày; gần bài khác hay ngoài khung giờ thì vẫn cho đổi', function (): void {
     [$post, $video] = rsPost($this, rsAt(10));
     $job = rsJob($post, 'uploading');
 
@@ -145,22 +145,36 @@ test('từ chối: Chrome đang tải lên, quá gần, ngoài khung giờ, sát
     expect($post->refresh()->scheduled_at->equalTo(rsAt(10)))->toBeTrue();
     $job->update(['state' => 'revoked', 'note' => ChromePostWatcher::EDIT_NOTE]);
 
-    rsMove($this, $video, CarbonImmutable::now()->addMinutes(30))->assertStatus(422)->assertJsonFragment(['ok' => false])
-        ->assertJsonPath('message', fn ($m) => str_contains($m, '45 phút'));
+    rsMove($this, $video, CarbonImmutable::now()->addMinutes(10))->assertStatus(422)->assertJsonFragment(['ok' => false])
+        ->assertJsonPath('message', fn ($m) => str_contains($m, '20 phút'));
 
+    // Ngoài khung giờ đăng của kênh: không còn bị chặn.
     AutoAccount::query()->whereKey($this->social->id)->update(['window_start' => 8, 'window_end' => 20]);
-    rsMove($this, $video, rsAt(21))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'khung giờ'));
+    rsMove($this, $video, rsAt(21))->assertOk()->assertJson(['state' => 'done']);
+    expect($post->refresh()->scheduled_at->equalTo(rsAt(21)))->toBeTrue();
     AutoAccount::query()->whereKey($this->social->id)->update(['window_start' => 0, 'window_end' => 24]);
 
+    // Sát bài khác cùng kênh (10 phút): vẫn cho.
     rsPost($this, rsAt(14));
-    rsMove($this, $video, rsAt(14, 10))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, '20 phút'));
+    rsMove($this, $video, rsAt(14, 10))->assertOk()->assertJson(['state' => 'done']);
 
-    $other = SocialAccount::factory()->tiktok()->create(['workspace_id' => $this->workspace->id, 'status' => AccountStatus::Connected, 'timezone' => 'Asia/Ho_Chi_Minh']);
-    rsPost($this, rsAt(16), 'hub', $other);
-    rsMove($this, $video, rsAt(16))->assertOk()->assertJson(['state' => 'done']);
+    // Giờ mới cách bây giờ 25 phút (>= 20): cho.
+    rsMove($this, $video, CarbonImmutable::now()->addMinutes(25))->assertOk();
 
     rsMove($this, $video, CarbonImmutable::now()->addDays(11))->assertStatus(422);
-    expect($post->refresh()->scheduled_at->equalTo(rsAt(16)))->toBeTrue();
+});
+
+test('describe trả channel_times: giờ các bài khác cùng kênh, không có bài của kênh khác hay của chính bài này', function (): void {
+    [, $video] = rsPost($this, rsAt(10));
+    rsPost($this, rsAt(14));
+    $other = SocialAccount::factory()->tiktok()->create(['workspace_id' => $this->workspace->id, 'status' => AccountStatus::Connected, 'timezone' => 'Asia/Ho_Chi_Minh']);
+    rsPost($this, rsAt(16), 'hub', $other);
+
+    $res = $this->actingAs($this->owner)->getJson("/auto/videos/{$video->id}/doi-gio")->assertOk();
+    $times = collect($res->json('channel_times'))->map(fn ($t) => CarbonImmutable::parse($t)->getTimestamp())->all();
+
+    expect($times)->toBe([rsAt(14)->getTimestamp()])
+        ->and($res->json('rules.min_lead_minutes'))->toBe(20);
 });
 
 test('B: bài đã hẹn trên TikTok chỉ đổi giờ khi Chrome báo đã xoá VÀ đã kiểm lại', function (): void {
@@ -242,7 +256,7 @@ test('B: từ chối khi thiếu item id, sát giờ cũ hoặc Chrome tắt; y�
     rsMove($this, $video, rsAt(18))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Chrome'));
     $this->client->update(['last_seen_at' => now()]);
 
-    [$soon, $soonVideo] = rsPost($this, CarbonImmutable::now()->addMinutes(40));
+    [$soon, $soonVideo] = rsPost($this, CarbonImmutable::now()->addMinutes(3));
     rsJob($soon, 'posted');
     rsMove($this, $soonVideo, rsAt(19))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'sắp tới giờ'));
 
@@ -269,7 +283,7 @@ test('Lịch đăng hiện bài đã hẹn trên TikTok (hub và Kho riêng) kè
         ->and($items[$riengVideo->id]['can_reschedule'])->toBeTrue();
 
     $this->actingAs($this->owner)->getJson("/auto/videos/{$hubVideo->id}/doi-gio")->assertOk()
-        ->assertJson(['kind' => 'tiktok', 'rules' => ['window_start' => 0, 'window_end' => 24, 'gap_minutes' => 20, 'min_lead_minutes' => 45]]);
+        ->assertJson(['kind' => 'tiktok', 'rules' => ['min_lead_minutes' => 20]]);
 });
 
 // ---------------------------------------------------------------- Sửa bài / bỏ xếp lịch (PostEdits)

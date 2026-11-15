@@ -280,16 +280,12 @@ final class RiengBatch
             $row['caption'] = $caption;
             $row['hashtags'] = $tags;
 
-            if ($caption === '') {
-                $row['status'] = 'error';
-                $row['messages'][] = 'Chưa có caption.';
-            } else {
-                $final = app(Hashtags::class)->apply($caption, $tags, $product);
+            // Caption và hashtag có thể trống: TikTok cho hẹn giờ bài không có chữ.
+            $final = app(Hashtags::class)->apply($caption, $tags, $product);
 
-                if (mb_strlen(HubText::compose($final['caption'], $final['hashtags'])) > HubText::MAX_CHARS) {
-                    $row['status'] = 'error';
-                    $row['messages'][] = 'Caption dài quá '.HubText::MAX_CHARS.' ký tự (giới hạn TikTok).';
-                }
+            if (mb_strlen(HubText::compose($final['caption'], $final['hashtags'])) > HubText::MAX_CHARS) {
+                $row['status'] = 'error';
+                $row['messages'][] = 'Caption dài quá '.HubText::MAX_CHARS.' ký tự (giới hạn TikTok).';
             }
 
             $ownToken = filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : null;

@@ -20,6 +20,7 @@ import type { ChannelOption } from '@/components/fork/kho/ChannelPicker.vue';
 import { coverUrl } from '@/components/fork/kho/kho';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import { toneClasses } from '@/components/fork/shared/status';
+import { timeNotice } from '@/components/fork/shared/timeNotice';
 import { loadVideo } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -32,12 +33,10 @@ interface EditInfo {
     reason: string | null;
     current_at: string | null;
     rules: {
-        window_start: number;
-        window_end: number;
-        gap_minutes: number;
         min_lead_minutes: number;
         max_ahead_hours: number;
     } | null;
+    channel_times?: string[];
     request: { state: string; open: boolean; message: string; action?: string } | null;
     account_id: string | null;
     caption: string;
@@ -92,7 +91,7 @@ const channelOptions = computed<ChannelOption[]>(() =>
 );
 
 const minAt = computed(() => {
-    const lead = info.value?.rules?.min_lead_minutes ?? 45;
+    const lead = info.value?.rules?.min_lead_minutes ?? 20;
     const m = dayjs().add(lead + 1, 'minute');
 
     return m.minute(Math.ceil(m.minute() / 5) * 5).second(0).format(FORMAT);
@@ -101,13 +100,20 @@ const minAt = computed(() => {
 const rulesText = computed(() => {
     const r = info.value?.rules;
 
-    if (!r) {
-        return '';
+    return r ? `Cách bây giờ ít nhất ${r.min_lead_minutes} phút, tối đa khoảng ${Math.floor(r.max_ahead_hours / 24)} ngày tới.` : '';
+});
+
+const nowTick = ref(Date.now());
+const clock = setInterval(() => (nowTick.value = Date.now()), 30000);
+// Chỉ báo bài trước/sau khi vẫn ở kênh hiện tại (đổi kênh thì không có dữ liệu giờ của kênh kia).
+const notice = computed(() => {
+    const i = info.value;
+
+    if (!i || !at.value || (i.current_at && dayjs(i.current_at).format(FORMAT) === at.value)) {
+        return null;
     }
 
-    const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
-
-    return `Trong khung ${hh(r.window_start)}–${hh(r.window_end)} của kênh, cách bây giờ ít nhất ${r.min_lead_minutes} phút và cách bài khác cùng kênh ít nhất ${r.gap_minutes} phút.`;
+    return timeNotice(at.value, account.value && account.value !== i.account_id ? [] : (i.channel_times ?? []), nowTick.value);
 });
 
 const splitTags = (s: string) =>
@@ -130,7 +136,10 @@ const stop = () => {
     }
 };
 
-onBeforeUnmount(stop);
+onBeforeUnmount(() => {
+    stop();
+    clearInterval(clock);
+});
 
 async function load(): Promise<EditInfo | null> {
     try {
@@ -458,6 +467,15 @@ watch(shownCover, () => {
                     </div>
                 </div>
                 <span v-if="rulesText" class="-mt-1.5 text-xs text-muted-foreground">{{ rulesText }}</span>
+                <span
+                    v-if="notice"
+                    :class="cn('-mt-1.5 rounded-lg border px-2.5 py-2 text-xs leading-relaxed', notice.tight ? toneClasses.warn.box : 'border-border bg-muted/40 text-muted-foreground')"
+                    data-testid="fork-viewer-edit-notice"
+                    aria-live="polite"
+                >
+                    <span class="block">{{ notice.fromNow }}</span>
+                    <span v-if="notice.before || notice.after" class="block">{{ [notice.before, notice.after].filter(Boolean).join(' · ') }}</span>
+                </span>
 
                 <label class="flex flex-col gap-1.5 text-sm">
                     <span class="flex items-baseline justify-between gap-2">

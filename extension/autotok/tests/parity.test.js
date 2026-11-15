@@ -61,8 +61,9 @@ test('caption length rule counts code points (Python len), not UTF-16 units', ()
   assert.match(L.validateCaption('é'.repeat(2201)), /at most 2200/);
   assert.equal(L.validateCaption('🌸'.repeat(2200)), null);           // 4400 UTF-16 units but 2200 code points
   assert.match(L.validateCaption('🌸'.repeat(2201)), /at most 2200/);
-  assert.equal(L.validateCaption('  　 '), 'caption is required');
-  assert.equal(L.validateCaption(''), 'caption is required');
+  assert.equal(L.validateCaption('  　 '), null);   // 1.4.7: blank caption allowed
+  assert.equal(L.validateCaption(''), null);
+  assert.equal(L.validateCaption(null), 'caption must be a string');
   assert.equal(L.validateCaption('﻿'), null);                    // JS trim() would reject, Python strip() keeps U+FEFF
 });
 
@@ -118,7 +119,7 @@ test('validateJob: public/private immediate and public scheduled pass; private s
   assert.equal(L.validateJob(job({ visibility: 'private' }), now).vis, 1);
   assert.equal(L.validateJob(job({ schedule_unix: now + 900 }), now).scheduleUnix, now + 900);
   assert.equal(L.validateJob(job({ schedule_time: new Date((now + 3600) * 1000).toISOString() }), now).scheduleUnix, now + 3600);
-  for (const bad of [{ visibility: 'private', schedule_unix: now + 3600 }, { visibility: 'friends' }, { schedule_unix: now + 899 }, { schedule_unix: now + 30 * 86400 + 1 }, { caption: '  ' }, { schedule_time: 'nope' }]) {
+  for (const bad of [{ visibility: 'private', schedule_unix: now + 3600 }, { visibility: 'friends' }, { schedule_unix: now + 899 }, { schedule_unix: now + 30 * 86400 + 1 }, { caption: null }, { schedule_time: 'nope' }]) {
     assert.throws(() => L.validateJob(job(bad), now), (e) => e.code === 'validate', JSON.stringify(bad));
   }
 });

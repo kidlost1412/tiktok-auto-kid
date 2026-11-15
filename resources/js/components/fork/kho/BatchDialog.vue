@@ -2,7 +2,7 @@
 // Đăng hàng loạt video riêng: chọn kênh + sản phẩm giỏ hàng + caption; giờ đăng luôn được tự đề xuất (sửa thẳng từng giờ được), xem trước lịch và xác nhận.
 // Ảnh bìa đã chọn được nhớ (theo video, theo kênh + sản phẩm, theo kênh) để lần sau tự dùng lại.
 import { router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import ChannelPicker from '@/components/fork/kho/ChannelPicker.vue';
 import ClipThumb from '@/components/fork/kho/ClipThumb.vue';
@@ -13,6 +13,7 @@ import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import HashtagChips from '@/components/fork/shared/HashtagChips.vue';
 import type { TagSuggestion } from '@/components/fork/shared/hashtags';
 import MediaLightbox from '@/components/fork/shared/MediaLightbox.vue';
+import { humanMinutes } from '@/components/fork/shared/timeNotice';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -126,6 +127,30 @@ const slotInfo = ref<Record<number, { status: ProposeRow['status']; messages: st
 const slotsBusy = ref(false);
 const slotProblem = ref('');
 const rules = ref<{ window: string | null; gap: number }>({ window: null, gap: 20 });
+// Khoảng cách giờ (tính ngay trên máy, cập nhật khi sửa giờ): còn bao lâu nữa, và cách bài trước cùng kênh bao nhiêu phút.
+const nowTick = ref(Date.now());
+const clock = setInterval(() => (nowTick.value = Date.now()), 30000);
+onBeforeUnmount(() => clearInterval(clock));
+const spacing = computed(() => {
+    const stamps = props.items
+        .map((it) => ({ id: it.id, t: times.value[it.id] ? dayjs(times.value[it.id]).valueOf() : NaN }))
+        .filter((r) => Number.isFinite(r.t))
+        .sort((a, b) => a.t - b.t);
+    const out: Record<number, { left: string; gap: string | null; tight: boolean }> = {};
+
+    stamps.forEach((r, i) => {
+        const diff = Math.round((r.t - nowTick.value) / 60000);
+        const prev = i > 0 ? Math.round((r.t - stamps[i - 1].t) / 60000) : null;
+
+        out[r.id] = {
+            left: diff >= 0 ? `còn ${humanMinutes(diff)} nữa` : 'đã quá giờ',
+            gap: prev !== null ? `cách bài trước ${humanMinutes(prev)}` : null,
+            tight: prev !== null && prev < 20,
+        };
+    });
+
+    return out;
+});
 const overrides = ref<Record<number, { caption: string; tags: string; open: boolean }>>({});
 const step = ref<'form' | 'preview' | 'result'>('form');
 const plan = ref<Plan | null>(null);
@@ -604,7 +629,7 @@ const areaCls =
             <DialogHeader class="shrink-0 border-b px-5 pt-5 pr-14 pb-4 sm:px-6">
                 <DialogTitle class="text-lg">Đăng hàng loạt · {{ items.length }} video</DialogTitle>
                 <DialogDescription>
-                    Chọn kênh và sản phẩm giỏ hàng, viết caption, rồi hẹn giờ đăng.
+                    Chọn kênh và sản phẩm giỏ hàng, viết caption (không bắt buộc), rồi hẹn giờ đăng.
                 </DialogDescription>
             </DialogHeader>
 
@@ -648,7 +673,7 @@ const areaCls =
                         </Callout>
 
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-sm font-medium" for="rieng-caption">Caption chung cho cả lượt</label>
+                            <label class="text-sm font-medium" for="rieng-caption">Caption chung cho cả lượt <span class="font-normal text-muted-foreground">(có thể để trống)</span></label>
                             <textarea id="rieng-caption" v-model="caption" :class="areaCls" placeholder="Viết nội dung bài đăng…" data-testid="fork-rieng-caption" />
                             <label class="mt-1 text-sm font-medium" for="rieng-tags">Hashtag chung</label>
                             <HashtagChips v-model="tags" input-id="rieng-tags" :suggestions="hashtagSuggestions ?? []" placeholder="Ví dụ: #nongnghiep #nanodong" testid="fork-rieng-tags" />
@@ -755,6 +780,13 @@ const areaCls =
                                                 <span v-else-if="times[it.id]" class="text-xs text-muted-foreground">App đề xuất</span>
                                                 <Button v-if="edited[it.id]" type="button" size="sm" variant="ghost" class="h-7 px-2 text-xs" :data-testid="`fork-rieng-time-auto-${it.id}`" @click="autoTime(it.id)">Để app tự xếp</Button>
                                             </div>
+                                            <p
+                                                v-if="spacing[it.id]"
+                                                :class="cn('text-xs', spacing[it.id].tight ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground')"
+                                                :data-testid="`fork-rieng-time-gap-${it.id}`"
+                                            >
+                                                {{ spacing[it.id].left }}<template v-if="spacing[it.id].gap"> · {{ spacing[it.id].gap }}</template>
+                                            </p>
                                             <p
                                                 v-for="m in slotInfo[it.id]?.messages ?? []"
                                                 :key="m"

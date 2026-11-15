@@ -385,7 +385,7 @@ final class ChromeJobs
 
         $caption = app(ContentSanitizer::class)->forPost($post) ?? '';
 
-        if (trim($caption) === '') {
+        if (trim($caption) === '' && data_get($post->meta, 'fork_caption_optional') !== true) {
             throw new ChromeRefusal('Bài không có nội dung (caption) — tiện ích Chrome từ chối caption rỗng; chưa đăng.');
         }
 

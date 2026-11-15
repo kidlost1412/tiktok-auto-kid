@@ -382,6 +382,10 @@ img.sp-anh{transition:opacity .3s ease}
 .b-kem{background:var(--amber-soft);color:var(--y-ink);border-color:color-mix(in srgb,var(--amber) 24%,transparent)!important}
 .gk-box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14.5px;line-height:1.7;color:var(--ink)}
 .gk-box b{display:block;font-weight:600;margin-bottom:4px}
+.gk-list{display:flex;flex-direction:column;gap:5px}
+.gk-it{line-height:1.6}
+.gk-t{display:inline-block;padding:0 8px;margin-right:2px;border-radius:999px;background:var(--line);font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.6}
+.gk-t:hover{filter:brightness(.92)}
 .vskel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
 .vskel .skel:first-child{aspect-ratio:9/16;border-radius:0}
 
@@ -1724,6 +1728,33 @@ async function danhGia(v, kq, gy) {
   await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy, loi_gk: kq === 'kem' ? (v.loi_gk || '') : ''}); v.danh_gia = {ket_qua: kq, gop_y: gy};
   toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : kq === 'kem' ? 'Đã ghi: không ưng — vẫn đăng, đã báo AI' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : kq === 'kem' ? 'kem' : 'bo'); veVideo();
 }
+// Tách góp ý giám khảo thành từng dòng; mốc thời gian (13.2s, 17–22.5s) thành chip bấm để tua video.
+const GK_TIME_RE = /(\d+(?:[.,]\d+)?)(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?\s*s(?![\p{L}\d])/giu;
+function gkTach(txt) {
+  const items = String(txt || '').split(/\s*\|\s*|\r?\n|;\s+/).map(s => s.trim()).filter(Boolean).map(raw => {
+    const m = new RegExp(GK_TIME_RE.source, 'iu').exec(raw);
+    return {raw, start: m ? parseFloat(m[1].replace(',', '.')) : null};
+  });
+  if (items.length > 1 && items.every(x => x.start != null)) items.sort((a, b) => a.start - b.start);   // sort ổn định
+  return items;
+}
+function gkDanhSach(txt) {
+  const items = gkTach(txt); if (!items.length) return '';
+  const html = items.map(it => {
+    let out = '', last = 0, m; const re = new RegExp(GK_TIME_RE.source, 'giu');
+    while ((m = re.exec(it.raw))) {
+      out += esc(it.raw.slice(last, m.index)) + `<span class="gk-t" data-t="${parseFloat(m[1].replace(',', '.'))}" title="Bấm để tua tới đoạn này">${esc(m[0])}</span>`;
+      last = m.index + m[0].length;
+    }
+    return `<div class="gk-it">${out + esc(it.raw.slice(last))}</div>`;
+  }).join('');
+  return `<div class="gk-list">${html}</div>`;
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('.gk-t'); if (!t) return;
+  const vd = $('#mVideo'), s = parseFloat(t.dataset.t); if (!vd || isNaN(s)) return;
+  vd.currentTime = s; vd.play().catch(() => {});
+});
 function moVideo(v) {
   CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
   $('#mLoi').textContent = v.loi || ''; $('#mGop').value = v.danh_gia.gop_y || '';
@@ -1735,7 +1766,7 @@ function moVideo(v) {
     v.thoi_luong && `<span class="pill">${ic('clock')} ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
     v.dang_bai && `<span class="pill y">${ic('file')} ${esc(v.dang_bai)}</span>`,
     v.lam_lai_tu && `<span class="pill r">${ic('repeat')} làm lại</span>`].filter(Boolean).join('');
-  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<div class="gk-box" style="margin-top:10px"><b>Giám khảo góp ý</b>${esc(v.loi_gk)}</div>` : ''}` : '';
+  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<div class="gk-box" style="margin-top:10px"><b>Giám khảo góp ý</b>${gkDanhSach(v.loi_gk)}</div>` : ''}` : '';
   const i = LOC_DS.findIndex(x => x.file === v.file);
   setT($('#mVt'), i >= 0 ? `${i + 1} / ${LOC_DS.length}` : '');
   $('#mTruoc').disabled = i <= 0; $('#mSau').disabled = i < 0 || i >= LOC_DS.length - 1;

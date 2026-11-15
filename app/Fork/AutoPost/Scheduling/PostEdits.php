@@ -58,7 +58,7 @@ final class PostEdits
         // Video đã về kho (không còn kênh, không còn bài): không có gì để sửa ở đây.
         $base = $video->social_account_id !== null
             ? $this->reschedules->describe($video)
-            : ['id' => $video->id, 'kind' => null, 'reason' => 'Video đang ở kho, chưa xếp lịch.', 'current_at' => null, 'rules' => null, 'request' => null];
+            : ['id' => $video->id, 'kind' => null, 'reason' => 'Video đang ở kho, chưa xếp lịch.', 'current_at' => null, 'rules' => null, 'channel_times' => [], 'request' => null];
         $post = $video->post_id ? Post::query()->find($video->post_id) : null;
         [$caption, $tags] = $post !== null ? self::splitContent((string) $post->content) : [(string) $video->caption, array_values((array) $video->hashtags)];
         $cover = $post !== null ? $this->coverInfo($video, $post) : null;
@@ -385,7 +385,7 @@ final class PostEdits
         if (array_key_exists('caption', $clean) || array_key_exists('hashtags', $clean)) {
             $content = HubText::compose($clean['caption'] ?? $oldCaption, $clean['hashtags'] ?? $oldTags);
 
-            if (trim($content) === '') {
+            if (trim($content) === '' && data_get($post->meta, 'fork_caption_optional') !== true) {
                 throw new RuntimeException('Caption không được để trống.');
             }
 

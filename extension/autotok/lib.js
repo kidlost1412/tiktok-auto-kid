@@ -68,7 +68,7 @@
   const codePointLength = (s) => Array.from(s).length;       // Python len(str)
 
   function validateCaption(caption) {
-    if (typeof caption !== 'string' || !pyStrip(caption)) return 'caption is required';
+    if (typeof caption !== 'string') return 'caption must be a string';   // 1.4.7: empty caption allowed (TikTok accepts it; Kho riêng may post without one)
     if (codePointLength(caption) > MAX_CAPTION_LENGTH) return `caption must be at most ${MAX_CAPTION_LENGTH} characters`;
     return null;
   }

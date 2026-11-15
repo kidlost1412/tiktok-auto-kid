@@ -426,9 +426,15 @@ Needs the protocol in range (409 `need_reload`). 404 `unknown_job`, 403 `bad_non
 ### 12.3 What the extension does (api-main.js `deleteScheduled`, in a minimized Studio tab `#autotok=del-<id>` armed in `block`)
 1. Passport identity must equal `expect_account` / `expect_user_id` (else `failed`, reason `identity`).
 2. Pre-check: read item_list pages until `item_id` is found. Not found -> `failed` `not_found`; listed but not a future scheduled
-   item at `schedule_unix` (+/- 15 min, more than 10 min away) -> `failed` `not_scheduled`. Nothing is deleted in these cases.
-3. ONE delete call: `deleteScheduledItemOnTikTok(item_id)` = `POST /api/aweme/delete/?aweme_id=<id>&aid=1988` (tiktok.com web
-   endpoint, sent from the page's MAIN world). **Not captured from a real Studio session yet: must be confirmed once live.**
+   item at `schedule_unix` (+/- 15 min, more than 3 min away) -> `failed` `not_scheduled`. Nothing is deleted in these cases.
+3. ONE delete (1.4.7), done with Studio's OWN buttons on `/tiktokstudio/content`: the row holding the link `/video/<item_id>`
+   (`[data-tt="components_RowLayout_FlexRow"]`, scrolled into the virtual list if needed) -> its last
+   `button[data-tt="components_ActionCell_Clickable"]` ("⋯") -> menu item "Delete" -> dialog "Delete post?" button "Delete".
+   Row/menu/dialog not found -> `failed` `ui_failed` (nothing sent). Studio's real call is
+   `DELETE /tiktok/creator/item/delete/v1/?item_id=<id>` (main.js `tiktok_creator_item_delete_v1`), but a hand-made fetch/XHR to
+   it returns the HTML app shell, and 1.4.6's guessed `POST /api/aweme/delete/` returned HTTP 403 — so no direct call is made.
+   Studio sends its request from a context a page-level XHR/fetch patch does NOT see (a block-by-patching test deleted a post
+   for real on 15/11/2026): never rely on monkey-patching to "dry-run" a Studio delete.
 4. Verify after 2.5 s, 4 s, 7 s: item_list scanned from the top until the list ends, or until at least one page past where the item
    was found AND a post older than `schedule_unix - 1 day` was seen. Absent -> `deleted` + `verified: true`. Still listed ->
    `not_deleted`. Lists unreadable -> `unknown`.

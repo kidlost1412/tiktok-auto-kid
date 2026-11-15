@@ -8,6 +8,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { RescheduleInfo, ScheduleEntry } from '@/components/fork/auto/types';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import { toneClasses } from '@/components/fork/shared/status';
+import { timeNotice } from '@/components/fork/shared/timeNotice';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
@@ -25,6 +26,8 @@ const value = ref('');
 const problem = ref('');
 const success = ref('');
 const changed = ref(false);
+const nowTick = ref(Date.now());
+const clock = setInterval(() => (nowTick.value = Date.now()), 30000);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pollUntil = 0;
 
@@ -35,7 +38,7 @@ const req = computed(() => info.value?.request ?? null);
 const waiting = computed(() => !!req.value?.open);
 const isTikTok = computed(() => info.value?.kind === 'tiktok' || props.entry?.state === 'tiktok_scheduled');
 const minValue = computed(() => {
-    const lead = info.value?.rules.min_lead_minutes ?? 45;
+    const lead = info.value?.rules.min_lead_minutes ?? 20;
     const m = dayjs().add(lead + 1, 'minute');
 
     return m.minute(Math.ceil(m.minute() / 5) * 5).second(0).format(FORMAT);
@@ -43,14 +46,9 @@ const minValue = computed(() => {
 const rulesText = computed(() => {
     const r = info.value?.rules;
 
-    if (!r) {
-        return '';
-    }
-
-    const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
-
-    return `Trong khung giờ đăng của kênh ${hh(r.window_start)}–${hh(r.window_end)}, cách bây giờ ít nhất ${r.min_lead_minutes} phút, tối đa khoảng ${Math.floor(r.max_ahead_hours / 24)} ngày tới, và cách các bài khác của cùng kênh ít nhất ${r.gap_minutes} phút.`;
+    return r ? `Cách bây giờ ít nhất ${r.min_lead_minutes} phút, tối đa khoảng ${Math.floor(r.max_ahead_hours / 24)} ngày tới.` : '';
 });
+const notice = computed(() => (unchanged.value ? null : timeNotice(value.value, info.value?.channel_times ?? [], nowTick.value)));
 
 const stop = () => {
     if (timer) {
@@ -142,7 +140,10 @@ watch(open, async (v) => {
     }
 });
 
-onBeforeUnmount(stop);
+onBeforeUnmount(() => {
+    stop();
+    clearInterval(clock);
+});
 
 const unchanged = computed(() => {
     const cur = info.value?.current_at;
@@ -232,6 +233,15 @@ async function save() {
                     <span class="font-medium">Giờ mới</span>
                     <DateTimePicker v-model="value" :min="minValue" testid="fork-auto-reschedule-at" aria-label="Giờ đăng mới" />
                     <span class="flex gap-1.5 text-xs text-muted-foreground"><IconInfoCircle class="mt-px size-3.5 shrink-0" />{{ rulesText }}</span>
+                    <span
+                        v-if="notice"
+                        :class="cn('rounded-lg border px-2.5 py-2 text-xs leading-relaxed', notice.tight ? toneClasses.warn.box : 'border-border bg-muted/40 text-muted-foreground')"
+                        data-testid="fork-auto-reschedule-notice"
+                        aria-live="polite"
+                    >
+                        <span class="block">{{ notice.fromNow }}</span>
+                        <span v-if="notice.before || notice.after" class="block">{{ [notice.before, notice.after].filter(Boolean).join(' · ') }}</span>
+                    </span>
                 </label>
 
                 <div

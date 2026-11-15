@@ -585,6 +585,26 @@ test('a per-video caption override is used and the 2200 limit is enforced per ro
         ->and($r['rows'][1]['status'])->toBe('error')->and($r['rows'][1]['messages'][0])->toContain('2200');
 });
 
+test('caption and hashtags are optional: an empty caption schedules fine and the post may be empty', function () {
+    $account = ($this->account)();
+    $a = ($this->rieng)('a.mp4');
+    $input = ($this->input)($account, [$a], ['caption' => '', 'hashtags' => '']);
+
+    $preview = ($this->batch)()->preview($input, $this->now);
+    expect($preview['ok'])->toBeTrue()->and($preview['rows'][0]['status'])->toBe('ok')->and($preview['rows'][0]['messages'])->toBe([]);
+
+    $done = ($this->batch)()->commit($input, false, $this->now);
+    expect($done['done'])->toBe(1)->and($done['failed'])->toBe(0);
+
+    $post = Post::query()->findOrFail($a->refresh()->post_id);
+    expect($post->content)->toBe('')->and($post->meta['fork_caption_optional'])->toBeTrue()->and($a->caption)->toBe('');
+
+    // Chrome nhận bài không caption và gửi chuỗi rỗng (không phải null).
+    $account->refresh();
+    $job = app(\App\Fork\Chrome\ChromeJobs::class)->queueForPost($post, 'scheduled');
+    expect($job->caption)->toBe('');
+});
+
 // ---------------------------------------------------------------- Lỗi khi dựng bài
 
 test('a build failure releases the video, restores its fields and reports the error', function () {

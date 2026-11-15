@@ -112,12 +112,11 @@ export interface RescheduleInfo {
     current_at: string | null;
     rules: {
         timezone: string;
-        window_start: number;
-        window_end: number;
-        gap_minutes: number;
         min_lead_minutes: number;
         max_ahead_hours: number;
     };
+    /** Giờ (ISO) các bài khác cùng kênh quanh bây giờ, để báo bài trước/sau. */
+    channel_times?: string[];
     request: RescheduleRequest | null;
 }
 
