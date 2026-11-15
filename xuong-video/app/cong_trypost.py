@@ -124,7 +124,7 @@ def ds_video(status="ung", may=None):
             continue
         vid = v.stem
         meta = _doc(kem(v, ".json"), {})
-        ung = (dg.get(v.name) or {}).get("ket_qua") == "dat"
+        ung = (dg.get(v.name) or {}).get("ket_qua") in ("dat", "kem")     # "kem" = Kid không ưng nhưng VẪN đăng
         t = tt.get(vid, {})
         if status == "ung" and not (ung and t.get("trang_thai") != "da_dang"):
             continue

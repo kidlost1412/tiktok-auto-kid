@@ -244,10 +244,10 @@ final class KhoController extends Controller
 
         $label = match ($state) {
             HubApi::OK => 'đang hoạt động',
-            HubApi::OFFLINE => 'hub đang tắt',
+            HubApi::OFFLINE => 'đang tắt',
             HubApi::BAD_KEY => 'sai khoá',
             'off' => 'chưa bật chế độ API (đang dùng thư mục hub)',
-            default => 'hub trả lời lỗi',
+            default => 'trả lời lỗi',
         };
 
         return [

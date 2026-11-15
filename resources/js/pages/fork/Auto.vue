@@ -3,7 +3,7 @@
 // hai bên cao bằng nhau và cuộn bên trong; dưới cùng là Kho theo sản phẩm trải ngang.
 // Chữ trên trang viết thẳng bằng tiếng Việt.
 import { Link, router } from '@inertiajs/vue3';
-import { IconBolt, IconBrandTiktok } from '@tabler/icons-vue';
+import { IconBolt, IconBrandTiktok, IconChevronRight } from '@tabler/icons-vue';
 import { useMediaQuery } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -240,9 +240,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
             >
                 Kho còn
                 {{ stock.new_total + (stock.scheduled_total ?? 0) }} video (gồm
-                cả bài đã hẹn) — chưa đủ một ngày đăng ({{
-                    stock.daily_cap
-                }}
+                cả bài đã hẹn) — chưa đủ một ngày đăng ({{ stock.daily_cap }}
                 bài). Hãy làm thêm video ở Xưởng Video.
             </Callout>
             <Callout v-if="accounts.length && !channelsOn.length" tone="danger">
@@ -357,59 +355,73 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                     v-if="stockRows.length"
                     class="grid gap-x-2 gap-y-0.5 p-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5"
                 >
-                    <li
-                        v-for="p in stockShown"
-                        :key="p.code"
-                        class="flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-accent/40"
-                        :class="!p.enabled && 'opacity-60'"
-                        :title="p.enabled ? p.name : `${p.name} (đang tắt)`"
-                        :data-testid="`fork-auto-product-${p.code}`"
-                    >
-                        <ProductThumb :src="p.image" class="size-9" />
-                        <div class="min-w-0 flex-1">
-                            <div
-                                class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
-                            >
-                                <span class="truncate font-medium">{{
-                                    p.short_name
-                                }}</span>
-                                <span
-                                    class="shrink-0 text-muted-foreground tabular-nums"
-                                    ><b class="font-semibold text-foreground">{{
-                                        fmtNum(p.counts.new)
-                                    }}</b>
-                                    · {{ fmtNum(p.counts.scheduled) }}</span
+                    <li v-for="p in stockShown" :key="p.code">
+                        <Link
+                            :href="`/auto/kho?product=${encodeURIComponent(p.code)}&tab=${p.counts.new > 0 ? 'cho' : p.counts.scheduled > 0 ? 'xep' : 'all'}`"
+                            class="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                            :class="!p.enabled && 'opacity-60'"
+                            :title="
+                                p.enabled
+                                    ? `${p.name} — xem kho`
+                                    : `${p.name} (đang tắt) — xem kho`
+                            "
+                            :data-testid="`fork-auto-product-${p.code}`"
+                        >
+                            <ProductThumb :src="p.image" class="size-9" />
+                            <div class="min-w-0 flex-1">
+                                <div
+                                    class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                                 >
-                            </div>
-                            <div
-                                class="mt-1 flex h-1 overflow-hidden rounded-full bg-muted"
-                            >
-                                <span
-                                    class="bg-primary"
-                                    :style="{
-                                        width: `${(p.counts.new / stockMax) * 100}%`,
-                                    }"
-                                />
-                                <span
-                                    class="bg-primary/35"
-                                    :style="{
-                                        width: `${(p.counts.scheduled / stockMax) * 100}%`,
-                                    }"
-                                />
-                            </div>
-                            <div
-                                class="mt-0.5 truncate text-[0.7188rem] text-muted-foreground/90 tabular-nums"
-                            >
-                                {{ fmtNum(p.counts.posted) }} đã đăng<template
-                                    v-if="p.counts.failed"
+                                    <span class="truncate font-medium">{{
+                                        p.short_name
+                                    }}</span>
+                                    <span
+                                        class="shrink-0 text-muted-foreground tabular-nums"
+                                        ><b
+                                            class="font-semibold text-foreground"
+                                            >{{ fmtNum(p.counts.new) }}</b
+                                        >
+                                        · {{ fmtNum(p.counts.scheduled) }}</span
+                                    >
+                                </div>
+                                <div
+                                    class="mt-1 flex h-1 overflow-hidden rounded-full bg-muted"
                                 >
-                                    ·
-                                    {{ fmtNum(p.counts.failed) }} lỗi</template
-                                ><template v-if="!p.enabled">
-                                    · đang tắt</template
+                                    <span
+                                        class="bg-primary"
+                                        :style="{
+                                            width: `${(p.counts.new / stockMax) * 100}%`,
+                                        }"
+                                    />
+                                    <span
+                                        class="bg-primary/35"
+                                        :style="{
+                                            width: `${(p.counts.scheduled / stockMax) * 100}%`,
+                                        }"
+                                    />
+                                </div>
+                                <div
+                                    class="mt-0.5 truncate text-[0.7188rem] text-muted-foreground/90 tabular-nums"
                                 >
+                                    {{ fmtNum(p.counts.posted) }} đã
+                                    đăng<template v-if="p.counts.failed">
+                                        ·
+                                        {{
+                                            fmtNum(p.counts.failed)
+                                        }}
+                                        lỗi</template
+                                    ><template v-if="!p.enabled">
+                                        · đang tắt</template
+                                    >
+                                </div>
                             </div>
-                        </div>
+                            <span
+                                class="flex shrink-0 items-center gap-0.5 text-[0.7188rem] font-medium text-primary-text opacity-60 transition group-hover:opacity-100 group-focus-visible:opacity-100"
+                                aria-hidden="true"
+                                >Xem kho<IconChevronRight
+                                    class="size-3.5 transition-transform group-hover:translate-x-0.5"
+                            /></span>
+                        </Link>
                     </li>
                 </ul>
                 <p

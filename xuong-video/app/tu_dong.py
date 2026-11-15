@@ -104,7 +104,7 @@ def dem(ma):
         kq = (dg.get(v.name) or {}).get("ket_qua")
         if (tt.get(v.stem) or {}).get("trang_thai") == "da_dang" or kq == "bo":
             continue
-        if kq == "dat" or (not tu_duyet_bat and not kq):   # tắt tự duyệt: video chờ anh duyệt tay vẫn tính tồn (khỏi làm thừa, tốn hạn mức)
+        if kq in ("dat", "kem") or (not tu_duyet_bat and not kq):   # tắt tự duyệt: video chờ anh duyệt tay vẫn tính tồn (khỏi làm thừa, tốn hạn mức)
             ton += 1
     return ton, nay
 

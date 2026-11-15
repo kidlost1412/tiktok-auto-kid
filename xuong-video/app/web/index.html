@@ -347,6 +347,7 @@ html.khoa-cuon,html.khoa-cuon body{overflow:hidden}
 .vid{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s,border-color .2s}
 .vid:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
 .vid.dat{border-color:color-mix(in srgb,var(--green) 60%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--green) 45%,transparent),var(--sh-sm)}
+.vid.kem{border-color:color-mix(in srgb,var(--amber) 55%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--amber) 35%,transparent),var(--sh-sm)}
 .vid.bo{opacity:.6}
 .vid.bo:hover{opacity:.9}
 .thumb{position:relative;aspect-ratio:9/16;background:#0B0B0E;cursor:pointer;overflow:hidden}
@@ -367,13 +368,14 @@ img.sp-anh{transition:opacity .3s ease}
 .vid .info .pill{align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .vid .t{font-weight:600;font-size:14px;line-height:1.35}
 .vid .m{color:var(--mute);font-size:12.5px}
-.vid .act{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:auto;padding-top:4px}
+.vid .act{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto;padding-top:4px}
 .vid .act button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 10px;border-radius:8px;border:1px solid transparent;font:500 13px var(--font);cursor:pointer;transition:filter .15s,background-color .15s}
 .vid .act button:hover{filter:brightness(.97)}
 :root[data-theme="dark"] .vid .act button:hover{filter:brightness(1.2)}
 .b-ok{background:var(--green-soft);color:var(--green);border-color:color-mix(in srgb,var(--green) 20%,transparent)!important}
-.b-no{background:var(--red-soft);color:var(--red);border-color:color-mix(in srgb,var(--red) 20%,transparent)!important}
-.b-cp{background:var(--sec);color:var(--ink);border-color:var(--line)!important}
+.b-kem{background:var(--amber-soft);color:var(--y-ink);border-color:color-mix(in srgb,var(--amber) 24%,transparent)!important}
+.gk-box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14.5px;line-height:1.7;color:var(--ink)}
+.gk-box b{display:block;font-weight:600;margin-bottom:4px}
 .vskel{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
 .vskel .skel:first-child{aspect-ratio:9/16;border-radius:0}
 
@@ -382,7 +384,7 @@ img.sp-anh{transition:opacity .3s ease}
 .modal.on{display:flex}
 .mbox{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-lg);display:grid;grid-template-columns:auto minmax(380px,520px);max-height:94vh;overflow:hidden;max-width:96vw}
 .mbox video{height:min(92vh,960px);aspect-ratio:9/16;background:#000;display:block}
-.mside{padding:22px 24px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+.mside{padding:22px 24px 0;overflow:auto;min-height:0;max-height:94vh;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
 .mside .x{align-self:flex-end}
 .mhd{display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .mhd .pos{margin-right:auto;font-size:13px;color:var(--mute);font-variant-numeric:tabular-nums}
@@ -724,12 +726,12 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 
 <!-- KHO VIDEO -->
 <section id="kho" class="hidden">
-  <div class="ph"><div><h1>Kho video</h1><p>Bấm vào video để xem to. Ưng / Bỏ kèm một dòng góp ý → ê-kíp AI đọc sổ gu này ở mọi lần làm sau.</p></div></div>
+  <div class="ph"><div><h1>Kho video</h1><p>Bấm vào video để xem to. Ưng / Không ưng kèm một dòng góp ý → ê-kíp AI đọc sổ gu này ở mọi lần làm sau.</p></div></div>
   <div class="card toolbar">
     <div class="tb">
       <div class="fld"><label for="ngayChon">Ngày</label><select id="ngayChon"></select></div>
       <div class="fld"><label for="locChon">Lọc</label><select id="locChon">
-        <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng</option><option value="bo">Anh bỏ</option></select></div>
+        <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng</option><option value="kem">Không ưng · vẫn đăng</option><option value="bo">Anh bỏ</option></select></div>
       <div style="margin-left:auto" class="row">
         <button class="btn ghost" id="btnMoThuMuc"><svg class="i"><use href="#i-fopen"/></svg>Mở thư mục</button>
         <button class="btn ghost" id="btnTaiLai"><svg class="i"><use href="#i-refresh"/></svg>Tải lại</button>
@@ -1029,8 +1031,8 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div id="mGk"></div>
     <div><h3>Đánh giá của anh</h3>
       <textarea id="mGop" style="min-height:80px" placeholder="Góp ý 1 dòng (không bắt buộc): vd. mở đầu chậm, cảnh rễ đẹp…"></textarea>
-      <div class="row" style="margin-top:10px;gap:8px"><button class="btn go" id="mOk"><svg class="i"><use href="#i-up"/></svg>Ưng</button><button class="btn stop" id="mNo"><svg class="i"><use href="#i-down"/></svg>Bỏ</button>
-        <button class="btn ghost" id="mLamLai"><svg class="i"><use href="#i-repeat"/></svg>Làm lại theo góp ý</button></div></div>
+      <div class="row" id="mNut" style="margin-top:10px;gap:8px;position:sticky;bottom:-1px;z-index:2;background:var(--card);padding:10px 0;box-shadow:0 -8px 12px -10px rgba(0,0,0,.25)"><button class="btn go" id="mOk" title="Anh ưng: video được đăng, góp ý (nếu có) báo AI làm theo"><svg class="i"><use href="#i-up"/></svg>Ưng</button><button class="btn soft" id="mNo" title="Không ưng nhưng vẫn đăng: AI được báo đây là video yếu để làm tốt hơn lần sau"><svg class="i"><use href="#i-down"/></svg>Không ưng (vẫn đăng)</button>
+        <button class="btn stop" id="mLamLai" title="Anh thật sự không hài lòng: video bị bỏ, không đăng, và được làm lại theo góp ý"><svg class="i"><use href="#i-repeat"/></svg>Làm lại (không đăng)</button></div></div>
     <details><summary class="note">Lời đọc</summary><div class="note" id="mLoi" style="margin-top:8px"></div></details>
   </div>
 </div></div>
@@ -1677,24 +1679,23 @@ function veVideo() {
       <div class="thumb cho" data-i="${VIDS.indexOf(v)}" tabindex="0" role="button" aria-label="Xem video ${esc(v.file)}">${v.bia ? `<img src="${v.bia}" alt="" loading="lazy" decoding="async"${i >= 6 ? ' fetchpriority="low"' : ''} onload="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')">` : `<video src="${v.url}#t=1.2" preload="metadata" muted onloadeddata="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')"></video>`}<div class="play"><span>${ic('play', 'f')}</span></div>${diem}</div>
       <div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
         <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + ($('#ngayChon').value === 'tat-ca' && v.ngay ? v.ngay.split('-').reverse().slice(0, 2).join('/') + ' ' : '') + v.luc : ''}</div>
-        ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : 'r'}">${v.danh_gia.tu_dong ? ic('bot') : ic(dg === 'dat' ? 'check' : 'x')}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt' : 'Anh ưng') : (v.danh_gia.tu_dong ? 'Tự bỏ' : 'Anh bỏ')}</span>` : ''}
+        ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : dg === 'kem' ? 'y' : 'r'}">${v.danh_gia.tu_dong ? ic('bot') : ic(dg === 'dat' ? 'check' : dg === 'kem' ? 'down' : 'x')}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt' : 'Anh ưng') : dg === 'kem' ? 'Không ưng · vẫn đăng' : (v.danh_gia.tu_dong ? 'Tự bỏ' : 'Anh bỏ')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">${ic('send')} Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">${ic('alert')} Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}
-        <div class="act"><button class="b-ok" data-dg="dat" title="Anh ưng">${ic('up')}Ưng</button><button class="b-no" data-dg="bo" title="Anh bỏ">${ic('down')}Bỏ</button><button class="b-cp" title="Chép caption">${ic('copy')}</button></div></div></div>`;
+        <div class="act"><button class="b-ok" data-dg="dat" title="Anh ưng: video được đăng">${ic('up')}Ưng</button><button class="b-kem" data-dg="kem" title="Không ưng nhưng vẫn đăng, báo AI đây là video yếu">${ic('down')}Không ưng</button></div></div></div>`;
   }).join('') : rong('film', 'Chưa có video ngày này', 'Video làm xong sẽ hiện ở đây để anh duyệt.');
   document.querySelectorAll('.thumb').forEach(t => { t.onclick = () => { OPENER = t; moVideo(VIDS[+t.dataset.i]); };
     t.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.onclick(); } }; });
   document.querySelectorAll('.vid').forEach(c => {
     const v = VIDS.find(x => x.file === c.dataset.f);
     c.querySelectorAll('[data-dg]').forEach(b => b.onclick = () => danhGia(v, b.dataset.dg, ''));
-    c.querySelector('.b-cp').onclick = () => { navigator.clipboard.writeText(v.caption); toast('Đã chép caption'); };
   });
 }
 $('#ngayChon').onchange = () => { ssSet('xv.ngay', $('#ngayChon').value); taiVideo(); }; $('#locChon').onchange = veVideo; $('#btnTaiLai').onclick = taiVideo;
 $('#btnMoThuMuc').onclick = () => api('/api/mo-thu-muc', {ngay: $('#ngayChon').value});
 async function danhGia(v, kq, gy) {
-  await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy}); v.danh_gia = {ket_qua: kq, gop_y: gy};
-  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : 'bo'); veVideo();
+  await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy, loi_gk: kq === 'kem' ? (v.loi_gk || '') : ''}); v.danh_gia = {ket_qua: kq, gop_y: gy};
+  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : kq === 'kem' ? 'Đã ghi: không ưng — vẫn đăng, đã báo AI' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : kq === 'kem' ? 'kem' : 'bo'); veVideo();
 }
 function moVideo(v) {
   CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
@@ -1707,7 +1708,7 @@ function moVideo(v) {
     v.thoi_luong && `<span class="pill">${ic('clock')} ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
     v.dang_bai && `<span class="pill y">${ic('file')} ${esc(v.dang_bai)}</span>`,
     v.lam_lai_tu && `<span class="pill r">${ic('repeat')} làm lại</span>`].filter(Boolean).join('');
-  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<details class="note" style="margin-top:10px"><summary>Giám khảo góp ý</summary>${esc(v.loi_gk)}</details>` : ''}` : '';
+  $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<div class="gk-box" style="margin-top:10px"><b>Giám khảo góp ý</b>${esc(v.loi_gk)}</div>` : ''}` : '';
   const i = LOC_DS.findIndex(x => x.file === v.file);
   setT($('#mVt'), i >= 0 ? `${i + 1} / ${LOC_DS.length}` : '');
   $('#mTruoc').disabled = i <= 0; $('#mSau').disabled = i < 0 || i >= LOC_DS.length - 1;
@@ -1716,7 +1717,7 @@ function moVideo(v) {
 async function mDi(d) {                    // đi tới video trước/sau trong danh sách đang lọc
   if (!CUR) return;
   const i = LOC_DS.findIndex(x => x.file === CUR.file), v = LOC_DS[i + d]; if (i < 0 || !v) return;
-  if ($('#mGop').value.trim() !== (CUR.danh_gia.gop_y || '').trim() && !await hoi({tieuDe: 'Góp ý chưa ghi', noiDung: 'Anh đã gõ góp ý nhưng chưa bấm Ưng / Bỏ. Chuyển video sẽ mất dòng này.', nutCo: 'Bỏ góp ý và chuyển', nutKhong: 'Ở lại', nguyHiem: true})) return;
+  if ($('#mGop').value.trim() !== (CUR.danh_gia.gop_y || '').trim() && !await hoi({tieuDe: 'Góp ý chưa ghi', noiDung: 'Anh đã gõ góp ý nhưng chưa bấm Ưng / Không ưng. Chuyển video sẽ mất dòng này.', nutCo: 'Bỏ góp ý và chuyển', nutKhong: 'Ở lại', nguyHiem: true})) return;
   moVideo(v);
 }
 $('#mTruoc').onclick = () => mDi(-1); $('#mSau').onclick = () => mDi(1);
@@ -1749,7 +1750,7 @@ $('#btnTdy').onclick = async () => {
   toast(r.tu_duyet.bat ? `Đã lưu — vừa tự duyệt ${r.da_duyet} video` : 'Đã tắt tự duyệt'); ST.tu_duyet = r.tu_duyet; TDY_BAN = false; taiVideo();
 };
 $('#mOk').onclick = () => { danhGia(CUR, 'dat', $('#mGop').value); $('#mDong').onclick(); };
-$('#mNo').onclick = () => { danhGia(CUR, 'bo', $('#mGop').value); $('#mDong').onclick(); };
+$('#mNo').onclick = () => { danhGia(CUR, 'kem', $('#mGop').value); $('#mDong').onclick(); };
 
 // ---------- SẢN PHẨM
 $('#btnDocNhan').onclick = async () => {
