@@ -15,7 +15,7 @@ use Throwable;
 /**
  * Ảnh bìa riêng của video trong Kho riêng (tải lên hoặc chọn một khung hình trong video).
  *
- * Chuẩn hoá đúng như ảnh bìa sản phẩm (CoverStore::prepare: jpg, cắt giữa 3:4, tối đa 1080x1440, <= 5 MB) nên đi cùng đường
+ * Chuẩn hoá đúng như ảnh bìa sản phẩm (CoverStore::prepare: jpg, giữ 3:4 hoặc 9:16 (lệch thì cắt giữa), tối đa 1080x1440 hoặc 1080x1920, <= 5 MB) nên đi cùng đường
  * với bìa sản phẩm tới tiện ích Chrome (meta.fork_cover + fork_cover_src=rieng, tải qua /api/ext/cover).
  *
  * Chỗ lưu: storage/app/rieng-covers/<mã video>/<uuid>.jpg (mỗi video giữ bản riêng của mình) và storage/app/rieng-covers/_tmp/<uuid>.jpg
@@ -230,7 +230,7 @@ final class RiengCovers
                 ?? throw new InvalidArgumentException('Không lấy được khung hình làm ảnh bìa (máy chưa có ffmpeg hoặc video không đọc được).');
         }
 
-        // Ảnh tạm đã chuẩn hoá rồi; qua prepare lần nữa vô hại (đã đúng 3:4) và kiểm lại giới hạn.
+        // Ảnh tạm đã chuẩn hoá rồi; qua prepare lần nữa vô hại (đã đúng 3:4 hoặc 9:16) và kiểm lại giới hạn.
         $prepared = app(CoverStore::class)->prepare($bytes, false);
         $dir = $this->dir((int) $video->id);
         $this->ensureDir($dir);

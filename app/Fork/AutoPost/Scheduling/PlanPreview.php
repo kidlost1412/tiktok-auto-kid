@@ -238,7 +238,7 @@ final class PlanPreview
         $hub = AutoProduct::query()->where('enabled', true)->get()->keyBy('code');
 
         return AutoVideo::query()
-            ->notRieng()->where('status', AutoVideo::NEW)
+            ->notRieng()->notHeld()->where('status', AutoVideo::NEW)
             ->whereIn('product_code', $hub->keys())
             ->selectRaw('product_code, quy_cach, count(*) as total')
             ->groupBy('product_code', 'quy_cach')

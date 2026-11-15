@@ -6,7 +6,9 @@ use App\Enums\Post\Status as PostStatus;
 use App\Enums\SocialAccount\Status as AccountStatus;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\Reschedule;
+use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Listeners\ChromePostWatcher;
@@ -268,4 +270,134 @@ test('Lịch đăng hiện bài đã hẹn trên TikTok (hub và Kho riêng) kè
 
     $this->actingAs($this->owner)->getJson("/auto/videos/{$hubVideo->id}/doi-gio")->assertOk()
         ->assertJson(['kind' => 'tiktok', 'rules' => ['window_start' => 0, 'window_end' => 24, 'gap_minutes' => 20, 'min_lead_minutes' => 45]]);
+});
+
+// ---------------------------------------------------------------- Sửa bài / bỏ xếp lịch (PostEdits)
+
+function rsLink(SocialAccount $social, string $shopId = '1729384756001234567'): void
+{
+    ProductLink::query()->create([
+        'social_account_id' => $social->id, 'auto_product_id' => 'p1', 'shop_product_id' => $shopId, 'display_name' => 'Giỏ '.$social->username,
+    ]);
+}
+
+function rsOther(object $t, bool $link = true): SocialAccount
+{
+    $other = SocialAccount::factory()->tiktok()->create([
+        'workspace_id' => $t->workspace->id, 'status' => AccountStatus::Connected, 'timezone' => 'Asia/Ho_Chi_Minh', 'username' => 'kenh_hai',
+    ]);
+    ChromeAccount::query()->create(['social_account_id' => $other->id, 'enabled' => true, 'tiktok_user_id' => '7012345678901234500', 'chrome_only' => false]);
+    AutoAccount::query()->create(['social_account_id' => $other->id, 'enabled' => true, 'daily_cap' => 40, 'window_start' => 0, 'window_end' => 24]);
+
+    if ($link) {
+        rsLink($other, '1729384756009999999');
+    }
+
+    return $other;
+}
+
+function rsDeleteVerified(object $t): void
+{
+    $task = $t->getJson('/api/ext/tasks', rsExt($t))->assertOk()->json('delete_scheduled');
+    $t->postJson('/api/ext/delete_scheduled/claim', ['id' => $task['id'], 'nonce' => $task['nonce']], rsExt($t))->assertJson(['ok' => true]);
+    $t->postJson('/api/ext/delete_scheduled/result', ['id' => $task['id'], 'nonce' => $task['nonce'], 'outcome' => 'deleted', 'verified' => true, 'item_id' => RS_ITEM, 'delete_sent' => true], rsExt($t))
+        ->assertOk()->assertJson(['state' => 'done']);
+}
+
+test('sửa bài chưa lên TikTok: giờ, kênh, caption và hashtag đổi ngay, job cũ bị thu hồi', function (): void {
+    rsLink($this->social);
+    $other = rsOther($this);
+    [$post, $video] = rsPost($this, rsAt(10));
+    $post->forceFill(['content' => "Caption cũ\n\n#cu #hai"])->save();
+    $old = rsJob($post, 'queued');
+
+    $this->actingAs($this->owner)->getJson("/auto/videos/{$video->id}/sua")->assertOk()
+        ->assertJson(['kind' => 'local', 'caption' => 'Caption cũ', 'hashtags' => ['#cu', '#hai']]);
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", [
+        'at' => rsAt(16)->toIso8601String(), 'social_account_id' => $other->id,
+        'caption' => 'Caption mới', 'hashtags' => ['#moi', 'ba bon', '#moi'],
+    ])->assertOk()->assertJson(['ok' => true, 'state' => 'done']);
+
+    $post->refresh();
+    $video->refresh();
+    expect($post->content)->toBe("Caption mới\n\n#moi #ba #bon")
+        ->and((string) $post->social_account_id)->toBe((string) $other->id)
+        ->and(data_get($post->meta, 'fork_shop_product_id'))->toBe('1729384756009999999')
+        ->and($post->scheduled_at->equalTo(rsAt(16)))->toBeTrue()
+        ->and((string) $video->social_account_id)->toBe((string) $other->id)
+        ->and($video->caption)->toBe('Caption mới')
+        ->and($video->hashtags)->toBe(['#moi', '#ba', '#bon'])
+        ->and($old->refresh()->state)->toBe('revoked');
+});
+
+test('sửa bài: từ chối kênh chưa gắn giỏ, caption rỗng và khi không có gì đổi', function (): void {
+    rsLink($this->social);
+    $other = rsOther($this, false);
+    [$post, $video] = rsPost($this, rsAt(10));
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", ['social_account_id' => $other->id])
+        ->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'chưa chọn sản phẩm giỏ hàng'));
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", ['caption' => '   ', 'hashtags' => []])
+        ->assertStatus(422)->assertJsonPath('message', 'Caption không được để trống.');
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", [])
+        ->assertStatus(422)->assertJsonPath('message', 'Chưa có gì thay đổi.');
+
+    expect((string) $post->refresh()->social_account_id)->toBe((string) $this->social->id);
+});
+
+test('sửa bài đã hẹn trên TikTok: chỉ áp thay đổi khi Chrome đã xoá và kiểm lại', function (): void {
+    rsLink($this->social);
+    [$post, $video] = rsPost($this, rsAt(10), 'rieng');
+    $posted = rsJob($post, 'posted');
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", ['caption' => 'Bản sửa', 'hashtags' => ['#x']])
+        ->assertOk()->assertJson(['state' => 'pending', 'kind' => 'tiktok']);
+    expect($post->refresh()->content)->not->toContain('Bản sửa')->and($posted->refresh()->state)->toBe('posted')
+        ->and(Reschedule::query()->value('action'))->toBe('edit');
+
+    rsDeleteVerified($this);
+
+    expect($post->refresh()->content)->toBe("Bản sửa\n\n#x")
+        ->and($post->scheduled_at->equalTo(rsAt(10)))->toBeTrue()
+        ->and($posted->refresh()->state)->toBe('revoked')
+        ->and(app(ChromeJobs::class)->latestForPost($post)->state)->toBe('queued');
+});
+
+test('bỏ xếp lịch video AI: bài bị bỏ, video về kho và không tự xếp lại cho tới khi chủ app cho phép', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10));
+    $job = rsJob($post, 'queued');
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/bo-xep-lich")->assertOk()->assertJson(['state' => 'done']);
+
+    $video->refresh();
+    expect(Post::query()->find($post->id))->toBeNull()
+        // Job còn xếp hàng không bao giờ được Chrome nhận nữa (bị thu hồi, hoặc xoá theo bài).
+        ->and(ChromeJob::query()->whereKey($job->id)->whereIn('state', ChromeJob::OPEN)->exists())->toBeFalse()
+        ->and($video->status)->toBe(AutoVideo::NEW)->and($video->post_id)->toBeNull()->and($video->social_account_id)->toBeNull()
+        ->and(data_get($video->meta, 'owner_hold'))->not->toBeNull()
+        ->and(AutoVideo::query()->notHeld()->whereKey($video->id)->exists())->toBeFalse();
+
+    $this->actingAs($this->owner)->getJson("/auto/videos/{$video->id}/sua")->assertOk()->assertJson(['held' => true, 'can_release' => true]);
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/cho-xep-lai")->assertOk();
+    expect(AutoVideo::query()->notHeld()->whereKey($video->id)->exists())->toBeTrue();
+});
+
+test('bỏ xếp lịch bài Kho riêng đã hẹn trên TikTok: chỉ bỏ sau khi đã xoá và kiểm lại', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10), 'rieng');
+    rsJob($post, 'posted');
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/bo-xep-lich")->assertOk()->assertJson(['state' => 'pending']);
+    expect($video->refresh()->status)->toBe(AutoVideo::SCHEDULED);
+
+    rsDeleteVerified($this);
+
+    $video->refresh();
+    expect($video->status)->toBe(AutoVideo::NEW)->and(Post::query()->find($post->id))->toBeNull()
+        ->and(data_get($video->meta, 'owner_hold'))->toBeNull();
+});
+
+test('tách caption và dòng hashtag cuối của nội dung bài', function (): void {
+    expect(PostEdits::splitContent("Một\n\nHai dòng\n\n#a #b"))->toBe(["Một\n\nHai dòng", ['#a', '#b']])
+        ->and(PostEdits::splitContent("Chỉ chữ\n\ncó #tag giữa"))->toBe(["Chỉ chữ\n\ncó #tag giữa", []]);
 });

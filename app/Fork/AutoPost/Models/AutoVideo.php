@@ -78,6 +78,8 @@ class AutoVideo extends Model
         return $q->where('status', self::NEW)
             // Video riêng của chủ app chỉ đăng qua "Đăng hàng loạt", không bao giờ do planner tự lấy.
             ->where('source', '!=', self::SOURCE_RIENG)
+            // Chủ app vừa "Bỏ xếp lịch" để sửa: chờ bấm "Cho xếp lịch lại".
+            ->notHeld()
             // File mp4 của hub chưa có trên đĩa (chế độ API) thì chưa giữ chỗ.
             ->whereNull('files_deleted_at')
             // Không có caption do hub viết thì không đăng (chờ hub bổ sung, lần ingest sau cập nhật).
@@ -87,6 +89,16 @@ class AutoVideo extends Model
             // Chế độ API: chỉ đăng video hub đã duyệt (có hub_id). Bản ghi cũ đọc từ thư mục có thể trùng
             // video hub (hub làm sạch metadata nên sha256 đổi) → không bao giờ đăng, tránh đăng 2 lần.
             ->when(filled(config('fork.auto.hub_api.key')), fn ($w) => $w->whereNotNull('hub_id'));
+    }
+
+    /**
+     * Bỏ video chủ app vừa "Bỏ xếp lịch" để sửa (meta.owner_hold, xem PostEdits).
+     *
+     * @param  Builder<static>  $q
+     */
+    public function scopeNotHeld(Builder $q): Builder
+    {
+        return $q->whereRaw("(meta->>'owner_hold') is null");
     }
 
     /**

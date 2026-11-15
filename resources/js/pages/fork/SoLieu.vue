@@ -16,6 +16,7 @@ import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
+import SourceFilter from '@/components/fork/shared/SourceFilter.vue';
 import {
     cardCls,
     fmtCompact,
@@ -101,6 +102,10 @@ const apply = (patch: Partial<Filters>) => {
         query.cm = 'mua';
     }
 
+    if (next.nguon && next.nguon !== 'all') {
+        query.nguon = next.nguon;
+    }
+
     router.get('/auto/so-lieu', query, {
         preserveScroll: true,
         preserveState: true,
@@ -132,12 +137,13 @@ const hasFilter = computed(
             props.filters.channel ||
             props.filters.product ||
             props.filters.goc ||
-            props.filters.giong
+            props.filters.giong ||
+            props.filters.nguon !== 'all'
         ),
 );
 
 const clearFilters = () =>
-    apply({ channel: '', product: '', goc: '', giong: '' });
+    apply({ channel: '', product: '', goc: '', giong: '', nguon: 'all' });
 
 const productName = (code: string | null) =>
     props.options.products.find((p) => p.code === code)?.name ?? code ?? '—';
@@ -405,6 +411,10 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                 >
                 <span class="mx-1 hidden h-5 w-px bg-border sm:block" />
             </template>
+            <SourceFilter
+                :model-value="filters.nguon"
+                @update:model-value="apply({ nguon: $event })"
+            />
             <NativeSelect
                 :model-value="filters.channel"
                 class="h-9"

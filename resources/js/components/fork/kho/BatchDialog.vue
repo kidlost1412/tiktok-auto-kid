@@ -692,7 +692,7 @@ const areaCls =
                                         {{ coverBusy.batch ? 'Đang tải…' : batchCover ? 'Đổi ảnh chung' : 'Chọn ảnh' }}
                                     </span>
                                 </label>
-                                <span class="text-xs text-muted-foreground">jpg, png hoặc webp, tối đa 5 MB. Ảnh được cắt giữa theo tỉ lệ 3:4.</span>
+                                <span class="text-xs text-muted-foreground">jpg, png hoặc webp, tối đa 5 MB. Ảnh dọc 9:16 hoặc 3:4 được giữ nguyên; tỉ lệ khác được cắt giữa về tỉ lệ gần nhất.</span>
                             </div>
                             <p class="text-xs text-muted-foreground">
                                 Muốn video nào có bìa riêng thì bấm "Tải ảnh" hoặc "Chọn khung" ở video đó bên dưới. Ảnh bạn chọn được nhớ cho lần sau.

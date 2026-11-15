@@ -56,7 +56,7 @@ export interface Persona {
         name: string;
         w: number;
         h: number;
-        /** Kích thước ảnh gốc trước khi cắt 3:4 (null với ảnh cũ). */
+        /** Kích thước ảnh gốc trước khi cắt về 3:4 / 9:16 (null với ảnh cũ). */
         orig_w?: number | null;
         orig_h?: number | null;
         size: number;

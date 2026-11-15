@@ -32,14 +32,24 @@ final class CoverStore
 
     public const int MAX_SIDE = 8000;
 
-    /** Studio từ chối ảnh bìa nhỏ hơn 324x432. Ảnh luôn được cắt giữa theo 3:4 rồi thu về tối đa 1080x1440. */
+    /**
+     * Studio từ chối ảnh bìa nhỏ hơn 324x432. Hai tỉ lệ được giữ: 3:4 (tối đa 1080x1440, tối thiểu 324x432)
+     * và 9:16 (tối đa 1080x1920, tối thiểu 324x576). Ảnh lệch tỉ lệ quá 3% được cắt giữa về tỉ lệ gần nhất.
+     */
     public const int MIN_WIDTH = 324;
 
     public const int MIN_HEIGHT = 432;
 
+    public const int MIN_HEIGHT_TALL = 576;
+
     public const int TARGET_WIDTH = 1080;
 
     public const int TARGET_HEIGHT = 1440;
+
+    public const int TARGET_HEIGHT_TALL = 1920;
+
+    /** Sai số tỉ lệ (tương đối) mà ảnh vẫn được coi là đúng 3:4 hoặc 9:16 và giữ nguyên, không cắt. */
+    public const float RATIO_TOLERANCE = 0.03;
 
     public static function normalizeMode(mixed $mode): string
     {
@@ -109,15 +119,16 @@ final class CoverStore
             'sha256' => hash('sha256', $bytes),
         ];
 
-        $ratio = $h > 0 ? $w / $h : 0;
+        $tall = self::isTall($cw, $ch);
+        $label = $tall ? '9:16' : '3:4';
         $notes = [];
 
-        if (abs($ratio - 3 / 4) > 0.01) {
-            $notes[] = 'ảnh '.$w.'×'.$h.' không phải 3:4 nên đã được cắt giữa còn '.$cw.'×'.$ch;
+        if (self::planCrop($w, $h)[0] !== $w || self::planCrop($w, $h)[1] !== $h) {
+            $notes[] = 'ảnh '.$w.'×'.$h.' không đúng 3:4 hay 9:16 nên đã được cắt giữa theo '.$label.' còn '.$cw.'×'.$ch;
         }
 
         if ($cw < self::TARGET_WIDTH) {
-            $notes[] = 'khuyên dùng '.self::TARGET_WIDTH.'×'.self::TARGET_HEIGHT.' (3:4) để bìa nét';
+            $notes[] = 'khuyên dùng '.self::TARGET_WIDTH.'×'.($tall ? self::TARGET_HEIGHT_TALL : self::TARGET_HEIGHT).' ('.$label.') để bìa nét';
         }
 
         $warning = $notes === [] ? null : ucfirst(implode('; ', $notes)).'.';
@@ -126,7 +137,8 @@ final class CoverStore
     }
 
     /**
-     * Kiểm tra ảnh (jpg/png/webp, đủ lớn, không quá 5 MB) và chuẩn hoá về đúng thứ pipeline cần: jpg cắt giữa 3:4, tối đa 1080x1440.
+     * Kiểm tra ảnh (jpg/png/webp, đủ lớn, không quá 5 MB) và chuẩn hoá về đúng thứ pipeline cần: jpg giữ tỉ lệ 3:4 hoặc 9:16
+     * (lệch quá 3% thì cắt giữa về tỉ lệ gần nhất), tối đa 1080x1440 (3:4) hoặc 1080x1920 (9:16).
      * Dùng chung cho ảnh bìa sản phẩm và ảnh bìa của video riêng. Ném InvalidArgumentException (tiếng Việt) khi không hợp lệ.
      *
      * @return array{bytes: string, w: int, h: int, orig_w: int, orig_h: int}
@@ -145,17 +157,19 @@ final class CoverStore
 
         [$w, $h] = [(int) $info[0], (int) $info[1]];
 
-        [$cw, $ch] = self::cropSize($w, $h);
+        [$cw, $ch] = self::planCrop($w, $h);
+        $tall = self::isTall($cw, $ch);
+        $minH = $tall ? self::MIN_HEIGHT_TALL : self::MIN_HEIGHT;
 
-        if ($cw < self::MIN_WIDTH || $ch < self::MIN_HEIGHT) {
-            throw new InvalidArgumentException('Ảnh quá nhỏ: sau khi cắt 3:4 phải tối thiểu '.self::MIN_WIDTH.'×'.self::MIN_HEIGHT.' px (ảnh này chỉ còn '.$cw.'×'.$ch.').');
+        if ($cw < self::MIN_WIDTH || $ch < $minH) {
+            throw new InvalidArgumentException('Ảnh quá nhỏ: sau khi cắt '.($tall ? '9:16' : '3:4').' phải tối thiểu '.self::MIN_WIDTH.'×'.$minH.' px (ảnh này chỉ còn '.$cw.'×'.$ch.').');
         }
 
         if (max($w, $h) > self::MAX_SIDE) {
             throw new InvalidArgumentException('Ảnh quá lớn (cạnh dài trên '.self::MAX_SIDE.' px).');
         }
 
-        // Luôn cắt giữa theo 3:4 (đúng cách Studio gửi bìa tự tải lên) và đổi sang jpg.
+        // Giữ 3:4 / 9:16, ngoài ra cắt giữa về tỉ lệ gần nhất, rồi đổi sang jpg.
         [$out, $cw, $ch] = $this->cropToJpeg($bytes);
 
         if (strlen($out) > self::MAX_BYTES) {
@@ -316,6 +330,45 @@ final class CoverStore
         return [$w, (int) round($w * 4 / 3)];       // cao hơn 3:4: cắt trên dưới
     }
 
+    /** Cắt giữa theo 9:16 (chưa thu nhỏ). @return array{0: int, 1: int} */
+    public static function cropSizeTall(int $w, int $h): array
+    {
+        if ($w * 16 > $h * 9) {
+            return [(int) round($h * 9 / 16), $h];
+        }
+
+        return [$w, (int) round($w * 16 / 9)];
+    }
+
+    /**
+     * Kích thước ảnh bìa sau xử lý (chưa thu nhỏ): giữ nguyên nếu tỉ lệ w/h cách 3:4 hoặc 9:16 không quá 3%,
+     * còn lại cắt giữa theo tỉ lệ gần hơn (so theo tỉ lệ logarit).
+     *
+     * @return array{0: int, 1: int}
+     */
+    public static function planCrop(int $w, int $h): array
+    {
+        if ($w <= 0 || $h <= 0) {
+            return [$w, $h];
+        }
+
+        $r = $w / $h;
+
+        foreach ([3 / 4, 9 / 16] as $target) {
+            if (abs($r - $target) / $target <= self::RATIO_TOLERANCE) {
+                return [$w, $h];
+            }
+        }
+
+        return abs(log($r / (3 / 4))) <= abs(log($r / (9 / 16))) ? self::cropSize($w, $h) : self::cropSizeTall($w, $h);
+    }
+
+    /** Ảnh đã chuẩn hoá có phải loại 9:16 không (gần 9:16 hơn 3:4). */
+    public static function isTall(int $w, int $h): bool
+    {
+        return $w > 0 && $h > 0 && abs(log(($w / $h) / (9 / 16))) < abs(log(($w / $h) / (3 / 4)));
+    }
+
     /** @return array{0: string, 1: int, 2: int} jpg, rộng, cao */
     private function cropToJpeg(string $bytes): array
     {
@@ -331,10 +384,12 @@ final class CoverStore
 
         $w = imagesx($src);
         $h = imagesy($src);
-        [$cw, $ch] = self::cropSize($w, $h);
+        [$cw, $ch] = self::planCrop($w, $h);
         $sx = intdiv($w - $cw, 2);
         $sy = intdiv($h - $ch, 2);
-        [$ow, $oh] = $cw > self::TARGET_WIDTH ? [self::TARGET_WIDTH, self::TARGET_HEIGHT] : [$cw, $ch];
+        $maxH = self::isTall($cw, $ch) ? self::TARGET_HEIGHT_TALL : self::TARGET_HEIGHT;
+        $scale = min(1.0, self::TARGET_WIDTH / $cw, $maxH / $ch);
+        [$ow, $oh] = $scale < 1.0 ? [max(1, (int) round($cw * $scale)), max(1, (int) round($ch * $scale))] : [$cw, $ch];
 
         $dst = imagecreatetruecolor($ow, $oh);
         imagefill($dst, 0, 0, (int) imagecolorallocate($dst, 255, 255, 255));   // nền trắng cho ảnh trong suốt

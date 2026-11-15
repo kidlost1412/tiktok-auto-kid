@@ -596,10 +596,11 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     bìa mặc định.
                                 </p>
                                 <p class="text-xs text-muted-foreground">
-                                    jpg, png, webp · tối đa 5 MB/ảnh · nên dùng
-                                    1080×1440 (3:4), tối thiểu 324×432. Ảnh được
-                                    cắt giữa theo 3:4; png/webp được đổi sang
-                                    jpg.
+                                    jpg, png hoặc webp, tối đa 5 MB/ảnh. Ảnh
+                                    dọc 9:16 (nên 1080×1920, tối thiểu 324×576)
+                                    hoặc 3:4 (nên 1080×1440, tối thiểu 324×432)
+                                    được giữ nguyên; tỉ lệ khác được cắt giữa về
+                                    tỉ lệ gần nhất. png/webp được đổi sang jpg.
                                 </p>
                             </div>
                         </div>

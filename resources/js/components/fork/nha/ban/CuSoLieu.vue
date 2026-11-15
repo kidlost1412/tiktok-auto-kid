@@ -12,6 +12,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { banBao } from '@/components/fork/nha/ban/bus';
 import { useInertiaProps } from '@/components/fork/nha/ban/useInertiaProps';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
+import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import {
     cardCls,
     fmtCompact,
@@ -379,10 +380,13 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                                     class="h-[53px] w-[30px] rounded-md"
                                 />
                                 <span class="min-w-0">
-                                    <span
-                                        class="block truncate text-sm font-medium"
-                                        >{{ productName(v.product_code) }}</span
-                                    >
+                                    <span class="flex min-w-0 items-center gap-1.5">
+                                        <span
+                                            class="truncate text-sm font-medium"
+                                            >{{ productName(v.product_code) }}</span
+                                        >
+                                        <SourceBadge :source="v.source" />
+                                    </span>
                                     <span
                                         class="block truncate text-xs text-muted-foreground"
                                         >{{

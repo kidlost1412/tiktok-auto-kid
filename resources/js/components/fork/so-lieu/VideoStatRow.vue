@@ -8,6 +8,7 @@ import {
 } from '@tabler/icons-vue';
 
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
+import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import { fmtCompact, fmtNum } from '@/components/fork/shared/status';
 import type { StatVideo } from '@/components/fork/so-lieu/types';
 import { openVideo } from '@/components/fork/viewer';
@@ -61,6 +62,7 @@ const pct = (n: number) =>
                     class="shrink-0 text-[0.75rem] text-muted-foreground"
                     >{{ video.quy_cach }}</span
                 >
+                <SourceBadge :source="video.source" />
             </div>
             <div class="truncate text-[0.75rem] text-muted-foreground">
                 {{ dayjs(video.posted_at).format('HH:mm DD/MM')

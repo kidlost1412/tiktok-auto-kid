@@ -20,7 +20,7 @@ import {
     IconShare3,
     IconShoppingCart,
 } from '@tabler/icons-vue';
-import { computed, onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import {
     copyCaption,
@@ -29,7 +29,9 @@ import {
     severityTone,
     videoUrl,
 } from '@/components/fork/kho/kho';
+import PostEditPanel from '@/components/fork/shared/PostEditPanel.vue';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
+import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import { fmtNum, toneClasses } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { stepVideo, viewer, viewerActions } from '@/components/fork/viewer';
@@ -118,6 +120,20 @@ const postThis = () => {
     }
 };
 
+// Sửa bài / bỏ xếp lịch: bài đã xếp mà chưa đăng, hoặc video AI vừa bỏ xếp lịch.
+const player = ref<HTMLVideoElement | null>(null);
+const playerTime = () => player.value?.currentTime ?? null;
+const canEditPost = computed(() => {
+    const v = video.value;
+
+    return (
+        !!v &&
+        (v.status === 'scheduled' ||
+            v.status === 'reserved' ||
+            (v.status === 'new' && !!v.held))
+    );
+});
+
 const timeRow = computed<[string, string] | null>(() => {
     const v = video.value;
 
@@ -190,6 +206,7 @@ const statLine = computed(() => {
                 >
                     <video
                         v-if="viewer.open && video.can_preview"
+                        ref="player"
                         :key="video.id"
                         :src="videoUrl(video.id)"
                         :poster="
@@ -250,12 +267,15 @@ const statLine = computed(() => {
                             class="size-12 rounded-lg"
                         />
                         <div class="min-w-0 flex-1">
-                            <h2
-                                class="truncate text-lg font-semibold"
-                                :title="title"
-                            >
-                                {{ title }}
-                            </h2>
+                            <div class="flex min-w-0 items-center gap-2">
+                                <h2
+                                    class="truncate text-lg font-semibold"
+                                    :title="title"
+                                >
+                                    {{ title }}
+                                </h2>
+                                <SourceBadge :source="video.source" />
+                            </div>
                             <p
                                 v-if="video.quy_cach"
                                 class="truncate text-sm text-muted-foreground"
@@ -380,6 +400,13 @@ const statLine = computed(() => {
                     >
                         {{ video.reason }}
                     </div>
+
+                    <PostEditPanel
+                        v-if="canEditPost"
+                        :key="`edit-${video.id}`"
+                        :video-id="video.id"
+                        :current-time="video.can_preview ? playerTime : undefined"
+                    />
 
                     <dl
                         class="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm"
