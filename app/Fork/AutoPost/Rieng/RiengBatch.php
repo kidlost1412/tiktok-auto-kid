@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Rieng;
 
-use App\Enums\Post\Status as PostStatus;
 use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\Media\ProductImageLookup;
 use App\Fork\AutoPost\Media\ProductImages;
@@ -19,10 +18,9 @@ use App\Fork\AutoPost\Scheduling\PostBuilder;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\VideoLibrary;
-use App\Fork\Chrome\ChromeJobs;
-use App\Models\Post;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -108,6 +106,51 @@ final class RiengBatch
     }
 
     /**
+     * Chỉ đề xuất giờ (không cần sản phẩm/caption, không ghi gì): để hộp đăng điền sẵn giờ cho từng video ngay khi mở.
+     * `items.*.at` = giờ chủ app đã sửa (giữ nguyên và kiểm), còn lại tự xếp.
+     *
+     * @param  array<string, mixed>  $in
+     * @return array{ok: bool, error: ?string, rows: list<array{id: int, at: ?string, status: string, messages: list<string>, edited: bool}>, left: int, window: ?string, gap_minutes: int}
+     */
+    public function propose(array $in, ?CarbonImmutable $now = null): array
+    {
+        $now ??= CarbonImmutable::now();
+        $gapMinutes = intdiv($this->planner->gapSeconds(), 60);
+        $auto = AutoAccount::query()->find((string) ($in['social_account_id'] ?? ''));
+
+        if ($auto === null) {
+            return ['ok' => false, 'error' => 'Hãy chọn kênh TikTok.', 'rows' => [], 'left' => 0, 'window' => null, 'gap_minutes' => $gapMinutes];
+        }
+
+        $tz = $this->planner->timezoneFor($auto);
+        $fmt = fn (int $ts): string => CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->format('H:i d/m');
+        $rows = [];
+        $seen = [];
+
+        foreach (array_values(array_filter((array) ($in['items'] ?? []), 'is_array')) as $item) {
+            $id = (int) ($item['id'] ?? 0);
+
+            if ($id <= 0 || isset($seen[$id])) {
+                continue;
+            }
+
+            $seen[$id] = true;
+            $rows[] = ['id' => $id, 'status' => 'ok', 'messages' => [], 'at' => null, '_at' => $this->parseAt($item['at'] ?? null)];
+        }
+
+        $left = $this->schedule($rows, $auto, $now, $fmt);
+
+        return [
+            'ok' => true,
+            'error' => null,
+            'rows' => array_map(fn (array $r): array => ['id' => $r['id'], 'at' => $r['at'], 'status' => $r['status'], 'messages' => $r['messages'], 'edited' => (bool) $r['edited']], $rows),
+            'left' => $left,
+            'window' => app(RiengSchedule::class)->windowLabel($auto),
+            'gap_minutes' => $gapMinutes,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $in
      * @return array<string, mixed>
      */
@@ -181,7 +224,8 @@ final class RiengBatch
         }
 
         $product = AutoProduct::query()->find($code);
-        $mode = ($in['mode'] ?? self::MODE_AUTO) === self::MODE_MANUAL ? self::MODE_MANUAL : self::MODE_AUTO;
+        // Không còn chia "tự động / thủ công": giờ luôn được tự đề xuất, giờ nào chủ app sửa (items.*.at) thì giữ và kiểm.
+        $mode = self::MODE_AUTO;
         $sharedCaption = trim((string) ($in['caption'] ?? ''));
         $sharedTags = Hashtags::normalize($in['hashtags'] ?? []);
         $items = array_values(array_filter((array) ($in['items'] ?? []), 'is_array'));
@@ -195,11 +239,6 @@ final class RiengBatch
 
         $tz = $this->planner->timezoneFor($auto);
         $fmt = fn (int $ts): string => CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->format('H:i d/m');
-        $gap = $this->planner->gapSeconds();
-        $horizon = $this->planner->horizonFor($auto, $now);
-        $hardMax = $now->addSeconds(ChromeJobs::SCHEDULE_MAX_AHEAD - 3600);
-        $minAt = $now->addSeconds(Planner::MIN_LEAD);
-        $room = $this->planner->futureRoom($auto, $now);
 
         $rows = [];
         $seen = [];
@@ -253,24 +292,13 @@ final class RiengBatch
                 }
             }
 
-            $row['cover'] = $this->coverFor($coverMode, filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : $batchToken, $video, $productCover, $row);
-            $row['_at'] = $mode === self::MODE_MANUAL ? $this->parseAt($item['at'] ?? null) : null;
+            $ownToken = filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : null;
+            $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, $productCover, $row);
+            $row['_at'] = $this->parseAt($item['at'] ?? null);
             $rows[] = $row;
         }
 
-        $left = 0;
-
-        if ($mode === self::MODE_AUTO) {
-            $left = $this->assignAuto($rows, $auto, $now, $horizon, $room, $tz);
-        } else {
-            $this->checkManual($rows, $auto, $now, $minAt, $horizon, $hardMax, $gap, $room, $tz, $fmt);
-        }
-
-        foreach ($rows as &$r) {
-            unset($r['_at']);
-        }
-
-        unset($r);
+        $left = $this->schedule($rows, $auto, $now, $fmt);
 
         return [
             'ok' => true,
@@ -307,10 +335,24 @@ final class RiengBatch
      * @param  array<string, mixed>  $row
      * @return array{kind: string, url: ?string, note: string, token: ?string}
      */
-    private function coverFor(string $mode, ?string $token, AutoVideo $video, array $productCover, array &$row): array
+    private function coverFor(string $mode, ?string $ownToken, ?string $batchToken, AutoVideo $video, array $productCover, array &$row): array
     {
         $covers = app(RiengCovers::class);
         $tmpUrl = fn (string $t): string => '/auto/kho/rieng/anh-bia/tam/'.$t;
+
+        // Ảnh riêng của video (tải lên / khung đã chọn / ảnh đã nhớ từ lần trước) luôn thắng, ở mọi cách chọn bìa.
+        if ($ownToken !== null) {
+            if ($covers->tmpPath($ownToken) === null) {
+                $row['status'] = 'error';
+                $row['messages'][] = 'Ảnh bìa đã chọn không còn nữa, hãy chọn lại.';
+
+                return ['kind' => 'own', 'url' => null, 'token' => null, 'note' => 'Lỗi ảnh bìa'];
+            }
+
+            return ['kind' => 'own', 'url' => $tmpUrl($ownToken), 'token' => $ownToken, 'note' => 'Ảnh riêng của video này'];
+        }
+
+        $token = $mode === self::COVER_PRODUCT ? null : $batchToken;
 
         if ($mode === self::COVER_PRODUCT) {
             return [
@@ -364,87 +406,66 @@ final class RiengBatch
     }
 
     /**
-     * Tự động: video (theo thứ tự chọn) lấy các giờ trống gần nhất của Planner, trong hạn mức bài chờ đăng.
-     * Gán `_at` thẳng vào $rows; video không còn giờ trống để status `skip`. Trả số video còn lại.
+     * Đặt giờ cho các dòng (gán `at` + bỏ `_at`). Giờ chủ app đã sửa (`_at`) được giữ và kiểm; dòng chưa có giờ được tự đề xuất
+     * giờ trống sớm nhất (RiengSchedule). Lỗi cứng (status `error`): gần hơn 45 phút, quá xa theo TikTok, ngoài khung giờ đăng,
+     * trùng giờ y hệt trên cùng kênh, vượt hạn mức bài chờ. Cảnh báo (status `warn`, cho phép "Vẫn hẹn"): cách bài cùng kênh
+     * chưa đủ giãn cách. Kênh khác không tính. Trả số video không còn giờ (status `skip`).
      *
      * @param  list<array<string, mixed>>  $rows
      */
-    private function assignAuto(array &$rows, AutoAccount $auto, CarbonImmutable $now, CarbonImmutable $horizon, int $room, \DateTimeZone $tz): int
+    private function schedule(array &$rows, AutoAccount $auto, CarbonImmutable $now, Closure $fmt): int
     {
-        $from = $now->addSeconds(Planner::MIN_LEAD)->startOfMinute()->addMinute();
-        $slots = array_slice($this->planner->slotsFor($auto, $from, $horizon), 0, max(0, $room));
-        $left = 0;
-        $i = 0;
-
-        foreach ($rows as &$r) {
-            if ($r['status'] === 'error') {
-                continue;
-            }
-
-            if (! isset($slots[$i])) {
-                $r['status'] = 'skip';
-                $r['messages'][] = $room <= 0 ? 'Kênh đã đủ số bài chờ đăng.' : 'Chưa có giờ trống trong '.$this->planner->aheadDays($auto).' ngày tới, video này để lại.';
-                $left++;
-
-                continue;
-            }
-
-            $r['_at'] = $slots[$i++];
-            $r['at'] = $r['_at']->setTimezone($tz)->toIso8601String();
-        }
-
-        unset($r);
-
-        return $left;
-    }
-
-    /**
-     * Thủ công: kiểm từng giờ do chủ chọn. Lỗi cứng (status `error`): thiếu giờ, gần hơn 45 phút, quá xa theo TikTok, trùng giờ y hệt
-     * trên cùng kênh, vượt hạn mức bài chờ. Cảnh báo (status `warn`, cho phép "Vẫn hẹn"): sát giờ bài khác của kênh,
-     * sát giờ kênh khác, ngoài số ngày xếp trước của kênh.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     */
-    private function checkManual(array &$rows, AutoAccount $auto, CarbonImmutable $now, CarbonImmutable $minAt, CarbonImmutable $horizon, CarbonImmutable $hardMax, int $gap, int $room, \DateTimeZone $tz, \Closure $fmt): void
-    {
-        $times = array_filter(array_map(fn (array $r): ?CarbonImmutable => $r['_at'] ?? null, $rows));
-        $stamps = array_map(fn (CarbonImmutable $t): int => $t->getTimestamp(), $times) ?: [$now->getTimestamp()];
-        $from = CarbonImmutable::createFromTimestampUTC(min($stamps) - $gap - 3600);
-        $to = CarbonImmutable::createFromTimestampUTC(max($stamps) + $gap + 3600);
-
-        $mine = $this->entries($auto, $from, $to, true);
-        $others = $this->entries($auto, $from, $to, false);
+        $sched = app(RiengSchedule::class);
+        $tz = $this->planner->timezoneFor($auto);
+        $gap = $this->planner->gapSeconds();
+        $gapMin = intdiv($gap, 60);
+        $minTs = $now->getTimestamp() + Planner::MIN_LEAD;
+        $maxTs = $sched->latest($now);
+        $room = $this->planner->futureRoom($auto, $now);
+        $busy = $sched->busy($auto, $now->getTimestamp() - $gap, $maxTs + $gap);
+        $window = $sched->windowLabel($auto);
+        $iso = fn (int $ts): string => CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->toIso8601String();
         $batch = [];
         $used = 0;
+        $left = 0;
 
+        // 1) Giờ chủ app tự sửa.
         foreach ($rows as &$r) {
-            if ($r['status'] === 'error') {
-                continue;
-            }
+            $r['edited'] = false;
 
             /** @var CarbonImmutable|null $at */
             $at = $r['_at'] ?? null;
 
             if ($at === null) {
-                $r['status'] = 'error';
-                $r['messages'][] = 'Chưa chọn giờ đăng.';
-
                 continue;
             }
 
-            $r['at'] = $at->setTimezone($tz)->toIso8601String();
-            $ts = $at->getTimestamp();
+            $r['edited'] = true;
 
-            if ($at->lessThan($minAt)) {
+            if ($r['status'] === 'error') {
+                continue;
+            }
+
+            $ts = $at->getTimestamp();
+            $r['at'] = $iso($ts);
+
+            if ($ts < $minTs) {
                 $r['status'] = 'error';
                 $r['messages'][] = 'Giờ đăng phải cách bây giờ ít nhất '.intdiv(Planner::MIN_LEAD, 60).' phút (để Chrome kịp nhận bài).';
 
                 continue;
             }
 
-            if ($at->greaterThan($hardMax)) {
+            if ($ts > $maxTs) {
                 $r['status'] = 'error';
                 $r['messages'][] = 'TikTok chỉ cho hẹn giờ tối đa khoảng 9 ngày tới.';
+
+                continue;
+            }
+
+            if (! $sched->inWindow($auto, $ts)) {
+                $r['status'] = 'error';
+                $r['messages'][] = 'Ngoài khung giờ đăng của kênh ('.$window.'). Hãy chọn giờ trong khung, hoặc đổi khung giờ ở Cài đặt kênh.';
 
                 continue;
             }
@@ -456,46 +477,34 @@ final class RiengBatch
                 continue;
             }
 
-            $exact = false;
+            $exact = null;
 
-            foreach ([...$mine, ...array_map(fn (int $t): array => ['ts' => $t, 'what' => 'một video khác trong lượt này'], $batch)] as $e) {
-                if (abs($e['ts'] - $ts) < self::EXACT_SECONDS) {
-                    $exact = true;
-                    $r['messages'][] = 'Đã có bài đúng giờ '.$fmt($e['ts']).' trên kênh này ('.($e['what'] ?? 'bài khác').').';
+            foreach ([...$busy, ...$batch] as $b) {
+                if (abs($b - $ts) < self::EXACT_SECONDS) {
+                    $exact = $b;
                     break;
                 }
             }
 
-            if ($exact) {
+            if ($exact !== null) {
                 $r['status'] = 'error';
+                $r['messages'][] = 'Đã có bài đúng giờ '.$fmt($exact).' trên kênh này, hãy chọn giờ khác.';
 
                 continue;
             }
 
-            foreach ($mine as $e) {
-                if (abs($e['ts'] - $ts) < $gap) {
+            foreach ($busy as $b) {
+                if (abs($b - $ts) < $gap) {
                     $r['status'] = 'warn';
-                    $r['messages'][] = 'Trùng giờ với bài '.$fmt($e['ts']).' của kênh này (cần cách nhau ít nhất '.intdiv($gap, 60).' phút).';
+                    $r['messages'][] = 'Gần bài '.$fmt($b).' của kênh này (nên cách nhau ít nhất '.$gapMin.' phút).';
                 }
             }
 
-            foreach ($batch as $t) {
-                if (abs($t - $ts) < $gap) {
+            foreach ($batch as $b) {
+                if (abs($b - $ts) < $gap) {
                     $r['status'] = 'warn';
-                    $r['messages'][] = 'Gần giờ '.$fmt($t).' của một video khác trong lượt này (cần cách nhau ít nhất '.intdiv($gap, 60).' phút).';
+                    $r['messages'][] = 'Gần giờ '.$fmt($b).' của một video khác trong lượt này (nên cách nhau ít nhất '.$gapMin.' phút).';
                 }
-            }
-
-            foreach ($others as $e) {
-                if (abs($e['ts'] - $ts) < Planner::CHANNEL_CLEARANCE) {
-                    $r['status'] = 'warn';
-                    $r['messages'][] = 'Trùng giờ với bài '.$fmt($e['ts']).' của kênh '.$e['what'].' (hai kênh nên cách nhau ít nhất '.intdiv(Planner::CHANNEL_CLEARANCE, 60).' phút).';
-                }
-            }
-
-            if ($at->greaterThan($horizon)) {
-                $r['status'] = 'warn';
-                $r['messages'][] = 'Xa hơn '.$this->planner->aheadDays($auto).' ngày xếp trước của kênh này.';
             }
 
             $batch[] = $ts;
@@ -503,39 +512,37 @@ final class RiengBatch
         }
 
         unset($r);
-    }
 
-    /**
-     * Bài đã xếp trong khoảng: video tự động/riêng và bài TikTok hẹn giờ. $same = cùng kênh; không thì các kênh khác.
-     *
-     * @return list<array{ts: int, what: string}>
-     */
-    private function entries(AutoAccount $auto, CarbonImmutable $from, CarbonImmutable $to, bool $same): array
-    {
-        $op = $same ? '=' : '!=';
-        $out = [];
-        $names = SocialAccount::query()->get(['id', 'username', 'display_name'])->mapWithKeys(fn (SocialAccount $s): array => [$s->id => '@'.($s->username ?: $s->display_name)]);
-
-        $videos = AutoVideo::query()->where('social_account_id', $op, $auto->social_account_id)->whereIn('status', self::COUNTED)
-            ->whereBetween('scheduled_for', [$from, $to])->get(['social_account_id', 'scheduled_for']);
-
-        foreach ($videos as $v) {
-            $out[] = ['ts' => $v->scheduled_for->getTimestamp(), 'what' => $same ? 'bài khác' : (string) ($names[$v->social_account_id] ?? 'khác')];
-        }
-
-        $posts = Post::query()->where('social_account_id', $op, $auto->social_account_id)->where('status', PostStatus::Scheduled)
-            ->whereBetween('scheduled_at', [$from, $to])->get(['social_account_id', 'scheduled_at']);
-
-        foreach ($posts as $p) {
-            $ts = CarbonImmutable::parse($p->scheduled_at)->getTimestamp();
-
-            // Bài của video tự động đã có dòng AutoVideo ở trên: không đếm hai lần.
-            if (! collect($out)->contains(fn (array $e): bool => $e['ts'] === $ts)) {
-                $out[] = ['ts' => $ts, 'what' => $same ? 'bài khác' : (string) ($names[$p->social_account_id] ?? 'khác')];
+        // 2) Tự đề xuất giờ trống sớm nhất cho các dòng còn lại (theo thứ tự chọn).
+        foreach ($rows as &$r) {
+            if ($r['status'] === 'error' || $r['edited']) {
+                continue;
             }
+
+            $ts = $used < $room ? $sched->next($auto, $minTs, $maxTs, [...$busy, ...$batch], $gap) : null;
+
+            if ($ts === null) {
+                $r['status'] = 'skip';
+                $r['messages'][] = $used >= $room
+                    ? 'Kênh đã đủ số bài chờ đăng.'
+                    : 'Không còn giờ trống trong khung giờ đăng ('.$window.') tới ngày xa nhất TikTok cho hẹn, video này để lại.';
+                $left++;
+
+                continue;
+            }
+
+            $r['at'] = $iso($ts);
+            $batch[] = $ts;
+            $used++;
         }
 
-        return $out;
+        foreach ($rows as &$r) {
+            unset($r['_at']);
+        }
+
+        unset($r);
+
+        return $left;
     }
 
     // ------------------------------------------------------------------ Ghi
@@ -569,6 +576,22 @@ final class RiengBatch
             } else {
                 $failed++;
                 $rows[] = $row + ['result' => 'error', 'error' => $error];
+            }
+        }
+
+        // Nhớ cách chọn bìa cho kênh + sản phẩm (và kênh), cùng ảnh riêng của từng video, để lần sau tự dùng lại.
+        if ($done > 0) {
+            try {
+                $memory = app(RiengCoverMemory::class);
+                $memory->rememberChoice((string) $social->id, $code, $qc, (string) $plan['cover_mode'], filled($in['cover_token'] ?? null) ? (string) $in['cover_token'] : null);
+
+                foreach ($rows as $r) {
+                    if (($r['result'] ?? null) === 'done' && ($r['cover']['kind'] ?? null) === 'own' && filled($r['cover']['token'] ?? null)) {
+                        $memory->rememberVideo((int) $r['id'], (string) $r['cover']['token']);
+                    }
+                }
+            } catch (Throwable $e) {
+                report($e);
             }
         }
 
@@ -617,12 +640,12 @@ final class RiengBatch
         try {
             $covers = app(RiengCovers::class);
 
-            if ($coverMode === self::COVER_PRODUCT) {
+            if ($coverMode === self::COVER_PRODUCT && ($coverToken === null || $coverToken === '')) {
                 $covers->forget((int) $video->id);
             } else {
                 $c = $covers->attach($video, $coverToken);
                 $ownCover = $c['file'];
-                $meta['cover'] = ['file' => $c['file'], 'kind' => $coverMode, 'w' => $c['w'], 'h' => $c['h']];
+                $meta['cover'] = ['file' => $c['file'], 'kind' => $coverToken !== null && $coverToken !== '' && $coverMode === self::COVER_PRODUCT ? 'own' : $coverMode, 'w' => $c['w'], 'h' => $c['h']];
             }
 
             $video->forceFill(['meta' => $meta])->save();

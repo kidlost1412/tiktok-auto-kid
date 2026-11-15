@@ -62,15 +62,31 @@ final class RiengCovers
         return is_file($path) ? $path : null;
     }
 
+    /** Chỗ giữ ảnh bìa đã nhớ (RiengCoverMemory): không bị dọn như ảnh tạm. */
+    public function savedDir(): string
+    {
+        return $this->root().'/_saved';
+    }
+
+    public function ensureSavedDir(): void
+    {
+        $this->ensureDir($this->savedDir());
+    }
+
+    /** Đường dẫn ảnh của một token: ảnh tạm vừa chọn, hoặc ảnh đã nhớ từ lần trước. */
     public function tmpPath(string $token): ?string
     {
         if (! self::validName($token)) {
             return null;
         }
 
-        $path = $this->tmpDir().'/'.$token;
+        foreach ([$this->tmpDir(), $this->savedDir()] as $dir) {
+            if (is_file($dir.'/'.$token)) {
+                return $dir.'/'.$token;
+            }
+        }
 
-        return is_file($path) ? $path : null;
+        return null;
     }
 
     /**

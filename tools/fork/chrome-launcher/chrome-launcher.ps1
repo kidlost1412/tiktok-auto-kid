@@ -275,7 +275,9 @@ function Start-ChromeProfile {
     param([string]$Exe, [string]$ProfileDir)
     # Không hiện cửa sổ; tiện ích có quyền "background" vẫn chạy.
     # Tiến trình tách rời, script không giữ vòng đời của Chrome.
-    Start-Process -FilePath $Exe -ArgumentList ('--profile-directory="{0}" --no-startup-window' -f $ProfileDir) | Out-Null
+    # Ba cờ cuối: cửa sổ Studio của tiện ích bị thu nhỏ/che khuất không bị Chrome làm chậm timer hay đóng băng trang
+    # (chỉ có tác dụng khi Chrome được mở mới bởi trợ lý này; Chrome đang chạy thì bỏ qua cờ).
+    Start-Process -FilePath $Exe -ArgumentList ('--profile-directory="{0}" --no-startup-window --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling' -f $ProfileDir) | Out-Null
 }
 
 function Invoke-Cycle {

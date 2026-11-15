@@ -405,3 +405,44 @@ cover (first frame) and the result carries `cover_status: "failed"` + `cover_war
 Job / sync / collection windows follow `windowStrategy`. A `tab` strategy with no normal window open (Chrome started in the background)
 uses a minimized, unfocused window instead of letting `tabs.create` open a visible one; a minimized window that came up in the normal
 state is minimized again. The extension closes what it opened.
+
+## 12. "Đổi giờ": delete a post already scheduled on TikTok (extension 1.4.6) -- optional, protocol stays v1
+
+TikTok does not let a scheduled post's time be edited. To move it, the app has the extension DELETE the scheduled item and
+then VERIFY with the item list (STUDIO-API.md (a)) that it is gone. Only a verified deletion lets the app set the new time and
+re-dispatch the post through the normal job flow (sections 3.3-3.7). Anything else changes nothing: the old TikTok schedule
+stays valid. Rule above all: never end up with zero or two copies; when in doubt, report `unknown`, never `deleted`.
+
+### 12.1 `GET /api/ext/tasks` gains `delete_scheduled`
+`{"sync_products": ..., "delete_scheduled": null | {"id": "rs_...", "nonce": "<32 hex>", "item_id": "7570000000000000777",
+"expect_user_id": "<digits>", "expect_account": "<handle>", "schedule_unix": 1793367000, "state": "pending" | "claimed"}}`.
+Offered only to a client whose TikTok identity is the channel's, while the old scheduled time is more than 20 min away. A claimed
+task is offered again to the same client only (resume). Old extensions ignore the key.
+
+### 12.2 `POST /api/ext/delete_scheduled/claim` `{"id", "nonce"}`
+-> `{"ok": true, "state": "claimed"}` or `{"ok": false, "state", "reason": "not-pending" | "too-late" | "identity-mismatch" | "identity-conflict"}`.
+Needs the protocol in range (409 `need_reload`). 404 `unknown_job`, 403 `bad_nonce`. The extension opens nothing unless `ok`.
+
+### 12.3 What the extension does (api-main.js `deleteScheduled`, in a minimized Studio tab `#autotok=del-<id>` armed in `block`)
+1. Passport identity must equal `expect_account` / `expect_user_id` (else `failed`, reason `identity`).
+2. Pre-check: read item_list pages until `item_id` is found. Not found -> `failed` `not_found`; listed but not a future scheduled
+   item at `schedule_unix` (+/- 15 min, more than 10 min away) -> `failed` `not_scheduled`. Nothing is deleted in these cases.
+3. ONE delete call: `deleteScheduledItemOnTikTok(item_id)` = `POST /api/aweme/delete/?aweme_id=<id>&aid=1988` (tiktok.com web
+   endpoint, sent from the page's MAIN world). **Not captured from a real Studio session yet: must be confirmed once live.**
+4. Verify after 2.5 s, 4 s, 7 s: item_list scanned from the top until the list ends, or until at least one page past where the item
+   was found AND a post older than `schedule_unix - 1 day` was seen. Absent -> `deleted` + `verified: true`. Still listed ->
+   `not_deleted`. Lists unreadable -> `unknown`.
+5. Lost tab / timeout: before the tab took the task -> `failed` (nothing sent); after -> `unknown`.
+
+### 12.4 `POST /api/ext/delete_scheduled/result`
+`{"id", "nonce", "outcome": "deleted" | "not_deleted" | "failed" | "unknown", "verified": bool, "delete_sent": bool|null,
+"item_id", "reason", "detail", "http", "status_code", "status_msg", "endpoint", "elapsed_ms"}` -> `{"ok": true, "state", "duplicate"}`.
+The app changes the post ONLY for `outcome: "deleted"` with `verified: true` and the task's `item_id`: in one transaction the old
+`posted` job becomes `revoked` (note "Bài đã được sửa giờ: ...", so the dispatcher queues a new attempt), `Post.scheduled_at` and
+`AutoVideo.scheduled_for` get the new time. `unknown` keeps everything and asks the owner to check TikTok Studio. The first result
+wins; late results are accepted while the request is `claimed` / `unknown`. On network failure retry until 200, 404 or 403.
+
+### 12.5 App side (deadlines)
+Requests: `pending -> claimed -> done | failed | unknown`, `pending -> expired` (not claimed in 15 min, or the old time came within
+20 min), `claimed -> unknown` (no result in 15 min). One open request per post. The app refuses up front when the old time is less
+than 60 min away, when the job has no `item_id`, when Chrome is not ready, or when another attempt would exceed the job attempt cap.

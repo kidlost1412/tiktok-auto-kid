@@ -495,6 +495,105 @@
     }
   }
 
+  // ---- v1.4.6 "Đổi giờ": delete ONE scheduled post, then VERIFY with item_list that it is gone (PROTOCOL.md section 12) ----
+  // The ONLY place that sends a delete to TikTok. NOT DOCUMENTED by TikTok and not captured from Studio in this repo: this is the
+  // tiktok.com web endpoint the profile page's "Delete" uses (POST /api/aweme/delete/?aweme_id=<id>&aid=1988), sent from this
+  // MAIN world so the page's own hooks can sign it. Whatever it answers, the caller decides ONLY from the item list afterwards.
+  // -> {sent, http, status_code, status_msg, endpoint, error}
+  async function deleteScheduledItemOnTikTok(itemId) {
+    const endpoint = '/api/aweme/delete/';
+    const url = endpoint + '?aweme_id=' + encodeURIComponent(itemId) + '&aid=' + AID;
+    try {
+      const r = await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'aweme_id=' + encodeURIComponent(itemId) });
+      let j = null; try { j = JSON.parse(await r.text()); } catch (_) { /* non-JSON */ }
+      return { sent: true, http: r.status, status_code: j && j.status_code != null ? Number(j.status_code) : null, status_msg: j && typeof j.status_msg === 'string' ? j.status_msg.slice(0, 120) : '', endpoint };
+    } catch (e) {
+      return { sent: true, http: null, status_code: null, status_msg: '', endpoint, error: String(e && e.message).slice(0, 120) };   // may have reached TikTok
+    }
+  }
+
+  let deleting = false;
+  async function deleteScheduled(msg) {
+    const S = window.AutotokStudio;
+    const nonce = String(msg.nonce);
+    const task = msg.task || {};
+    const itemId = String(task.item_id || '');
+    const expect = Number(task.schedule_unix) || 0;
+    const t0 = Date.now();
+    const done = (result) => window.postMessage({ __autotok: 1, from: 'api', kind: 'done', nonce, result: Object.assign({ item_id: itemId, elapsed_ms: Date.now() - t0 }, result) }, location.origin);
+    let sent = false;
+    const listPage = async (cursor) => {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const r = await fetch(S.itemListUrl(), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S.itemListBody(cursor, 50)) });
+          if (r.status === 200) { const p = S.parseItemList(JSON.parse(await r.text())); if (p.ok) return p; }
+        } catch (_) { /* retry */ }
+        await sleep(1500 * (i + 1));
+      }
+      return null;
+    };
+    // Scan item_list until the item is found or its absence is proven. -> {ok, st}
+    const scan = async (minPages) => {
+      const st = S.scanStart(itemId, expect, minPages);
+      let cursor = 0;
+      for (let n = 0; n < 8; n++) {
+        const p = await listPage(cursor);
+        if (!p) return { ok: false, st };
+        S.scanPage(st, p);
+        if (S.scanDone(st) || p.cursor === cursor) break;
+        cursor = p.cursor;
+        await sleep(800);
+      }
+      return { ok: S.scanDone(st), st };
+    };
+    try {
+      if (!S || !/^[0-9]{5,25}$/.test(itemId)) return done({ outcome: 'failed', reason: 'bad_task', delete_sent: false });
+      // 1. strict identity: the logged-in account must be the channel's
+      let pj = null;
+      try { pj = await (await fetch('/passport/web/account/info/?aid=' + AID, { credentials: 'include' })).json(); } catch (_) { pj = null; }
+      const id = L.checkIdentity(pj, { username: task.expect_account, userId: task.expect_user_id });
+      if (!id.ok) return done({ outcome: 'failed', reason: 'identity', detail: id.reason, delete_sent: false });
+      // 2. wait for the page's signing SDK (item_list is signed by the page)
+      const hk = window.__autotokHook;
+      const w0 = Date.now();
+      while (document.readyState !== 'complete' && Date.now() - w0 < 20000) await sleep(300);
+      while (hk && XMLHttpRequest.prototype.send === hk.wrapperSend && Date.now() - w0 < 20000) await sleep(400);
+      await sleep(1500);
+      // 3. BEFORE deleting: the item must be listed and still scheduled at the expected time (never delete a published video)
+      const pre = await scan(1);
+      if (!pre.ok) return done({ outcome: 'failed', reason: 'list_failed', delete_sent: false });
+      if (!pre.st.found) return done({ outcome: 'failed', reason: 'not_found', delete_sent: false, checks: pre.st.pages });
+      const chk = S.scheduledCheck(pre.st.found, expect, Math.floor(Date.now() / 1000), 600, 900);
+      if (!chk.ok) return done({ outcome: 'failed', reason: 'not_scheduled', detail: chk.reason, delete_sent: false });
+      // 4. the single delete call
+      const del = await deleteScheduledItemOnTikTok(itemId);
+      sent = true;
+      // 5. verify: the item must be absent from a scan that reaches at least one page past where it was found
+      let last = null, foundAgain = false;
+      for (const waitMs of [2500, 4000, 7000]) {
+        await sleep(waitMs);
+        last = await scan(pre.st.foundPage + 1);
+        if (last.ok && S.scanProvesAbsent(last.st)) {
+          return done({ outcome: 'deleted', verified: true, delete_sent: true, http: del.http, status_code: del.status_code, status_msg: del.status_msg, endpoint: del.endpoint });
+        }
+        if (last.ok && last.st.found) foundAgain = true;
+      }
+      return done(foundAgain && last && last.ok
+        ? { outcome: 'not_deleted', reason: 'not_deleted', verified: true, delete_sent: true, http: del.http, status_code: del.status_code, status_msg: del.status_msg, endpoint: del.endpoint, detail: del.error }
+        : { outcome: 'unknown', reason: 'unknown', verified: false, delete_sent: true, http: del.http, status_code: del.status_code, endpoint: del.endpoint, detail: del.error });
+    } catch (e) {
+      return done({ outcome: sent ? 'unknown' : 'failed', reason: sent ? 'unknown' : 'exception', delete_sent: sent, detail: String(e && e.message).slice(0, 200) });
+    }
+  }
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.__autotok !== 1 || d.from !== 'content' || d.kind !== 'delete_scheduled') return;
+    if (deleting) return;
+    deleting = true;
+    deleteScheduled(d).finally(() => { deleting = false; });
+  });
+
   window.addEventListener('message', (e) => {
     const d = e.data;
     if (e.source !== window || !d || d.__autotok !== 1 || d.from !== 'content' || d.kind !== 'collect') return;

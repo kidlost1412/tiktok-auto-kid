@@ -12,6 +12,7 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Rieng\RiengBatch;
+use App\Fork\AutoPost\Rieng\RiengCoverMemory;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
@@ -267,7 +268,7 @@ test('frame mode extracts a full-size frame at the chosen second, and the defaul
     // Video a: khung đã chọn; video b: không đụng gì => khung mặc định (giây 1).
     $input = ($this->input)($account, [['id' => $a->id, 'cover_token' => $token], ['id' => $b->id]], ['cover_mode' => 'frame']);
     $preview = app(RiengBatch::class)->preview($input, $this->now);
-    expect($preview['rows'][0]['cover']['note'])->toBe('Khung đã chọn')
+    expect($preview['rows'][0]['cover']['note'])->toBe('Ảnh riêng của video này')
         ->and($preview['rows'][1]['cover']['url'])->toBe("/auto/kho/rieng/video/{$b->id}/thumb");
 
     $done = app(RiengBatch::class)->commit($input, false, $this->now);
@@ -354,4 +355,48 @@ test('a hub video built without an override never gets a rieng cover source', fu
     expect($post->meta['fork_cover'])->toBe($res['entry']['file'])->and($post->meta)->not->toHaveKey('fork_cover_src');
     $cover = app(CoverStore::class)->forPost($post);
     expect($cover['code'])->toBe($this->code)->and($cover)->not->toHaveKey('src');
+});
+
+// ---------------------------------------------------------------- Nhớ ảnh bìa cho lần sau
+
+test('cover choices are remembered per video, per channel + product and per channel, and reused next time', function () {
+    $account = ($this->account)();
+    $other = ($this->account)();
+    $a = ($this->rieng)('a.mp4');
+    $b = ($this->rieng)('b.mp4');
+    $c = ($this->rieng)('c.mp4');
+    $owner = rcOwner();
+    $memory = app(RiengCoverMemory::class);
+
+    // Chọn ảnh riêng cho video b qua endpoint tải lên (kèm video_id): nhớ ngay, chưa cần đăng.
+    $this->actingAs($owner)->post('/auto/kho/rieng/anh-bia/tai-len', ['image' => rcImage('jpg', 600, 800, 90), 'video_id' => $b->id])->assertOk();
+    $recall = $memory->recall((string) $account->id, $this->code, null, [$a->id, $b->id]);
+    expect($recall['mode'])->toBeNull()->and($recall['rows'])->toHaveKey($b->id)->and($recall['rows'])->not->toHaveKey($a->id);
+    $bToken = $recall['rows'][$b->id]['token'];
+    expect(app(RiengCovers::class)->tmpPath($bToken))->not->toBeNull();
+
+    // Đăng lượt có ảnh chung (tải lên) cho kênh + sản phẩm: lần sau tự chọn lại "Tải ảnh lên" với đúng ảnh đó.
+    $shared = ($this->stage)(rcImage('jpg', 540, 960, 10));
+    $done = app(RiengBatch::class)->commit(($this->input)($account, [['id' => $a->id], ['id' => $b->id, 'cover_token' => $bToken]], ['cover_mode' => 'upload', 'cover_token' => $shared]), false, $this->now);
+    expect($done['done'])->toBe(2);
+
+    // Ảnh tạm bị dọn vẫn không mất ảnh đã nhớ.
+    File::deleteDirectory(app(RiengCovers::class)->tmpDir());
+
+    $again = $memory->recall((string) $account->id, $this->code, null, [$b->id, $c->id]);
+    expect($again['mode'])->toBe('upload')->and($again['from'])->toBe('pair')
+        ->and($again['batch']['token'])->toBe($shared)->and(app(RiengCovers::class)->tmpPath($shared))->not->toBeNull()
+        ->and($again['rows'][$b->id]['token'])->toBe($bToken)->and($again['rows'])->not->toHaveKey($c->id);
+
+    // Sản phẩm khác trên cùng kênh: dùng lựa chọn theo kênh. Kênh khác: chưa nhớ gì.
+    expect($memory->recall((string) $account->id, 'khac', null, [])['from'])->toBe('account')
+        ->and($memory->recall((string) $other->id, $this->code, null, [])['mode'])->toBeNull();
+
+    // Ảnh nhớ dùng lại được để đăng thật (token trỏ vào chỗ nhớ).
+    $p = app(RiengBatch::class)->preview(($this->input)($account, [['id' => $c->id, 'cover_token' => $bToken]], ['cover_mode' => 'upload', 'cover_token' => $shared]), $this->now);
+    expect($p['rows'][0]['status'])->toBe('ok')->and($p['rows'][0]['cover']['kind'])->toBe('own');
+
+    // Bỏ bìa riêng: quên ảnh của video đó.
+    $this->actingAs($owner)->post('/auto/kho/rieng/video/'.$b->id.'/quen-bia')->assertOk();
+    expect($memory->recall((string) $account->id, $this->code, null, [$b->id])['rows'])->toBe([]);
 });

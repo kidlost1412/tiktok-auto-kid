@@ -125,7 +125,37 @@
     return items.filter((i) => i.post_time > 0 && i.post_time <= nowS - (minAgeS || 0) && i.post_time >= nowS - days * DAY).sort((a, b) => b.post_time - a.post_time).slice(0, cap || 40);
   }
 
+  // ---------- v1.4.6 "Đổi giờ" (PROTOCOL.md section 12): pure checks around deleting ONE scheduled item ----------
+  // The delete request itself lives in api-main.js (deleteScheduledItemOnTikTok); these helpers only judge item_list pages.
+
+  // Is the listed item still a scheduled (not yet published) post at the time the app expects? -> {ok, reason, at}
+  // `at` = schedule_time, else post_time. It must be > now + minAheadS and within toleranceS of the expected unix time.
+  function scheduledCheck(item, expectUnix, nowS, minAheadS, toleranceS) {
+    const x = obj(item);
+    const at = int0(x.schedule_time) || int0(x.post_time);
+    if (!at) return { ok: false, reason: 'no-time', at: 0 };
+    if (at <= nowS + (minAheadS == null ? 600 : minAheadS)) return { ok: false, reason: 'too-close-or-published', at };
+    if (Number(expectUnix) > 0 && Math.abs(at - Number(expectUnix)) > (toleranceS == null ? 900 : toleranceS)) return { ok: false, reason: 'time-mismatch', at };
+    return { ok: true, reason: '', at };
+  }
+
+  // Scanner state over successive item_list pages (newest post_time first). Feed each parsed page with `scanPage`.
+  // found: the item_id was listed. complete: the scan went far enough to PROVE absence: the list ended, or at least `minPages`
+  // pages were read AND an item older than (expectUnix - 1 day) was seen (scheduled items sort at the top by post_time).
+  function scanStart(itemId, expectUnix, minPages) { return { itemId: String(itemId), expectUnix: Number(expectUnix) || 0, minPages: Math.max(1, minPages || 1), pages: 0, found: null, foundPage: -1, sawOlder: false, ended: false }; }
+  function scanPage(st, page) {
+    st.pages++;
+    for (const it of page.items || []) {
+      if (it.item_id === st.itemId && !st.found) { st.found = it; st.foundPage = st.pages; }
+      if (st.expectUnix && it.post_time > 0 && it.post_time < st.expectUnix - DAY) st.sawOlder = true;
+    }
+    if (!page.hasMore) st.ended = true;
+    return st;
+  }
+  const scanDone = (st) => !!st.found || st.ended || (st.sawOlder && st.pages >= st.minPages);
+  const scanProvesAbsent = (st) => !st.found && (st.ended || (st.sawOlder && st.pages >= st.minPages));
+
   const api = { COMMON, itemListUrl, itemListBody, parseItemList, insightUrl, accountRequests, parseAccountInsight, videoInsightRequests, videoInsightUrl, parseVideoInsight,
-    commentsUrl, commentsBody, parseComments, takeNewComments, pickInsightTargets };
+    commentsUrl, commentsBody, parseComments, takeNewComments, pickInsightTargets, scheduledCheck, scanStart, scanPage, scanDone, scanProvesAbsent };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AutotokStudio = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

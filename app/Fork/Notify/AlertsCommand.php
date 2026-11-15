@@ -11,6 +11,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\VideoComment;
 use App\Fork\AutoPost\Models\VideoStat;
+use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
@@ -262,7 +263,9 @@ final class AlertsCommand extends Command
             ->whereIn('state', ['failed', 'rejected', 'uncertain'])
             ->where('updated_at', '>=', now()->subDay())
             ->orderBy('updated_at')
-            ->get();
+            ->get()
+            // TikTok đầy lịch hẹn: không phải lỗi, app tự hẹn lại khi có chỗ (Lịch đăng có ghi chú).
+            ->reject(fn (ChromeJob $job): bool => ChromeJobs::isQuotaRejection($job));
 
         $names = $this->usernames($jobs->pluck('social_account_id'));
 

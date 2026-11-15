@@ -89,6 +89,11 @@ class ChromeAwareTikTokPublisher
             return ! str_starts_with((string) $job->note, ChromeJobs::CANCEL_TEXT);
         }
 
+        // TikTok từ chối vì kênh đầy lịch hẹn: chắc chắn chưa lên, tới giờ thì đăng ngay.
+        if (ChromeJobs::isQuotaRejection($job)) {
+            return true;
+        }
+
         if ($job->state === 'failed') {
             return data_get($job->result, 'not_sent') === true || $job->authorized_at === null;
         }

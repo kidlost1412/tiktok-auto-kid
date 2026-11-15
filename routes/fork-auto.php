@@ -7,6 +7,7 @@ use App\Fork\AutoPost\Http\GioHangController;
 use App\Fork\AutoPost\Http\KhoController;
 use App\Fork\AutoPost\Http\MediaController;
 use App\Fork\AutoPost\Http\PersonaliseController;
+use App\Fork\AutoPost\Http\RescheduleController;
 use App\Fork\AutoPost\Http\RiengController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
@@ -21,6 +22,9 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::patch('accounts/{socialAccount}', [AutoController::class, 'updateAccount'])->name('accounts.update');
     Route::post('huong-dan/an', [AutoController::class, 'hideOnboarding'])->name('onboarding.hide');
     Route::post('videos/{video}/thu-lai', [AutoController::class, 'retryVideo'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.retry');
+    // "Đổi giờ" bài đã xếp lịch mà chưa đăng (bài đã hẹn trên TikTok: xoá bài hẹn cũ qua Chrome rồi hẹn lại).
+    Route::get('videos/{video}/doi-gio', [RescheduleController::class, 'show'])->whereNumber('video')->name('videos.reschedule.show');
+    Route::post('videos/{video}/doi-gio', [RescheduleController::class, 'store'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.reschedule');
     Route::post('accounts/{socialAccount}/pause', [AutoController::class, 'pause'])->name('accounts.pause');
     Route::post('accounts/{socialAccount}/apply-hours', [AutoController::class, 'applyHours'])->name('accounts.apply-hours');
     // Giỏ hàng TikTok Shop: trang riêng, chọn sản phẩm theo từng kênh và từng quy cách.
@@ -77,6 +81,9 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::post('anh-bia/tai-len', [RiengController::class, 'coverUpload'])->middleware('throttle:60,1')->name('cover.upload');
         Route::get('anh-bia/tam/{token}', [RiengController::class, 'coverTemp'])->name('cover.temp');
         Route::post('video/{video}/khung', [RiengController::class, 'coverFrame'])->whereNumber('video')->middleware('throttle:60,1')->name('cover.frame');
+        Route::post('anh-bia/nho', [RiengController::class, 'coverRecall'])->middleware('throttle:120,1')->name('cover.recall');
+        Route::post('video/{video}/quen-bia', [RiengController::class, 'coverForget'])->whereNumber('video')->middleware('throttle:120,1')->name('cover.forget');
+        Route::post('dat-lich/goi-y', [RiengController::class, 'batchPropose'])->middleware('throttle:120,1')->name('batch.propose');
         Route::post('dat-lich/xem', [RiengController::class, 'batchPreview'])->middleware('throttle:60,1')->name('batch.preview');
         Route::post('dat-lich', [RiengController::class, 'batchCommit'])->middleware('throttle:20,1')->name('batch.commit');
     });

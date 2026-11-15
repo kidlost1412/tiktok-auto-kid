@@ -243,6 +243,25 @@
       await runCollect(hello.nonce, hello.plan || {});
       return;
     }
+    if (hello.role === 'delete') {   // v1.4.6 "Đổi giờ": delete one scheduled post + verify (api-main.js deleteScheduled)
+      let dr;
+      let handed = false;
+      try {
+        await arm('block');
+        await waitFor(() => document.readyState !== 'loading', { timeout: 30000, what: 'trang tải xong' });
+        if (/\/login/.test(location.pathname)) throw new StepError('not-logged-in', location.href);
+        handed = true;
+        window.postMessage({ __autotok: 1, from: 'content', kind: 'delete_scheduled', nonce: NONCE, task: hello.task }, location.origin);
+        const done = await waitFor(() => api.done, { timeout: 4 * 60000, interval: 500, what: 'MAIN-world delete (api-main.js)' });
+        dr = done.result;
+      } catch (e) {
+        // Once handed to the MAIN world a delete may have been sent: never claim "nothing happened".
+        dr = handed ? { outcome: 'unknown', reason: 'unknown', delete_sent: null, detail: String(e.message).slice(0, 200) }
+          : { outcome: 'failed', reason: e instanceof StepError ? e.code : 'exception', delete_sent: false, detail: String(e.message).slice(0, 200) };
+      }
+      await send('deleteResult', { result: dr });
+      return;
+    }
     if (hello.role === 'sync') {
       let sr;
       try { sr = await runSync(hello); } catch (e) { sr = { outcome: 'failed', reason: e instanceof StepError ? e.code : 'exception', detail: e.message }; console.error('[autotok]', e); }

@@ -13,6 +13,7 @@ use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\HashtagSuggestions;
 use App\Fork\AutoPost\Rieng\RiengBatch;
+use App\Fork\AutoPost\Rieng\RiengCoverMemory;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengInfo;
@@ -523,6 +524,13 @@ final class RiengController extends Controller
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
 
+        // Ảnh chọn riêng cho một video: nhớ ngay để lần sau mở lại vẫn còn.
+        $videoId = (int) $request->input('video_id', 0);
+
+        if ($videoId > 0 && AutoVideo::query()->whereKey($videoId)->where('source', AutoVideo::SOURCE_RIENG)->exists()) {
+            app(RiengCoverMemory::class)->rememberVideo($videoId, $token);
+        }
+
         return response()->json(['ok' => true, 'token' => $token, 'url' => '/auto/kho/rieng/anh-bia/tam/'.$token]);
     }
 
@@ -539,7 +547,40 @@ final class RiengController extends Controller
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
 
+        app(RiengCoverMemory::class)->rememberVideo((int) $video->id, $token);
+
         return response()->json(['ok' => true, 'token' => $token, 'url' => '/auto/kho/rieng/anh-bia/tam/'.$token]);
+    }
+
+    /** Ảnh bìa đã nhớ cho lượt đăng sắp mở: cách chọn bìa theo kênh + sản phẩm (hoặc kênh) và ảnh riêng của từng video. */
+    public function coverRecall(Request $request): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $data = $request->validate([
+            'social_account_id' => ['required', 'string'],
+            'product_code' => ['nullable', 'string', 'max:100'],
+            'quy_cach' => ['nullable', 'string', 'max:100'],
+            'ids' => ['nullable', 'array', 'max:200'],
+            'ids.*' => ['integer'],
+        ]);
+        $this->findAccount($accountId, (string) $data['social_account_id']);
+
+        return response()->json(app(RiengCoverMemory::class)->recall(
+            (string) $data['social_account_id'],
+            (string) ($data['product_code'] ?? ''),
+            filled($data['quy_cach'] ?? null) ? (string) $data['quy_cach'] : null,
+            array_map('intval', (array) ($data['ids'] ?? [])),
+        ));
+    }
+
+    /** Bỏ ảnh bìa đã nhớ của một video (chủ app chọn lại bìa mặc định). */
+    public function coverForget(Request $request, AutoVideo $video): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        abort_unless($video->isRieng(), SymfonyResponse::HTTP_NOT_FOUND);
+        app(RiengCoverMemory::class)->forgetVideo((int) $video->id);
+
+        return response()->json(['ok' => true]);
     }
 
     public function coverTemp(Request $request, string $token): BinaryFileResponse|SymfonyResponse
@@ -563,6 +604,21 @@ final class RiengController extends Controller
         return $this->batch($request, true);
     }
 
+    /** Đề xuất giờ đăng cho từng video (giờ đã sửa tay thì giữ và kiểm). Không ghi gì. */
+    public function batchPropose(Request $request): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $in = $request->validate([
+            'social_account_id' => ['required', 'string'],
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.id' => ['required', 'integer'],
+            'items.*.at' => ['nullable', 'string', 'max:40'],
+        ]);
+        $this->findAccount($accountId, (string) $in['social_account_id']);
+
+        return response()->json(app(RiengBatch::class)->propose($in));
+    }
+
     private function batch(Request $request, bool $commit): JsonResponse
     {
         $accountId = $this->authorizeOwner($request);
@@ -574,7 +630,7 @@ final class RiengController extends Controller
             'quy_cach' => ['nullable', 'string', 'max:100'],
             'caption' => ['nullable', 'string', 'max:5000'],
             'hashtags' => ['nullable'],
-            'mode' => ['required', 'in:auto,manual'],
+            'mode' => ['sometimes', 'in:auto,manual'],
             'accept_warnings' => ['sometimes', 'boolean'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.id' => ['required', 'integer'],

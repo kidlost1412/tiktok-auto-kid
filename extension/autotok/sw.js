@@ -620,7 +620,8 @@ async function pollTasks() {
     return false;
   }
   lastTasksErr = '';
-  const rid = t && t.sync_products != null && t.sync_products !== '' && t.sync_products !== false ? String(t.sync_products) : null;
+  if (t && t.delete_scheduled && typeof t.delete_scheduled === 'object' && !(await getSync()) && await startDelete(t.delete_scheduled)) return true;   // v1.4.6
+  const rid =t && t.sync_products != null && t.sync_products !== '' && t.sync_products !== false ? String(t.sync_products) : null;
   return rid ? startSync(rid) : false;
 }
 
@@ -779,6 +780,119 @@ async function pickTemplateProduct(candidates, keyed) {
   return keyedSet.size === 1 ? Array.from(keyedSet)[0] : null;
 }
 
+// ---------- v1.4.6 "Đổi giờ": delete one scheduled post on TikTok + verify (PROTOCOL.md section 12) ----------
+// Durable like a job: 'activeDelete' is written BEFORE the tab opens, one at a time, never while a job / sync / collect runs.
+// The Studio tab (armed 'block': no /project/post/ can leave it) runs api-main.js deleteScheduled: pre-check in item_list,
+// ONE delete call, re-check. Only {outcome:'deleted', verified:true} lets the app change anything.
+const DELETE_DEADLINE_MS = 6 * 60 * 1000;
+const getDel = async () => (await chrome.storage.local.get('activeDelete')).activeDelete || null;
+const patchDel = (patch) => locked(async () => {
+  const cur = await getDel();
+  if (!cur) return null;
+  const n = Object.assign({}, cur, patch);
+  await chrome.storage.local.set({ activeDelete: n });
+  return n;
+});
+
+async function closeDeleteWindow(d) {
+  const s = await getSettings();
+  if (s.keepOpen || !d) return;
+  try {
+    if (d.strategy === 'tab' && d.tabId != null) await chrome.tabs.remove(d.tabId);
+    else if (d.windowId != null) await chrome.windows.remove(d.windowId);
+  } catch (e) { await log('đóng cửa sổ xoá bài hẹn: ' + e.message, 'WARN'); }
+}
+
+// task = {id, nonce, item_id, expect_user_id, expect_account, schedule_unix, state} from /api/ext/tasks. -> true when started.
+async function startDelete(task) {
+  if (!task || !task.id || !task.nonce || !/^[0-9]{5,25}$/.test(String(task.item_id || ''))) return false;
+  const free = await locked(async () => {
+    const { activeJob, activeSync, activeCollect, activeDelete, lastDeleteDone } = await chrome.storage.local.get(['activeJob', 'activeSync', 'activeCollect', 'activeDelete', 'lastDeleteDone']);
+    return !(activeJob || activeSync || activeCollect || activeDelete || lastDeleteDone === task.id);
+  });
+  if (!free) return false;
+  let c = null;
+  try { c = await api('/api/ext/delete_scheduled/claim', { method: 'POST', timeoutMs: 10000, body: { id: task.id, nonce: task.nonce } }); } catch (e) {
+    await log('nhận việc xoá bài hẹn lỗi: ' + e.message, 'WARN');
+    if (isGone(e)) await chrome.storage.local.set({ lastDeleteDone: task.id });
+    return false;
+  }
+  if (!c || !c.ok) { await log(`không nhận việc xoá bài hẹn ${task.id}: ${(c && c.reason) || '?'}`, 'WARN'); return false; }
+  const started = await locked(async () => {
+    const { activeJob, activeSync, activeCollect, activeDelete } = await chrome.storage.local.get(['activeJob', 'activeSync', 'activeCollect', 'activeDelete']);
+    if (activeJob || activeSync || activeCollect || activeDelete) return false;
+    await chrome.storage.local.set({ activeDelete: { id: task.id, nonce: task.nonce, localNonce: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+      task, startedAt: Date.now(), tabId: null, windowId: null, strategy: null, handedOver: false, finished: false, result: null } });
+    return true;
+  });
+  if (!started) return false;
+  await log(`xoá bài hẹn cũ trên TikTok (item ${task.item_id}) để đổi giờ`);
+  try {
+    const s = await getSettings();
+    const { tab, windowId, strategy } = await createStudioWindow(STUDIO_URL.replace(/\/upload$/, '/content') + '#autotok=del-' + encodeURIComponent(task.id), s);
+    await patchDel({ tabId: tab.id, windowId, strategy });
+  } catch (e) { await finishDelete({ outcome: 'failed', reason: 'open-window-failed', delete_sent: false, detail: e.message }); }
+  return true;
+}
+
+// Records the result, closes the window, delivers it (retried by recoverDelete until 200 / 404 / 403).
+async function finishDelete(result) {
+  let d = null;
+  await locked(async () => {
+    const cur = await getDel();
+    if (!cur || cur.finished) return;
+    d = Object.assign({}, cur, { finished: true, result: Object.assign({ item_id: cur.task && cur.task.item_id }, result), finishedAt: Date.now() });
+    await chrome.storage.local.set({ activeDelete: d });
+  });
+  if (!d) return { ok: false };
+  await log(`xoá bài hẹn ${d.id}: ${d.result.outcome}${d.result.reason ? ' (' + d.result.reason + ')' : ''}`, d.result.outcome === 'deleted' ? '' : 'WARN');
+  await closeDeleteWindow(d);
+  await deliverDelete(d);
+  return { ok: true };
+}
+
+async function deliverDelete(d) {
+  try {
+    await api('/api/ext/delete_scheduled/result', { method: 'POST', timeoutMs: 20000, body: Object.assign({}, d.result, { id: d.id, nonce: d.nonce }) });
+  } catch (e) {
+    if (!isGone(e)) {
+      const tries = (d.resultTries || 0) + 1;
+      await patchDel({ resultTries: tries, nextResultTry: Date.now() + Math.min(2000 * 2 ** tries, 30000) });
+      await log('gửi kết quả xoá bài hẹn lỗi, thử lại: ' + e.message, 'WARN');
+      return false;
+    }
+    await log('máy chủ không còn việc xoá này: ' + e.message, 'WARN');
+  }
+  await locked(async () => { await chrome.storage.local.set({ lastDeleteDone: d.id }); await chrome.storage.local.remove('activeDelete'); });
+  return true;
+}
+
+// true = a delete is running or its result is still undelivered (no new claims meanwhile).
+async function recoverDelete() {
+  const d = await getDel();
+  if (!d) return false;
+  if (d.finished) { if (Date.now() >= (d.nextResultTry || 0)) await deliverDelete(d); return !!(await getDel()); }
+  // Before the tab took the task nothing can have been sent; after it, a timeout / closed tab is "unknown", never "failed".
+  const lost = (why) => finishDelete(d.handedOver ? { outcome: 'unknown', reason: 'unknown', delete_sent: null, detail: why } : { outcome: 'failed', reason: why, delete_sent: false });
+  if (Date.now() - d.startedAt > DELETE_DEADLINE_MS) { await lost('delete-timeout'); return true; }
+  if (d.tabId != null) {
+    let gone = false;
+    try { await chrome.tabs.get(d.tabId); } catch (_) { gone = true; }
+    if (gone) { await lost('tab-closed'); return true; }
+  }
+  return true;
+}
+
+// The delete tab is recognised by its id or its #autotok=del-<id> hash.
+async function deleteFor(t) {
+  if (!t) return null;
+  const d = await getDel();
+  if (!d || d.finished) return null;
+  const byHash = (t.url || '').includes('#autotok=del-' + encodeURIComponent(d.id));
+  if (d.tabId !== t.id && !byHash) return null;
+  return patchDel({ tabId: t.id, windowId: t.windowId, handedOver: true });
+}
+
 let lastCapture = { json: '', at: 0 };
 
 // ---------- polling ----------
@@ -803,6 +917,7 @@ async function pollLoop() {
           await wait(4000); continue;
         }
         if (await recoverCollect()) { await setPoll('đang thu số liệu'); await wait(4000); continue; }
+        if (await recoverDelete()) { await setPoll('đang xoá bài hẹn cũ để đổi giờ'); await wait(3000); continue; }   // v1.4.6
         const c = await getConn();
         if (c.state === 'unauthorized') { await setPoll('cần ghép nối lại'); return; }
         if (c.needReload) { await setPoll('cần tải lại tiện ích'); await wait(10000); continue; }   // never claim while out of protocol range
@@ -859,6 +974,8 @@ const handlers = {
     if (!a) {
       const co = await collectFor(t);
       if (co) return { role: 'collect', nonce: co.nonce, plan: co.plan };
+      const del = await deleteFor(t);   // v1.4.6
+      if (del) return { role: 'delete', nonce: del.localNonce, task: del.task };
       const sy = await syncFor(t);
       return sy ? { role: 'sync', request_id: sy.request_id, nonce: sy.nonce } : { role: 'none' };
     }
@@ -1061,6 +1178,13 @@ const handlers = {
     await chrome.storage.local.set({ avatarSeen: { url, at: Date.now() } });
     if (!old || old.url !== url || Date.now() - old.at > 6 * 3600 * 1000) await helloIfDue(true);   // send it to the app now
     return { ok: true };
+  },
+
+  // v1.4.6: result of the delete tab (only from that tab, with its local nonce).
+  async deleteResult(msg, sender) {
+    const d = await getDel();
+    if (!d || d.finished || !sender.tab || d.tabId !== sender.tab.id || !msg.nonce || msg.nonce !== d.localNonce || !msg.result) return { ok: false };
+    return finishDelete(msg.result);
   },
 
   async result(msg, sender) {

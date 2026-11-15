@@ -456,16 +456,16 @@ function shopBody(array $override = []): array
 test('tasks returns the sync request flag for the bound account only', function () {
     $token = cartHello($this);
 
-    $this->getJson('/api/ext/tasks', extHeaders($token))->assertOk()->assertExactJson(['sync_products' => null]);
+    $this->getJson('/api/ext/tasks', extHeaders($token))->assertOk()->assertExactJson(['sync_products' => null, 'delete_scheduled' => null]);
 
     $id = app(ShopSync::class)->requestSync($this->social->id);
-    $this->getJson('/api/ext/tasks', extHeaders($token))->assertOk()->assertExactJson(['sync_products' => $id]);
+    $this->getJson('/api/ext/tasks', extHeaders($token))->assertOk()->assertExactJson(['sync_products' => $id, 'delete_scheduled' => null]);
 
     $this->getJson('/api/ext/tasks')->assertUnauthorized();
 
     // Chrome chưa khai báo danh tính thì không nhận việc.
     $anon = pairExtension($this, 'Chrome 2');
-    $this->getJson('/api/ext/tasks', extHeaders($anon))->assertOk()->assertExactJson(['sync_products' => null]);
+    $this->getJson('/api/ext/tasks', extHeaders($anon))->assertOk()->assertExactJson(['sync_products' => null, 'delete_scheduled' => null]);
 });
 
 test('products upsert keeps ids as strings, marks missing and clears the request flag', function () {

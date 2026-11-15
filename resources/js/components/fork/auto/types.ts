@@ -84,6 +84,41 @@ export interface LichItem {
     empty_reason?: string | null;
     link: string | null;
     error: string | null;
+    /** Ghi chú cảnh báo (vd. bài đang giữ trong app vì kênh đã đủ số bài hẹn giờ trên TikTok). */
+    note?: string | null;
+    /** Nguồn video: hub | rieng (Kho riêng) | ... */
+    source?: string | null;
+    /** Đổi giờ được không (bài đã xếp mà chưa đăng, Chrome không đang tải lên). */
+    can_reschedule?: boolean;
+    /** Yêu cầu đổi giờ gần nhất (trong 24 giờ). */
+    reschedule?: RescheduleRequest | null;
+}
+
+export interface RescheduleRequest {
+    id: string;
+    state: 'pending' | 'claimed' | 'done' | 'failed' | 'expired' | 'unknown';
+    open: boolean;
+    message: string;
+    new_at: string | null;
+    old_at: string | null;
+    at: string | null;
+}
+
+/** GET /auto/videos/{id}/doi-gio */
+export interface RescheduleInfo {
+    id: number;
+    kind: 'local' | 'tiktok' | null;
+    reason: string | null;
+    current_at: string | null;
+    rules: {
+        timezone: string;
+        window_start: number;
+        window_end: number;
+        gap_minutes: number;
+        min_lead_minutes: number;
+        max_ahead_hours: number;
+    };
+    request: RescheduleRequest | null;
 }
 
 /** Một dòng của bảng lịch: bài trong lịch kèm kênh của nó. */

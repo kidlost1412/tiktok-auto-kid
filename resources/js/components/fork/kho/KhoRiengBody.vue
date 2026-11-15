@@ -124,14 +124,19 @@ const allSelected = computed(
 );
 
 const dupOf = (v: RiengVideo): string | null => v.duplicate?.text ?? null;
-const pickOne = (v: RiengVideo) => {
-    picked.value[v.id] = { file_name: v.file_name, duplicate: dupOf(v) };
+
+// Luôn gán một object MỚI cho `picked`: khi trang không truyền v-model, defineModel giữ object thường (không reactive),
+// sửa tại chỗ (picked.value[id] = …) thì giao diện không cập nhật — lỗi "bấm không tick được".
+const setPicked = (fn: (next: typeof picked.value) => void) => {
+    const next = { ...picked.value };
+    fn(next);
+    picked.value = next;
 };
 
 let lastIdx = -1;
 const idxOf = (id: number) => props.videos.data.findIndex((x) => x.id === id);
 
-// Bấm chọn / bỏ chọn; giữ Shift thì chọn cả đoạn từ video bấm trước đó.
+// Bấm chọn / bỏ chọn; giữ Shift thì chọn cả đoạn từ video bấm trước đó. Video trùng vẫn chọn được (hộp đăng sẽ cảnh báo).
 const toggle = (v: RiengVideo, shift = false) => {
     if (!v.selectable) {
         return;
@@ -139,40 +144,40 @@ const toggle = (v: RiengVideo, shift = false) => {
 
     const i = idxOf(v.id);
     const on = !(v.id in picked.value);
+    const range =
+        shift && lastIdx >= 0 && lastIdx !== i
+            ? props.videos.data.slice(Math.min(lastIdx, i), Math.max(lastIdx, i) + 1)
+            : [v];
 
-    if (shift && lastIdx >= 0 && lastIdx !== i) {
-        const [lo, hi] = [Math.min(lastIdx, i), Math.max(lastIdx, i)];
-
-        for (const x of props.videos.data.slice(lo, hi + 1)) {
+    setPicked((next) => {
+        for (const x of range) {
             if (!x.selectable) {
                 continue;
             }
 
             if (on) {
-                pickOne(x);
+                next[x.id] = { file_name: x.file_name, duplicate: dupOf(x) };
             } else {
-                delete picked.value[x.id];
+                delete next[x.id];
             }
         }
-    } else if (on) {
-        pickOne(v);
-    } else {
-        delete picked.value[v.id];
-    }
+    });
 
     lastIdx = i;
 };
 
 const toggleAll = () => {
-    if (allSelected.value) {
+    const off = allSelected.value;
+
+    setPicked((next) => {
         for (const s of plain.value) {
-            delete picked.value[s.id];
+            if (off) {
+                delete next[s.id];
+            } else {
+                next[s.id] = { file_name: s.file_name, duplicate: null };
+            }
         }
-    } else {
-        for (const s of plain.value) {
-            picked.value[s.id] = { file_name: s.file_name, duplicate: null };
-        }
-    }
+    });
 };
 
 const clearPicked = () => {
@@ -605,9 +610,11 @@ const postOne = (id: number) => {
 
 const onBatchDone = () => {
     // Video đã hẹn giờ thì bỏ chọn.
-    for (const it of batchItems.value) {
-        delete picked.value[it.id];
-    }
+    setPicked((next) => {
+        for (const it of batchItems.value) {
+            delete next[it.id];
+        }
+    });
 
     if (props.embedded) {
         emit('changed', 'xem');

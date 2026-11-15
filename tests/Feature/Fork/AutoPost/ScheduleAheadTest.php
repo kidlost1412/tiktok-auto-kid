@@ -204,7 +204,7 @@ test('finishing one scheduled upload hands the next post over immediately', func
 
 test('already uploaded posts do not block newer ones from being dispatched', function (): void {
     $account = ($this->account)(['schedule_ahead_days' => 5, 'daily_cap' => 20]);
-    config(['fork.auto.max_future_posts' => 100]);
+    config(['fork.auto.max_future_posts' => 100, 'fork.auto.tiktok_schedule_cap' => 100]);
     ($this->videos)(80);
     app(Planner::class)->planAll($this->now);
 
@@ -218,6 +218,89 @@ test('already uploaded posts do not block newer ones from being dispatched', fun
 
     expect(app(ScheduledDispatcher::class)->dispatchForAccount($account))->toBe(1)
         ->and(ChromeJob::query()->where('state', 'queued')->value('post_id'))->toBe($posts[55]->id);
+});
+
+test('no more than the TikTok scheduled-post cap is handed over; the rest waits in the app and goes up when a slot frees', function (): void {
+    $account = ($this->account)(['schedule_ahead_days' => 5, 'daily_cap' => 20]);
+    config(['fork.auto.max_future_posts' => 100, 'fork.auto.tiktok_schedule_cap' => 50]);
+    ($this->videos)(70);
+    app(Planner::class)->planAll($this->now);
+    $posts = Post::query()->where('social_account_id', $account->id)->orderBy('scheduled_at')->get();
+    expect($posts->count())->toBeGreaterThan(55);
+
+    foreach ($posts->take(50) as $p) {
+        aheadJob($p->id, $account->id);
+    }
+
+    expect(app(ChromeJobs::class)->pendingOnTikTok($account->id))->toBe(50)
+        ->and(app(ScheduledDispatcher::class)->dispatchForAccount($account))->toBe(0)
+        ->and(ChromeJob::query()->where('state', 'queued')->count())->toBe(0)
+        ->and(AutoVideo::query()->where('post_id', $posts[50]->id)->value('status'))->toBe('scheduled');
+
+    // Một bài trên TikTok đã tới giờ đăng => trống một chỗ => bài sớm nhất còn lại được hẹn lên.
+    $posts[0]->forceFill(['scheduled_at' => now()->subMinute()])->save();
+
+    expect(app(ScheduledDispatcher::class)->dispatchForAccount($account))->toBe(1)
+        ->and(ChromeJob::query()->where('state', 'queued')->value('post_id'))->toBe($posts[50]->id);
+});
+
+test('a post TikTok rejected because the channel is full is kept, retried when there is room, and never marked failed', function (): void {
+    $account = ($this->account)(['schedule_ahead_days' => 3]);
+    ($this->videos)(3);
+    app(Planner::class)->planAll($this->now);
+    $dispatcher = app(ScheduledDispatcher::class);
+    $chrome = app(ChromeJobs::class);
+
+    $dispatcher->dispatchForAccount($account);
+    $job = ChromeJob::query()->first();
+    $job->forceFill(['state' => 'authorized', 'authorized_at' => now()])->save();
+    $chrome->ingestResult($job->id, ['outcome' => 'rejected', 'http' => 200, 'status_code' => 3013021, 'status_msg' => 'Exceeding the scheduled post quantity']);
+    $job->refresh();
+
+    expect($job->state)->toBe('rejected')->and(ChromeJobs::isQuotaRejection($job))->toBeTrue()
+        ->and($chrome->outcome($job)->message)->toBe(ChromeJobs::QUOTA_HELD_TEXT)
+        // TikTok vừa báo đầy khi kênh có 0 bài chờ (do bài hẹn tay chẳng hạn): không gửi lại ngay để khỏi tải lên rồi bị từ chối lặp lại.
+        ->and($chrome->scheduleLimitFor($account->id))->toBe(0)
+        ->and($dispatcher->dispatchForAccount($account))->toBe(0);
+
+    // Hết hạn ghi nhớ (hoặc có chỗ): giao lại đúng bài đó, lần từ chối vì đầy không tính vào số lần thử.
+    \Illuminate\Support\Facades\Cache::forget(ChromeJobs::QUOTA_FULL_KEY.$account->id);
+    ChromeJob::query()->where('post_id', $job->post_id)->update(['attempt' => 3]);
+    expect($dispatcher->dispatchForAccount($account))->toBe(1)
+        ->and(ChromeJob::query()->where('state', 'queued')->value('post_id'))->toBe($job->post_id);
+
+    // Tới giờ đăng mà vẫn bị từ chối vì đầy: Chrome đăng ngay, không báo lỗi.
+    ChromeJob::query()->where('state', 'queued')->delete();
+    $post = Post::query()->find($job->post_id);
+    $post->forceFill(['scheduled_at' => now()->subMinute()])->save();
+    try {
+        app(ChromeAwareTikTokPublisher::class)->publish($post->fresh(['socialAccount']));
+        $thrown = null;
+    } catch (\Throwable $e) {
+        $thrown = $e;
+    }
+
+    expect($thrown)->toBeInstanceOf(\App\Exceptions\PlatformUnavailableException::class)
+        ->and(ChromeJob::query()->where('post_id', $post->id)->where('state', 'queued')->value('mode'))->toBe('now');
+});
+
+test('the calendar shows a post held because TikTok is full, and it can still be moved locally', function (): void {
+    $account = ($this->account)(['schedule_ahead_days' => 3]);
+    $at = CarbonImmutable::now()->addDay()->setTime(3, 0);
+    $post = Post::factory()->forAccount($account)->create(['status' => PostStatus::Scheduled, 'scheduled_at' => $at]);
+    $video = AutoVideo::create([
+        'hash' => 'held', 'path' => '/held.mp4', 'batch_date' => '2026-11-09', 'file_name' => 'held_MIXKIT_1.mp4', 'product_code' => 'nano-dong',
+        'status' => 'scheduled', 'social_account_id' => $account->id, 'post_id' => $post->id, 'scheduled_for' => $at,
+    ]);
+    aheadJob($post->id, $account->id, 'rejected', ['result' => ['outcome' => 'rejected', 'status_code' => 3013021]]);
+
+    $info = app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->calendarInfo(collect([$video]));
+    expect($info[$video->id]['held'])->toBeTrue()->and($info[$video->id]['can_reschedule'])->toBeTrue()
+        ->and(app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->inspect($video)['kind'])->toBe('local');
+
+    $other = aheadJob($post->id, $account->id, 'rejected', ['attempt' => 2, 'result' => ['outcome' => 'rejected', 'status_code' => 3013099]]);
+    expect(app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->calendarInfo(collect([$video]))[$video->id]['held'])->toBeFalse()
+        ->and(ChromeJobs::isQuotaRejection($other))->toBeFalse();
 });
 
 test('a video scheduled days ahead becomes posted at its scheduled time even if the app only wakes up later', function (): void {
