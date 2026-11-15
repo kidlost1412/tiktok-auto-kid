@@ -7,6 +7,7 @@ use App\Fork\AutoPost\Http\GioHangController;
 use App\Fork\AutoPost\Http\KhoController;
 use App\Fork\AutoPost\Http\MediaController;
 use App\Fork\AutoPost\Http\PersonaliseController;
+use App\Fork\AutoPost\Http\PostEditController;
 use App\Fork\AutoPost\Http\RescheduleController;
 use App\Fork\AutoPost\Http\RiengController;
 use App\Fork\AutoPost\Http\StatsController;
@@ -25,6 +26,11 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     // "Đổi giờ" bài đã xếp lịch mà chưa đăng (bài đã hẹn trên TikTok: xoá bài hẹn cũ qua Chrome rồi hẹn lại).
     Route::get('videos/{video}/doi-gio', [RescheduleController::class, 'show'])->whereNumber('video')->name('videos.reschedule.show');
     Route::post('videos/{video}/doi-gio', [RescheduleController::class, 'store'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.reschedule');
+    // Sửa bài đã xếp lịch (giờ, kênh, caption, hashtag, ảnh bìa), bỏ xếp lịch, cho xếp lịch lại (khung xem video, Lịch đăng).
+    Route::get('videos/{video}/sua', [PostEditController::class, 'show'])->whereNumber('video')->name('videos.edit.show');
+    Route::post('videos/{video}/sua', [PostEditController::class, 'update'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.edit');
+    Route::post('videos/{video}/bo-xep-lich', [PostEditController::class, 'unschedule'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.unschedule');
+    Route::post('videos/{video}/cho-xep-lai', [PostEditController::class, 'release'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.release');
     Route::post('accounts/{socialAccount}/pause', [AutoController::class, 'pause'])->name('accounts.pause');
     Route::post('accounts/{socialAccount}/apply-hours', [AutoController::class, 'applyHours'])->name('accounts.apply-hours');
     // Giỏ hàng TikTok Shop: trang riêng, chọn sản phẩm theo từng kênh và từng quy cách.

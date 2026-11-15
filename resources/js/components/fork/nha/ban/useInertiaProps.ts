@@ -5,8 +5,9 @@
 //
 // - `url` có thể là chuỗi, ref hoặc getter: đổi giá trị (bộ lọc, kênh, khoảng ngày...) thì tự tải lại, GIỮ dữ liệu cũ
 //   trên màn hình (loading = true) thay vì dựng lại component.
-// - Bộ nhớ đệm theo (url + only) trong ~30 giây: mở lại bàn / quay lại bộ lọc cũ hiện NGAY dữ liệu cũ rồi làm mới ngầm
-//   (stale-while-revalidate). Chỉ lần tải đầu của mỗi bàn / mỗi lần đổi url dùng đệm; các lần tải lại sau thao tác luôn lấy mới.
+// - Bộ nhớ đệm theo (url + only), giữ trong RAM và sessionStorage: mở lại bàn / quay lại bộ lọc cũ hiện NGAY dữ liệu
+//   lần trước (kể cả đã cũ, tối đa vài giờ) rồi luôn làm mới ngầm (stale-while-revalidate). Chỉ lần tải đầu của mỗi bàn /
+//   mỗi lần đổi url dùng đệm; khung xương (skeleton) chỉ hiện khi chưa từng có dữ liệu. Các lần tải lại sau thao tác luôn lấy mới.
 // - Các request trùng (cùng url + only) đang bay được gộp làm một.
 import { usePage } from '@inertiajs/vue3';
 import {
@@ -18,12 +19,42 @@ import {
     type MaybeRefOrGetter,
 } from 'vue';
 
-const TTL_MS = 30_000;
+const MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const STORE_PREFIX = 'tta-desk:';
+const STORE_MAX_CHARS = 400_000;
 
 type Bag = Record<string, unknown>;
 
 const cache = new Map<string, { at: number; data: Bag }>();
 const inflight = new Map<string, Promise<Bag>>();
+
+function readStored(key: string): { at: number; data: Bag } | null {
+    try {
+        const raw = sessionStorage.getItem(STORE_PREFIX + key);
+
+        if (!raw) {
+            return null;
+        }
+
+        const v = JSON.parse(raw) as { at?: number; data?: Bag };
+
+        return typeof v.at === 'number' && v.data ? { at: v.at, data: v.data } : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeStored(key: string, value: { at: number; data: Bag }): void {
+    try {
+        const raw = JSON.stringify(value);
+
+        if (raw.length <= STORE_MAX_CHARS) {
+            sessionStorage.setItem(STORE_PREFIX + key, raw);
+        }
+    } catch {
+        // đầy bộ nhớ hoặc bị chặn: chỉ mất bản đệm, không sao
+    }
+}
 
 const keyOf = (url: string, only?: string[]) =>
     `${url}|${[...(only ?? [])].sort().join(',')}`;
@@ -74,7 +105,9 @@ async function fetchBag(
 
         const j = (await r.json()) as { props?: Bag };
         const data = (j.props ?? {}) as Bag;
-        cache.set(key, { at: Date.now(), data });
+        const entry = { at: Date.now(), data };
+        cache.set(key, entry);
+        writeStored(key, entry);
 
         return data;
     })().finally(() => inflight.delete(key));
@@ -112,9 +145,10 @@ export function useInertiaProps<T extends Record<string, unknown>>(
         // Lần tải đầu (hoặc vừa đổi url): có đệm còn hạn thì hiện ngay rồi làm mới ngầm.
         if (!primed) {
             primed = true;
-            const hit = cache.get(keyOf(u, onlyNow));
+            const k = keyOf(u, onlyNow);
+            const hit = cache.get(k) ?? readStored(k);
 
-            if (hit && Date.now() - hit.at < TTL_MS) {
+            if (hit && Date.now() - hit.at < MAX_AGE_MS) {
                 apply(hit.data, onlyNow);
             }
         }

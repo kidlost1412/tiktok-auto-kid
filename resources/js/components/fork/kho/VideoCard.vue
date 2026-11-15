@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// Thẻ video trong kho: rê chuột để xem trước (tự phát, tắt tiếng), có thao tác nhanh chép caption / mở TikTok.
+// Thẻ video trong kho: rê chuột để xem trước (tự phát, tắt tiếng), có thao tác nhanh mở TikTok.
 import { router } from '@inertiajs/vue3';
 import {
-    IconCopy,
     IconExternalLink,
     IconMovie,
     IconPlayerPlayFilled,
@@ -12,7 +11,6 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 
 import {
     cardLine,
-    copyCaption,
     coverUrl,
     fmtDuration,
     type KhoVideo,
@@ -31,6 +29,7 @@ const props = defineProps<{
 const emit = defineEmits<{ open: []; retried: [] }>();
 
 const coverFailed = ref(false);
+const coverLoaded = ref(false);
 const line = computed(() => cardLine(props.video));
 
 // Xem trước khi rê chuột: chỉ trên thiết bị có chuột, chờ một nhịp để lướt qua không tải video.
@@ -90,13 +89,27 @@ const retry = () => {
         @mouseenter="enter"
         @mouseleave="leave"
     >
-        <div class="relative aspect-[9/16] w-full overflow-hidden bg-muted">
+        <div
+            :class="
+                cn(
+                    'relative aspect-[9/16] w-full overflow-hidden bg-muted',
+                    video.has_cover && !coverFailed && !coverLoaded && 'animate-pulse',
+                )
+            "
+        >
             <img
                 v-if="video.has_cover && !coverFailed"
                 :src="coverUrl(video.id)"
                 :alt="video.file_name"
                 loading="lazy"
-                class="size-full object-cover"
+                decoding="async"
+                :class="
+                    cn(
+                        'size-full object-cover transition-opacity duration-300',
+                        coverLoaded ? 'opacity-100' : 'opacity-0',
+                    )
+                "
+                @load="coverLoaded = true"
                 @error="coverFailed = true"
             />
             <div
@@ -147,18 +160,6 @@ const retry = () => {
             <div
                 class="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
             >
-                <button
-                    v-if="video.caption"
-                    type="button"
-                    class="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
-                    title="Chép caption và hashtag"
-                    aria-label="Chép caption và hashtag"
-                    @click.stop="copyCaption(video)"
-                    @keydown.enter.stop
-                    @keydown.space.stop
-                >
-                    <IconCopy class="size-4" />
-                </button>
                 <a
                     v-if="video.tiktok_link"
                     :href="video.tiktok_link"

@@ -257,7 +257,7 @@
     return { ok: true, width, height, size, mime: cv.mime, sha256: cv.sha256 };
   }
   // The cover_info object Studio sends for a custom uploaded cover (captured from a real post): cover_type 3 = CUSTOM_IMAGE,
-  // crop_type 2 = AUTO_CROP (the image is already center-cropped to 3:4 by the app). blob_url / coverProject are omitted.
+  // crop_type 2 = AUTO_CROP (the image is already 3:4 or 9:16, cropped by the app; cover_width/height are its real size). blob_url / coverProject are omitted.
   // cover = {uri, width, height} -> object | null (anything doubtful = no cover_info, the default first-frame cover stays)
   function buildCoverInfo(cover) {
     if (!cover || typeof cover.uri !== 'string' || !cover.uri) return null;

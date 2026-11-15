@@ -12,6 +12,7 @@ import {
 } from '@tabler/icons-vue';
 import { computed, ref, type Component } from 'vue';
 
+import ConfirmHost from '@/components/ConfirmHost.vue';
 import Toast from '@/components/Toast.vue';
 import { cn } from '@/lib/utils';
 
@@ -133,5 +134,6 @@ const active = (href: string) => path.value.startsWith(href);
             <slot />
         </main>
         <Toast />
+        <ConfirmHost />
     </div>
 </template>

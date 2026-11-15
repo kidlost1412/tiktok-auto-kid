@@ -20,6 +20,10 @@ export interface KhoVideo {
     ngay_lam: string | null;
     status: string;
     legacy: boolean;
+    /** Nguồn: rieng = Kho riêng, còn lại = video AI (Xưởng Video). */
+    source?: string | null;
+    /** Video AI đã "Bỏ xếp lịch" để sửa: bộ xếp lịch tự động tạm không lấy. */
+    held?: boolean;
     caption: string | null;
     hashtags: string[];
     cart_name: string | null;

@@ -195,14 +195,14 @@ test('an uploaded batch cover plus a per-video override reach the built posts an
     expect($postA->meta['fork_cover_src'])->toBe('rieng')->and($fileA)->not->toBeNull()->and($fileB)->not->toBeNull()
         ->and($a->meta['cover']['file'])->toBe($postA->meta['fork_cover'])->and($a->meta['cover']['kind'])->toBe('upload')
         ->and(hash_file('sha256', $fileA))->not->toBe(hash_file('sha256', $fileB))
-        ->and(getimagesize($fileA)[0])->toBe(540)->and(getimagesize($fileA)[1])->toBe(720)      // 9:16 -> cắt giữa 3:4
+        ->and(getimagesize($fileA)[0])->toBe(540)->and(getimagesize($fileA)[1])->toBe(960)      // 9:16 giữ nguyên
         ->and(getimagesize($fileB)[0])->toBe(600)->and(getimagesize($fileB)[1])->toBe(800)      // png vuông -> jpg 3:4
         ->and(getimagesize($fileA)['mime'])->toBe('image/jpeg');
 
     // Đi cùng đường với bìa sản phẩm: payload job Chrome có options.cover trỏ tới /api/ext/cover.
     $job = app(ChromeJobs::class)->queueForPost($postA, 'now');
     $cover = app(ChromeJobs::class)->jobPayload($job, new ChromeClient(['tiktok_username' => 'u']))['options']['cover'];
-    expect($cover)->toMatchArray(['url' => '/api/ext/cover?id='.$job->id, 'mime' => 'image/jpeg', 'size' => filesize($fileA), 'sha256' => hash_file('sha256', $fileA), 'width' => 540, 'height' => 720])
+    expect($cover)->toMatchArray(['url' => '/api/ext/cover?id='.$job->id, 'mime' => 'image/jpeg', 'size' => filesize($fileA), 'sha256' => hash_file('sha256', $fileA), 'width' => 540, 'height' => 960])
         ->and($job->options['cover']['src'])->toBe('rieng')->and($job->options['cover']['video'])->toBe($a->id);
 });
 
@@ -237,7 +237,7 @@ test('the upload endpoint accepts jpg, png and webp and rejects other files, hug
     $big = UploadedFile::fake()->create('bia.jpg', 6 * 1024, 'image/jpeg');
     $this->actingAs($owner)->post('/auto/kho/rieng/anh-bia/tai-len', ['image' => $big], ['Accept' => 'application/json'])->assertStatus(422);
 
-    // Quá nhỏ sau khi cắt 3:4 (cùng luật với ảnh bìa sản phẩm).
+    // Quá nhỏ sau khi chuẩn hoá (cùng luật với ảnh bìa sản phẩm).
     $this->actingAs($owner)->post('/auto/kho/rieng/anh-bia/tai-len', ['image' => rcImage('jpg', 200, 300)], ['Accept' => 'application/json'])
         ->assertStatus(422)->assertJsonPath('ok', false);
 
@@ -263,7 +263,7 @@ test('frame mode extracts a full-size frame at the chosen second, and the defaul
     $r->assertOk()->assertJsonPath('ok', true);
     $token = $r->json('token');
     $size = getimagesize($this->covers.'/_tmp/'.$token);
-    expect($size[0])->toBe(540)->and($size[1])->toBe(720);
+    expect($size[0])->toBe(540)->and($size[1])->toBe(960);   // khung 9:16 giữ nguyên tỉ lệ
 
     // Video a: khung đã chọn; video b: không đụng gì => khung mặc định (giây 1).
     $input = ($this->input)($account, [['id' => $a->id, 'cover_token' => $token], ['id' => $b->id]], ['cover_mode' => 'frame']);

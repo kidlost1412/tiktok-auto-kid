@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import dayjs from '@/dayjs';
+import { atHandle } from '@/lib/handle';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
@@ -50,7 +51,7 @@ const pause = () => {
     router.post(`/auto/accounts/${props.account.id}/pause`, {}, opts);
 };
 
-const name = computed(() => `@${props.account.username ?? props.account.display_name ?? '—'}`);
+const name = computed(() => atHandle(props.account.username ?? props.account.display_name) || '—');
 const cap = computed(() => props.today?.cap ?? props.account.daily_cap);
 const planned = computed(() => props.today?.planned ?? 0);
 const posted = computed(() => props.today?.posted ?? 0);

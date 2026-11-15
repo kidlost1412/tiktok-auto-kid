@@ -1,0 +1,5 @@
+@extends('errors::layout')
+@section('title', 'Không tìm thấy trang')
+@section('code', '404')
+@section('heading', 'Không tìm thấy trang này')
+@section('message', 'Đường dẫn anh mở không có trong app, hoặc trang đã được dời đi. Anh quay về Khu Tự Trị hoặc trang Tự động đăng nhé.')

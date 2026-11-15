@@ -151,6 +151,7 @@ export interface Lich {
 export interface RecentRow {
     id: number;
     file_name: string;
+    source?: string | null;
     product_code: string | null;
     product_image?: string | null;
     cart_name?: string | null;
@@ -188,6 +189,7 @@ export interface ProductRow {
 /** Bài lỗi gần đây (khu "Gần đây"), kèm cờ có thử lại an toàn hay không. */
 export interface FailedRow {
     id: number;
+    source?: string | null;
     product_code: string | null;
     product_image?: string | null;
     username: string | null;

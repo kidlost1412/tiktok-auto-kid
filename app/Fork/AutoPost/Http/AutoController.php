@@ -440,6 +440,8 @@ final class AutoController extends Controller
                     'empty_reason' => $slot['reason'],
                     'link' => null,
                     'error' => null,
+                    // Giờ dự kiến chỉ đến từ bộ xếp lịch tự động: luôn là video AI.
+                    'source' => isset($slot['video']['id']) ? 'hub' : null,
                 ];
             }
 
@@ -518,6 +520,7 @@ final class AutoController extends Controller
             ->map(fn (AutoVideo $v): array => [
                 'id' => $v->id,
                 'file_name' => $v->file_name,
+                'source' => $v->source,
                 'product_code' => $v->product_code,
                 'username' => $accounts->firstWhere('id', $v->social_account_id)?->username,
                 'scheduled_for' => $v->scheduled_for?->toIso8601String(),
@@ -543,6 +546,7 @@ final class AutoController extends Controller
             ->map(fn (AutoVideo $v): array => [
                 'id' => $v->id,
                 'file_name' => $v->file_name,
+                'source' => $v->source,
                 'product_code' => $v->product_code,
                 'product_image' => $images->forSlot((string) $v->social_account_id, $v->product_code, $v->quy_cach),
                 'cart_name' => $v->product_name,
@@ -577,6 +581,7 @@ final class AutoController extends Controller
 
                 return [
                     'id' => $v->id,
+                    'source' => $v->source,
                     'product_code' => $v->product_code,
                     'product_image' => $images->forSlot((string) $v->social_account_id, $v->product_code, $v->quy_cach),
                     'username' => $accounts->firstWhere('id', $v->social_account_id)?->username,

@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { confirm as confirmDialog } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 
 interface Pair {
@@ -299,8 +300,17 @@ const telegramTest = (): void =>
         ),
     );
 
-const revoke = (client: ChromeClient): void => {
-    if (!window.confirm(`Thu hồi kết nối "${client.label}"?`)) return;
+const revoke = async (client: ChromeClient): Promise<void> => {
+    if (
+        !(await confirmDialog({
+            title: `Thu hồi kết nối "${client.label}"?`,
+            description:
+                'Tiện ích Chrome này sẽ không nhận bài đăng nữa cho đến khi anh ghép nối lại.',
+            confirmText: 'Thu hồi',
+            destructive: true,
+        }))
+    )
+        return;
     run(`revoke-${client.id}`, (done) =>
         router.delete(`/settings/chrome/clients/${client.id}`, base(done)),
     );
@@ -467,7 +477,7 @@ const copy = async (text: string): Promise<void> => {
     }
 };
 
-const JOBS_STEP = 10;
+const JOBS_STEP = 5;
 const jobsShown = ref(JOBS_STEP);
 const visibleJobs = computed(() => props.jobs.slice(0, jobsShown.value));
 
@@ -1003,7 +1013,7 @@ const chromeOnlyCandidates = computed(() => {
                         data-testid="fork-chrome-telegram"
                     >
                         <span
-                            class="fk-pill"
+                            class="fk-pill shrink-0"
                             :class="
                                 telegram?.configured ? 'is-green' : 'is-amber'
                             "
@@ -1014,7 +1024,9 @@ const chromeOnlyCandidates = computed(() => {
                                     : 'Chưa cấu hình'
                             }}
                         </span>
-                        <span class="min-w-0 flex-1 text-muted-foreground">
+                        <span
+                            class="min-w-[12rem] flex-[1_1_14rem] text-muted-foreground"
+                        >
                             Nối bot, chọn loại tin và xem trước tin nhắn ở trang
                             Telegram (không cần sửa file).
                         </span>

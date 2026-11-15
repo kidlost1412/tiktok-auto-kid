@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{ zoom: [] }>();
 
 const failed = ref(false);
+const loaded = ref(false);
 const playing = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -53,6 +54,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).p
         :class="
             cn(
                 'group relative block aspect-[9/16] w-14 shrink-0 overflow-hidden rounded-lg border bg-muted text-muted-foreground shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                !failed && !loaded && 'animate-pulse',
                 props.class,
             )
         "
@@ -67,7 +69,14 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).p
             :src="`/auto/kho/rieng/video/${id}/thumb`"
             alt=""
             loading="lazy"
-            class="absolute inset-0 size-full object-cover"
+            decoding="async"
+            :class="
+                cn(
+                    'absolute inset-0 size-full object-cover transition-opacity duration-300',
+                    loaded ? 'opacity-100' : 'opacity-0',
+                )
+            "
+            @load="loaded = true"
             @error="failed = true"
         />
         <span v-else class="absolute inset-0 flex items-center justify-center"><IconMovie class="size-5" /></span>

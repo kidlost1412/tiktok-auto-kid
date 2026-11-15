@@ -120,3 +120,18 @@ test('channel avatar is stored locally and exposed on the social account', funct
 
     expect(app(ChannelAvatars::class)->store($this->sa->fresh(), 'https://evil.example.com/a.png'))->toBeFalse();
 });
+
+test('recent and upcoming payloads carry the video source', function (): void {
+    AutoAccount::query()->create(['social_account_id' => $this->sa->id, 'enabled' => true]);
+    $ai = mvideo($this, 'posted', ['posted_at' => now()->subHours(2), 'source' => 'hub']);
+    $own = mvideo($this, 'posted', ['posted_at' => now()->subHour(), 'source' => AutoVideo::SOURCE_RIENG]);
+    $sched = mvideo($this, 'scheduled', ['scheduled_for' => now()->addDay(), 'source' => AutoVideo::SOURCE_RIENG]);
+
+    $this->actingAs($this->owner)->get('/auto')->assertOk()->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('recent.0.id', $own->id)
+        ->where('recent.0.source', AutoVideo::SOURCE_RIENG)
+        ->where('recent.1.id', $ai->id)
+        ->where('recent.1.source', 'hub')
+        ->where('upcoming.0.id', $sched->id)
+        ->where('upcoming.0.source', AutoVideo::SOURCE_RIENG));
+});

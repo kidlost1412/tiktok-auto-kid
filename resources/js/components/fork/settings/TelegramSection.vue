@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { confirm as confirmDialog } from '@/composables/useConfirm';
 
 interface TypeRow {
     key: string;
@@ -106,8 +107,17 @@ const sample = (id: string): void =>
         router.post(`/settings/telegram/sample/${id}`, {}, opts(done)),
     );
 
-const disconnect = (): void => {
-    if (!window.confirm('Xoá token và chat id đã lưu trong app?')) return;
+const disconnect = async (): Promise<void> => {
+    if (
+        !(await confirmDialog({
+            title: 'Xoá token và chat id đã lưu trong app?',
+            description:
+                'Mèo sẽ ngừng gửi cảnh báo qua Telegram cho đến khi anh nối lại bot.',
+            confirmText: 'Xoá',
+            destructive: true,
+        }))
+    )
+        return;
     run('disconnect', (done) =>
         router.delete('/settings/telegram', opts(done)),
     );

@@ -130,7 +130,7 @@ const nameLen = computed(() => [...props.name].length);
                 'group/row grid gap-y-2 py-2.5 transition-colors lg:items-center',
                 compact
                     ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
-                    : 'gap-x-5 px-5 lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
+                    : 'gap-x-3 px-5 xl:gap-x-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
                 state === 'need' && 'bg-amber-50/70 dark:bg-amber-950/25',
                 state === 'bad' && 'bg-red-50/50 dark:bg-red-950/20',
             )
@@ -254,6 +254,7 @@ const nameLen = computed(() => [...props.name].length);
                 :maxlength="nameMax"
                 placeholder="Tên giỏ hiện trên video"
                 :value="name"
+                :title="name"
                 @input="
                     emit(
                         'update:name',

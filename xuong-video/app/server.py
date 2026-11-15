@@ -1103,8 +1103,9 @@ def danh_gia(body):
     dg[f] = {"ket_qua": body.get("ket_qua"), "gop_y": body.get("gop_y", "").strip(), "luc": datetime.datetime.now().isoformat(timespec="minutes")}
     ghi_json(danh_gia_f(), dg, indent=1)
     gy = body.get("gop_y", "").strip()
-    if gy:      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc
-        nhan = "ƯNG" if body.get("ket_qua") == "dat" else "KHÔNG ƯNG"
+    kq = body.get("ket_qua")
+    if gy or kq == "kem":      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc. "Không ưng" (kem) luôn ghi, dù không có góp ý
+        nhan = "ƯNG" if kq == "dat" else ("KHÔNG ƯNG (vẫn đăng, video yếu)" if kq == "kem" else "KHÔNG ƯNG")
         parts = f.split("_")
         hs = {}
         try:
@@ -1113,9 +1114,13 @@ def danh_gia(body):
         except Exception:
             hs = {}
         parts = [hs.get("ma") or parts[0], hs.get("goc") or (parts[1] if len(parts) > 1 else ""), hs.get("dao_dien") or (parts[2] if len(parts) > 2 else "")]
+        chi_tiet = gy
+        if kq == "kem":
+            loi_gk = " ".join(str(body.get("loi_gk") or "").split())[:300]
+            chi_tiet = "; ".join(x for x in (f"giám khảo chê: {loi_gk}" if loi_gk else "", f"Kid ghi: {gy}" if gy else "") if x) or "không ghi lý do"
         with open(LS / "so-gu.md", "a", encoding="utf-8") as fh:
             fh.write(f"- [{datetime.date.today():%d/%m}] Kid {nhan} ({parts[0]}, góc {parts[1] if len(parts) > 1 else ''}, "
-                     f"đạo diễn {parts[2] if len(parts) > 2 else ''}): {gy}\n")
+                     f"đạo diễn {parts[2] if len(parts) > 2 else ''}): {chi_tiet}\n")
     return {"ok": True}
 
 

@@ -56,6 +56,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { confirm as confirmDialog } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -146,7 +147,10 @@ const toggle = (v: RiengVideo, shift = false) => {
     const on = !(v.id in picked.value);
     const range =
         shift && lastIdx >= 0 && lastIdx !== i
-            ? props.videos.data.slice(Math.min(lastIdx, i), Math.max(lastIdx, i) + 1)
+            ? props.videos.data.slice(
+                  Math.min(lastIdx, i),
+                  Math.max(lastIdx, i) + 1,
+              )
             : [v];
 
     setPicked((next) => {
@@ -555,9 +559,12 @@ const toggleQueue = async (id: number) => {
 
 const clearQueue = async () => {
     if (
-        !window.confirm(
-            'Xoá hết video khỏi giỏ chờ đăng? Video vẫn còn nguyên trong kho, chỉ bỏ khỏi giỏ.',
-        )
+        !(await confirmDialog({
+            title: 'Xoá hết video khỏi giỏ chờ đăng?',
+            description: 'Video vẫn còn nguyên trong kho, chỉ bỏ khỏi giỏ.',
+            confirmText: 'Xoá khỏi giỏ',
+            destructive: true,
+        }))
     ) {
         return;
     }
@@ -832,13 +839,17 @@ const pickFolder = async () => {
     }
 };
 
-const removeFolder = (f: Folder) => {
+const removeFolder = async (f: Folder) => {
     openMenu.value = null;
 
     if (
-        !window.confirm(
-            `Bỏ thư mục "${f.name}" khỏi Kho riêng?\nFile video trong thư mục vẫn còn nguyên, app chỉ quên chúng.`,
-        )
+        !(await confirmDialog({
+            title: `Bỏ thư mục "${f.name}" khỏi Kho riêng?`,
+            description:
+                'File video trong thư mục vẫn còn nguyên, app chỉ quên chúng.',
+            confirmText: 'Bỏ thư mục',
+            destructive: true,
+        }))
     ) {
         return;
     }

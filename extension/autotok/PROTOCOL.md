@@ -386,7 +386,7 @@ same permission serves the product confirmation of 10.4. Nothing else is added: 
 ### 11.1 Job field `options.cover` and `GET /api/ext/cover?id=<job>`
 Present only when the post's product has a custom cover (modes "fixed" / "random" in the app):
 `"options": {..., "cover": {"url": "/api/ext/cover?id=ej_...", "name": "cover.jpg", "mime": "image/jpeg", "size": 123456, "sha256": "<64 hex>", "width": 1080, "height": 1440}}`.
-The app center-crops every cover to 3:4 (at most 1080x1440, at least 324x432 -- Studio refuses smaller) and stores it as JPEG <= 5 MB;
+The app keeps a cover that is within 3% of 3:4 or 9:16 as is and otherwise center-crops it to the closer one (3:4: at most 1080x1440, at least 324x432; 9:16: at most 1080x1920, at least 324x576 -- Studio refuses anything under 324x432) and stores it as JPEG <= 5 MB;
 `width`/`height` are the pixel size of that stored file. It is served with the same rules as `/api/ext/video` (claiming client, job running).
 The extension downloads it (size + sha256 checked), uploads it to TikTok through the same VOD pipeline as the video with `FileType=image`,
 and sends the cover in the post body as an OBJECT (shape captured from a real Studio post with a custom cover):
