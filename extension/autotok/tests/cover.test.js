@@ -16,6 +16,17 @@ test('validateCoverMeta accepts a well-formed cover and returns its pixel size',
   assert.equal(L.validateCoverMeta(meta({ width: 324, height: 432 })).ok, true);
 });
 
+test('9:16 covers (1080x1920, 324x576) pass validation and go into cover_info with their real size', () => {
+  const v = L.validateCoverMeta(meta({ width: 1080, height: 1920 }));
+  assert.equal(v.ok, true);
+  assert.equal(v.height, 1920);
+  assert.equal(L.validateCoverMeta(meta({ width: 324, height: 576 })).ok, true);
+  const ci = L.buildCoverInfo({ uri: 'tos/x', width: 1080, height: 1920 });
+  assert.equal(ci.cover_width, 1080);
+  assert.equal(ci.cover_height, 1920);
+  assert.equal(ci.crop_type, 2);
+});
+
 test('validateCoverMeta rejects anything doubtful (the post then goes out with the default cover)', () => {
   for (const bad of [null, 'x', meta({ url: 'https://evil/x' }), meta({ mime: 'image/gif' }), meta({ size: 0 }), meta({ size: 6 * 1024 * 1024 }),
     meta({ size: 1.5 }), meta({ sha256: 'zz' }), meta({ width: 323 }), meta({ height: 431 }), meta({ width: undefined }), meta({ height: '1440px' })]) assert.equal(L.validateCoverMeta(bad).ok, false);

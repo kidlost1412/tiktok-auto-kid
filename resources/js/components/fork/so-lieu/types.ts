@@ -21,6 +21,8 @@ export type KpiKey =
 export interface StatVideo {
     id: number;
     file_name: string;
+    /** hub | kho | ra (Xưởng Video, AI) hoặc rieng (Kho riêng). */
+    source?: string | null;
     posted_at: string;
     date: string;
     hour: number;
@@ -80,6 +82,7 @@ export interface Filters {
     giong: string;
     sort: 'moi' | 'view' | 'tuong-tac';
     cm: 'all' | 'mua';
+    nguon: 'all' | 'ai' | 'rieng';
 }
 
 export interface Options {

@@ -70,6 +70,8 @@ final class StatsController extends Controller
             'giong' => $this->scalar($request, 'giong'),
             'sort' => $sort,
             'cm' => $request->query('cm') === 'mua' ? 'mua' : 'all',
+            // Nguồn video: all | ai (Xưởng Video) | rieng (Kho riêng).
+            'nguon' => in_array($request->query('nguon'), ['ai', 'rieng'], true) ? (string) $request->query('nguon') : 'all',
         ];
 
         // Phần nặng (đọc bài đã đăng + số liệu) tính một lần và chỉ khi có prop nào cần: partial reload của bàn Cú
@@ -90,7 +92,9 @@ final class StatsController extends Controller
                 ->when($filters['channel'] !== '', fn ($q) => $q->where('social_account_id', $filters['channel']))
                 ->when($filters['product'] !== '', fn ($q) => $q->where('product_code', $filters['product']))
                 ->when($filters['goc'] !== '', fn ($q) => $q->where('goc', $filters['goc']))
-                ->when($filters['giong'] !== '', fn ($q) => $q->where('giong', $filters['giong']));
+                ->when($filters['giong'] !== '', fn ($q) => $q->where('giong', $filters['giong']))
+                ->when($filters['nguon'] === 'rieng', fn ($q) => $q->where('source', AutoVideo::SOURCE_RIENG))
+                ->when($filters['nguon'] === 'ai', fn ($q) => $q->where(fn ($w) => $w->whereNull('source')->orWhere('source', '!=', AutoVideo::SOURCE_RIENG)));
 
             $current = $base()->where('posted_at', '>=', $from->utc())->where('posted_at', '<', $to->utc())->get();
             $previous = $base()->where('posted_at', '>=', $prevFrom->utc())->where('posted_at', '<', $from->utc())->get();
@@ -306,6 +310,7 @@ final class StatsController extends Controller
         return [
             'id' => $v->id,
             'file_name' => $v->file_name,
+            'source' => $v->source,
             'posted_at' => $v->posted_at->toIso8601String(),
             'date' => $local->format('Y-m-d'),
             'hour' => (int) $local->format('G'),

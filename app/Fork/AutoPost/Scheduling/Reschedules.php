@@ -298,6 +298,24 @@ final class Reschedules
             : $this->requestDelete($video, $post, $info['job'], $at);
     }
 
+    /**
+     * Xoá bài hẹn trên TikTok để sửa bài / bỏ xếp lịch (PostEdits). Cùng an toàn như đổi giờ: chỉ áp thay đổi khi
+     * Chrome báo đã xoá VÀ đã kiểm lại. Ném RuntimeException (câu tiếng Việt) khi từ chối.
+     *
+     * @param  array<string, mixed>  $changes
+     * @return array{state: string, message: string, id: string}
+     */
+    public function requestDeleteFor(AutoVideo $video, Post $post, ChromeJob $job, CarbonImmutable $newAt, string $action, array $changes = []): array
+    {
+        $this->reconcile();
+
+        if ($this->openFor($video) !== null) {
+            throw new RuntimeException('Bài này đang chờ xoá bài hẹn cũ trên TikTok — chờ xong rồi hãy sửa tiếp.');
+        }
+
+        return $this->requestDelete($video, $post, $job, $newAt->utc()->second(0), $action, $changes);
+    }
+
     /** @return array{state: string, message: string} */
     private function changeLocal(AutoVideo $video, Post $post, CarbonImmutable $at): array
     {
@@ -340,7 +358,7 @@ final class Reschedules
     }
 
     /** @return array{state: string, message: string, id: string} */
-    private function requestDelete(AutoVideo $video, Post $post, ChromeJob $job, CarbonImmutable $at): array
+    private function requestDelete(AutoVideo $video, Post $post, ChromeJob $job, CarbonImmutable $at, string $action = 'time', array $changes = []): array
     {
         $itemId = (string) data_get($job->result, 'item_id', '');
 
@@ -378,12 +396,14 @@ final class Reschedules
                 'schedule_unix' => $unix,
                 'state' => 'pending',
                 'nonce' => bin2hex(random_bytes(16)),
+                'action' => $action,
+                'changes' => $changes === [] ? null : $changes,
             ]);
         } catch (UniqueConstraintViolationException) {
-            throw new RuntimeException('Bài này đang chờ xoá bài hẹn cũ trên TikTok để đổi giờ — chờ xong rồi hãy đổi tiếp.');
+            throw new RuntimeException('Bài này đang chờ xoá bài hẹn cũ trên TikTok — chờ xong rồi hãy sửa tiếp.');
         }
 
-        Log::info('Đổi giờ bài đã hẹn trên TikTok: chờ Chrome xoá bài hẹn cũ.', ['reschedule' => $row->id, 'video_id' => $video->id, 'item_id' => $itemId]);
+        Log::info('Sửa bài đã hẹn trên TikTok: chờ Chrome xoá bài hẹn cũ.', ['reschedule' => $row->id, 'action' => $action, 'video_id' => $video->id, 'item_id' => $itemId]);
 
         return ['state' => 'pending', 'message' => 'Đang xoá bài hẹn cũ trên TikTok…', 'id' => $row->id];
     }
@@ -496,7 +516,11 @@ final class Reschedules
             $row->forceFill([
                 'state' => $applied === null ? 'done' : 'failed',
                 'result' => $keep,
-                'message' => $applied ?? 'Đã xoá bài hẹn cũ trên TikTok (đã kiểm lại). App sẽ tải lên lại với giờ mới.',
+                'message' => $applied ?? match ((string) ($row->action ?: 'time')) {
+                    'unschedule' => 'Đã xoá bài hẹn trên TikTok (đã kiểm lại) và bỏ xếp lịch — video đã về kho.',
+                    'edit' => 'Đã xoá bài hẹn cũ trên TikTok (đã kiểm lại) và lưu thay đổi. App sẽ tải lên lại bản mới.',
+                    default => 'Đã xoá bài hẹn cũ trên TikTok (đã kiểm lại). App sẽ tải lên lại với giờ mới.',
+                },
                 'finished_at' => now(),
             ])->save();
 
@@ -510,7 +534,8 @@ final class Reschedules
         Log::info('Đổi giờ: kết quả xoá bài hẹn cũ', ['reschedule' => $row->id, 'outcome' => $outcome, 'verified' => $verified, 'state' => $state]);
 
         if ($state === 'done') {
-            $this->dispatch((string) $row->social_account_id);
+            // Sửa bài có thể đã chuyển sang kênh khác: giao bài cho kênh hiện tại của bài.
+            $this->dispatch((string) (Post::query()->whereKey($row->post_id)->value('social_account_id') ?? $row->social_account_id));
         }
 
         return ['state' => $state, 'duplicate' => false];
@@ -538,6 +563,18 @@ final class Reschedules
             Log::error('Đổi giờ: đã xoá bài hẹn cũ trên TikTok nhưng bài trong app đã thay đổi.', ['reschedule' => $row->id]);
 
             return 'Đã xoá bài hẹn cũ trên TikTok nhưng bài trong app vừa thay đổi nên chưa đặt giờ mới — hãy kiểm tra bài này (có thể cần đăng lại).';
+        }
+
+        $action = (string) ($row->action ?: 'time');
+
+        if ($action === 'unschedule') {
+            app(PostEdits::class)->unscheduleNow($video, $post);
+
+            return null;
+        }
+
+        if ($action === 'edit') {
+            return app(PostEdits::class)->applyNow($video, $post, (array) $row->changes, CarbonImmutable::instance($row->new_at));
         }
 
         $post->scheduled_at = $row->new_at;
@@ -586,6 +623,7 @@ final class Reschedules
             'open' => $row->isOpen(),
             'message' => $row->message ?? ($row->state === 'claimed' ? 'Chrome đang xoá bài hẹn cũ trên TikTok…' : 'Đang chờ Chrome xoá bài hẹn cũ trên TikTok…'),
             'new_at' => $row->new_at?->toIso8601String(),
+            'action' => (string) ($row->action ?: 'time'),
             'old_at' => $row->old_at?->toIso8601String(),
             'at' => $row->updated_at?->toIso8601String(),
         ];

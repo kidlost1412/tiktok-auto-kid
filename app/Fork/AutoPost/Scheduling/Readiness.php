@@ -44,6 +44,8 @@ final class Readiness
 
     public const string RIENG = 'rieng';
 
+    public const string HELD = 'held';
+
     /** @var array<string, array{auto: AutoAccount, name: string}>|null */
     private ?array $eligible = null;
 
@@ -78,9 +80,14 @@ final class Readiness
         $out = [];
 
         foreach ($videos as $v) {
-            if ($v->status === AutoVideo::NEW) {
-                $out[$v->id] = $this->one($v);
+            if ($v->status !== AutoVideo::NEW) {
+                continue;
             }
+
+            // Chủ app vừa "Bỏ xếp lịch" để sửa: bộ xếp lịch không lấy cho tới khi bấm "Cho xếp lịch lại".
+            $out[$v->id] = PostEdits::isHeld($v)
+                ? ['code' => self::HELD, 'severity' => 'muted', 'reason' => 'Anh đã bỏ xếp lịch để sửa — mở video, bấm "Cho xếp lịch lại" khi xong.', 'next_slot' => null]
+                : $this->one($v);
         }
 
         return $out;

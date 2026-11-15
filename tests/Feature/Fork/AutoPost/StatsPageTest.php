@@ -158,3 +158,27 @@ test('every auto page renders with zero channels', function (): void {
         $this->actingAs($this->owner)->get($path)->assertOk();
     }
 });
+
+test('stats rows carry source and nguon filters ai versus rieng', function (): void {
+    soLieuVideo($this->sa, ['source' => 'hub'], ['views_count' => 100]);
+    soLieuVideo($this->sa, ['source' => 'kho'], ['views_count' => 200]);
+    soLieuVideo($this->sa, ['source' => AutoVideo::SOURCE_RIENG], ['views_count' => 900]);
+
+    $get = fn (string $q) => $this->actingAs($this->owner)->get('/auto/so-lieu?'.$q);
+
+    $get('sort=view')->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('filters.nguon', 'all')
+        ->where('videos_total', 3)
+        ->where('videos.0.source', AutoVideo::SOURCE_RIENG)
+        ->where('videos.2.source', 'hub'));
+    $get('nguon=ai')->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('filters.nguon', 'ai')
+        ->where('kpis.posts.value', 2)
+        ->where('kpis.views.value', 300)
+        ->where('videos_total', 2));
+    $get('nguon=rieng')->assertInertia(fn (AssertableInertia $p) => $p
+        ->where('kpis.posts.value', 1)
+        ->where('kpis.views.value', 900)
+        ->where('videos.0.source', AutoVideo::SOURCE_RIENG));
+    $get('nguon=bậy')->assertInertia(fn (AssertableInertia $p) => $p->where('filters.nguon', 'all')->where('videos_total', 3));
+});

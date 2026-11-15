@@ -7,6 +7,7 @@ import { ref } from 'vue';
 
 import type { FailedRow, RecentRow } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
+import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import {
     cardCls,
     fmtCompact,
@@ -120,9 +121,13 @@ const when = (iso: string | null) => {
                     "
                 />
                 <div class="min-w-0 flex-1">
-                    <div class="truncate text-[0.8125rem] font-medium">
-                        {{ productName(f.product_code) }}
-                        <span class="font-normal text-muted-foreground"
+                    <div class="flex min-w-0 items-center gap-1.5">
+                        <span class="truncate text-[0.8125rem] font-medium">{{
+                            productName(f.product_code)
+                        }}</span>
+                        <SourceBadge :source="f.source" />
+                        <span
+                            class="shrink-0 text-[0.8125rem] text-muted-foreground"
                             >· {{ when(f.at) }}</span
                         >
                     </div>
@@ -236,8 +241,12 @@ const when = (iso: string | null) => {
                         class="h-[50px] w-[28px] rounded"
                     />
                     <div class="min-w-0 flex-1">
-                        <div class="truncate text-[0.8125rem] font-medium">
-                            {{ productName(r.product_code) }}
+                        <div class="flex min-w-0 items-center gap-1.5">
+                            <span
+                                class="truncate text-[0.8125rem] font-medium"
+                                >{{ productName(r.product_code) }}</span
+                            >
+                            <SourceBadge :source="r.source" />
                         </div>
                         <div
                             class="truncate text-[0.75rem] text-muted-foreground"

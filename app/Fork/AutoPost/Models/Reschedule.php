@@ -41,6 +41,7 @@ class Reschedule extends Model
             'claimed_at' => 'datetime',
             'finished_at' => 'datetime',
             'result' => 'array',
+            'changes' => 'array',
         ];
     }
 

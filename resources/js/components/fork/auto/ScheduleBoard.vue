@@ -5,6 +5,9 @@ import { useMediaQuery } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
 import ScheduleDayList from '@/components/fork/auto/ScheduleDayList.vue';
+import { matchesSource } from '@/components/fork/shared/source';
+import type { SourceFilter as SourceFilterValue } from '@/components/fork/shared/source';
+import SourceFilter from '@/components/fork/shared/SourceFilter.vue';
 import type {
     AccountRow,
     Lich,
@@ -23,6 +26,8 @@ const props = defineProps<{
 const wide = useMediaQuery('(min-width: 1536px)');
 
 const channel = ref<string>('all');
+// Lọc nguồn: video AI (Xưởng Video) / Kho riêng.
+const source = ref<SourceFilterValue>('all');
 const picked = ref<string | null>(null);
 
 const entries = computed<ScheduleEntry[]>(() => {
@@ -34,6 +39,14 @@ const entries = computed<ScheduleEntry[]>(() => {
         }
 
         for (const item of props.lich.channels[a.id]?.items ?? []) {
+            // Giờ trống (không có video) chỉ hiện khi không lọc nguồn.
+            if (
+                source.value !== 'all' &&
+                !(item.source && matchesSource(item.source, source.value))
+            ) {
+                continue;
+            }
+
             out.push({
                 ...item,
                 channelId: a.id,
@@ -108,11 +121,11 @@ const pct = (n: number, d: Day) =>
                     Lịch đăng
                 </h2>
                 <p class="text-[0.7812rem] text-muted-foreground">
-                    Bấm một dòng để xem video. Nét đứt là giờ dự kiến, chưa hẹn
-                    lên TikTok.
+                    Bấm một dòng để xem và sửa video, bấm giờ để đổi giờ. Nét
+                    đứt là giờ dự kiến, chưa hẹn lên TikTok.
                 </p>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <!-- Chú thích chấm trạng thái (kiểu 3 cột) -->
                 <div
                     v-if="wide"
@@ -142,6 +155,7 @@ const pct = (n: number, d: Day) =>
                         />Dự kiến</span
                     >
                 </div>
+                <SourceFilter v-model="source" />
                 <NativeSelect
                     v-if="multi"
                     v-model="channel"

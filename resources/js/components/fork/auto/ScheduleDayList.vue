@@ -14,6 +14,7 @@ import { computed, ref, watch } from 'vue';
 import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
 import type { ScheduleEntry } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
+import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import { statusOf, toneClasses } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { openVideo } from '@/components/fork/viewer';
@@ -255,7 +256,27 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                         @keydown.enter.self.prevent="open(e)"
                         @keydown.space.self.prevent="open(e)"
                     >
+                        <!-- Bấm giờ để đổi giờ ngay (bài đã xếp mà chưa đăng) -->
+                        <button
+                            v-if="canMove(e)"
+                            type="button"
+                            :class="
+                                cn(
+                                    'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
+                                    compact ? '-mr-1 text-[0.8438rem]' : '-mr-1 text-[0.9375rem]',
+                                    moving(e) && 'text-primary-text',
+                                )
+                            "
+                            :title="moving(e) ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…' : 'Bấm để đổi giờ'"
+                            :data-testid="`fork-auto-time-${e.id}`"
+                            @click.stop="startMove(e)"
+                            @keydown.enter.stop
+                            @keydown.space.stop
+                        >
+                            {{ dayjs(e.at).format('HH:mm') }}
+                        </button>
                         <span
+                            v-else
                             :class="
                                 cn(
                                     'text-right font-semibold tabular-nums',
@@ -295,6 +316,10 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                         e.product_label ?? e.product_code ?? '—'
                                     }}</span
                                 >
+                                <SourceBadge
+                                    :source="e.source"
+                                    :class="compact ? 'h-4 px-1 text-[0.625rem] [&_svg]:size-2.5' : ''"
+                                />
                                 <span
                                     v-if="multi"
                                     class="shrink-0 text-[0.75rem] text-muted-foreground"

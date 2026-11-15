@@ -20,6 +20,7 @@ use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengInfo;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
+use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Readiness;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\Shop\HubCartAttach;
@@ -558,6 +559,9 @@ final class KhoController extends Controller
                 'collected_at' => data_get($stats, 'at'),
             ],
             'legacy' => $v->source === 'ra',
+            // Nguồn (AI / Kho riêng) và cờ "đã bỏ xếp lịch để sửa" cho khung xem video.
+            'source' => $v->source,
+            'held' => PostEdits::isHeld($v),
             'caption' => $v->caption,
             'hashtags' => array_values(array_filter((array) $v->hashtags, 'is_string')),
             'cart_name' => filled($cartName) ? (string) $cartName : null,

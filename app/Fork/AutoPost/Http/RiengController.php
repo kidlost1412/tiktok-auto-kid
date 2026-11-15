@@ -538,7 +538,8 @@ final class RiengController extends Controller
     public function coverFrame(Request $request, AutoVideo $video): JsonResponse
     {
         $this->authorizeOwner($request);
-        abort_unless($video->isRieng(), SymfonyResponse::HTTP_NOT_FOUND);
+        // Video riêng, hoặc video AI đang xếp lịch (sửa ảnh bìa trong khung xem video): cần file trên máy.
+        abort_unless($video->isRieng() || ($video->post_id !== null && $video->files_deleted_at === null), SymfonyResponse::HTTP_NOT_FOUND);
         $data = $request->validate(['t' => ['required', 'numeric', 'min:0', 'max:86400']]);
 
         try {
@@ -547,7 +548,9 @@ final class RiengController extends Controller
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
 
-        app(RiengCoverMemory::class)->rememberVideo((int) $video->id, $token);
+        if ($video->isRieng()) {
+            app(RiengCoverMemory::class)->rememberVideo((int) $video->id, $token);
+        }
 
         return response()->json(['ok' => true, 'token' => $token, 'url' => '/auto/kho/rieng/anh-bia/tam/'.$token]);
     }
