@@ -3,9 +3,10 @@
 import {LightLeak} from '@remotion/light-leaks';
 import {Star} from '@remotion/shapes';
 import React from 'react';
+import {ChuDap, ChuGach, ChuMatNa, ChuNghieng, ChuSo, ChuTang, chiaDong} from './ChuLon';
 import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 
-export type Block = {loai: string; f0: number; f1: number; data: Record<string, any>};
+export type Block = {loai: string; f0: number; f1: number; data: Record<string, any>; top?: number; zone?: string; vi_tri?: string; am?: string};
 export type Theme = {font: string; accent: string; red: string; green: string; text: string};
 
 const STROKE = (px: number, c = '#000') => ({WebkitTextStroke: `${px}px ${c}`, paintOrder: 'stroke fill' as const});
@@ -32,7 +33,7 @@ const HookDap: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // chữ to
   const shake = t < 8 ? (random(`s${t}`) - 0.5) * 18 : 0;
   return <AbsoluteFill style={{opacity: out, justifyContent: 'center', alignItems: 'center'}}>
     <div style={{width: 900, textAlign: 'center', transform: `translate(${shake}px, -180px) scale(${2.2 - 1.2 * s})`, fontFamily: th.font, fontSize: 118,
-      lineHeight: 1.02, color: th.text, ...STROKE(16), filter: `drop-shadow(${SHADOW})`}}>
+      lineHeight: 1.25, color: th.text, ...STROKE(16), filter: `drop-shadow(${SHADOW})`}}>
       {words.map((w, i) => <span key={i} style={i === hi ? {color: '#111', background: th.accent, padding: '0 14px', borderRadius: 12, WebkitTextStroke: '0px'} : {}}>{w} </span>)}
     </div>
   </AbsoluteFill>;
@@ -45,7 +46,7 @@ const HookTungTu: React.FC<{b: Block; th: Theme}> = ({b, th}) => {   // từng c
   return <Zone top={(b as any).top ?? 260} style={{opacity: out, flexDirection: 'column', alignItems: 'center'}}>
     {words.map((w, i) => {
       const s = spring({frame: t - i * step, fps, config: {damping: 12, stiffness: 230}});
-      return <div key={i} style={{fontFamily: th.font, fontSize: i % 2 ? 84 : 100, lineHeight: 1.0, color: i % 3 === 1 ? th.accent : th.text,
+      return <div key={i} style={{fontFamily: th.font, fontSize: i % 2 ? 84 : 100, lineHeight: 1.25, color: i % 3 === 1 ? th.accent : th.text,
         ...STROKE(12), transform: `translateX(${(1 - s) * (i % 2 ? 300 : -300)}px)`, opacity: s}}>{w}</div>;
     })}
   </Zone>;
@@ -69,8 +70,8 @@ const HookMatNa: React.FC<{b: Block; th: Theme}> = ({b, th}) => {    // lộ ch�
   const p = interpolate(t, [0, 14], [0, 1], {extrapolateRight: 'clamp', easing: Easing.inOut(Easing.cubic)});
   const bar = interpolate(t, [0, 10, 20], [0, 1, 0], {extrapolateRight: 'clamp'});
   return <Zone top={(b as any).top ?? 280} style={{opacity: out}}>
-    <div style={{position: 'relative', fontFamily: th.font, fontSize: 92, lineHeight: 1.05, color: th.text, textAlign: 'center', ...STROKE(12),
-      clipPath: `inset(0 ${100 - p * 100}% 0 0)`}}>{String(b.data.text || '').toUpperCase()}
+    <div style={{position: 'relative', fontFamily: th.font, fontSize: 92, lineHeight: 1.25, color: th.text, textAlign: 'center', ...STROKE(12),
+      padding: '14px 12px', clipPath: `inset(0 ${100 - p * 100}% 0 0)`}}>{String(b.data.text || '').toUpperCase()}
       <div style={{position: 'absolute', top: 0, bottom: 0, left: `${p * 100 - 6}%`, width: '6%', background: th.accent, opacity: bar}}/>
     </div>
   </Zone>;
@@ -142,7 +143,7 @@ const SoDem: React.FC<{b: Block; th: Theme}> = ({b, th}) => {        // số đ�
       {b.data.nhan_trai && <div style={{background: th.red, color: '#fff', fontFamily: th.font, fontSize: 60, padding: '12px 26px', borderRadius: 18, boxShadow: SHADOW}}>
         {String(b.data.nhan_trai).toUpperCase()}</div>}
       <div style={{fontFamily: th.font, fontSize: 64, color: th.text, ...STROKE(10)}}>→</div>
-      <div style={{fontFamily: th.font, fontSize: 132, lineHeight: 1, color: th.accent, ...STROKE(14)}}>{v}
+      <div style={{fontFamily: th.font, fontSize: 132, lineHeight: 1.25, color: th.accent, ...STROKE(14)}}>{v}
         <span style={{fontSize: 64, color: th.text}}> {String(b.data.don_vi || '').toUpperCase()}</span></div>
     </div>
   </Zone>;
@@ -187,7 +188,7 @@ const LowerThird: React.FC<{b: Block; th: Theme}> = ({b, th}) => {
   const line = interpolate(t, [0, 12], [0, 1], {extrapolateRight: 'clamp'});
   return <div style={{position: 'absolute', top: 1160, left: 50, opacity: out, transform: `translateX(${(inn - 1) * 600}px)`}}>
     <div style={{height: 10, width: 420 * line, background: th.accent, borderRadius: 6, marginBottom: 8}}/>
-    <div style={{background: th.red, color: '#fff', fontFamily: th.font, fontSize: 58, padding: '8px 26px', borderRadius: '12px 12px 12px 0'}}>{String(b.data.dong1 || '').toUpperCase()}</div>
+    <div style={{background: th.red, color: '#fff', fontFamily: th.font, fontSize: 58, lineHeight: 1.25, padding: '8px 26px', borderRadius: '12px 12px 12px 0'}}>{String(b.data.dong1 || '').toUpperCase()}</div>
     {b.data.dong2 && <div style={{display: 'inline-block', background: '#fff', color: '#111', fontFamily: th.font, fontSize: 40, padding: '6px 22px', borderRadius: '0 0 12px 12px'}}>{b.data.dong2}</div>}
   </div>;
 };
@@ -198,19 +199,26 @@ const NhanDan: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // nhãn d�
   return <div style={{position: 'absolute', top: 240, right: 170, opacity: out, transform: `rotate(${12 - (1 - s) * 40}deg) scale(${s})`}}>
     <div style={{position: 'relative', width: 300, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
       <div style={{position: 'absolute'}}><Star points={14} innerRadius={125} outerRadius={150} fill={th.red} cornerRadius={6}/></div>
-      <div style={{position: 'relative', fontFamily: th.font, fontSize: 44, color: '#fff', textAlign: 'center', width: 220, lineHeight: 1.05}}>{String(b.data.text || '').toUpperCase()}</div>
+      <div style={{position: 'relative', fontFamily: th.font, fontSize: 44, color: '#fff', textAlign: 'center', width: 220, lineHeight: 1.25}}>{String(b.data.text || '').toUpperCase()}</div>
     </div>
   </div>;
 };
 
-const DaQuang: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // bút dạ quang
+const DaQuang: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // bút dạ quang: dải vàng phủ KÍN cả dòng (cả dấu mũ, dấu thanh)
   const {t, out} = useLife(b);
-  const p = interpolate(t, [2, 16], [0, 100], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-  return <Zone top={(b as any).top ?? 270} style={{opacity: out}}>
-    <div style={{fontFamily: th.font, fontSize: 80, color: '#111', textAlign: 'center', lineHeight: 1.15,
-      backgroundImage: `linear-gradient(transparent 18%, ${th.accent} 18%, ${th.accent} 92%, transparent 92%)`, backgroundRepeat: 'no-repeat',
-      backgroundSize: `${p}% 100%`, padding: '0 16px', textShadow: '0 0 0 #000', filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.3))'}}>
-      <span style={{color: p > 30 ? '#111' : th.text, ...(p > 30 ? {} : STROKE(10))}}>{String(b.data.text || '').toUpperCase()}</span></div>
+  const p = interpolate(t, [2, 18], [0, 100], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const lines = chiaDong(String(b.data.text || ''), 18);
+  const px = lines.length > 1 ? 76 : 84;
+  const base: React.CSSProperties = {fontFamily: th.font, fontSize: px, lineHeight: 1.3, padding: '4px 22px', whiteSpace: 'nowrap'};
+  return <Zone top={(b as any).top ?? 270} style={{opacity: out, flexDirection: 'column', alignItems: 'center', gap: 6}}>
+    {lines.map((l, k) => {
+      const txt = l.map(x => x.w).join(' ');
+      return <div key={k} style={{position: 'relative', filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.3))'}}>
+        <div style={{...base, color: th.text, ...STROKE(10)}}>{txt}</div>
+        <div style={{...base, position: 'absolute', left: 0, top: 0, bottom: 0, right: 0, background: th.accent, color: '#111', borderRadius: 10,
+          clipPath: `inset(0 ${100 - p}% 0 0)`}}>{txt}</div>
+      </div>;
+    })}
   </Zone>;
 };
 
@@ -221,8 +229,8 @@ const CanhBao: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // băng c�
     <div style={{transform: `scaleX(${inn})`, boxShadow: SHADOW, borderRadius: 16, overflow: 'hidden', width: 860}}>
       <div style={{height: 22, background: stripes, backgroundPosition: `${f * 3}px 0`}}/>
       <div style={{background: '#111', padding: '14px 26px', textAlign: 'center'}}>
-        <div style={{fontFamily: th.font, fontSize: 44, color: '#FFD400'}}>⚠ {String(b.data.tieu_de || 'LƯU Ý').toUpperCase()}</div>
-        <div style={{fontFamily: th.font, fontSize: 58, color: '#fff'}}>{String(b.data.text || '').toUpperCase()}</div>
+        <div style={{fontFamily: th.font, fontSize: 44, lineHeight: 1.25, color: '#FFD400'}}>⚠ {String(b.data.tieu_de || 'LƯU Ý').toUpperCase()}</div>
+        <div style={{fontFamily: th.font, fontSize: 58, lineHeight: 1.25, color: '#fff'}}>{String(b.data.text || '').toUpperCase()}</div>
       </div>
       <div style={{height: 22, background: stripes, backgroundPosition: `${-f * 3}px 0`}}/>
     </div>
@@ -233,8 +241,8 @@ const DaiChay: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // dải ch
   const {f, out, inn} = useLife(b);
   const unit = `${String(b.data.text || '').toUpperCase()}  ★  `;
   return <div style={{position: 'absolute', top: 230, left: 0, width: 1080, overflow: 'hidden', opacity: out * inn, transform: 'rotate(-3deg)',
-    background: th.accent, padding: '12px 0', boxShadow: SHADOW}}>
-    <div style={{whiteSpace: 'nowrap', fontFamily: th.font, fontSize: 56, color: '#111', transform: `translateX(${-(f * 9) % 1400}px)`}}>{unit.repeat(8)}</div>
+    background: th.accent, padding: '16px 0', boxShadow: SHADOW}}>
+    <div style={{whiteSpace: 'nowrap', fontFamily: th.font, fontSize: 56, lineHeight: 1.3, color: '#111', transform: `translateX(${-(f * 9) % 1400}px)`}}>{unit.repeat(8)}</div>
   </div>;
 };
 
@@ -244,7 +252,7 @@ const BongChu: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // chữ n�
   return <Zone top={(b as any).top ?? 250} style={{opacity: out}}>
     <div style={{position: 'relative', width: 760, height: 330, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: `scale(${s})`}}>
       <div style={{position: 'absolute', transform: `rotate(${t * 1.5}deg)`}}><Star points={16} innerRadius={120} outerRadius={175} fill={th.accent}/></div>
-      <div style={{position: 'relative', fontFamily: th.font, fontSize: 84, color: '#fff', ...STROKE(12), textAlign: 'center', lineHeight: 1}}>{String(b.data.text || '').toUpperCase()}</div>
+      <div style={{position: 'relative', fontFamily: th.font, fontSize: 84, color: '#fff', ...STROKE(12), textAlign: 'center', lineHeight: 1.25}}>{String(b.data.text || '').toUpperCase()}</div>
     </div>
   </Zone>;
 };
@@ -275,7 +283,7 @@ const HopQua: React.FC<{b: Block; th: Theme}> = ({b, th}) => {       // hộp qu
         {conf.map((c, i) => t > 8 && <rect key={i} x={85 + c.x} y={60 + c.y} width="12" height="18" fill={c.c} transform={`rotate(${c.r} ${85 + c.x} ${60 + c.y})`}/>)}
       </svg>
       <div style={{background: '#fff', borderRadius: 24, padding: '16px 28px', boxShadow: SHADOW, border: `6px solid ${th.red}`}}>
-        <div style={{fontFamily: th.font, fontSize: 60, color: th.red, lineHeight: 1.05}}>{String(b.data.dong1 || '').toUpperCase()}</div>
+        <div style={{fontFamily: th.font, fontSize: 60, color: th.red, lineHeight: 1.25}}>{String(b.data.dong1 || '').toUpperCase()}</div>
         <div style={{fontFamily: th.font, fontSize: 42, color: th.green}}>{String(b.data.dong2 || '').toUpperCase()}</div>
       </div>
     </div>
@@ -317,7 +325,7 @@ const TheQua: React.FC<{b: Block; th: Theme}> = ({b, th}) => {       // thẻ qu
   return <Zone top={(b as any).top ?? 240} style={{opacity: out * Math.min(1, inn * 1.5), transform: `translateY(${(1 - inn) * -120}px)`}}>
     <div style={{background: bg, color: fg, fontFamily: th.font, textAlign: 'center', padding: '22px 44px', borderRadius: 28, boxShadow: SHADOW, transform: `scale(${pulse})`,
       border: kind === 'the_trang' ? `8px solid ${th.red}` : 'none'}}>
-      <div style={{fontSize: 70, lineHeight: 1.08}}>{String(b.data.dong1 || '').toUpperCase()}</div>
+      <div style={{fontSize: 70, lineHeight: 1.25}}>{String(b.data.dong1 || '').toUpperCase()}</div>
       <div style={{fontSize: 52, marginTop: 8}}>{String(b.data.dong2 || '').toUpperCase()}</div>
     </div>
   </Zone>;
@@ -342,6 +350,7 @@ export const REGISTRY: Record<string, React.FC<{b: Block; th: Theme}>> = {
   hook_dap: HookDap, hook_tung_tu: HookTungTu, hook_go_may: HookGoMay, hook_mat_na: HookMatNa, hook_tem: HookTem, hook_bang: HookBang, hook_hoi: HookHoi,
   checklist: Checklist, so_dem: SoDem, so_sanh: SoSanh, vong_tron: VongTron, lower_third: LowerThird, nhan_dan: NhanDan, da_quang: DaQuang,
   canh_bao: CanhBao, dai_chay: DaiChay, bong_chu: BongChu, mui_ten_chi: MuiTenChi,
+  chu_dap: ChuDap, chu_mat_na: ChuMatNa, chu_nghieng: ChuNghieng, chu_tang: ChuTang, chu_so: ChuSo, chu_gach: ChuGach,
   hop_qua: HopQua, bang_qua: BangQua, nut_gio_hang: NutGioHang, the_qua: TheQua,
 };
 

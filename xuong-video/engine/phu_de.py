@@ -81,10 +81,138 @@ def auto_lines(plain):
     return final
 
 
-def chia_dong(text, dong_ai, words, emph_keys=()):
+MAC_DINH = {"bat": True, "co": 44, "y": 1500, "tu_moi_dong": [2, 5]}
+SO_CHU = {"không", "một", "hai", "ba", "bốn", "tư", "năm", "lăm", "sáu", "bảy", "tám", "chín", "mười", "mươi", "mốt", "trăm", "nghìn", "ngàn",
+          "triệu", "tỷ", "linh", "lẻ", "rưỡi"}
+DON_VI = {"ml", "lít", "lit", "l", "kg", "g", "gam", "gói", "chai", "phần", "%", "m", "cm", "mm", "ha", "sào", "lần", "con", "lá", "ngày", "giờ", "phút", "đồng", "k"}
+
+
+def cau_hinh(cfg=None):
+    """Đọc config["phu_de"] = {bat, co, y, tu_moi_dong:[ít,nhiều]}; thiếu/sai → mặc định hợp lý."""
+    raw = (cfg or {}).get("phu_de") if isinstance(cfg, dict) else None
+    raw = raw if isinstance(raw, dict) else {}
+    out = dict(MAC_DINH)
+    if isinstance(raw.get("bat"), bool):
+        out["bat"] = raw["bat"]
+    for k, lo, hi in (("co", 24, 90), ("y", 300, 1700)):
+        try:
+            out[k] = int(min(hi, max(lo, int(float(raw[k])))))
+        except Exception:
+            pass
+    try:
+        a, b = [int(x) for x in raw["tu_moi_dong"]][:2]
+        a = max(1, min(a, 8)); b = max(a, min(b, 8))
+        out["tu_moi_dong"] = [a, b]
+    except Exception:
+        pass
+    return out
+
+
+def _chuan(w):
+    return re.sub(r"[^\w%]", "", str(w).lower())
+
+
+def _la_so(w):
+    c = _chuan(w)
+    return bool(c) and (c in SO_CHU or bool(re.fullmatch(r"\d+([.,]\d+)?", c)))
+
+
+def _cam_cat(ws):
+    """cam[i] = True nếu KHÔNG được ngắt giữa ws[i-1] và ws[i]: tên riêng viết hoa liền nhau (Bọ Trĩ Top One), cụm số (hai trăm bốn mươi), số + đơn vị (240 ml)."""
+    cam = [False] * len(ws)
+    for i in range(1, len(ws)):
+        a, b = ws[i - 1], ws[i]
+        if re.search(r"[,;:…!?.]$", a):
+            continue
+        ca, cb = _chuan(a), _chuan(b)
+        if a[:1].isupper() and b[:1].isupper():
+            cam[i] = True
+        elif _la_so(a) and (_la_so(b) or (cb in DON_VI and re.search(r"\d", ca))):
+            cam[i] = True
+    return cam
+
+
+def _cat_doan(ws, cam, lo, hi):
+    """Chia ws (không có dấu câu giữa chừng) thành các cụm ≤ hi từ, cân đối, tránh cắt chỗ cấm."""
+    n = len(ws)
+    if n <= hi:
+        return [(0, n)]
+    ly_tuong = n / -(-n // hi)
+    INF = 1e9
+    best = [INF] * (n + 1); tr = [0] * (n + 1); best[0] = 0
+    for j in range(1, n + 1):
+        for i in range(j):
+            if best[i] >= INF or (i > 0 and cam[i]):
+                continue
+            sz = j - i
+            c = best[i] + (sz - ly_tuong) ** 2 + (1000 if sz > hi else 0) + (300 if sz < lo else 0)
+            if c < best[j]:
+                best[j], tr[j] = c, i
+    out, j = [], n
+    while j > 0:
+        out.append((tr[j], j)); j = tr[j]
+    return out[::-1]
+
+
+def cat_cum(ws, lo=2, hi=5):
+    """Chia danh sách từ hiển thị thành cụm lo–hi từ: ngắt ở dấu câu trước, rồi cân đối; không cắt tên riêng / số."""
+    if not ws:
+        return []
+    cam = _cam_cat(ws)
+    doan, a = [], 0
+    for i, w in enumerate(ws):
+        if re.search(r"[,;:…!?.]$", w) and i + 1 < len(ws):
+            doan.append((a, i + 1)); a = i + 1
+    doan.append((a, len(ws)))
+    cum = []
+    for a, b in doan:
+        cum += [(a + x, a + y) for x, y in _cat_doan(ws[a:b], cam[a:b], lo, hi)]
+    ra = []
+    for a, b in cum:                                   # cụm 1 từ → gộp vào cụm kề nếu không quá dài
+        if b - a < lo and ra and ra[-1][1] - ra[-1][0] + (b - a) <= hi and not re.search(r"[.!?]$", ws[ra[-1][1] - 1]):
+            ra[-1] = (ra[-1][0], b)
+        else:
+            ra.append((a, b))
+    if len(ra) > 1 and ra[0][1] - ra[0][0] < lo and ra[0][1] - ra[0][0] + ra[1][1] - ra[1][0] <= hi:
+        ra[1] = (ra[0][0], ra[1][1]); ra = ra[1:]
+    return [" ".join(ws[a:b]) for a, b in ra]
+
+
+def _chu_cua_khoi(d):
+    """Mọi chữ trong data của khối (để biết khối đang nói gì)."""
+    if isinstance(d, str):
+        return [d]
+    if isinstance(d, dict):
+        return [x for v in d.values() for x in _chu_cua_khoi(v)]
+    if isinstance(d, (list, tuple)):
+        return [x for v in d for x in _chu_cua_khoi(v)]
+    if isinstance(d, (int, float)):
+        return [str(d)]
+    return []
+
+
+def loc_phu_de(lines, blocks, nguong=0.6):
+    """Bỏ dòng phụ đề đang trùng chữ với khối đang hiện cùng lúc (khối nói rồi, phụ đề đọc lại là thừa)."""
+    out = []
+    for ln in lines or []:
+        tk = [t for t in _toks(" ".join(w["w"] for w in ln["words"]))]
+        trung = False
+        for b in blocks or []:
+            if b["f1"] <= ln["f0"] or b["f0"] >= ln["f1"]:
+                continue
+            bt = set(_toks(" ".join(_chu_cua_khoi(b.get("data")))))
+            if tk and sum(t in bt for t in tk) / len(tk) >= nguong:
+                trung = True; break
+        if not trung:
+            out.append(ln)
+    return out
+
+
+def chia_dong(text, dong_ai, words, emph_keys=(), tu_min=2, tu_max=5):
     plain = re.sub(r"\[[^\]]*\]\s*", "", text).strip()
-    lines = dong_ai if dong_ai and _toks(" ".join(dong_ai)) == _toks(plain) and all(3 <= len(l.split()) <= 12 for l in dong_ai) \
-        else auto_lines(plain)
+    dung_ai = bool(dong_ai and _toks(" ".join(dong_ai)) == _toks(plain))
+    base = dong_ai if dung_ai else auto_lines(plain)
+    lines = [c for ln in base for c in cat_cum(_tu_dem(ln), tu_min, tu_max)]
     keys = [k.lower() for k in emph_keys if k]
     out = []
     for ln, (a, b) in zip(lines, chia_tu([_tu_dem(ln) for ln in lines], words)):
@@ -94,4 +222,4 @@ def chia_dong(text, dong_ai, words, emph_keys=()):
         out.append({"text": ln, "f0": int(round(ws[0]["s"] * FPS)), "f1": int(round(ws[-1]["e"] * FPS)),
                     "words": [{"w": w["w"], "f0": int(round(w["s"] * FPS)), "f1": int(round(w["e"] * FPS)),
                                "emph": any(k in w["w"].lower() for k in keys)} for w in ws]})
-    return out, (lines is dong_ai)
+    return out, dung_ai

@@ -4,8 +4,15 @@ W, H, FPS = 1080, 1920, 30
 RECT = {"khung_mo": (82, 200, 900, 1350), "khung_nho": (160, 260, 760, 1140), "chia_doi": (32, 170, 1000, 740),
         "chia_ngang": (24, 330, 508, 1080), "luoi_4": (36, 170, 490, 720)}
 CAO = {"checklist": 380, "so_sanh": 360, "bang_qua": 430, "so_dem": 200, "hop_qua": 230, "nut_gio_hang": 170, "the_qua": 230,
-       "canh_bao": 170, "dai_chay": 130, "hook_tung_tu": 300}
+       "canh_bao": 170, "dai_chay": 130, "hook_tung_tu": 300,
+       "chu_dap": 400, "chu_mat_na": 400, "chu_nghieng": 400, "chu_tang": 420, "chu_so": 420, "chu_gach": 400}
 VUNG_PHU_DE = (1380, 1600)
+try:                     # bố cục mới (chia_3, ba_doc…): ô ĐẦU là ô của cảnh chính
+    import bo_cuc as _BC
+    for _k, _r in _BC.RECTS.items():
+        RECT.setdefault(_k, tuple(_r[0]))
+except Exception:
+    pass
 
 
 def hop_man_hinh(d):
@@ -45,12 +52,14 @@ def dat_khoi(blocks, doan):
     """Gán b['top'] cho khối nằm trong Zone (câu mở, khối giữa, chốt) để không đè chai. Trả số khối đã dời."""
     doi = 0
     for b in blocks or []:
+        if b.get("co_dinh"):                     # đạo diễn đã chọn vị trí (vi_tri) → máy không dời
+            continue
         hops = hop_trong(doan, b["f0"] / FPS, b["f1"] / FPS)
         if not hops:
             continue
         cao = CAO.get(b["loai"], 260)
         mac_dinh = 250
-        ung = [mac_dinh, 140, 1060, 860, 560]
+        ung = [mac_dinh, 1060, 860, 560]            # y ≥ 230: không lên sát mép trên
         def diem(top):
             khung = (60, top, 940, top + cao)
             phat = sum(_chong(khung, h) for h in hops) / (880 * cao)

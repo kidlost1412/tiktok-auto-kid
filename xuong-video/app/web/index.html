@@ -228,6 +228,12 @@ input.sw:checked::after{transform:translateX(16px)}
 .run-h .run-l{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink2)}
 .run-h .note{text-align:right}
 #trangThai:not(:empty){margin-top:14px}
+.lo-ds{display:grid;gap:8px;margin-top:12px}.lo-ds:empty{display:none}
+.lo-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line)}
+.lo-row .lo-t{flex:1;min-width:0}.lo-row .lo-t b{display:block;font-weight:600;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lo-row .lo-t .note{font-size:12.5px}
+.lo-row .bar{height:6px;margin-top:6px}
+.lo-row.cho{background:var(--panel);border-style:dashed}
 .stat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 @media (max-width:1360px) and (min-width:1101px){.stat{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.stat{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -631,6 +637,9 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div class="runbox">
         <div class="run-h"><span class="run-l"><svg class="i"><use href="#i-clock"/></svg>Tiến độ lô</span><span class="note" id="barText">Chưa chạy.</span></div>
         <div class="bar"><i id="barFill"></i></div>
+        <div class="lo-ds" id="cacLo"></div>
+        <div class="lo-ds" id="hangCho"></div>
+        <p class="note" id="sucMay" style="margin:10px 0 0"></p>
       </div>
       <div id="trangThai"></div>
     </div>
@@ -1375,6 +1384,19 @@ function mau(l) {
   if (/XONG|ĐẠT|\[\d+\/\d+\]|OK/.test(l)) return 'ok';
   return '';
 }
+function veCacLo(dangLo) {        // danh sách lô đang chạy (mỗi lô 1 nút Dừng) + hàng chờ + dòng sức máy
+  const phut = bd => { const m = Math.max(0, Math.round((Date.now() / 1000 - (bd || Date.now() / 1000)) / 60)); return m >= 60 ? `${Math.floor(m / 60)} giờ ${String(m % 60).padStart(2, '0')}` : `${m} phút`; };
+  $('#cacLo').innerHTML = dangLo.map(x => { const tong = x.tien_do.tong || x.so_video || 0, p = tong ? Math.round(100 * x.tien_do.xong / tong) : 0;
+    return `<div class="lo-row"><div class="lo-t"><b>${esc(x.ten || x.ma)}</b><span class="note">${x.tien_do.xong}/${tong} video · ${phut(x.bat_dau)}</span><div class="bar"><i style="width:${Math.max(4, p)}%"></i></div></div>
+      <button class="btn stop sm" data-dung="${esc(x.ma)}">${ic('stop', 'f')}Dừng</button></div>`; }).join('');
+  $('#hangCho').innerHTML = (ST.hang_cho || []).map((x, i) => `<div class="lo-row cho"><div class="lo-t"><b>${esc(x.ten || x.ma)}</b><span class="note">Đang chờ chỗ (thứ ${i + 1}) · ${x.so} video</span></div>
+      <button class="btn ghost sm" data-bo="${esc(x.ma)}">${ic('x')}Bỏ khỏi hàng chờ</button></div>`).join('');
+  const sm = ST.suc_may;
+  $('#sucMay').textContent = sm ? `Máy: ${Math.round(sm.ram_gb)} GB RAM (đang trống ${sm.ram_trong_gb} GB) → tối đa ${sm.lo_toi_da} lô cùng lúc, ${sm.khe_dung} khe dựng.` : '';
+}
+$('#cacLo').onclick = async e => { const b = e.target.closest('[data-dung]'); if (!b || !confirm('Dừng lô này? Video đã xong vẫn giữ.')) return;
+  await api('/api/dung', {san_pham: b.dataset.dung}); toast('Đã dừng lô.'); capNhat(); };
+$('#hangCho').onclick = async e => { const b = e.target.closest('[data-bo]'); if (!b) return; await api('/api/dung', {san_pham: b.dataset.bo}); toast('Đã bỏ khỏi hàng chờ.'); capNhat(); };
 async function capNhat() {
   ST = await api('/api/trang-thai');
   pmBadge(ST.prompt_moi);
@@ -1386,12 +1408,17 @@ async function capNhat() {
   }
   if (!$('#spSua').options.length) { ST.san_pham.forEach(p => $('#spSua').add(new Option(p.ten, p.ma))); hienAnhSua(); }
   hienAnhChon(); veKhoThem(); durVe(sel.value);
-  const td = ST.tien_do, chay = ST.dang_chay;
-  $('#btnChay').classList.toggle('hidden', chay); $('#btnDung').classList.toggle('hidden', !chay || ST.chay_ngoai_app);
+  const dangLo = (ST.cac_lo || []).filter(x => x.dang_chay), chay = ST.dang_chay;
+  const td = dangLo.length > 1 ? {xong: dangLo.reduce((a, x) => a + x.tien_do.xong, 0), tong: dangLo.reduce((a, x) => a + (x.tien_do.tong || x.so_video || 0), 0), da_xong: false, het_han_muc: null} : ST.tien_do;
+  // Nhiều lô chạy cùng lúc: nút "Bắt đầu làm" LUÔN dùng được (chỉ khoá khi chính sản phẩm đang chọn đã chạy/đang chờ); "Dừng" = dừng tất cả
+  $('#btnChay').classList.toggle('hidden', chay && !dangLo.length);
+  $('#btnChay').disabled = dangLo.some(x => x.ma === sel.value) || (ST.hang_cho || []).some(x => x.ma === sel.value);
+  $('#btnDung').classList.toggle('hidden', !chay || ST.chay_ngoai_app);
   const pct = td.tong ? Math.round(100 * td.xong / td.tong) : 0;
   $('#barFill').style.width = (chay ? Math.max(4, pct) : (td.da_xong ? 100 : pct)) + '%';
-  $('#barText').textContent = chay ? `Đang làm: ${td.xong}/${td.tong} video xong${ST.chay_ngoai_app ? ' (đang chạy từ cửa sổ lệnh)' : ''}…`
+  $('#barText').textContent = chay ? `Đang làm${dangLo.length > 1 ? ' ' + dangLo.length + ' lô' : ''}: ${td.xong}/${td.tong} video xong${ST.chay_ngoai_app ? ' (đang chạy từ cửa sổ lệnh)' : ''}…`
     : td.da_xong ? `Lô gần nhất xong: ${td.xong}/${td.tong} video.` : (td.tong ? `Lô gần nhất dừng ở ${td.xong}/${td.tong}.` : 'Chưa chạy.');
+  veCacLo(dangLo);
   $('#trangThai').innerHTML = td.het_han_muc && !chay
     ? `<div class="errbox">${ic('alert')} Hết hạn mức Claude. Vào ⚙️ Cài đặt → Đăng nhập / Đổi tài khoản, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '';
   const lg = $('#log'), dinh = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
@@ -1484,9 +1511,9 @@ $('#btnChay').onclick = async () => {
   if (!confirm(`Làm ${n} video cho ${$('#spChon').selectedOptions[0].text}, dài ${giay[0]}–${giay[1]} giây?`)) return;
   const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon(), giay});
   if (r.ok) { const p = spLam().find(x => x.ma === sp); if (p) p.thoi_luong = giay; }
-  toast(r.ok ? 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.' : r.loi); if (r.ok) baoViec('thodung', 'bat-dau'); capNhat();
+  toast(r.ok ? (r.cho ? `Máy đang bận — đã xếp hàng chờ (thứ ${r.cho}), tự chạy khi có chỗ.` : 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.') : r.loi); if (r.ok) baoViec('thodung', 'bat-dau'); capNhat();
 };
-$('#btnDung').onclick = async () => { if (confirm('Dừng lô đang làm? Video đã xong vẫn giữ.')) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
+$('#btnDung').onclick = async () => { if (confirm('Dừng TẤT CẢ lô đang làm (và xoá hàng chờ)? Video đã xong vẫn giữ.')) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
 
 // ---------- KHO VIDEO
 async function taiNgay() {
@@ -1611,7 +1638,7 @@ function veDauCt() {
   const ma = $('#spSua').value, p = TQ.find(x => x.ma === ma), o = $('#spSua').selectedOptions[0];
   $('#spTenCt').textContent = (p && p.ten) || (o && o.text) || ma || '';
   $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng làm video</span>' : `<span class="pill y dot">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`) +
-    `<span class="pill">${ic('film')} ${p.video_kho} video gốc</span><span class="pill">${ic('layers')} ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được</span><span class="pill">${ic('video')} ${p.da_lam} video đã làm</span>` +
+    hcNhan(p.ma) + `<span class="pill">${ic('film')} ${p.video_kho} video gốc</span><span class="pill">${ic('layers')} ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được</span><span class="pill">${ic('video')} ${p.da_lam} video đã làm</span>` +
     (p.ma ? `<span class="pc-code" style="margin:0">${esc(p.ma)}</span>` : '');
 }
 document.querySelectorAll('#sp [data-ve]').forEach(b => b.onclick = () => { spXem(b.dataset.ve); if (b.dataset.ve === 'ds') taiTongQuan(); });
@@ -1629,7 +1656,7 @@ async function taiTongQuan(moi) {
   $('#tqBang').innerHTML = !ds.length ? rong('pkg', 'Chưa có sản phẩm nào', 'Bấm "Thêm sản phẩm mới" để bắt đầu.') :
     ds.map(p => { const pm = p.video_kho ? Math.min(100, Math.round(100 * p.mo_ta / p.video_kho)) : 0, thieu = p.video_kho > p.mo_ta;
       return `<div class="pc" data-ma="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Mở ${esc(p.ten)}" role="button" tabindex="0">
-      <div class="pc-media">${anhSp(p.anh)}<div class="pc-st">${tt(p)}</div></div>
+      <div class="pc-media">${anhSp(p.anh)}<div class="pc-st">${tt(p)}${hcNhan(p.ma)}</div></div>
       <div class="pc-body">
         <div><div class="pc-name">${esc(p.ten)}</div><div class="pc-code">${esc(p.ma)}</div></div>
         <div class="pc-m">
@@ -1662,6 +1689,21 @@ $('#btnTqMoi').onclick = () => taiTongQuan(true);
 const spCtHien = () => SPV.xem === 'ct' && !$('#sp').classList.contains('hidden');
 // ---------- Học cảnh: một nút + một dòng trạng thái. Việc nạp cảnh vào kho (chuẩn bị kho) chạy tiếp ngay trên cùng dòng đó.
 const HOC = {t: null, ma: '', h: null, k: null, s: null, chay: false, nap: false, nho: 0, moLuc: 0, bam: false, loiKhoa: ''};
+// Các sản phẩm đang học cảnh (nhiều sản phẩm học cùng lúc): hỏi nhẹ mỗi 4 giây khi đang ở tab Sản phẩm, gắn nhãn lên danh sách + đầu trang chi tiết
+let HOC_DANG = {};
+const hcNhan = ma => { const d = HOC_DANG[ma]; if (!d) return '';
+  return `<span class="pill b dot hc-nhan" title="Đang học cảnh bằng Antigravity">${d.cho > 0 ? `Chờ tới lượt học cảnh (${d.cho})` : d.dang_dung ? 'Đang dừng học cảnh…' : `Đang học cảnh${d.tong ? ' ' + d.xong + '/' + d.tong : ''}`}</span>`; };
+async function hcTaiDang() {
+  if ($('#sp').classList.contains('hidden') || document.hidden) return;
+  let r; try { r = await api('/api/hoc-canh-dang'); } catch (e) { return; }
+  const m = {}; ((r && r.dang_hoc) || []).forEach(x => { m[x.ma] = x; });
+  if (JSON.stringify(m) === JSON.stringify(HOC_DANG)) return;
+  HOC_DANG = m;
+  document.querySelectorAll('#tqBang .pc[data-ma]').forEach(c => { const st = c.querySelector('.pc-st'); if (!st) return;
+    st.querySelectorAll('.hc-nhan').forEach(x => x.remove()); st.insertAdjacentHTML('beforeend', hcNhan(c.dataset.ma)); });
+  if (SPV.xem === 'ct') veDauCt();
+}
+setInterval(() => hcTaiDang().catch(() => {}), 4000);
 const HC_LOAI = {chai_ro: 'Chai rõ nhãn', nhan_sau: 'Mặt sau nhãn', pha_rot: 'Pha, rót', phun_tuoi: 'Phun, tưới', re_goc: 'Rễ, gốc', cay_benh: 'Cây bệnh',
   ket_qua: 'Cây khoẻ, kết quả', vuon_rong: 'Toàn cảnh vườn', nguoi_lam: 'Người làm vườn', nguoi_noi: 'Người nói vào máy', kho_hang: 'Kho hàng', khac: 'Khác'};
 const HC_CO = {toan: 'Toàn cảnh', toan_canh: 'Toàn cảnh', trung: 'Trung cảnh', trung_canh: 'Trung cảnh', can: 'Cận cảnh', can_canh: 'Cận cảnh'};
@@ -1731,12 +1773,11 @@ function hcVe() {
       }
     } else phu = j.thong_bao || 'Đang kiểm kho…';
     nut = ic('stop', 'f') + 'Dừng'; lop = 'stop';
+    if (j.cho > 0) { dong = `Đang chờ tới lượt (xếp thứ ${j.cho})…`; phu = `Máy đang học cảnh cho ${h.toi_da_sp || 3} sản phẩm cùng lúc — tới lượt sẽ tự bắt đầu.`; pc = null; }
   } else if (nap || cho || nho) {
     dong = cho && !nap ? 'Đang đợi hub làm xong video để nạp cảnh vào kho…' : 'Đang nạp cảnh vào kho…';
     pc = nap && k.buoc >= 1 && k.buoc <= 3 ? Math.round((k.buoc - 1) / 3 * 100 + 8) : 8;
     nut = ic('loader') + 'Đang nạp kho…'; tat = true;
-  } else if (h.job_khac) {
-    dong = 'Máy đang học cảnh cho sản phẩm khác, anh đợi xong nhé.'; tat = true;
   } else if (!mo) {
     if (dangMo) { dong = 'Đang mở Antigravity… đợi vài giây là xong.'; nut = ic('loader') + 'Đang mở…'; tat = true; }
     else { dong = h.agy_thong_bao || 'Antigravity chưa mở. Bấm nút bên dưới, mở xong máy sẽ tự báo.'; nut = ic('play') + 'Mở Antigravity'; }
@@ -1753,6 +1794,8 @@ function hcVe() {
     if (['dung', 'het_luot', 'loi'].includes(j.trang_thai) || (j.trang_thai === 'can_mo' && !mo)) { phu = j.thong_bao; xau = j.trang_thai !== 'dung'; }
     else if (j.trang_thai === 'xong' && j.thong_bao !== 'Kho đã đủ mô tả.') phu = j.thong_bao;
   }
+  const kh = h.hoc_khac || [];                                // sản phẩm khác đang học cảnh: chỉ báo, không chặn
+  if (kh.length && !dung) phu = (phu ? phu + ' · ' : '') + `Đang học cảnh thêm ${kh.length} sản phẩm khác: ` + kh.slice(0, 3).map(x => x.ten).join(', ') + (kh.length > 3 ? '…' : '');
   $('#hcDong').textContent = dong;
   $('#hcBar').classList.toggle('hidden', pc === null); $('#hcFill').style.width = (pc || 0) + '%';
   const bp = $('#hcPhu'); bp.textContent = phu; bp.style.color = xau ? 'var(--red)' : ''; bp.classList.toggle('hidden', !phu);
@@ -1795,7 +1838,7 @@ $('#btnHoc').onclick = async () => {
   if (j && j.dang_chay) {
     if (j.dang_dung) return;
     HOC.bam = true; hcVe();
-    try { await api('/api/hoc-canh-dung', {}); toast('Đang dừng…'); } catch (e) { toast('Không dừng được — thử lại'); }
+    try { await api('/api/hoc-canh-dung', {ma: HOC.ma}); toast('Đang dừng…'); } catch (e) { toast('Không dừng được — thử lại'); }
     HOC.bam = false; return taiHoc();
   }
   if (!h.agy.mo) {

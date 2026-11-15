@@ -132,22 +132,22 @@ class AnToanTest(unittest.TestCase):
         for ky_vong in (10, 30, 60, 60):
             goi = self._mot_luot(self.CFG, ma_thoat=lambda: 1, vua_chay="sp")
             self.assertEqual(goi, [])
-            con = (tu_dong.TRANG_THAI["nghi_den"].timestamp() - time.time()) / 60
-            self.assertAlmostEqual(con, ky_vong, delta=1)
             f2 = json.loads(f.read_text(encoding="utf-8"))
-            f2["nghi_den"] = None; f.write_text(json.dumps(f2), encoding="utf-8")        # hết giờ nghỉ → lô lỗi tiếp theo
-        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))["loi_lien_tiep"], 4)
+            con = (f2["sp"]["sp"]["nghi_den"] - time.time()) / 60                         # nghỉ lùi dần RIÊNG sản phẩm lô lỗi
+            self.assertAlmostEqual(con, ky_vong, delta=1)
+            f2["sp"]["sp"]["nghi_den"] = None; f.write_text(json.dumps(f2), encoding="utf-8")        # hết giờ nghỉ → lô lỗi tiếp theo
+        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))["sp"]["sp"]["loi_lien_tiep"], 4)
 
     def test_tran_lo_moi_ngay(self):
         import datetime
         f = self.d / "lich-su" / "tu-dong-nghi.json"
-        f.write_text(json.dumps({"ngay": datetime.date.today().isoformat(), "so_lo": 3}), encoding="utf-8")
+        f.write_text(json.dumps({"sp": {"sp": {"ngay": datetime.date.today().isoformat(), "so_lo": 3}}}), encoding="utf-8")      # trần tính riêng từng sản phẩm
         c = {"tu_dong": {"bat": True, "toi_da_lo_ngay": 3, "san_pham": {"sp": {"bat": True}}}}
         self.assertEqual(self._mot_luot(c), [])
         self.assertIn("đủ 3 lô", tu_dong.TRANG_THAI["ghi"])
         c["tu_dong"]["toi_da_lo_ngay"] = 4
         self.assertEqual(len(self._mot_luot(c)), 1)                  # dưới trần → chạy, và đếm thêm 1
-        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))["so_lo"], 4)
+        self.assertEqual(json.loads(f.read_text(encoding="utf-8"))["sp"]["sp"]["so_lo"], 4)
 
     def test_don_dep_file_part_cu(self):
         ra = self.d / "ra"; ngay = ra / "2026-01-01"; ngay.mkdir(parents=True)

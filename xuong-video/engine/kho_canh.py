@@ -10,7 +10,7 @@ from pathlib import Path
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
-from phieu import VAI_TU_LOAI
+from phieu import VAI_TU_LOAI, dep_may
 
 VAI_TRO = [   # vai trò chung (từ khoá trong mô tả + thẻ)
     ("chai_ro", ["cầm chai", "cam_chai", "chai_", "nhãn", "nhan_doc_ro", "can_canh_san_pham", "xoay chai", "xoay_chai"]),
@@ -80,7 +80,7 @@ def nap(ma):
             if (c.get("diem") or 0) < 2 and not the_c & {"nguoi_noi_vao_may", "cam_chai", "can_san_pham", "nhan_doc_ro", "combo_san_pham"}:
                 bo["diem"] += 1; continue
             chu_ghi = str(c.get("chu_chen_san", "")).strip().lower() not in SACH   # giữ lại, AI soát chấm mức chữ
-            if any(float(s.get("tu_s", 0)) < b and float(s.get("den_s", 1e9)) > a for s in khac):
+            if d.get("kieu") != 2 and any(float(s.get("tu_s", 0)) < b and float(s.get("den_s", 1e9)) > a for s in khac):   # kiểu 2: giữ, chỉ đánh dấu
                 bo["hang_khac"] += 1; continue
             def _chong(v):
                 try:
@@ -112,6 +112,11 @@ def nap(ma):
                           "the": the[:10], "cay": d.get("cay_trong", []), "dep": [round(x, 2) for x in kd],
                           "chu_ghi": chu_ghi, "noi_ghi": co_noi}
             if ph:                                           # AI đã điền phiếu → ghi thẳng kết quả soát (soat_kho.py bỏ qua cảnh đã có soat)
+                if ph.get("net") is not None:                # chấm lại điểm đẹp theo luật máy hiện hành (đổi luật không cần học lại)
+                    try:
+                        shot["diem"] = c["diem"] = dep_may(ph.get("net"), ph.get("chuyen_dong"), ph.get("loi"), int(ph.get("chu_chen") or 0), bool(ph.get("hang_khac")))
+                    except Exception:
+                        pass
                 shot.update(kieu=2, loai=ph.get("loai"), noi=ph.get("dang_noi_ve") or "", loi=ph.get("loi") or "",
                             soat={"mat": 2 if ph.get("loai") == "nguoi_noi" else ph.get("mat", 0), "chu_muc": ph.get("chu_chen", 0),
                                   "hang_khac": bool(ph.get("hang_khac")), "dep": c.get("diem"), "nhan": ph.get("nhan"), "ghi": _text(c.get("hinh", ""))[:80]})

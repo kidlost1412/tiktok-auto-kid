@@ -4,7 +4,7 @@
 - ra/<ngày>/_ban-chua-dat cũ hơn 5 ngày (bản giám khảo chưa đạt, đã có bản dựng lại)
 - nhật ký app dài quá 5 MB → giữ phần cuối
 dung_luong() → số liệu cho app (dung lượng từng ngày, ổ còn trống)."""
-import json, os, secrets, shutil, time
+import json, os, re, secrets, shutil, time
 from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
@@ -12,11 +12,47 @@ _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, KEM
 
 
-# ---------------------------------------------------------------- khoá lô (dang-chay.lock)
+# ---------------------------------------------------------------- khoá lô (dang-chay-<mã sp>.lock; dang-chay.lock = khoá kiểu cũ)
+# Mỗi SẢN PHẨM một khoá riêng (cùng sản phẩm không bao giờ chạy 2 lô cùng lúc, khác sản phẩm chạy song song được). dang-chay.lock (không mã)
+# là khoá của lô khởi động bằng bản CLI cũ — vẫn được tính là "đang có lô chạy".
 # Dòng đầu GIỮ NGUYÊN dạng "<pid> <mã sp>" (app đọc cột 1 = PID, phần còn lại = mã sản phẩm). Danh tính tiến trình (giờ tạo + token ngẫu nhiên)
-# nằm ở file kèm dang-chay.lock.id → PID bị cấp lại cho một python khác (vd. chính app) không còn bị tính là "lô đang chạy".
-def _f_khoa():
-    return HUB / "lich-su" / "dang-chay.lock"
+# nằm ở file kèm <khoá>.id → PID bị cấp lại cho một python khác (vd. chính app) không còn bị tính là "lô đang chạy".
+def _f_khoa(ma=None):
+    """ma=None → khoá kiểu cũ dang-chay.lock; có mã → dang-chay-<mã>.lock."""
+    if not ma:
+        return HUB / "lich-su" / "dang-chay.lock"
+    return HUB / "lich-su" / f"dang-chay-{re.sub(r'[^A-Za-z0-9._-]', '_', str(ma))}.lock"
+
+
+def cac_f_khoa():
+    """Mọi file khoá lô đang có trên đĩa (kể cả khoá đã cũ): [(mã sp hoặc None nếu khoá kiểu cũ, đường dẫn)]."""
+    ls = HUB / "lich-su"; out = []
+    f0 = ls / "dang-chay.lock"
+    if f0.exists():
+        out.append((None, f0))
+    try:
+        for f in sorted(ls.glob("dang-chay-*.lock")):
+            if f.name.endswith(".lock.lock"):          # file phụ của khoa_tep (khoá HĐH), không phải khoá lô
+                continue
+            out.append((f.name[len("dang-chay-"):-len(".lock")], f))
+    except OSError:
+        pass
+    return out
+
+
+def cac_khoa_con_song():
+    """[{"pid","ma","f","rieng"}] của MỌI lô thật sự còn chạy (khoá riêng từng sản phẩm + khoá kiểu cũ). Không xoá gì."""
+    out = []
+    for ma, f in cac_f_khoa():
+        d = khoa_con_song(f)
+        if d:
+            out.append(dict(d, ma=d.get("ma") or ma or "", f=f, rieng=ma is not None))
+    return out
+
+
+def lo_cua_san_pham(ma):
+    """Khoá còn sống của lô đang chạy sản phẩm `ma` (khoá riêng hoặc khoá kiểu cũ ghi đúng mã đó); None nếu không có."""
+    return next((d for d in cac_khoa_con_song() if d["ma"] == ma), None)
 
 
 def _id_f(f):
@@ -92,10 +128,10 @@ def khoa_con_song(f=None):
 
 
 def lay_khoa_lo(ma_sp, f=None):
-    """Tạo khoá lô ĐỘC QUYỀN (O_EXCL, tuần tự hoá bằng khoá HĐH): 2 lô khởi động cùng giây chỉ 1 lô qua. Trả token (chuỗi) nếu lấy được,
-    None nếu đang có lô khác chạy. Khoá cũ (tiến trình đã chết / PID cấp lại) tự được dọn."""
+    """Tạo khoá lô ĐỘC QUYỀN (O_EXCL, tuần tự hoá bằng khoá HĐH): 2 lô CÙNG SẢN PHẨM khởi động cùng giây chỉ 1 lô qua (mặc định khoá
+    dang-chay-<mã>.lock; truyền f để dùng file khác, vd. khe dựng). Trả token (chuỗi) nếu lấy được, None nếu đang bị giữ. Khoá cũ (tiến trình đã chết / PID cấp lại) tự được dọn."""
     from su_kien import khoa_tep
-    f = Path(f or _f_khoa()); f.parent.mkdir(parents=True, exist_ok=True)
+    f = Path(f or _f_khoa(ma_sp)); f.parent.mkdir(parents=True, exist_ok=True)
     try:
         with khoa_tep(f, 5):
             if f.exists():
@@ -155,7 +191,8 @@ def don(log=print):
     if not ra.exists():
         return 0
     try:
-        kh = khoa_con_song(); lo_chay = bool(kh) and kh["pid"] != os.getpid()      # lô KHÁC đang chạy (lô của chính mình đã tự xoá _tam rồi gọi don)
+        song = [d for d in ([khoa_con_song()] + [x for x in cac_khoa_con_song() if x.get("rieng")]) if d]
+        lo_chay = any(d["pid"] != os.getpid() for d in song)      # lô KHÁC đang chạy (lô của chính mình đã tự xoá _tam rồi gọi don)
         san_tam = max(1.0, float(cfg_hub().get("don_tam_gio", 6))) * 3600        # sàn tuổi: thư mục tạm mới hơn mức này không bao giờ bị xoá
     except Exception:
         lo_chay, san_tam = True, 6 * 3600
@@ -234,7 +271,7 @@ def don(log=print):
         from su_kien import _cat_dong
         ls = HUB / "lich-su"
         for mau, giu, byte in (("nhat-ky.txt", 8000, 1_500_000), ("lo.jsonl", 2000, 400_000), ("cau-da-dung*.txt", 4000, 400_000),
-                               ("canh-da-dung-*.txt", 600, 120_000), ("giong.csv", 4000, 400_000), ("token.csv", 8000, 1_500_000)):
+                               ("canh-da-dung-*.txt", 600, 120_000), ("giong.csv", 4000, 400_000), ("token.csv", 8000, 1_500_000), ("lo/*.txt", 3000, 400_000)):
             for f in ls.glob(mau):
                 _cat_dong(f, giu, byte, "utf-8-sig" if f.suffix == ".csv" else "utf-8", f.suffix == ".csv")
     except Exception:

@@ -149,7 +149,7 @@ class TuongThichDeBaiCuTest(Base):
         self.assertEqual(out.count("KHÔNG chạy lệnh terminal"), 1); self.assertEqual(out.count("JSON thuần"), 1)
 
     def test_dinh_dang_json_cua_cac_vai_tu_gan(self):
-        for k, token in (("giam-khao", '"diem"'), ("doc-nhan", '"su_that"'), ("soat-kho", '"chu_muc"'), ("dao-dien", '"doan"'), ("bien-kich", '"y_canh"')):
+        for k, token in (("giam-khao", '"muc"'), ("doc-nhan", '"su_that"'), ("soat-kho", '"chu_muc"'), ("dao-dien", '"doan"'), ("bien-kich", '"y_canh"')):
             pm.luu(k, "de bai cu khong co dinh dang")
             ctx = {b: "v" for b in pm.VAI[k]["bien"]}
             self.assertIn(token, pm.dien(k, **ctx), k)

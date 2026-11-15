@@ -189,8 +189,7 @@ class BoCucTest(unittest.TestCase):
         self.assertGreaterEqual(sum(k in BC.TOAN for k in L), -int(-0.35 * n // 1), L)
         self.assertFalse(any(L[i] == L[i - 1] == L[i - 2] for i in range(2, n)), L)
         for sg, k in zip(segs, L):
-            if BC._nguoi_noi(sg["shot"]):
-                self.assertNotIn(k, ("day", "day_zoom", "pip_troi", "pip_giua"))
+            # gói L: máy không còn né cảnh người nói/aff ở toàn màn (miệng lệch tiếng không quan trọng) → bỏ ràng buộc cũ
             self.assertGreaterEqual(len(sg.get("phu_shots", [])), BC.SO_PHU[k])
 
     def test_tran_san_bat_ke_dao_dien_chon_gi(self):

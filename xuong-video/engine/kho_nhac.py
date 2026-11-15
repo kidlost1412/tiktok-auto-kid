@@ -10,7 +10,7 @@ QUY TẮC
   File không đoán được nhóm thì không dùng.
 - Kho mặc định chưa cài vẫn chạy được: chỉ dùng nguồn thêm; nhóm nào không có file thì bỏ qua tiếng đó.
 - Tải gói mặc định: tai_goi(url, sha256) — chỉ từ link người dùng đặt trong config (nhac.goi_mac_dinh_url)."""
-import csv, hashlib, json, os, re, subprocess, time, urllib.request, zipfile
+import array, csv, hashlib, json, math, os, re, subprocess, time, urllib.request, zipfile
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -34,6 +34,11 @@ def goc_nhac():
 
 def goc_sfx():
     return Path(cfg()["duong_dan"].get("sfx") or (GOC_TAI_NGUYEN / "sfx"))
+
+
+def goc_sfx_moi():
+    """Âm thanh đóng gói sẵn theo mã (xuong-video/mau/sfx-moi): có ngay khi cài, không cần mạng, không chép sang thư mục dữ liệu."""
+    return CODE / "mau" / "sfx-moi"
 
 
 def nguon_phu(loai, chi_bat=True):
@@ -139,6 +144,8 @@ def chon_nhac(group, rng):
 
 # ---------------------------------------------------------------- SFX
 _TU_KHOA = [   # (nhóm đích, từ khoá) — khớp đầu tiên thắng; whoosh -> cả vut_nhe và vut_manh
+    (("con_dau",), ("stamp", "seal")), (("but_viet",), ("scrawl", "handwrit")), (("phun_suong",), ("mist", "spray", "sprinkler")),
+    (("thong_bao",), ("ping",)), (("tick",), ("tick",)),
     (("chup",), ("camera", "shutter")), (("go_phim",), ("typewriter", "keyboard", "typing")),
     (("tien",), ("coin", "money", "cash")), (("vo_tay",), ("applause", "clap")),
     (("lap_lanh",), ("sparkle", "twinkle", "glitter", "magic")), (("no_lon",), ("explosion", "boom", "blast")),
@@ -148,7 +155,7 @@ _TU_KHOA = [   # (nhóm đích, từ khoá) — khớp đầu tiên thắng; who
     (("bop",), ("pop", "click", "bubble", "tap", "blip")),
 ]
 NHOM_SFX = ("vut_nhe", "vut_manh", "roi_phep", "dap", "no_lon", "keo_len", "bop", "go_phim", "chup", "ting", "lap_lanh", "dung", "sai",
-            "tien", "tui_qua", "vo_tay")
+            "tien", "tui_qua", "vo_tay", "tick", "thong_bao", "con_dau", "but_viet", "phun_suong", "nuoc")
 
 
 def nhom_sfx(rel):
@@ -162,6 +169,37 @@ def nhom_sfx(rel):
         if any(re.search(r"(?<![a-z])" + w, s) for w in tk):
             return list(nhom)
     return []
+
+
+def do_am(p, toi_da=8.0):
+    """Đo 1 file âm thanh bằng ffmpeg (không cần numpy): {"dai", "dinh_db", "t_dinh", "t_bat", "tan_cong"} hoặc None nếu đọc lỗi.
+    dinh_db = đỉnh lớn nhất mọi kênh (volumedetect); t_dinh = giây tới cửa sổ 5 ms to nhất; t_bat = giây tới lúc bắt đầu nghe thấy
+    (trên đỉnh -24 dB); tan_cong = t_dinh - t_bat."""
+    try:
+        r = subprocess.run(["ffmpeg", "-v", "info", "-t", "30", "-i", str(p), "-vn", "-af", "volumedetect", "-f", "null", "-"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        m = re.search(r"max_volume:\s*(-?[\d.]+) dB", r.stderr)
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-t", str(toi_da), "-i", str(p), "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                             capture_output=True, timeout=60).stdout
+    except Exception:
+        return None
+    if not m or len(raw) < 320:
+        return None
+    a = array.array("h")
+    a.frombytes(raw[:len(raw) // 2 * 2])
+    if a.itemsize != 2:
+        return None
+    w = 80
+    env = [max(map(abs, a[i:i + w])) for i in range(0, len(a), w)]
+    pk = max(env)
+    if pk <= 0:
+        return None
+    k = env.index(pk)
+    nguong = pk * 10 ** (-24 / 20)
+    b = next((i for i, v in enumerate(env) if v >= nguong), k)
+    dai = thoi_luong(p) or len(a) / 16000
+    t_dinh, t_bat = round((k + 0.5) * w / 16000, 3), round(b * w / 16000, 3)
+    return {"dai": round(dai, 3), "dinh_db": float(m.group(1)), "t_dinh": t_dinh, "t_bat": t_bat, "tan_cong": round(max(0.0, t_dinh - t_bat), 3)}
 
 
 def sfx_phu():

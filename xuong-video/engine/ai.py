@@ -47,11 +47,24 @@ def doc_trang_thai():
         return {}
 
 
+MA_LO = ""       # mã sản phẩm của lô đang chạy trong tiến trình này (ekip đặt) → token.csv ghi cột "lo" để tách chi phí từng lô chạy song song
+
+
 def _ghi_trang_thai(ma, **kv):
+    """Đọc-sửa-ghi tai-khoan.json: nhiều lô (nhiều tiến trình) + app cùng ghi → khoá file HĐH để không đè nhau (quá 5 s không lấy được khoá → ghi không khoá, như cũ)."""
+    from su_kien import khoa_tep
     with _lock:
-        d = doc_trang_thai(); x = d.setdefault(ma, {}); x.update(kv)
-        F_TK.parent.mkdir(exist_ok=True)
-        ghi_json(F_TK, d, indent=1)
+        try:
+            with khoa_tep(F_TK, 5):
+                return _ghi_trang_thai_khong_khoa(ma, **kv)
+        except TimeoutError:
+            return _ghi_trang_thai_khong_khoa(ma, **kv)
+
+
+def _ghi_trang_thai_khong_khoa(ma, **kv):
+    d = doc_trang_thai(); x = d.setdefault(ma, {}); x.update(kv)
+    F_TK.parent.mkdir(exist_ok=True)
+    ghi_json(F_TK, d, indent=1)
 
 
 def env_tk(tk):
@@ -212,17 +225,13 @@ def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
             r, d, rl = _goi_1(tk, vai, prompt, anh, model, effort, timeout, False)
         res = d.get("result") or ""
         u = d.get("usage") or {}
-        with _lock:
-            f = HUB / "lich-su" / "token.csv"; f.parent.mkdir(exist_ok=True)
-            new = not f.exists()
-            with open(f, "a", newline="", encoding="utf-8-sig") as fh:
-                w = csv.writer(fh)
-                if new:
-                    w.writerow(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video"])
-                w.writerow([t0.strftime("%Y-%m-%d %H:%M:%S"), vai, model, effort, round((datetime.datetime.now() - t0).total_seconds(), 1),
-                            u.get("input_tokens", 0), u.get("cache_creation_input_tokens", 0), u.get("cache_read_input_tokens", 0),
-                            u.get("output_tokens", 0), d.get("total_cost_usd", 0), d.get("num_turns", 0), len(anh or []), tk["ma"],
-                            getattr(VIEC, "video", "")])
+        import su_kien as _sk              # nhiều lô cùng ghi token.csv: noi_them = khoá file HĐH + dòng tiêu đề đặt trong khoá (không ghi trùng / không ném lỗi)
+        _sk.noi_them(HUB / "lich-su" / "token.csv", _sk.dong_csv([
+            t0.strftime("%Y-%m-%d %H:%M:%S"), vai, model, effort, round((datetime.datetime.now() - t0).total_seconds(), 1),
+            u.get("input_tokens", 0), u.get("cache_creation_input_tokens", 0), u.get("cache_read_input_tokens", 0),
+            u.get("output_tokens", 0), d.get("total_cost_usd", 0), d.get("num_turns", 0), len(anh or []), tk["ma"],
+            getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
+            dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
         txt = res + " " + (r.stderr or "")
         if (rl and rl.get("status") == "rejected") or re.search(r"hit your .*limit|usage limit|limit reached", txt, re.I):
             if not (rl and rl.get("status") == "rejected"):

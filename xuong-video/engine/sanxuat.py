@@ -11,14 +11,21 @@ from duong_dan import DATA as HUB, cfg as cfg_hub
 CFG = cfg_hub()
 
 
+MA = ""                                    # mã sản phẩm của lô này (đặt ở __main__); nhiều lô chạy song song nên mỗi lô một nhật ký riêng
+
+
 def log(msg):
-    line = f"[{datetime.datetime.now():%H:%M:%S}] {msg}"
+    gio = f"[{datetime.datetime.now():%H:%M:%S}]"
+    line = f"{gio} {msg}"
     try:
         print(line, flush=True)
     except Exception:                      # console đóng / mã hoá lạ → vẫn ghi sổ
         pass
     from su_kien import noi_them           # nhật ký không bao giờ làm sập lô (file bị khoá → ghi tạm .cho-ghi); quá 1,5 MB → giữ 8000 dòng cuối
-    noi_them(HUB / "lich-su" / "nhat-ky.txt", line + "\n", giu_dong=8000, toi_da_byte=1_500_000)
+    if MA:                                 # nhật ký riêng của lô: lich-su/lo/<mã>.txt (không tiền tố) — app đọc tiến độ từng lô từ đây
+        noi_them(HUB / "lich-su" / "lo" / f"{MA}.txt", line + "\n", giu_dong=3000, toi_da_byte=400_000)
+    # nhật ký chung nhat-ky.txt: thêm tiền tố "[<mã>] " để biết dòng của lô nào khi nhiều lô xen nhau
+    noi_them(HUB / "lich-su" / "nhat-ky.txt", (f"{gio} [{MA}] {msg}" if MA else line) + "\n", giu_dong=8000, toi_da_byte=1_500_000)
 
 
 def music_pick(group, rng):
@@ -33,6 +40,7 @@ def music_pick(group, rng):
 
 if __name__ == "__main__":
     (HUB / "lich-su").mkdir(exist_ok=True)
+    MA = sys.argv[1] if len(sys.argv) > 1 else ""
     from ekip import chay
     if len(sys.argv) > 3 and sys.argv[2] == "--lam-lai":      # sanxuat.py <ma> --lam-lai <file json danh sách>
         ds = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))

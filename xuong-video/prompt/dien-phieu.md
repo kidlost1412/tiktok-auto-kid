@@ -43,7 +43,7 @@ KHUNG PHIẾU (giữ đúng tên trường, không thêm trường; "video" đ�
   kho_hang = kho, thùng hàng, nhiều chai xếp, cửa hàng
   khac = không thuộc loại nào ở trên
 - co_canh: "toan" (thấy cả vườn/luống/nhiều cây) | "trung" (một cây, một người từ hông trở lên, vài cành) | "can" (một chùm trái, vài lá, bàn tay, chai chiếm phần lớn khung)
-- mat: 0 = không thấy mặt người; 1 = có mặt người nhưng nhỏ/nghiêng/không nói vào máy; 2 = mặt rõ, nhìn máy hoặc đang nói
+- mat: 0 = không thấy mặt người; 1 = có mặt người nhưng nhỏ/xa/quay lưng và KHÔNG nói; 2 = mặt rõ VÀ người đó đang nói (nghe tiếng nói, miệng mấp máy) — kể cả khi không nhìn máy, cúi xuống làm việc hay rót thuốc
 - chu_chen: chữ/sticker/bình luận chèn SAU khi quay (không tính chữ in trên nhãn chai): 0 = không có; 1 = ít, nhỏ, sát mép; 2 = nhiều/to, che hình
 - hang_khac: true nếu chủ thể là chai/gói của sản phẩm KHÁC (không phải: {{ten_sp}})
 - nhan_doc: tên sản phẩm ĐỌC ĐƯỢC RÕ trên nhãn trong cảnh đó, chép đúng chữ in; không đọc rõ hoặc không có chai → ""

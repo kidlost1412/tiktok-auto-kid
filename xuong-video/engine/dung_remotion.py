@@ -5,8 +5,8 @@ import json, os, random, shutil, subprocess
 from pathlib import Path
 
 from dung import render, sentence_times, MENU as MENU_NEN
-from phu_de import chia_dong
-from cong_thuc import RECIPES, xep_khoi, chon_atmos
+from phu_de import chia_dong, cau_hinh as cau_hinh_phu_de, loc_phu_de
+from cong_thuc import RECIPES, xep_khoi, chon_atmos, khung_tron
 import sfx as SFX
 from lam_sach import lam_sach
 from anh_bia import chon_bia
@@ -52,38 +52,52 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
               "emph": any(k in w["w"].lower() for k in keys)} for si, s in enumerate(sents) for w in s["words"]]
     cap = pick("phu_de", st.get("phu_de"), rng)
     big = False
-    lines, by_ai = chia_dong(voice["text"], plan.get("dong"), voice["words"], keys)
+    pd = cau_hinh_phu_de(CFG)                 # phụ đề nhỏ, tuỳ chọn: config["phu_de"] = {bat, co, y, tu_moi_dong}
+    lines, by_ai = chia_dong(voice["text"], plan.get("dong"), voice["words"], keys, *pd["tu_moi_dong"])
     recipe = st.get("cong_thuc") if st.get("cong_thuc") in RECIPES else None
     blocks, atmos = None, None
     if recipe:   # chặng 2: thư viện khối theo công thức dựng
-        blocks, cta_f0 = xep_khoi(recipe, st.get("khoi"), sents, total, st, rng, plan.get("ten_thuong_hieu", ""))
+        blocks, cta_f0 = xep_khoi(recipe, st.get("khoi"), sents, total, st, rng, plan.get("ten_thuong_hieu", ""), voice["words"])
         atmos = chon_atmos(recipe, rng, [int(c * FPS) for c in info.get("cuts", [])])
     else:
         cta_f0 = max(int(round((sents[-1]["s"] - 0.15) * FPS)), dur_f - 5 * FPS)
+    if not pd["bat"]:
+        lines = []
+    elif blocks:
+        lines = loc_phu_de(lines, blocks)      # ẩn dòng phụ đề đang trùng chữ với khối đang hiện
+    cy = CENTER_Y.get(st.get("vi_tri_phu_de"), pd["y"])      # đạo diễn nêu vị trí → theo đạo diễn; không thì theo config
+    mau_nhan = st.get("mau_nhan") if st.get("mau_nhan") in ACCENT else "vang"
     props = {
         "blocks": blocks, "atmos": atmos,
         "duration_f": dur_f, "audio": "", "clips": [], "transition": {"kind": "cut", "dur_f": 0}, "words": words,
         "lines": lines,
-        "cap": {"style": cap, "center_y": CENTER_Y[pick("vi_tri_phu_de", st.get("vi_tri_phu_de"), rng)],
-                "upper": pick("viet_hoa", st.get("viet_hoa"), rng) == "co", "max_px": rng.choice([54, 58, 62])},
-        "caption": {"style": cap, "center_y": CENTER_Y[pick("vi_tri_phu_de", st.get("vi_tri_phu_de"), rng)],
-                    "upper": pick("viet_hoa", st.get("viet_hoa"), rng) == "co", "group": 2 if big else rng.choice([3, 4])},
-        "colors": {"accent": ACCENT[pick("mau_nhan", st.get("mau_nhan"), rng)], "brand_red": "#D7262E", "brand_green": "#2E9E44", "text": "#FFFFFF"},
+        "cap": {"style": cap, "center_y": cy, "bat": pd["bat"], "co": pd["co"], "max_px": pd["co"],
+                "upper": pick("viet_hoa", st.get("viet_hoa"), rng) == "co"},
+        "caption": {"style": cap, "center_y": cy, "upper": pick("viet_hoa", st.get("viet_hoa"), rng) == "co", "group": 2 if big else rng.choice([3, 4])},
+        "colors": {"accent": ACCENT[mau_nhan], "brand_red": "#D7262E", "brand_green": "#2E9E44", "text": "#FFFFFF"},
         "open_card": {"kind": pick("the_mo", st.get("the_mo"), rng), "text": (st.get("chu_the_mo") or plan.get("ten_thuong_hieu", ""))[:26],
                       "f1": min(int(round((sents[0]["e"] + 0.3) * FPS)), 100)},
         "cta": {"kind": pick("the_chot", st.get("the_chot"), rng), "line1": (st.get("chu_chot_1") or "QUÀ TẶNG THEO ĐƠN")[:26],
                 "line2": (st.get("chu_chot_2") or "BẤM GIỎ HÀNG")[:24], "f0": cta_f0},
-        "arrow": {"f0": cta_f0 + 10, "label": rng.choice(["GIỎ HÀNG", "BẤM VÀO ĐÂY", "ĐẶT NGAY"])},
-        "progress_bar": pick("thanh_tien_do", st.get("thanh_tien_do"), rng) == "co",
+        "arrow": {"f0": cta_f0 + 10, "label": st.get("nhan_mui_ten") or rng.choice(["GIỎ HÀNG", "BẤM VÀO ĐÂY", "ĐẶT NGAY"])},
+        "progress_bar": st.get("thanh_tien_do") == "co",          # mặc định tắt: chỉ bật khi đạo diễn nêu
     }
     if blocks is None:
         del props["blocks"], props["atmos"]
     doan = info.get("doan") or []
     if blocks:                         # né nhãn chai: dời khối chữ / mũi tên giỏ hàng sang khoảng trống
         info["ne_nhan"] = dat_khoi(blocks, doan)
+        info["khung_tron"] = khung_tron(doan, blocks)     # đoạn toàn màn trơ chữ (chỉ báo cho giám khảo/máy kiểm, không tự thêm chữ)
     tm = dat_mui_ten(cta_f0, dur_f, doan)
     if tm:
         props["arrow"]["top"] = tm
+    if blocks:                         # khối chốt trên bố cục hai/ba cột: đặt lên dải trống phía trên các ô (không đè mặt người / chai trong ô)
+        chot = blocks[-1]; t_ch = chot["f0"] / FPS + 0.2
+        d_ch = next((d for d in doan if d["t0"] <= t_ch < d["t1"]), doan[-1] if doan else None)
+        if d_ch and d_ch.get("bo_cuc") in ("chia_ngang", "ba_doc"):
+            chot["top"] = 150
+        if chot["loai"] == "nut_gio_hang":
+            props["arrow"]["top"] = -999      # đã có nút giỏ hàng → không vẽ thêm mũi tên chồng lên
     (work_dir / "props.json").write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")   # LUÔN ghi (lỗi rà soát #1)
     if blocks:
         props["open_card"]["kind"] = blocks[0]["loai"]; props["cta"]["kind"] = blocks[-1]["loai"]
@@ -93,8 +107,9 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
     ev = []
     if blocks:   # chặng 3: SFX khớp khối chữ + điểm cắt
         bl = [{"loai": b["loai"], "f0": b["f0"], "f1": b["f1"], "n": len((b.get("data") or {}).get("items") or []) or 3,
-               "text": (b.get("data") or {}).get("text", "")} for b in blocks]
-        ev = SFX.len_lich(st.get("sfx"), bl, info.get("cuts", []), total, rng, info.get("pops"), info.get("chuyen_canh"))
+               "text": (b.get("data") or {}).get("text", ""), "am": b.get("am")} for b in blocks]
+        ev = SFX.len_lich(st.get("sfx"), bl, info.get("cuts", []), total, rng, info.get("pops"), info.get("chuyen_canh"),
+                          am_mo=st.get("am_mo"), lat_trang=[d["lat"] for d in (info.get("doan") or []) if d.get("lat")])
         info["sfx_lich"] = SFX.tom_tat(ev)
     info.update({"phu_de": cap, "the_mo": props["open_card"]["kind"], "the_chot": props["cta"]["kind"],
                  "mau_nhan": st.get("mau_nhan"), "font": "DT Phudu", "kieu_karaoke": f"remotion-{cap}",

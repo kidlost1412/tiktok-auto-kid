@@ -8,7 +8,11 @@ import datetime, json, re, unicodedata
 LOAI = ["chai_ro", "nhan_sau", "pha_rot", "phun_tuoi", "re_goc", "cay_benh", "ket_qua", "vuon_rong", "nguoi_lam", "nguoi_noi", "kho_hang", "khac"]
 CO_CANH = ["toan", "trung", "can"]
 GIOI_HAN = {"ta": 120, "dang_noi_ve": 80, "loi": 60, "nhan_doc": 80, "loi_hay": 220, "tom_tat": 200, "cay_trong": 60}
-NO_RONG = 0.06                    # nới khung nhãn mỗi phía 6% cạnh của chính khung (AI khoanh chưa chuẩn)
+# khuyết điểm NẶNG (so trên chữ bỏ dấu): hình xấu hoặc nhãn sản phẩm không đọc được → điểm tối đa 3. Còn lại là lỗi vặt → tối đa 4.
+LOI_NANG = (r"mo nhoe|nhoe|mat net|(?<!canh )\bmo\b|\btoi\b|loa|chay sang|nguoc|lat guong|lat chu|che[^,;]{0,14}\b(nhan|chu|mat)\b|che kin|"
+            r"rung manh|giat|chu de|phu de|de len|chu chen|anh chen|khung chen|chu to|banner|bang chu|so do|anh minh hoa|binh luan|mui ten|"
+            r"watermark|logo|sticker|nhieu hat|vo hinh|meo|nghieng manh|qua nua|gan het|chu the nho")
+NO_RONG = 0.06                   # nới khung nhãn mỗi phía 6% cạnh của chính khung (AI khoanh chưa chuẩn)
 
 # loại cảnh → vai trò kho_canh đang dùng
 VAI_TU_LOAI = {"chai_ro": ["chai_ro"], "nhan_sau": ["nhan_can"], "pha_rot": ["pha_rot"], "phun_tuoi": ["phun"], "re_goc": ["re"], "cay_benh": ["van_de"],
@@ -36,12 +40,16 @@ def dep_may(net, chuyen_dong, loi="", chu_chen=0, hang_khac=False):
         net = float(net)
     except Exception:
         net = 0.0
-    if chu_chen == 2 or hang_khac:
+    if chu_chen == 2:
         return 1
+    if hang_khac:                 # Kid 14/11: hàng hãng khác làm nền vẫn dùng được, chỉ không xếp cao
+        return 3 if net >= 0.4 else 2
     if net < 0.4:
         return 2
-    if loi:
+    if loi and re.search(LOI_NANG, _bo_dau(loi).lower()):
         return 3
+    if loi:                       # lỗi vặt (cắt nhẹ mép, dính mũi giày, nền bừa…) — chấm thật 14/11: cảnh đẹp bị kéo về 3 vì lỗi vặt → tối đa 4
+        return 4 if net >= 0.7 else 3
     if net >= 1.0:
         return 5
     if net >= 0.7:

@@ -28,6 +28,12 @@ GOP_GIAY = 0.3              # gộp nhiều thay đổi dồn dập thành 1 l�
 NHIP_DU_PHONG = 2.0         # không có watchdog: so mtime mỗi 2 giây
 NHIP_AN_TOAN = 5.0          # có watchdog: vẫn tính lại thưa (bắt việc không ghi file, vd lô tự thoát)
 FILE_THEO_DOI = ("su-kien.jsonl", "danh-gia.json", "dang-chay.lock")
+MAU_KHOA_LO = "dang-chay*.lock"          # khoá từng sản phẩm: dang-chay-<mã>.lock (+ khoá kiểu cũ dang-chay.lock)
+
+
+def la_file_theo_doi(ten):
+    """Tên file trong lich-su/ có đáng canh không: sổ sự kiện, đánh giá, và MỌI khoá lô (mỗi sản phẩm một khoá)."""
+    return ten in FILE_THEO_DOI or (ten.startswith("dang-chay") and ten.endswith(".lock"))
 
 
 def n_cuoi(f):
@@ -137,6 +143,10 @@ class Phat:
                     ds.append((t, st.st_mtime_ns, st.st_size))
                 except OSError:
                     ds.append((t, 0, 0))
+            try:                                  # khoá của từng sản phẩm (dang-chay-<mã>.lock): xuất hiện / biến mất = số lô chạy đổi
+                ds.append(("khoa-lo", tuple(sorted((x.name, x.stat().st_mtime_ns) for x in self.ls.glob(MAU_KHOA_LO) if x.name.endswith(".lock")))))
+            except OSError:
+                ds.append(("khoa-lo", ()))
         if self.ra:
             try:
                 ds.append(("ra", tuple(sorted((x.name, x.stat().st_mtime_ns) for x in self.ra.iterdir() if x.is_dir()))))
@@ -182,7 +192,7 @@ class Phat:
                     ds = [getattr(ev, "src_path", ""), getattr(ev, "dest_path", "")]
                     ds = [os.fsdecode(d) for d in ds if d]
                     if self.loai == "ls":
-                        ok = any(Path(d).name in FILE_THEO_DOI for d in ds)
+                        ok = any(la_file_theo_doi(Path(d).name) for d in ds)
                     else:
                         ok = ev.is_directory or any(d.lower().endswith(".mp4") and not d.lower().endswith(".part.mp4") for d in ds)
                     if ok:

@@ -84,11 +84,14 @@ def bad(s, chinh=True):
     Kid 10/11: cảnh có người nói vẫn tốt → giữ (máy dựng sẽ đặt vào khung/ô để không lộ lệch khẩu hình); chữ chèn ít thì vẫn dùng."""
     x = s.get("soat") or {}
     chu = x.get("chu_muc", 2 if x.get("chu") else 0)
-    return bool(chu >= 2 or x.get("hang_khac") or (x.get("dep") or 3) <= 1)
+    return bool(chu >= 2 or (x.get("dep") or 3) <= 1)        # Kid 14/11: có hàng hãng khác làm nền vẫn dùng (chỉ không làm cảnh chai chốt — xem bo_cuc.la_chai)
 
 
 def nguoi_noi(s):
-    return ((s.get("soat") or {}).get("mat") or 0) >= 2
+    """Người có thể đang nói (đặt trong khung, không full màn — miệng mấp máy lệch lời đọc). Chấm thật 14/11: AI hay ghi mat=1 cho người
+    đang nói mà không nhìn máy → mặt người cỡ trung/cận cũng tính."""
+    m = (s.get("soat") or {}).get("mat") or 0
+    return m >= 2 or (m == 1 and s.get("co_canh") not in ("toan", None))
 
 
 if __name__ == "__main__":

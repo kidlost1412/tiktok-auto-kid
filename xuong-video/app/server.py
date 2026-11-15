@@ -6,14 +6,16 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 import anh_sp
 import luong
+import dieu_phoi
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, kem_ngay, don_kem_cu, glob_kem, ghi_json, KHOA_DANH_GIA, pid_la_lo_sx
+import suc_may
 WEB = Path(__file__).resolve().parent / "web"
 PORT = int(os.environ.get("XUONG_PORT") or 8765)
 LS = HUB / "lich-su"
-RUN = {"proc": None, "bat_dau": None, "san_pham": None, "so_video": 0}
+RUN = dieu_phoi.RUN          # mã sản phẩm → {"proc", "bat_dau", "so_video", "log"}: nhiều lô chạy song song (xem dieu_phoi.py)
 BAT_DAU_APP = time.time()
 _auth = {"t": 0, "v": None}
 
@@ -168,31 +170,14 @@ def _popen(cmd, **kw):
         return subprocess.Popen(cmd, creationflags=co, **kw)
 
 
-def pid_lo():
-    """PID lô đang chạy theo file khoá (kể cả lô của phiên app trước), None nếu không có."""
-    k = LS / "dang-chay.lock"
-    try:
-        pid = int(k.read_text().split()[0])
-        return pid if pid_la_lo_sx(pid) else None      # PID phải là tiến trình python; không thì là khoá cũ (PID bị cấp lại)
-    except Exception:
-        return None
+def pid_lo(ma=None):
+    """PID lô đang chạy (của sản phẩm `ma`, hoặc lô bất kỳ) theo file khoá — kể cả lô của phiên app trước; None nếu không có."""
+    return dieu_phoi.pid_lo(ma)
 
 
-def dang_chay():
-    p = RUN["proc"]
-    if p and p.poll() is None:
-        return True
-    k = LS / "dang-chay.lock"                 # lô chạy từ cửa sổ lệnh (sanxuat.ps1) cũng tính
-    if k.exists():
-        try:
-            pid = int(k.read_text().split()[0])
-            if pid_la_lo_sx(pid):
-                return True
-            k.unlink(missing_ok=True)         # khoá cũ (tiến trình đã chết hoặc PID bị cấp lại cho app khác) → dọn
-            return False
-        except Exception:
-            return False
-    return False
+def dang_chay(ma=None):
+    """Không nêu mã: có BẤT KỲ lô nào đang chạy (app bật / cửa sổ lệnh / phiên app trước / khoá kiểu cũ). Có mã: đúng sản phẩm đó đang chạy."""
+    return dieu_phoi.dang_chay(ma)
 
 
 def auth(force=False):
@@ -209,28 +194,15 @@ def auth(force=False):
     return v
 
 
-def nhat_ky_lo():
-    """Các dòng nhật ký của lần chạy gần nhất."""
-    f = LS / "nhat-ky.txt"
-    if not f.exists():
-        return []
-    lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
-    idx = max([i for i, l in enumerate(lines) if "BẮT ĐẦU" in l] or [0])
-    return lines[idx:][-400:]
+def nhat_ky_lo(ma=None):
+    """Các dòng nhật ký của lần chạy gần nhất. Có mã sản phẩm: nhật ký RIÊNG của lô đó (lich-su/lo/<mã>.txt); không mã: nhật ký chung (có tiền tố [mã])."""
+    return dieu_phoi.nhat_ky_lo(ma)
 
 
-def tien_do(lines):
-    done, total, het = 0, 0, None
-    for l in lines:
-        m = re.search(r"\[(\d+)/(\d+)\]", l)
-        if m:
-            done, total = int(m.group(1)), int(m.group(2))
-        m2 = re.search(r"BẮT ĐẦU.*?: (\d+) video", l)
-        if m2:
-            total = total or int(m2.group(1))
-        if "HẾT HẠN MỨC" in l:
-            het = l
-    return {"xong": done, "tong": total or RUN["so_video"], "het_han_muc": het, "da_xong": any("XONG:" in l for l in lines)}
+def tien_do(lines, ma=None):
+    """Tiến độ từ các dòng nhật ký. ma: sản phẩm của lô (số video dự phòng khi nhật ký chưa có dòng BẮT ĐẦU); không mã: lô bắt đầu gần nhất."""
+    ma = ma or dieu_phoi.lo_gan_nhat()
+    return dieu_phoi.tien_do(lines, (RUN.get(ma) or {}).get("so_video") or 0)
 
 
 def moc_dem():
@@ -666,7 +638,10 @@ def kiem_dinh(ma, sua):
 
 def hoc_canh_trang_thai(ma):
     import hoc_canh
-    j = dict(hoc_canh.JOB)
+    tc = hoc_canh.tat_ca_job()                       # mỗi sản phẩm 1 việc học riêng
+    j = tc.get(str(ma))
+    khac = [{"ma": k, "ten": hoc_canh.ten_san_pham(k), "cho": int(v.get("cho") or 0), "tong": v.get("tong") or 0, "xong": v.get("xong") or 0}
+            for k, v in tc.items() if v.get("dang_chay") and k != str(ma)]
     try:
         quyen = hoc_canh.trang_thai_quyen(hoc_canh.km._kho_cua(ma))
     except Exception:
@@ -674,7 +649,7 @@ def hoc_canh_trang_thai(ma):
     agy = hoc_canh.trang_thai_agy()
     return {"agy": agy, "agy_thong_bao": hoc_canh.MSG_AGY_VO if agy.get("vo") else "", "model": hoc_canh.doc_model(),
             "models": [{"v": k, "t": t} for k, t in hoc_canh.MODELS.items()],
-            "job": j if j.get("ma") == ma else None, "job_khac": bool(j.get("dang_chay") and j.get("ma") != ma),
+            "job": j, "hoc_khac": khac, "toi_da_sp": hoc_canh.doc_toi_da_sp(),
             "dang_chay_lo": bool(dang_chay()), "quyen": quyen, "kho_cho": ma in KHO_CHO}
 
 
@@ -779,7 +754,7 @@ def hoc_canh_bat_dau(ma, lai=False, chi=None):
     agy = hoc_canh.trang_thai_agy()
     if not agy["mo"]:
         return {"ok": False, "loi": hoc_canh.MSG_AGY_VO if agy.get("vo") else "Antigravity chưa mở — bấm Mở Antigravity.", "can": "mo"}
-    if hoc_canh.JOB.get("dang_chay"):
+    if hoc_canh.job(ma).get("dang_chay"):                     # chỉ chặn đúng sản phẩm này; sản phẩm khác học song song được
         return {"ok": False, "loi": "Đang học rồi."}
     # Học cảnh là làn riêng: KHÔNG chặn làm video (và ngược lại). Đang làm video thì học nhường máy: chỉ 1 lô một lúc.
     return hoc_canh.bat_dau_nen(ma, khi_xong=lambda kq: _chuan_bi_kho_sau_hoc(ma), ban_san_xuat=dang_chay, lai=bool(lai),
@@ -959,8 +934,6 @@ def _token_map(f):
 
 def lam_lai(ds):
     """ds: [{file, gop_y}] → chạy nền 'làm lại theo góp ý' (gom theo sản phẩm, mỗi lần 1 sản phẩm)."""
-    if dang_chay():
-        return {"ok": False, "loi": "Hub đang chạy một lô khác — đợi xong rồi làm lại."}
     viec = []
     for x in ds:
         v = (ra_dir() / x.get("file", "")).resolve()
@@ -972,14 +945,15 @@ def lam_lai(ds):
     if not viec:
         return {"ok": False, "loi": "Không tìm thấy video cần làm lại"}
     ma = viec[0]["ma"]; cung = [x for x in viec if x["ma"] == ma]
-    fj = LS / f"lam-lai-{int(time.time())}.json"
+    if dang_chay(ma) or dieu_phoi.vi_tri_hang(ma):
+        return {"ok": False, "loi": "Sản phẩm này đang có một lô chạy (hoặc đang chờ) — đợi xong rồi làm lại."}
+    fj = LS / f"lam-lai-{ma}-{int(time.time())}.json"
     fj.write_text(json.dumps(cung, ensure_ascii=False), encoding="utf-8")
-    c = cfg(); log = open(LS / "app-chay.log", "a", encoding="utf-8")
-    RUN["proc"] = _popen([c["duong_dan"]["python"], "-X", "utf8", str(CODE / "engine" / "sanxuat.py"), ma, "--lam-lai", str(fj)],
-                         cwd=str(HUB), stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
-    log.close(); RUN.update(bat_dau=time.time(), san_pham=ma, so_video=len(cung))
+    r = dieu_phoi.yeu_cau(ma, len(cung), lam_lai_f=fj)        # hết chỗ theo sức máy → vào hàng chờ (r["cho"] = vị trí)
+    if not r.get("ok"):
+        return r
     con = len(viec) - len(cung)
-    return {"ok": True, "so": len(cung), "con_lai": con}
+    return dict(r, so=len(cung), con_lai=con)
 
 
 def danh_gia_f():
@@ -1065,8 +1039,8 @@ def _video_mot_ngay(ngay, dg, tp):
 def chay(sp, so, kho_them=None, giay=None):
     """kho_them: danh sách mã kho phụ anh chọn ("Dùng thêm cảnh từ kho khác"); None = giữ lựa chọn đã nhớ (tự động dùng cái này).
     Lựa chọn được ghi vào hồ sơ sản phẩm (kho_them) — engine đọc từ đó, lần sau/tự động dùng lại."""
-    if dang_chay():
-        return {"ok": False, "loi": "Hub đang chạy một lô khác."}
+    if dang_chay(sp) or dieu_phoi.vi_tri_hang(sp):          # chỉ chặn đúng sản phẩm này; sản phẩm khác chạy song song (hết chỗ → xếp hàng chờ)
+        return {"ok": False, "loi": "Sản phẩm này đang có một lô chạy (hoặc đang chờ) — mỗi sản phẩm chỉ một lô một lúc."}
     if not co_khoa_giong():                  # kiểm TRƯỚC khi chạy: thiếu khoá giọng thì lô hỏng giữa chừng, phí hạn mức Claude
         return {"ok": False, "loi": "Chưa có khoá ElevenLabs (giọng đọc). Vào tab Cài đặt → mục \"Khoá ElevenLabs\" dán khoá rồi Lưu, sau đó chạy lại."}
     from tu_dong import san_sang
@@ -1090,19 +1064,12 @@ def chay(sp, so, kho_them=None, giay=None):
         if hs.get("kho_them") != ok:
             hs["kho_them"] = ok
             f.write_text(json.dumps(hs, ensure_ascii=False, indent=1), encoding="utf-8")
-    c = cfg()
     try:
         from tu_dong import huy_nghi
-        huy_nghi()                           # anh/ vòng tự động bắt đầu lô mới → bỏ giờ nghỉ sau DỪNG / lô lỗi
+        huy_nghi(sp)                         # anh/ vòng tự động bắt đầu lô mới → bỏ giờ nghỉ sau DỪNG / lô lỗi của sản phẩm này
     except Exception:
         pass
-    log = open(LS / "app-chay.log", "a", encoding="utf-8")
-    env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    RUN["proc"] = _popen([c["duong_dan"]["python"], "-X", "utf8", str(CODE / "engine" / "sanxuat.py"), sp, str(so)],
-                         cwd=str(HUB), stdout=log, stderr=subprocess.STDOUT, env=env)
-    log.close()                                   # tiến trình con đã giữ bản riêng của file nhật ký
-    RUN.update(bat_dau=time.time(), san_pham=sp, so_video=so)
-    return {"ok": True}
+    return dieu_phoi.yeu_cau(sp, so)         # {"ok": True} chạy ngay · {"ok": True, "cho": vị trí} hết chỗ theo sức máy → xếp hàng chờ
 
 
 def luu_kho_them(ma, ds):
@@ -1116,29 +1083,14 @@ def luu_kho_them(ma, ds):
     return {"ok": True, "kho_them": ok}
 
 
-def dung():
+def dung(ma=None):
+    """ma: dừng đúng lô của sản phẩm đó (hoặc bỏ nó khỏi hàng chờ). Không mã: bỏ cả hàng chờ + dừng MỌI lô (như trước)."""
     try:                                       # TRƯỚC khi kill: vòng tự động không được bật lô mới ngay sau khi anh bấm DỪNG
         from tu_dong import khi_bam_dung
-        khi_bam_dung()
+        khi_bam_dung(ma=ma)
     except Exception:
         pass
-    p = RUN["proc"]
-    pid = p.pid if (p and p.poll() is None) else pid_lo()      # lô của phiên app trước (app đã khởi động lại) cũng dừng được
-    if pid:
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
-        with open(LS / "nhat-ky.txt", "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.datetime.now():%H:%M:%S}] ⏹ Anh đã bấm DỪNG. Video đã xong vẫn giữ nguyên.\n")
-        for _ in range(20):                    # chờ tiến trình thật sự tắt rồi mới xoá khoá (lô bị kill -F không kịp tự xoá)
-            if not pid_la_lo_sx(pid):
-                break
-            time.sleep(0.25)
-        else:
-            return {"ok": True, "con_chay": True}          # vẫn chưa tắt → giữ khoá
-        try:
-            (LS / "dang-chay.lock").unlink(missing_ok=True)
-        except OSError:
-            pass
-    return {"ok": True}
+    return dieu_phoi.dung_mot(ma) if ma else dieu_phoi.dung_tat_ca()      # lô của phiên app trước (app đã khởi động lại) cũng dừng được (theo file khoá)
 
 
 _KHOA_DG = KHOA_DANH_GIA                       # khoá dùng chung với tự duyệt (engine/duyet.py)
@@ -1279,11 +1231,12 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); q = parse_qs(u.query)
         if u.path in ("/health", "/api/health"):           # cho launcher TikTokAuto.exe giám sát
-            p = RUN["proc"]
+            cac = dieu_phoi.lo_dang_chay()
+            gan = dieu_phoi.lo_gan_nhat()
             return self._json({"ok": True, "app": "xuong-video", "pid": os.getpid(), "cong": PORT,
                                "cong_trypost": cfg().get("trypost", {}).get("cong"), "bat_dau_app": BAT_DAU_APP,
-                               "dang_chay_lo": bool(dang_chay()), "pid_lo": (p.pid if p and p.poll() is None else pid_lo()),
-                               "san_pham_lo": RUN.get("san_pham")})
+                               "dang_chay_lo": bool(cac), "pid_lo": pid_lo(gan) if gan else pid_lo(),
+                               "san_pham_lo": gan, "so_lo": len(cac), "cac_lo": [{"ma": r["ma"], "pid": r["pid"]} for r in cac]})
         if u.path in ("/", "/index.html"):
             return self._file(WEB / "index.html")
         if u.path.startswith("/web/"):
@@ -1293,12 +1246,16 @@ class H(BaseHTTPRequestHandler):
             p = (ra_dir() / unquote(q.get("p", [""])[0])).resolve()
             return self._file(p) if p.is_relative_to(ra_dir().resolve()) else self.send_error(403)
         if u.path == "/api/trang-thai":
-            lines = nhat_ky_lo(); c = cfg()
+            gan = dieu_phoi.lo_gan_nhat()                  # trường cũ (dang_chay / tien_do / nhat_ky / bat_dau) = lô bắt đầu gần nhất; chi tiết từng lô ở "cac_lo"
+            lines = nhat_ky_lo(gan); c = cfg()
             nk = LS / "nhat-ky.txt"
-            td = tien_do(lines)
+            td = tien_do(lines, gan)
             ngoai = (not dang_chay()) and bool(lines) and not td["da_xong"] and not td["het_han_muc"] \
                 and nk.exists() and time.time() - nk.stat().st_mtime < 240 and not any("DỪNG" in l for l in lines[-2:])
-            return self._json({"prompt_moi": prompt_so_ban_moi(), "dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai, "bat_dau": RUN["bat_dau"], "tien_do": td,
+            cac_lo = dieu_phoi.tom_tat_cac_lo()
+            return self._json({"prompt_moi": prompt_so_ban_moi(), "dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai,
+                               "bat_dau": (RUN.get(gan) or {}).get("bat_dau") or next((x["bat_dau"] for x in cac_lo if x["ma"] == gan), None), "tien_do": td,
+                               "cac_lo": cac_lo, "hang_cho": [dict(x, ten=dieu_phoi.ten_sp(x["ma"])) for x in dieu_phoi.hang_cho()], "suc_may": suc_may.suc_may(),
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
@@ -1315,17 +1272,16 @@ class H(BaseHTTPRequestHandler):
                 toi_da = max(1, min(1500, int(q.get("max", ["300"])[0] or 300)))
             except ValueError:
                 toi_da = 300
-            lines = nhat_ky_lo(); td = tien_do(lines); chay = bool(dang_chay())
-            ma_sp, ten_sp = RUN.get("san_pham"), None
+            ma_sp, ten_sp = dieu_phoi.lo_gan_nhat(), None            # lô bắt đầu gần nhất (trường cũ); các lô đang chạy ở "cac_lo"
+            lines = nhat_ky_lo(ma_sp); td = tien_do(lines, ma_sp); chay = bool(dang_chay())
             try:
-                k = LS / "dang-chay.lock"
-                if not ma_sp and k.exists():
-                    cot = k.read_text().split(None, 1); ma_sp = cot[1].strip() if len(cot) > 1 else None
                 if ma_sp:
                     ten_sp = next((p.get("ten_ngan") or p.get("ten") for p in san_pham_ds() if p.get("ma") == ma_sp), None)
             except Exception:
                 pass
             return self._json({"ok": True, "dang_chay": chay, "tien_do": td, "san_pham": {"ma": ma_sp, "ten": ten_sp or ma_sp},
+                               "cac_lo": [{"ma": x["ma"], "ten": x["ten"], "so_video": x["so_video"], "tien_do": x["tien_do"], "dang_chay": x["dang_chay"]}
+                                          for x in dieu_phoi.tom_tat_cac_lo() if x["dang_chay"]],
                                "su_kien": su_kien.doc(sau, toi_da), "bay_gio": time.time(),
                                "cho_duyet": so_cho_duyet()})
         if u.path == "/api/tai-khoan-ds":
@@ -1340,6 +1296,10 @@ class H(BaseHTTPRequestHandler):
             return self._json(video_ngay(q.get("ngay", [datetime.date.today().isoformat()])[0]))
         if u.path.startswith("/api/lenh-gemini/"):
             return self._json({"lenh": lenh_gemini(u.path.split("/")[-1])})
+        if u.path == "/api/hoc-canh-dang":                       # các sản phẩm đang học cảnh (cho danh sách sản phẩm)
+            import hoc_canh
+            return self._json({"dang_hoc": [{"ma": k, "cho": int(v.get("cho") or 0), "tong": v.get("tong") or 0, "xong": v.get("xong") or 0, "dang_dung": bool(v.get("dang_dung"))}
+                                            for k, v in hoc_canh.tat_ca_job().items() if v.get("dang_chay")], "toi_da_sp": hoc_canh.doc_toi_da_sp()})
         if u.path.startswith("/api/hoc-canh/"):
             try:
                 return self._json(hoc_canh_trang_thai(u.path.split("/")[-1]))
@@ -1510,7 +1470,7 @@ class H(BaseHTTPRequestHandler):
         if u.path.startswith("/api/hoc-canh/"):
             return self._json(hoc_canh_bat_dau(u.path.split("/")[-1], lai=bool(b.get("lai")), chi=b.get("chi")))
         if u.path == "/api/hoc-canh-dung":
-            import hoc_canh; return self._json(hoc_canh.dung())
+            import hoc_canh; return self._json(hoc_canh.dung(str(b["ma"]) if b.get("ma") else None))      # có "ma" = dừng đúng sản phẩm đó; không có = dừng hết
         if u.path.startswith("/api/hoc-canh-quyen/"):
             return self._json(hoc_canh_quyen(u.path.split("/")[-1]))
         if u.path == "/api/agy-mo":
@@ -1527,7 +1487,7 @@ class H(BaseHTTPRequestHandler):
         if u.path.startswith("/api/chuan-bi-kho/"):
             return self._json(chuan_bi_kho(u.path.split("/")[-1]))
         if u.path == "/api/dung":
-            return self._json(dung())
+            return self._json(dung(b.get("san_pham") if isinstance(b.get("san_pham"), str) and b.get("san_pham") else None))      # không mã = dừng tất cả (tương thích)
         if u.path == "/api/danh-gia":
             return self._json(danh_gia(b))
         if u.path.startswith("/api/tai-khoan-dang-nhap/"):
@@ -1713,9 +1673,15 @@ def main():
         print("Không bật được luồng tin tức thì:", e)
     try:                                   # tự động giữ kho video
         from tu_dong import bat_dau
-        bat_dau(dang_chay, chay, lambda: (RUN["proc"].poll() if RUN["proc"] else None))      # mã thoát lô vừa rồi: khác 0 = lô lỗi → nghỉ lùi dần
+        bat_dau(dang_chay, chay, dieu_phoi.ma_thoat,      # mã thoát lô vừa rồi của TỪNG sản phẩm: khác 0 = lô lỗi → sản phẩm đó nghỉ lùi dần
+                cau={"so_dang_chay": lambda: len(dieu_phoi.lo_dang_chay()), "toi_da": lambda: suc_may.suc_may()["lo_toi_da"],
+                     "nhat_ky": nhat_ky_lo, "so_cho": lambda: len(dieu_phoi.hang_cho())})
     except Exception as e:
         print("Không bật được tự động:", e)
+    try:                                   # luồng nền: bật lô kế trong hàng chờ khi có chỗ (hàng chờ đọc lại từ file → khởi động lại app không mất)
+        dieu_phoi.bat_dau_hang_cho()
+    except Exception as e:
+        print("Không bật được hàng chờ lô:", e)
     threading.Thread(target=_vong_kiem_han_muc, daemon=True, name="kiem-han-muc").start()
     try:                                   # cổng cho app TikTok Auto — cần X-Key, chỉ nghe loopback
         from cong_trypost import chay_nen

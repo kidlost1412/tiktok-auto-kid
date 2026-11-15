@@ -35,6 +35,7 @@ VAI = {
             "luat": "Luật sản xuất (tài liệu \"Luật sản xuất\" bên dưới, bỏ phần Dựng)",
             "san_pham": "Hồ sơ sản phẩm (sự thật được nói, quà tặng, điều cấm…) dạng JSON",
             "so_gu": "Sổ gu của chủ hàng (cả tiêu đề) — để trống nếu chưa có sổ gu",
+            "ban_hang": "Kiến thức bán hàng chung + hồ sơ bán hàng riêng của sản phẩm (cả tiêu đề) — để trống nếu chưa có",
             "giong_that": "Câu người thật nói trong clip kho (cả tiêu đề, tối đa 8 câu) — để trống nếu kho chưa có mô tả kiểu 2",
             "kho_canh": "Kho cảnh đang có: số cảnh dùng được theo loại + cây trồng có trong kho (cả tiêu đề) — để trống nếu chưa có kho cảnh",
             "so_lieu_tiktok": "Số liệu thật từ TikTok (cả tiêu đề) — chỉ có khi nhóm đủ ≥ 15 video và trung vị ≥ 200 view/24h, không thì để trống",
@@ -56,7 +57,7 @@ VAI = {
             "cau_da_dung": "(đề bài cũ) 150 câu đã dùng của sản phẩm — bản mặc định mới không gửi, máy tự loại câu lặp nguyên văn",
             "giong": "Danh sách tên giọng đọc, cách nhau bằng dấu |",
         },
-        "bat_buoc": ["san_pham", "so_ban", "de_bai", "ten_phai_nhac", "giong"],
+        "bat_buoc": ["san_pham", "so_ban", "de_bai", "ten_phai_nhac", "giong", "ban_hang"],
     },
     "dao-dien": {
         "ten": "Đạo diễn — lên bảng dựng",
@@ -69,6 +70,11 @@ VAI = {
             "bai_hoc": "Bài học giám khảo từ các video trước (chung + riêng sản phẩm)",
             "sp": "Hồ sơ rút gọn của sản phẩm (JSON)",
             "cau": "Lời đọc chia câu, có mốc thời gian từng câu",
+            "tu": "Lời đọc đánh số từng từ (để canh điểm cắt và chữ theo từ)",
+            "khoi_mo_ta": "Danh mục khối chữ (loại, mô tả, dữ liệu) sinh từ máy dựng",
+            "am": "Các nhóm âm thanh đang có + mô tả",
+            "aff": "Danh sách id cảnh AFF (người thật cầm/nói về sản phẩm) trong tờ ứng viên",
+            "don_ban": "Đòn bán chính của bài do biên kịch ghi",
             "total": "Tổng thời lượng video (giây)",
             "nhan": "Chữ nhấn do biên kịch đề xuất",
             "ds": "Danh sách cảnh ứng viên (id | vai trò | mô tả | độ dài)",
@@ -88,11 +94,11 @@ VAI = {
             "so_lieu_tiktok": "Số liệu thật TikTok về gu/công thức dựng (cả tiêu đề, bắt đầu bằng 2 dòng trống) — để trống nếu chưa có",
             "gop_y_giam_khao": "Giám khảo yêu cầu sửa bản trước (cả tiêu đề, bắt đầu bằng 2 dòng trống) — để trống ở lần dựng đầu",
         },
-        "bat_buoc": ["cau", "ds", "bo_cuc", "ct", "n"],
+        "bat_buoc": ["cau", "ds", "bo_cuc", "ct", "n", "tu", "khoi_mo_ta", "am", "aff", "don_ban"],
     },
     "giam-khao": {
         "ten": "Giám khảo — chấm bản dựng",
-        "mo_ta": "AI xem tờ ảnh các khung của video đã dựng, chấm điểm 1–10 và nói cần sửa gì. Điểm đạt (≥ 7) quyết định có dựng lại hay không.",
+        "mo_ta": "AI xem tờ ảnh các khung của video đã dựng và trả lời DANH SÁCH KIỂM cố định (đạt/trượt từng mục, kèm lý do + giây). Máy tự đo trước những gì đo được và tự tính điểm = 10 × số mục đạt / số mục. Điểm đạt (≥ 7) quyết định tự duyệt.",
         "file": "giam-khao.md",
         "bien": {
             "ten": "Tên sản phẩm (tên ngắn)",
@@ -100,8 +106,9 @@ VAI = {
             "cau": "Lời đọc theo thời gian",
             "tom": "Tóm tắt bảng dựng đạo diễn đã làm (JSON)",
             "so_gu": "Sổ gu của chủ hàng (cả tiêu đề, 1 dòng) — để trống nếu chưa có",
+            "muc": "Danh sách kiểm cố định (mỗi dòng một mục; mục máy đã bắt trượt được ghi rõ để AI bỏ qua)",
         },
-        "bat_buoc": ["ten", "cau"],
+        "bat_buoc": ["ten", "cau", "muc"],
     },
     "soat-kho": {
         "ten": "Soát kho cảnh",
@@ -174,6 +181,13 @@ VAI = {
         "bien": {},
         "bat_buoc": [],
     },
+    "kien-thuc-ban-hang": {
+        "ten": "Tài liệu: Kiến thức bán hàng",
+        "mo_ta": "Cách nghĩ của người bán giỏi (đòn bán, chỗ khác, tâm lý mua, nhớ thương hiệu, bằng chứng xã hội…) — biên kịch đọc trước khi viết. Là CÁCH NGHĨ, không phải khuôn. Hồ sơ bán hàng riêng của từng sản phẩm nằm ở san-pham/<mã>/ban-hang.md. Tài liệu thường, không có chỗ điền {{...}}.",
+        "file": "luat/KIEN-THUC-BAN-HANG.md",
+        "bien": {},
+        "bat_buoc": [],
+    },
     "so-tay-editor": {
         "ten": "Tài liệu: Sổ tay editor cao cấp",
         "mo_ta": "Sổ tay kinh nghiệm dựng video — đạo diễn và giám khảo đều đọc. Tài liệu thường, không có chỗ điền {{...}}.",
@@ -219,9 +233,9 @@ HOP_DONG = {
                      "CHUNG: tối đa 15 dòng, KHÔNG nêu tên sản phẩm. RIENG: tối đa 10 dòng. Không chữ nào khác."},
     ],
     "giam-khao": [
-        {"khi_thieu": '"diem"',
-         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT JSON {"diem": 1-10, "dat": true|false (đạt khi ≥ 7 và không lỗi nặng), '
-                     '"loi": ["tối đa 3 lỗi nặng nhất, mỗi lỗi ≤ 12 từ, có giây"], "sua": "≤ 35 từ chỉ dẫn đổi cảnh/bố cục; rỗng nếu đạt"}'},
+        {"khi_thieu": '"muc"',
+         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT JSON {"muc": [{"id": "<id mục trong danh sách kiểm>", "dat": true|false|null, "ly_do": "≤ 12 từ, rỗng nếu đạt", "giay": 0.5}], '
+                     '"loi": ["tối đa 3 lỗi nặng nhất, mỗi lỗi ≤ 12 từ, có giây"], "sua": "≤ 35 từ chỉ dẫn đổi cảnh/bố cục; rỗng nếu đạt"}. Không ghi điểm, máy tự tính.'},
     ],
     "doc-nhan": [
         {"khi_thieu": '"su_that"',
@@ -240,6 +254,9 @@ HOP_DONG = {
                      '"dong": ["<dòng phụ đề>", ...] (chia lời đọc bỏ tag thành cụm ý 5–10 từ, ghép lại đúng y lời đọc), '
                      '"y_canh": ["<câu 1 nên thấy hình gì, ≤12 từ>", ... đúng bằng số câu], "nhan_tu": ["<2–4 từ cần phóng to>"], '
                      '"caption": ["3 caption khác nhau, mỗi cái ≤ 90 ký tự"], "hashtag": ["đúng 3 hashtag tiếng Việt không dấu"]}. Trả về một mảng JSON các phần tử này.'},
+        {"khi_thieu": '"don_ban"',
+         "noi_dung": 'THÊM MỘT TRƯỜNG (bắt buộc) vào mỗi phần tử: "don_ban": "<một câu tiếng Việt ≤ 20 từ nói đòn bán chính của bài: vì sao người này nên mua món này, lúc này>". '
+                     'Trước khi viết, mỗi bài chọn MỘT đòn bán chính (theo phần kiến thức bán hàng nếu có) và bài phải trả lời được câu đó.'},
     ],
     "dao-dien": [
         {"khi_thieu": '"doan"',
@@ -560,7 +577,7 @@ def dung(key, text, ctx):
         if h["khi_thieu"] not in text:
             text = text.rstrip("\n") + "\n\n" + h["noi_dung"]
     co = set(_RE_BIEN.findall(text))
-    them = [b for b in t["bat_buoc"] if b not in co and b in ctx]
+    them = [b for b in t["bat_buoc"] if b not in co and b in ctx and str(ctx[b]).strip()]     # dữ liệu rỗng (vd. chưa có tài liệu) thì không gắn tiêu đề trống
     out = thay(key, text, ctx)
     for b in them:
         out += f"\n\n[{t['bien'].get(b, b)}]\n{ctx[b]}"

@@ -1,36 +1,31 @@
 // Phụ đề karaoke v3: MỘT dòng theo cụm ý (Claude ngắt), chữ nhỏ là lớp phụ, đặt thấp, karaoke đúng từng chữ.
-import {fitText} from '@remotion/layout-utils';
 import React from 'react';
 import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
 
 export type CapWord = {w: string; f0: number; f1: number; emph?: boolean};
 export type CapLine = {text: string; f0: number; f1: number; words: CapWord[]};
 export type CapStyle = 'to_dan' | 'mo_sang' | 'o_nhay' | 'gach_chay' | 'nhich_len' | 'hop_mo' | 'quet_mau' | 'vien_day';
-export type CapCfg = {style: CapStyle; center_y: number; upper: boolean; max_px: number};
+export type CapCfg = {style: CapStyle; center_y: number; upper: boolean; max_px?: number; co?: number; bat?: boolean};
 
-const MAX_W = 940;   // vùng an toàn: tránh cột nút TikTok bên phải
-const MIN_PX = 42;
+const MAX_W = 860;   // vùng an toàn: tránh cột nút TikTok bên phải (x ≤ 920); chữ cỡ CỐ ĐỊNH, quá rộng thì xuống dòng (Python đã chia ngắn)
 
 export const Caption: React.FC<{lines: CapLine[]; cfg: CapCfg; font: string; accent: string; text: string}> = ({lines, cfg, font, accent, text}) => {
   const f = useCurrentFrame();
   const {fps} = useVideoConfig();
+  if (cfg.bat === false) return null;
   const idx = lines.findIndex((l, i) => f >= l.f0 - 3 && f < (lines[i + 1] ? lines[i + 1].f0 - 3 : l.f1 + 14));
   if (idx < 0) return null;
   const ln = lines[idx];
-  const shown = cfg.upper ? ln.text.toUpperCase() : ln.text;
-  // chừa chỗ cho viền chữ + ô màu của chữ đang đọc
-  const fit = fitText({text: shown, withinWidth: MAX_W - 90, fontFamily: font, fontWeight: '900'}).fontSize * 0.94;
-  const px = Math.max(MIN_PX, Math.min(cfg.max_px, fit));
-  const oneLine = fit >= MIN_PX;
+  const px = cfg.co ?? cfg.max_px ?? 44;
   const enter = spring({frame: f - (ln.f0 - 3), fps, config: {damping: 18, stiffness: 200}});
   const st = cfg.style;
   const stroke = st === 'vien_day' ? 14 : 10;
   const baseText: React.CSSProperties = st === 'hop_mo' ? {} : {WebkitTextStroke: `${stroke}px #000`, paintOrder: 'stroke fill'};
   const active = [...ln.words].reverse().find(w => f >= w.f0);
-  return <div style={{position: 'absolute', left: 50, width: MAX_W, top: cfg.center_y, display: 'flex', justifyContent: 'center',
+  return <div style={{position: 'absolute', left: 60, width: MAX_W, top: cfg.center_y, display: 'flex', justifyContent: 'center',
     transform: `translateY(calc(-50% + ${(1 - enter) * 16}px))`, opacity: Math.min(1, enter * 1.4)}}>
     <div style={{textAlign: 'center', fontFamily: font, fontWeight: 900, fontSize: px, lineHeight: 1.18, color: text,
-      whiteSpace: oneLine ? 'nowrap' : 'normal',
+      whiteSpace: 'normal',
       ...(st === 'hop_mo' ? {background: 'rgba(0,0,0,0.58)', borderRadius: 18, padding: '8px 22px'} : {}),
       textShadow: st === 'hop_mo' ? 'none' : '0 4px 14px rgba(0,0,0,0.45)'}}>
       {ln.words.map((w, j) => {

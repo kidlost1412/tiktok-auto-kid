@@ -93,9 +93,12 @@ class DepMayTest(unittest.TestCase):
         self.assertEqual(d(1.2, "rung"), 5)                      # độ rung không tính vào điểm
         self.assertEqual(d(0.7, "em"), 4); self.assertEqual(d(0.69, "em"), 3); self.assertEqual(d(0.4, "em"), 3)
         self.assertEqual(d(0.39, "em"), 2)
-        self.assertEqual(d(1.5, "em", "rung"), 3)               # có khuyết điểm → tối đa 3 dù nét
+        self.assertEqual(d(1.5, "em", "rung mạnh"), 3)          # khuyết điểm nặng → tối đa 3 dù nét
+        self.assertEqual(d(1.5, "em", "nhãn chai bị lật ngược chữ"), 3); self.assertEqual(d(1.5, "em", "phụ đề đè lên nhãn"), 3)
+        self.assertEqual(d(1.5, "em", "chai bị cắt nhẹ hai mép"), 4)   # lỗi vặt → tối đa 4
+        self.assertEqual(d(0.6, "em", "lọt mũi ủng góc dưới"), 3); self.assertEqual(d(1.2, "em", "lá tiền cảnh mờ"), 4)
         self.assertEqual(d(0.8, "em", "  "), 4)                  # khuyết điểm toàn khoảng trắng = không có
-        self.assertEqual(d(1.5, "em", "", 2), 1); self.assertEqual(d(1.5, "em", "", 0, True), 1)       # 1 chỉ khi chữ chèn nhiều / hàng khác
+        self.assertEqual(d(1.5, "em", "", 2), 1); self.assertEqual(d(1.5, "em", "", 0, True), 3)       # 1 chỉ khi chữ chèn nhiều; hàng hãng khác (làm nền) → 3, vẫn dùng
         self.assertEqual(d(0.1, "rung", "mờ"), 2)
         for net in (0.0, 0.3, 0.5, 0.9, 1.2, 3.0):
             for cd in ("em", "rung"):
@@ -127,8 +130,8 @@ class MoTaKieu2Test(unittest.TestCase):
                          ("can_canh", "dung_yen", "doc_ro: Nano Đồng", "khong", 5, "cao"))
         self.assertEqual(c[0]["hinh"], "Tay cầm chai Nano Đồng xoay mặt trước"); self.assertIn("cam_chai", c[0]["the"]); self.assertIn("nhan_doc_ro", c[0]["the"])
         self.assertEqual(c[1]["may_quay"], "rung_tay"); self.assertEqual(c[1]["the"], ["nguoi_noi_vao_may"]); self.assertEqual(c[1]["san_pham"], "khong_co")
-        self.assertEqual((c[2]["chu_chen_san"], c[2]["diem"]), ("co", 3))                       # có lỗi "rung" → tối đa 3
-        self.assertEqual(c[3]["diem"], 1)                                                       # hàng khác → 1
+        self.assertEqual((c[2]["chu_chen_san"], c[2]["diem"]), ("co", 4))                       # lỗi vặt "rung" → tối đa 4
+        self.assertEqual(c[3]["diem"], 3)                                                       # hàng khác → 3 (vẫn dùng làm nền)
         self.assertEqual(sorted(c[0]["phieu"]), sorted(["loai", "mat", "chu_chen", "hang_khac", "nhan", "loi", "dang_noi_ve", "net", "chuyen_dong"]))
         self.assertEqual([(s["ten_tren_nhan"], s["la_san_pham_khac"]) for s in d["san_pham_thay"]], [("Nano Đồng", False), ("NANO LÂN", True)])
         d2 = _mo_ta_mau(nghe_duoc=False)
@@ -178,12 +181,13 @@ class KhoCanhKieu2Test(unittest.TestCase):
         self._ghi("v0.mp4", _mo_ta_mau("v0.mp4"))
         shots, _ = self.kc.nap("t1")
         theo = {round(s["tu"], 1): s for s in shots}
-        self.assertEqual(sorted(theo), [2.0, 8.5, 20.0])                       # cảnh hàng khác (30s) bị bỏ như kiểu cũ
+        self.assertEqual(sorted(theo), [2.0, 8.5, 20.0, 30.0])                 # Kid 14/11: cảnh hàng khác (30s) vẫn giữ, chỉ đánh dấu
+        self.assertTrue(theo[30.0]["soat"]["hang_khac"])
         chai, noi, phun = theo[2.0], theo[8.5], theo[20.0]
         self.assertIn("chai_ro", chai["vai_tro"]); self.assertEqual(chai["co_canh"], "can_canh"); self.assertEqual(chai["loai"], "chai_ro")
         self.assertEqual(chai["soat"], {"mat": 0, "chu_muc": 0, "hang_khac": False, "dep": 5, "nhan": chai["soat"]["nhan"], "ghi": "Tay cầm chai Nano Đồng xoay mặt trước"})
         self.assertEqual(len(chai["soat"]["nhan"]), 4)
-        self.assertIn("phun", phun["vai_tro"]); self.assertEqual(phun["soat"]["chu_muc"], 1); self.assertEqual(phun["soat"]["dep"], 3)
+        self.assertIn("phun", phun["vai_tro"]); self.assertEqual(phun["soat"]["chu_muc"], 1); self.assertEqual(phun["soat"]["dep"], 4)
         self.assertEqual(noi["noi"], "bọ trĩ làm xoăn đọt ớt"); self.assertTrue(noi["noi_ghi"]); self.assertEqual(noi["soat"]["mat"], 2)
         import soat_kho
         self.assertTrue(soat_kho.nguoi_noi(noi)); self.assertFalse(soat_kho.nguoi_noi(chai))
@@ -213,7 +217,7 @@ class KhoCanhKieu2Test(unittest.TestCase):
         s2, _ = self.kc.nap("t1")
         self.assertTrue(all(s["kieu"] == 2 for s in s2), "cảnh kiểu cũ của video đã học lại phải bị thay")
         self.assertFalse(any(s["mo_ta"] == "cảnh cũ cầm chai" for s in s2))
-        self.assertEqual(sorted(s["id"] for s in s2), ["0001", "0002", "0003"])        # id mới nối tiếp, id cũ 0000 không dùng lại
+        self.assertEqual(sorted(s["id"] for s in s2), ["0001", "0002", "0003", "0004"])        # id mới nối tiếp, id cũ 0000 không dùng lại
         s3, _ = self.kc.nap("t1")                                                      # chạy lại: id ổn định
         self.assertEqual(sorted((s["id"], s["tu"]) for s in s3), sorted((s["id"], s["tu"]) for s in s2))
 
@@ -261,7 +265,8 @@ class HocKhoV2Test(unittest.TestCase):
         self.assertEqual((hc.JOB["giai_doan"], hc.JOB["model"], hc.JOB["canh_tong"], hc.JOB["xong"], hc.JOB["tong"]), ("", "gemini-4-hydrogen-high", 6, 2, 2))
         self.assertFalse((self.kho / "_tam" / "hoc-canh").exists())
         tt = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))
-        self.assertFalse(tt["job"]["dang_chay"]); self.assertEqual(tt["conv"], [])
+        e = tt["jobs"][str(self.kho)]                                                   # file giờ chứa job của mọi sản phẩm (khoá = mã/đường dẫn kho)
+        self.assertFalse(e["job"]["dang_chay"]); self.assertEqual(e["conv"], [])
         rep = km.kiem_kho(self.kho, sua=False, do_dai=lambda p: 40.0)
         self.assertEqual((rep["da_dung"], rep["da_sua"], rep["thieu_mo_ta"]), (2, [], []))
         r2 = self._chay(gia.runner_gia(log))                                           # chạy lại: không còn gì để học
@@ -439,7 +444,7 @@ class HocKhoV2Test(unittest.TestCase):
                 self.assertEqual(hc.doc_model(), "gemini-4-hydrogen-high", cu)
         with mock.patch.object(hc, "doc_cau_hinh", lambda: {"model": "gemini-3.8-flash-medium"}):
             self.assertEqual(hc.doc_model(), "gemini-3.8-flash-medium")
-        self.assertEqual(list(hc.MODELS)[0], "gemini-4-hydrogen-high"); self.assertEqual(len(hc.MODELS), 3)
+        self.assertEqual(list(hc.MODELS)[0], "gemini-4-hydrogen-high"); self.assertEqual(len(hc.MODELS), 4)
         self._videos(1)
         r = self._chay(gia.runner_gia(log), model="flash")
         self.assertEqual(log[-1]["model"], "gemini-4-hydrogen-high")                        # cấu hình cũ → mặc định
@@ -476,7 +481,7 @@ class KhoiPhucTest(unittest.TestCase):
             luu["file"] = (hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8")        # ảnh chụp lúc "hub bị tắt giữa chừng"
             return gia.runner_gia([])(model, prompt, outs, td, khi_co, **kw)
         hc.hoc_kho(str(kho), runner=runner, do_dai=lambda p: 40.0, kiem_mo=lambda: True, project=False, ten="t", cat=gia.cat_gia(2), to_anh=gia.to_anh_gia)
-        snap = json.loads(luu["file"])
+        snap = json.loads(luu["file"])["jobs"][str(kho)]                       # file giờ chứa job của mọi sản phẩm
         tam = kho / "_tam" / "hoc-canh" / "01-abc"; tam.mkdir(parents=True); (tam / "to-1.jpg").write_bytes(b"j")
         self.assertTrue(snap["job"]["dang_chay"]); self.assertEqual(snap["conv"], ["cid-dang-chay"]); self.assertEqual(snap["job"]["giai_doan"], "hoc")
         # mô phỏng khởi động lại: file cũ còn đó, JOB trong bộ nhớ trống, thư mục tạm còn sót
@@ -490,7 +495,7 @@ class KhoiPhucTest(unittest.TestCase):
         self.assertEqual((hc.JOB["trang_thai"], hc.JOB["dang_chay"], hc.JOB["dung"]), ("dung", False, True))
         self.assertEqual(hc.JOB["thong_bao"], "Xưởng vừa khởi động lại giữa lúc học — đã dừng gọn việc dở. Bấm Học cảnh để làm tiếp (video đã học được giữ).")
         self.assertTrue(snap["job"]["ma"] == hc.JOB["ma"])
-        now = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))
+        now = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))["jobs"][str(kho)]
         self.assertFalse(now["job"]["dang_chay"]); self.assertEqual(now["conv"], [])
         with mock.patch.object(hc, "huy_cuoc_tro_chuyen", lambda c: self.fail("chỉ khôi phục 1 lần")):
             self.assertIsNone(hc.khoi_phuc())
@@ -600,7 +605,7 @@ class DaoDienKieu2Test(unittest.TestCase):
         self.assertTrue(d[3].startswith("Tay cầm chai Nano Đồng")); self.assertEqual(len(d[3]), 90)
         self.assertEqual(d[4], "nói: bọ trĩ làm xoăn đọt ớt"); self.assertEqual(d[5], "4.0")
         s2n = dict(s2, soat={"mat": 2, "ghi": "g", "dep": 3})
-        self.assertIn("NGƯỜI NÓI", dd.dong_ds("0001", s2n))
+        self.assertIn("AFF", dd.dong_ds("0001", s2n))
         cu = {"id": "0002", "vai_tro": ["vuon"], "co_canh": None, "mo_ta": "mô tả dài của cảnh kiểu cũ " * 5, "soat": {"mat": 0, "ghi": "ghi cũ", "dep": 3}, "dai": 3.5, "noi": "bỏ qua"}
         self.assertEqual(dd.dong_ds("0002", cu), "0002 | vuon | ghi cũ | 3.5")                  # cảnh cũ: không cột cỡ cảnh khi chưa biết, giữ soat.ghi, không có "nói"
         cu2 = dict(cu, soat={"mat": 0, "dep": 3}, co_canh="toan")

@@ -13,7 +13,8 @@ NGUONG_CAT = 0.40         # khác biệt màu giữa 2 mẫu liền nhau → v�
 DAI_DOAN = 4.0            # độ dài đoạn lấy ra (giây)
 DAI_TOI_THIEU = 2.0
 KHAC_HINH = 0.30          # 2 đoạn trong cùng cú máy phải khác hình cỡ này mới lấy cả hai
-TOI_DA_MOI_CU = 4
+TOI_DA_MOI_CU = 6
+CACH_XA = 7.0             # đoạn thêm trong cú máy dài phải cách các đoạn đã lấy chừng này giây
 W, H = 160, 284
 
 
@@ -116,6 +117,17 @@ def cat(path):
             if any(not (e <= c["s"] or s >= c["e"]) for c in chon):
                 continue
             if any(_khac(hs[g], hs[c["g"]]) < KHAC_HINH for c in chon):
+                continue
+            chon.append({"s": s, "e": e, "g": g, "kieu": kieu, "rung": rung, "diem": diem})
+        # Cú máy dài quay liền một chỗ (vlog cầm tay trong vườn): màu gần như không đổi nên vòng trên chỉ lấy 1 đoạn — chấm thật 14/11: 35/112 video Bọ Trĩ
+        # chỉ ra 1 cảnh, kho chỉ lấy 32% thời lượng gốc. Lấy thêm đoạn cách xa ≥ CACH_XA giây (thường là việc khác: cầm chai → vạch lá → phun), chỉ cần khác hình một nửa ngưỡng.
+        for diem, s, e, kieu, rung in ung:
+            if len(chon) >= toi_da:
+                break
+            g = (s + e) // 2
+            if any(not (e <= c["s"] or s >= c["e"]) for c in chon) or any(abs(t[g] - t[c["g"]]) < CACH_XA for c in chon):
+                continue
+            if any(_khac(hs[g], hs[c["g"]]) < KHAC_HINH * 0.5 for c in chon):
                 continue
             chon.append({"s": s, "e": e, "g": g, "kieu": kieu, "rung": rung, "diem": diem})
         for c in sorted(chon, key=lambda c: c["s"]):

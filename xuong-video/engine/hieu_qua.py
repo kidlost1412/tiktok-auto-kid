@@ -100,9 +100,8 @@ def cap_nhat():
                     r[k] = s[k]; doi = True
         if doi:
             LS.mkdir(parents=True, exist_ok=True)
-            tmp = f.with_suffix(".tmp")
-            tmp.write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding="utf-8")
-            tmp.replace(f)
+            from duong_dan import ghi_json          # ghi nguyên tử, tên file tạm riêng từng tiến trình/luồng (nhiều lô cùng gọi cap_nhat)
+            ghi_json(f, db, indent=1)
         return db
 
 

@@ -13,7 +13,9 @@ from dung import kiem_chop
 from kho_chung import kho_them_cua, la_kho_chung
 from dung_remotion import chuan_bi, dung_lo
 from cong_thuc import chuan_hoa
-from don_dep import khoa_con_song, lay_khoa_lo, nha_khoa_lo
+from don_dep import _f_khoa as lay_f_khoa, khoa_con_song, lay_khoa_lo, nha_khoa_lo, lo_cua_san_pham, cac_khoa_con_song
+import suc_may as SM
+import kiem_may as KM
 from kiem_khung import scan
 import su_kien as SK
 
@@ -26,13 +28,30 @@ COT = ["file", "goc", "giong", "gu_dao_dien", "cong_thuc", "diem_giam_khao", "la
 
 
 _khoa_sig = threading.Lock()
-F_KHOA = HUB / "lich-su" / "dang-chay.lock"
+F_KHOA = HUB / "lich-su" / "dang-chay.lock"      # khoá kiểu cũ (lô khởi động bằng bản CLI cũ); khoá mới: dang-chay-<mã sp>.lock (don_dep._f_khoa)
 
 
-def dang_co_lo():
-    """Có lô đang chạy (từ app hay cửa sổ lệnh)? — file khoá phải trỏ tới tiến trình python CÒN SỐNG và đúng giờ tạo tiến trình ghi lúc khoá
-    (PID bị cấp lại cho một python khác, kể cả chính app, = khoá cũ)."""
-    return khoa_con_song(F_KHOA) is not None
+def dang_co_lo(ma=None):
+    """Có lô đang chạy (từ app hay cửa sổ lệnh)? ma=None: BẤT KỲ sản phẩm nào; có mã: đúng sản phẩm đó. File khoá phải trỏ tới tiến trình python
+    CÒN SỐNG và đúng giờ tạo tiến trình ghi lúc khoá (PID bị cấp lại cho một python khác, kể cả chính app, = khoá cũ). Khoá kiểu cũ vẫn tính."""
+    cu = khoa_con_song(F_KHOA)
+    if ma:
+        return lo_cua_san_pham(ma) is not None or (cu is not None and cu.get("ma") in ("", ma))
+    return cu is not None or bool(cac_khoa_con_song())
+
+
+def dong_bo_chu_ky(sig_file, used_sigs):
+    """Chữ ký chống trùng trong ngày dùng chung giữa các lô chạy song song: gộp (hợp) file trên đĩa với bộ nhớ của lô này, ghi lại nếu có gì mới,
+    và nạp phần của lô khác vào used_sigs. Khoá file HĐH quanh đọc-gộp-ghi nên 2 lô không đè nhau. Gọi ở luồng chính (giữa các đợt)."""
+    try:
+        with _khoa_sig, SK.khoa_tep(sig_file, 10):
+            tren_dia = set(sig_file.read_text(encoding="utf-8").split()) if sig_file.exists() else set()
+            hop = tren_dia | set(used_sigs)
+            if hop != tren_dia:
+                ghi_nguyen_tu(sig_file, chr(10).join(sorted(hop)))
+            used_sigs |= hop
+    except (OSError, TimeoutError):
+        pass
 
 
 def segs_theo_luat(sents, total, shots, per, rng, y_canh=None):
@@ -106,20 +125,23 @@ def segs_may_dung(voice, sc, sp, shots, tranh, rng):
 
 
 def chay(ma_sp, so_video, log, music_pick, lam_lai=None):
-    token = lay_khoa_lo(ma_sp, F_KHOA)     # tạo khoá độc quyền (O_EXCL): 2 lô cùng giây chỉ 1 lô qua
+    cu = khoa_con_song(F_KHOA)             # lô khởi động bằng bản CLI cũ (khoá không mã) đang làm đúng sản phẩm này → không chạy chồng
+    token = None if (cu and cu.get("ma") in ("", ma_sp)) else lay_khoa_lo(ma_sp)     # khoá riêng sản phẩm (O_EXCL): cùng sản phẩm 2 lô cùng giây chỉ 1 lô qua
     if token is None:
-        log("⛔ Đang có một lô khác chạy — không chạy chồng (đợi lô kia xong)."); return
+        log(f"⛔ Đang có một lô {ma_sp} khác chạy — không chạy chồng (đợi lô kia xong)."); return
     try:
+        import ai as _ai
+        _ai.MA_LO = ma_sp                  # token.csv ghi cột "lo" → báo cáo chi phí tách riêng từng lô chạy song song
         _chay(ma_sp, so_video, log, music_pick, lam_lai)
     finally:
-        nha_khoa_lo(token, F_KHOA)
+        nha_khoa_lo(token, lay_f_khoa(ma_sp))
 
 
 def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     t_bat_dau = time.time()
     day = datetime.date.today().isoformat()
     out_dir = Path(CFG["duong_dan"]["ra"]) / day
-    tam = out_dir / "_tam" / datetime.datetime.now().strftime("lo-%H%M%S")      # thư mục tạm riêng cho từng lô
+    tam = out_dir / "_tam" / datetime.datetime.now().strftime(f"lo-{ma_sp}-%H%M%S")      # thư mục tạm riêng cho từng lô (có mã sản phẩm: 2 lô chạy song song không đụng nhau)
     (out_dir / "_giong").mkdir(parents=True, exist_ok=True)
     sp = json.loads((HUB / "san-pham" / ma_sp / "san-pham.json").read_text(encoding="utf-8"))
     shots = json.loads((HUB / "san-pham" / ma_sp / "canh.json").read_text(encoding="utf-8"))
@@ -157,7 +179,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     sheet = kem_ngay(out_dir, "bang-ghi-ekip.csv", ghi=True)
     ghi_hang = lambda row: SK.noi_them(sheet, SK.dong_csv(row), ma_hoa="utf-8-sig", dau=SK.dong_csv(COT))     # Excel đang mở bảng → ghi tạm .cho-ghi, không làm sập lô
     sig_file = HUB / "lich-su" / f"chu-ky-{day}.txt"
-    used_sigs = set(sig_file.read_text(encoding="utf-8").split()) if sig_file.exists() else set()
+    used_sigs = set(sig_file.read_text(encoding="utf-8").split()) if sig_file.exists() else set()      # dùng chung các lô: dong_bo_chu_ky gộp lại giữa các đợt
     da_dung_f = HUB / "lich-su" / f"canh-da-dung-{ma_sp}.txt"
     lo_dung = []                      # cảnh (chính + ô phụ) đã dùng trong lô này; lịch sử các ngày trước do dao_dien tự tính độ "mệt"
 
@@ -276,7 +298,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 SK.ghi("dao-dien", "loi", f"Máy tự dựng lỗi: {str(e2)[:80]}", video=f'{t["vname"]}-{t["j"]}')
                 t["hong"] = True
                 return t
-        st = {kk: edl.get(kk) for kk in ("cong_thuc", "phu_de", "mau_nhan", "chuyen_canh", "chuyen_dong", "mau", "sfx", "nhac") if edl.get(kk)}
+        st = {kk: edl.get(kk) for kk in ("cong_thuc", "phu_de", "mau_nhan", "chuyen_canh", "chuyen_dong", "mau", "sfx", "nhac", "am_mo", "vien") if edl.get(kk)}
         st["khoi"] = [x for x in edl.get("khoi", []) if isinstance(x, dict)]
         st["nhan_tu"] = edl.get("nhan_tu") or t["sc"].get("nhan_tu", [])
         with _khoa_sig:                       # 3 luồng đạo diễn cùng sửa used_sigs (lỗi rà soát #11)
@@ -320,13 +342,18 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             with ThreadPoolExecutor(3) as ex:
                 list(ex.map(lambda t: len_bang(t, (gop or {}).get(id(t), "")), nhom))
         ds = [t for t in ds if not t.get("hong")]      # máy tự dựng cũng không nổi → bỏ riêng video đó
-        with ThreadPoolExecutor(2) as ex:      # 2 luồng FFmpeg: máy 16 GB
-            ds = [x for x in ex.map(dung_nen, ds) if x]
+        with SM.khe_dung(ma_sp, log, "FFmpeg"):      # khe dựng TOÀN MÁY (nhiều lô cùng xin → xếp hàng, xem suc_may.py)
+            with ThreadPoolExecutor(SM.song_song_ffmpeg()) as ex:      # RAM < 20 GB: 1 video FFmpeg/khe; từ 20 GB: 2
+                ds = [x for x in ex.map(dung_nen, ds) if x]
         moi = [t for t in ds if Path(t["job"]["base"]).exists()       # bản dựng lại hỏng: giữ nguyên bản cũ, không dựng chữ lại
                and not (t.get("_cu") and t["job"]["out"] == t["_cu"]["job"]["out"])]   # (không ghi đè file cũ)
         if moi:
             SK.ghi("dung", "bat-dau", f"Dựng lớp chữ {len(moi)} video", so=len(moi), buoc="chu")
-        done = set(dung_lo([t["job"] for t in moi], tam / "_public", log)) if moi else set()
+        if moi:
+            with SM.khe_dung(ma_sp, log, "Remotion"):
+                done = set(dung_lo([t["job"] for t in moi], tam / "_public", log))
+        else:
+            done = set()
         if moi:
             SK.ghi("dung", "xong", f"Xong lớp chữ {len(done)}/{len(moi)}", so=len(done), buoc="chu")
         return [t for t in moi if t["job"]["out"] in done]
@@ -357,19 +384,20 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     try:
       for n_dot, dot in enumerate(cac_dot(), 1):
         try:
+            dong_bo_chu_ky(sig_file, used_sigs)        # nạp chữ ký các lô khác vừa dùng (chống trùng trong ngày giữa các lô song song)
             xong = mot_vong(dot)
             def cham(t):                     # giám khảo lỗi / hết hạn mức → vẫn giữ video, để trống điểm (lỗi rà soát #3)
                 SK.ghi("giam-khao", "bat-dau", "Đang xem và chấm", video=f'{t["vname"]}-{t["j"]}')
                 try:
                     VIEC.video = f'{t["vname"]}-{t["j"]}'
-                    r = giam_khao(sp, t["job"]["out"], t["info"].get("_sents") or _sents(t), t["edl"], t["work"])
+                    r = giam_khao(sp, t["job"]["out"], t["info"].get("_sents") or _sents(t), t["edl"], t["work"], **ngu_canh_gk(t, qua))
                 except Exception as e:
                     r = {"diem": None, "dat": None, "loi": [f"chưa chấm: {type(e).__name__}"], "sua": ""}
                 r["loi"] = [str(x) for x in (r.get("loi") or []) if x]
                 return t, r
             with ThreadPoolExecutor(3) as ex:
                 kq = list(ex.map(cham, xong))
-            ghi_bai_hoc([x for _, r in kq for x in r["loi"] if not x.startswith("chưa chấm")], ma_sp)
+            ghi_ket_qua_giam_khao([(f'{t["vname"]}-{t["j"]}', r) for t, r in kq], ma_sp, bool(qua), log)
             for t, r in kq:
                 t["gk"] = r; t["lan"] = 1
                 log(f"  giám khảo {t['fname']}: {r.get('diem')}/10 {'ĐẠT' if r.get('dat') else 'CHƯA ĐẠT'} {'; '.join((r.get('loi') or [])[:2])}")
@@ -407,7 +435,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         t["lan"] = 1
                 def cham_lai(t):             # chấm lại lỗi / hết hạn mức → điểm trống → giữ bản cũ (đã chấm), cất bản mới
                     try:
-                        return t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"])
+                        return t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"], **ngu_canh_gk(t, qua))
                     except Exception as e:
                         return t, {"diem": None, "dat": None, "loi": [f"chưa chấm: {type(e).__name__}"], "sua": ""}
                 with ThreadPoolExecutor(3) as ex:
@@ -468,11 +496,12 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 meta = {"id": Path(t["job"]["out"]).stem, "ma": ma_sp, "quy_cach": t["sc"].get("quy_cach"), "goc": t["sc"]["goc"],
                         "dang": t["sc"].get("dang"), "mo": t["sc"].get("mo"), "chot": t["sc"].get("chot"), "vai": t["sc"].get("vai"), "giong": t["sc"]["giong"], "dao_dien": t["gu"], "cong_thuc": info.get("cong_thuc"),
                         "nhac": t["music"]["ten"] if t.get("music") else None, "diem": gk.get("diem"), "caption": cap_cua(t),
+                        "giam_khao": {"nguon": gk.get("nguon"), "muc": [{k: m.get(k) for k in ("id", "dat", "ly_do", "giay", "nguon")} for m in gk.get("muc") or []]} if gk.get("muc") else None,
                         "hashtag": t["sc"].get("hashtag", []), "loi_doc": re.sub(r"\[[^\]]*\]\s*", "", t["sc"]["text"]),
                         "thoi_luong": info.get("thoi_luong"), "ngay_lam": day, "luc_lam": datetime.datetime.now().isoformat(timespec="seconds"),
                         "ma_viec": f'{t["vname"]}-{t["j"]}', "ky_tu_giong": t["voice"].get("ky_tu") or len(t["voice"].get("text", "")),
                         "giong_file": t["voice"].get("meta"), "dung_chung_giong": per,          # 1 giọng dùng cho `per` video
-                        "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "nhan_tu", "captions", "caption",
+                        "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "don_ban", "nhan_tu", "captions", "caption",
                                                                  "hashtag", "dang", "quy_cach", "mo", "than", "chot", "vai", "chu_mo")},
                         "lam_lai_tu": t.get("lam_lai_tu")}
                 kem(t["job"]["out"], ".json", ghi=True).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
@@ -492,10 +521,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             except Exception as e:
                 log(f"  ⚠ lưu hồ sơ {t.get('fname')} lỗi: {type(e).__name__}: {str(e)[-160:]} → bỏ qua video này, làm tiếp")
                 SK.ghi("he-thong", "loi", f"Lưu hồ sơ lỗi: {type(e).__name__}", video=f'{t["vname"]}-{t["j"]}')
-        try:
-            ghi_nguyen_tu(sig_file, "\n".join(sorted(used_sigs)))
-        except OSError:
-            pass
+        dong_bo_chu_ky(sig_file, used_sigs)               # hợp với file trên đĩa (KHÔNG ghi đè: lô khác có thể vừa thêm chữ ký)
         if het_msg:
             log(f"⛔ HẾT HẠN MỨC CLAUDE (mọi tài khoản): {het_msg}. Đã xong {made} video, đã lưu đủ hồ sơ. Đăng nhập/đổi tài khoản rồi chạy tiếp.")
             break
@@ -530,17 +556,48 @@ def _sents(t):
     return sentence_times(t["voice"]["text"], t["voice"]["words"])
 
 
+def ngu_canh_gk(t, qua):
+    """Dữ liệu để giám khảo cho máy kiểm trước: bảng dựng thật, hồ sơ dựng, file props.json của lớp chữ, kho có cảnh quà thật không."""
+    return {"segs": (t.get("plan") or {}).get("edl_segs"), "info": t.get("info"), "props_f": (t.get("job") or {}).get("props"),
+            "co_canh_qua": bool(qua)}
+
+
 def ghi_bai_hoc(loi, ma_sp):
-    """Lỗi giám khảo bắt được → sổ bài học RIÊNG của sản phẩm (bỏ mốc giây, bỏ trùng). Gom bài học tách phần chung sau."""
+    """Bài học (chỉ lỗi ĐẠO DIỄN sửa được) → sổ bài học RIÊNG của sản phẩm: bỏ mốc giây, bỏ trùng và bỏ na ná dòng đã có / dòng vừa thêm.
+    Lỗi do máy dựng/dữ liệu KHÔNG vào đây (xem ghi_ket_qua_giam_khao → loi-may.jsonl). Gom bài học tách phần chung sau."""
     f = HUB / "lich-su" / f"bai-hoc-{ma_sp}.txt"
-    cu = set(f.read_text(encoding="utf-8").splitlines()) if f.exists() else set()
+    cu = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()] if f.exists() else []
     moi = []
     for x in loi:
         x = re.sub(r"^[\d.,\s]*s?\s*(câu[^:]*:)?\s*", "", str(x)).strip(" -;:")
-        if len(x) > 8 and f"- {x}" not in cu:
-            moi.append(f"- {x}")
+        if len(x) > 8 and not KM.la_loi_may(x):
+            d = f"- {x}"
+            if not any(KM.tuong_tu(d, o) for o in cu + moi):
+                moi.append(d)
     if moi:
         SK.noi_them(f, "\n".join(moi) + "\n", giu_dong=600, toi_da_byte=100_000)
+    return moi
+
+
+def ghi_ket_qua_giam_khao(kq, ma_sp, co_canh_qua=False, log=print):
+    """Sau khi giám khảo chấm một đợt. kq: [(tên video, kết quả giám khảo)]. Tách theo NGƯỜI SỬA ĐƯỢC:
+    · lỗi đạo diễn sửa được (chọn cảnh, nhịp, móc câu, hình hợp lời, bố cục) → bài học (sổ đưa cho đạo diễn);
+    · lỗi máy/dữ liệu (chữ đè nhãn, lớp màu, thiếu cảnh quà trong kho, giỏ hàng, vùng an toàn) → lich-su/loi-may.jsonl, đạo diễn KHÔNG thấy.
+    Mọi phát hiện của máy kiểm được ghi vào nhật ký lô. → (số bài học mới, số bản ghi lỗi máy)."""
+    hoc, ghi_may = [], []
+    luc = datetime.datetime.now().isoformat(timespec="seconds")
+    for ten, r in kq:
+        if r.get("diem") is None:
+            continue
+        for f in r.get("may") or []:
+            log(f"  🔎 máy kiểm {ten}: [{f['muc']}] {f['chi_tiet']} (người sửa: {'đạo diễn' if f['nguoi_sua'] == 'dao_dien' else 'máy/dữ liệu'})")
+        h, m = KM.tach_bai_hoc(r, co_canh_qua)
+        hoc += h
+        ghi_may += [{"luc": luc, "san_pham": ma_sp, "video": ten, "muc": x["muc"], "nguon": x["nguon"], "giay": x.get("giay"), "chi_tiet": x["chi_tiet"]} for x in m]
+    moi = ghi_bai_hoc(hoc, ma_sp)
+    if ghi_may:
+        SK.noi_them(HUB / "lich-su" / "loi-may.jsonl", "\n".join(json.dumps(x, ensure_ascii=False) for x in ghi_may) + "\n", giu_dong=3000, toi_da_byte=600_000)
+    return len(moi), len(ghi_may)
 
 
 def cap_cua(t):
@@ -612,7 +669,7 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     rows = []
     for x in _csv.DictReader(open(f, encoding="utf-8-sig")):
         try:
-            if datetime.datetime.fromisoformat(x["luc"]) >= bd:
+            if datetime.datetime.fromisoformat(x["luc"]) >= bd and (x.get("lo") or ma_sp) == ma_sp:      # nhiều lô song song: chỉ tính lượt gọi của lô này
                 rows.append(x)
         except Exception:
             pass
@@ -630,7 +687,7 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     if fg.exists():
         for x in _csv.DictReader(open(fg, encoding="utf-8-sig")):
             try:
-                if datetime.datetime.fromisoformat(x["luc"]) >= bd:
+                if datetime.datetime.fromisoformat(x["luc"]) >= bd and (not ma_sp or str(x.get("ten") or "").startswith(ma_sp + "-")):
                     ky_tu += int(x["ky_tu"] or 0)
             except Exception:
                 pass

@@ -1,7 +1,8 @@
 {
  "_cach_dung": "Mỗi khi đổi một gu mặc định (prompt/*.md, luat/*.md): thêm \"<tên-vai>\": {\"<VERSION mới>\": \"vì sao đổi, 1-3 câu cho chủ app không rành kỹ thuật\"}, rồi chạy: python engine/prompt_mau.py ghi-manifest",
  "bien-kich": {
-  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu."
+  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
+  "1.2.14": "Biên kịch được học cách nghĩ của người bán giỏi: mỗi bài chọn MỘT đòn bán chính (vì sao người này nên mua món này, lúc này) rồi ghi lại thành một câu ngắn. Có thêm hồ sơ bán hàng riêng của từng sản phẩm. Dù bạn đang giữ đề bài cũ, máy vẫn tự gắn phần kiến thức này vào."
  },
  "luat-san-xuat": {
   "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu."
@@ -10,12 +11,18 @@
   "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng."
  },
  "dao-dien": {
-  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng."
+  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
+  "1.2.14": "Đạo diễn được nghĩ như editor: tự chọn bố cục (thêm 3 ô, 3 dải, lật trang nhanh), đặt chữ lớn theo đúng từ trong lời đọc, chọn tiếng theo nghĩa, và dùng nhiều cảnh người thật cầm sản phẩm. Máy không còn tự đổi lựa chọn của đạo diễn."
  },
  "so-tay-editor": {
-  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng."
+  "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
+  "1.2.14": "Sổ tay viết lại theo cách nghĩ thay vì khuôn: người thật cầm hàng là bằng chứng mạnh nhất, khung trơn phải có chữ lớn, tiếng phải khớp thứ đang hiện, phụ đề chỉ là lớp phụ."
  },
  "giam-khao": {
-  "1.2.13": "Giám khảo chấm thêm móc câu (hai khung đầu có giữ người xem không) và khoảng thở của bản dựng."
+  "1.2.13": "Giám khảo chấm thêm móc câu (hai khung đầu có giữ người xem không) và khoảng thở của bản dựng.",
+  "1.2.14": "Giám khảo không chấm cảm tính 1–10 nữa mà trả lời một danh sách kiểm cố định (móc câu, nhãn rõ, chốt có chai/quà, không che nhãn…): điểm = 10 × số mục đạt / số mục nên không còn dồn ở 5–6. Máy tự đo trước những gì đo được (chữ đè nhãn, người nói full màn, lặp cảnh, thiếu cảnh quà). Lỗi do máy dựng/kho không còn thành bài học cho đạo diễn."
+ },
+ "kien-thuc-ban-hang": {
+  "1.2.14": "Tài liệu MỚI: kiến thức bán hàng cho biên kịch (bán cái vườn sau khi dùng, nói mình khác ở đâu, tâm lý mua, giúp nhớ thương hiệu, người quanh mình đang dùng). Là cách nghĩ chứ không phải khuôn; bạn sửa được như các tài liệu luật khác."
  }
 }

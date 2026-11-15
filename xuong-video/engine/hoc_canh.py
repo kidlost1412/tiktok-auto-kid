@@ -6,7 +6,7 @@ language_server.exe agentapi (new-conversation) với 2 biến môi trường AN
 trong <kho>/_tam/hoc-canh/<lô>/ và hub chờ file đó (ổn định 2 lần kiểm). Mỗi lô ≤ 24 cảnh (2 tờ ảnh) và ≤ 5 video. Mỗi lần chạy kiểm lại kho nên bấm lại là làm tiếp.
 Trạng thái việc học + mã cuộc trò chuyện đang mở được ghi ở lich-su/hoc-canh-job.json: hub khởi động lại giữa chừng thì khoi_phuc() huỷ gọn việc dở.
 agentapi không cho đọc trạng thái lỗi/hết lượt (metadata chỉ có cấu hình) → quá hạn chờ thì báo lỗi; 2 lô liền không có phiếu thì dừng cả việc."""
-import ctypes, hashlib, json, os, shutil, socket, subprocess, sys, threading, time, urllib.request, uuid
+import collections.abc, contextvars, ctypes, hashlib, json, os, shutil, socket, subprocess, sys, threading, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -20,7 +20,7 @@ _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
 import prompt_mau
 LS = HUB / "lich-su"
-MODELS = {"gemini-4-hydrogen-high": "Gemini 4 Hydrogen · High (mặc định)", "gemini-3.8-flash-high": "Gemini 3.8 Flash · High",
+MODELS = {"gemini-4-hydrogen-high": "Gemini 4 Hydrogen · High (mặc định)", "gemini-4-argon-high": "Gemini 4 Argon · High", "gemini-3.8-flash-high": "Gemini 3.8 Flash · High",
           "gemini-3.8-flash-medium": "Gemini 3.8 Flash · Medium"}      # id thật của Antigravity (agentapi tự rơi về bậc flash nếu id không có)
 MODEL_MAC_DINH = "gemini-4-hydrogen-high"
 SONG_SONG_MAC_DINH = 2
@@ -67,9 +67,34 @@ class Huy(Exception):
     """Anh bấm Dừng: bỏ việc đang làm ngay."""
 
 
-# Mỗi lần học có 1 sự kiện "huy" + danh sách cuộc trò chuyện Antigravity đã mở (để Dừng thật sự huỷ được việc đang chạy ở Antigravity).
-_RUN = {"huy": threading.Event(), "conv": set(), "proc": set(), "kho": ""}
+# Mỗi SẢN PHẨM đang học có 1 "run": sự kiện "huy" + các cuộc trò chuyện Antigravity đã mở + tiến trình agentapi (để Dừng thật sự huỷ được đúng việc của sản phẩm đó)
+# và 1 job (tiến độ). Nhiều sản phẩm học cùng lúc → mỗi sản phẩm 1 run/1 job riêng; luồng của sản phẩm nào biết run của nó qua biến ngữ cảnh _CUR.
+_RUNS = {}                 # khoá sản phẩm (str(ma)) → run
+_JOBS = {}                 # khoá sản phẩm → job (dict tiến độ)
+_ULTIMA = [None]           # khoá của việc bắt đầu gần nhất (JOB/_RUN dạng cũ trỏ vào đây)
 _RUN_LOCK = threading.Lock()
+_CUR = contextvars.ContextVar("hoc_canh_run", default=None)
+
+
+def _run_moi(khoa, kho, job):
+    return {"huy": threading.Event(), "conv": set(), "proc": set(), "kho": str(kho), "ma": khoa, "job": job}
+
+
+_RUN0 = _run_moi("", "", None)       # run "rỗng" cho luồng không thuộc việc học nào (không ai đặt huy)
+
+
+def _run_hien():
+    """Run của luồng hiện tại (luồng học / luồng con được sao ngữ cảnh); không thuộc việc nào → run rỗng."""
+    return _CUR.get() or _RUN0
+
+
+class _VaoRun:
+    """_RUN dạng cũ (dict): trỏ vào run của luồng hiện tại."""
+    def __getitem__(self, k): return _run_hien()[k]
+    def get(self, k, d=None): return _run_hien().get(k, d)
+
+
+_RUN = _VaoRun()
 GRACE_DUNG_S = 3          # đang gửi việc cho Antigravity mà bấm Dừng: chờ tối đa chừng này giây lấy mã cuộc trò chuyện để huỷ, quá thì giết tiến trình
 
 
@@ -205,7 +230,7 @@ def _agentapi(*args, timeout=60, project=None):
         raise ChuaMo(_msg_chua_mo())
     if not LS_EXE.exists():
         raise ChuaMo("Không thấy language_server.exe của Antigravity.")
-    huy = _RUN["huy"]
+    run = _run_hien(); huy = run["huy"]
     if huy.is_set():
         raise Huy()
     env = dict(os.environ, ANTIGRAVITY_LS_ADDRESS=f"127.0.0.1:{h['httpPort']}", ANTIGRAVITY_CSRF_TOKEN=str(h["csrfToken"]))
@@ -214,7 +239,7 @@ def _agentapi(*args, timeout=60, project=None):
     p = subprocess.Popen([str(LS_EXE), "agentapi", *args], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          text=True, encoding="utf-8", errors="replace", creationflags=NO_WIN)
     with _RUN_LOCK:
-        _RUN["proc"].add(p)
+        run["proc"].add(p)
     t0 = time.time(); t_huy = None
     try:
         while True:
@@ -232,7 +257,7 @@ def _agentapi(*args, timeout=60, project=None):
                     raise LoiTam(f"Antigravity không trả lời trong {timeout} giây.")
     finally:
         with _RUN_LOCK:
-            _RUN["proc"].discard(p)
+            run["proc"].discard(p)
         if p.poll() is None:
             _giet_cay(p.pid)
     return p.returncode, (out or ""), (err or "").replace(str(h["csrfToken"]), "***")
@@ -282,7 +307,7 @@ def _kiem_project_nhan(cid, project):
     except Exception:
         return
     if pid != project:
-        JOB["canh_bao"] = ("Antigravity chưa nhận Project tự duyệt của Xưởng Video nên có thể còn hỏi \"Accept\". "
+        _job_hien()["canh_bao"] = ("Antigravity chưa nhận Project tự duyệt của Xưởng Video nên có thể còn hỏi \"Accept\". "
                            "Đóng hẳn Antigravity rồi mở lại một lần, sau đó bấm Học cảnh tiếp.")
 
 
@@ -316,8 +341,9 @@ def danh_sach_project(toi_da=80):
                 return m.get("projectId") or "", m.get("workspaceUris") or []
             except Exception:
                 return "", []
+        cx = [contextvars.copy_context() for _ in ids]                 # luồng con biết run của sản phẩm (Dừng giết được tiến trình)
         with ThreadPoolExecutor(max_workers=4) as ex:
-            for pid, ws in ex.map(doc, ids):
+            for pid, ws in ex.map(lambda a: a[0].run(doc, a[1]), zip(cx, ids)):
                 if pid and pid != "outside-of-project" and ws:
                     for u in ws:
                         mp.setdefault(_uri_thanh_duong_dan(u), pid)
@@ -447,7 +473,8 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     Mỗi file xong thì gọi khi_co(path, nội dung chữ) ngay. Quá hạn (= han_moi_video × số video, tối đa HAN_LO_TOI_DA_S) thì thôi.
     Anh bấm Dừng (`huy` được đặt) → huỷ ngay cuộc trò chuyện ở Antigravity, xoá file đầu ra dở dang, trả về phần đã xong. Quá hạn cũng huỷ.
     → danh sách path đã nhận được."""
-    huy = huy or _RUN["huy"]
+    run = _run_hien()
+    huy = huy or run["huy"]
     huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
     ngu = ngu or (lambda giay: huy.wait(giay))
     outs = [Path(o) for o in outs]
@@ -467,7 +494,7 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     cid = gui(model, prompt, tieu_de, project) if project else gui(model, prompt, tieu_de)
     if cid:
         with _RUN_LOCK:
-            _RUN["conv"].add(cid)
+            run["conv"].add(cid)
         _luu()
     cu = {o: -1 for o in outs}; on = {o: 0 for o in outs}; xong = []
     t = 0
@@ -505,9 +532,59 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
                 pass
         if cid:
             with _RUN_LOCK:
-                _RUN["conv"].discard(cid)
+                run["conv"].discard(cid)
             _luu()
     return xong
+
+
+def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy_cuoc=None, ngu=None, huy=None, tieu_de="Giám khảo"):
+    """Hỏi Antigravity MỘT câu rồi chờ 1 file kết quả (JSON do AI ghi ra `out_file`) — dùng cho tiến trình KHÔNG thuộc việc học nào (vd. lô sản xuất
+    chấm video). KHÔNG đụng job/run của Học cảnh và KHÔNG ghi hoc-canh-job.json (file đó của tiến trình hub). Chờ file có chữ và ổn định 2 lần kiểm
+    liền (kích thước không đổi). Luôn huỷ cuộc trò chuyện sau khi xong/quá hạn và xoá file kết quả. → nội dung chữ của file.
+    Lỗi: ChuaMo (Antigravity chưa mở), LoiTam (không nhận việc / quá hạn `han` giây), Huy (`huy` được đặt)."""
+    huy = huy or threading.Event()
+    huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
+    ngu = ngu or (lambda giay: huy.wait(giay))
+    out = Path(out_file)
+    tam = out.with_name(out.name + ".tmp")
+
+    def don():
+        for f in (out, tam):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    don()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if huy.is_set():
+        raise Huy()
+    cid = None
+    try:
+        cid = gui(chuan_model(model), prompt, tieu_de, project) if project else gui(chuan_model(model), prompt, tieu_de)
+        cu, on, t = -1, 0, 0.0
+        while t <= han:
+            ngu(CHU_KY_S); t += CHU_KY_S
+            if huy.is_set():
+                raise Huy()
+            try:
+                n = out.stat().st_size
+            except OSError:
+                n = -1
+            if n > 0:
+                on = on + 1 if n == cu else 0
+                if on >= 2:
+                    return out.read_text(encoding="utf-8", errors="replace")
+            else:
+                on = 0
+            cu = n
+        raise LoiTam(f"Antigravity không trả kết quả trong {han} giây.")
+    finally:
+        if cid:
+            try:
+                huy_cuoc(cid)
+            except Exception:
+                pass
+        don()
 
 
 # ----------------------------------------------------------------------------------------------- lời nhắc điền phiếu (cả lô)
@@ -528,58 +605,122 @@ def loi_nhac_phieu(viec, to, ra, ten_sp=""):
 
 
 # ----------------------------------------------------------------------------------------------- tiến độ + trạng thái lưu bền
-JOB = {"dang_chay": False, "ma": None, "tong": 0, "xong": 0, "hien_tai": "", "loi": [], "trang_thai": "nghi", "thong_bao": "",
-       "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": "", "giai_doan": "", "model": "", "canh_tong": 0, "canh_xong": 0}
-_LOCK = threading.Lock()
+def _job_rong():
+    return {"dang_chay": False, "ma": None, "tong": 0, "xong": 0, "hien_tai": "", "loi": [], "trang_thai": "nghi", "thong_bao": "",
+            "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": "", "giai_doan": "", "model": "", "canh_tong": 0, "canh_xong": 0, "cho": 0}
+
+
+_JOB_RONG = _job_rong()          # job khi chưa có sản phẩm nào học
+_LOCK = threading.Lock()         # bảo vệ kiểm tra "sản phẩm này đang học chưa" + tạo job/run
 _LUU_LOCK = threading.Lock()
 FILE_JOB = "hoc-canh-job.json"
 MSG_KHOI_PHUC = "Xưởng vừa khởi động lại giữa lúc học — đã dừng gọn việc dở. Bấm Học cảnh để làm tiếp (video đã học được giữ)."
+TOI_DA_SP_MAC_DINH = 3           # số sản phẩm học cùng lúc tối đa (hoc_canh.toi_da_sp); dư thì xếp hàng
+_SLOT = threading.Condition()
+_HANG = []                       # khoá các sản phẩm đang chờ lượt (FIFO)
+_DANG = set()                    # khoá các sản phẩm đang giữ 1 lượt chạy
+
+
+def _khoa(ma):
+    return str(ma)
+
+
+def _job_hien():
+    """Job của luồng hiện tại (luồng học); không thì job của việc bắt đầu gần nhất; chưa có thì job rỗng."""
+    r = _CUR.get()
+    if r is not None and r.get("job") is not None:
+        return r["job"]
+    return _JOBS.get(_ULTIMA[0]) or _JOB_RONG
+
+
+def job(ma=None):
+    """Job (dict sống) của sản phẩm `ma`; ma=None → việc bắt đầu gần nhất. Chưa có → job rỗng (không đăng ký)."""
+    if ma is None:
+        return _job_hien()
+    return _JOBS.get(_khoa(ma)) or _job_rong()
+
+
+class _VaoJob(collections.abc.MutableMapping):
+    """JOB dạng cũ (dict): trỏ vào job hiện tại (xem _job_hien). Việc mới nên dùng job(ma) / tat_ca_job()."""
+    def __getitem__(self, k): return _job_hien()[k]
+    def __setitem__(self, k, v): _job_hien()[k] = v
+    def __delitem__(self, k): del _job_hien()[k]
+    def __iter__(self): return iter(list(_job_hien()))
+    def __len__(self): return len(_job_hien())
+
+
+JOB = _VaoJob()
+
+
+def tat_ca_job():
+    """{khoá sản phẩm: bản sao job} của mọi sản phẩm đã học/đang học từ lúc hub chạy."""
+    with _RUN_LOCK:
+        return {k: dict(j, loi=list(j.get("loi") or [])) for k, j in _JOBS.items()}
+
+
+def dang_hoc():
+    """Khoá các sản phẩm đang học hoặc đang chờ lượt."""
+    with _RUN_LOCK:
+        return [k for k, j in _JOBS.items() if j.get("dang_chay")]
 
 
 def _luu():
-    """Ghi lich-su/hoc-canh-job.json (nguyên tử): JOB + mã các cuộc trò chuyện Antigravity đang mở + kho — để khởi động lại hub vẫn huỷ được việc dở. Không bao giờ ném lỗi."""
+    """Ghi lich-su/hoc-canh-job.json (nguyên tử, dưới khoá vì nhiều luồng ghi): {"jobs": {khoá sản phẩm: {job, conv: mã các cuộc trò chuyện Antigravity đang mở, kho}}}
+    — để khởi động lại hub vẫn huỷ được việc dở của MỌI sản phẩm. Không bao giờ ném lỗi."""
     try:
-        with _RUN_LOCK:
-            conv = sorted(_RUN["conv"]); kho = _RUN.get("kho") or ""
         with _LUU_LOCK:
+            with _RUN_LOCK:
+                jobs = {}
+                for k, j in _JOBS.items():
+                    r = _RUNS.get(k) or {}
+                    jobs[k] = {"job": dict(j, loi=list(j.get("loi") or [])), "conv": sorted(r.get("conv") or ()), "kho": str(r.get("kho") or "")}
             f = LS / FILE_JOB
             f.parent.mkdir(parents=True, exist_ok=True)
-            tmp = f.with_name(f.name + f".{os.getpid()}.tmp")
-            tmp.write_text(json.dumps({"job": dict(JOB, loi=list(JOB.get("loi") or [])), "conv": conv, "kho": str(kho), "luc": time.time()}, ensure_ascii=False), encoding="utf-8")
+            tmp = f.with_name(f.name + f".{os.getpid()}.{threading.get_ident()}.tmp")
+            tmp.write_text(json.dumps({"jobs": jobs, "luc": time.time()}, ensure_ascii=False), encoding="utf-8")
             tmp.replace(f)
     except Exception:
         pass
 
 
 def cap_nhat(**kw):
-    """JOB.update + lưu bền."""
-    JOB.update(**kw)
+    """Cập nhật job hiện tại + lưu bền."""
+    _job_hien().update(**kw)
     _luu()
 
 
 def khoi_phuc():
-    """Gọi 1 lần lúc hub khởi động. File trạng thái còn ghi "đang học" mà tiến trình này không học gì = hub vừa bị tắt giữa chừng → huỷ các cuộc trò chuyện Antigravity
-    còn mở, dọn <kho>/_tam/hoc-canh, đặt JOB về "dung" kèm lời nhắn. → số cuộc trò chuyện đã huỷ, hoặc None nếu không có gì để dọn."""
-    if JOB.get("dang_chay"):
-        return None
+    """Gọi 1 lần lúc hub khởi động. File trạng thái còn ghi sản phẩm nào "đang học" mà tiến trình này không học gì = hub vừa bị tắt giữa chừng → với MỖI sản phẩm dở:
+    huỷ các cuộc trò chuyện Antigravity còn mở, dọn <kho>/_tam/hoc-canh, đặt job về "dung" kèm lời nhắn. → tổng số cuộc trò chuyện đã huỷ, hoặc None nếu không có gì để dọn."""
+    with _RUN_LOCK:
+        if any(j.get("dang_chay") for j in list(_JOBS.values()) + [_JOB_RONG]):
+            return None
     try:
         d = json.loads((LS / FILE_JOB).read_text(encoding="utf-8"))
     except Exception:
         return None
-    job = d.get("job") or {}
-    if not isinstance(job, dict) or not (job.get("dang_chay") or job.get("trang_thai") == "dang_chay"):
+    muc = d.get("jobs") if isinstance(d, dict) and isinstance(d.get("jobs"), dict) else {"": d} if isinstance(d, dict) else {}      # dạng cũ: 1 job
+    tong, co = 0, False
+    for k, e in muc.items():
+        jb = (e or {}).get("job") if isinstance(e, dict) else None
+        if not isinstance(jb, dict) or not (jb.get("dang_chay") or jb.get("trang_thai") == "dang_chay"):
+            continue
+        co = True
+        conv = [str(c) for c in (e.get("conv") or []) if c]
+        for c in conv:
+            huy_cuoc_tro_chuyen(c)
+        tong += len(conv)
+        if e.get("kho"):
+            shutil.rmtree(Path(e["kho"]) / "_tam" / "hoc-canh", ignore_errors=True)
+        khoa = _khoa(jb.get("ma") or k or e.get("kho") or "")
+        nj = dict(_job_rong(), **jb)
+        nj.update(dang_chay=False, dung=True, dang_dung=False, trang_thai="dung", thong_bao=MSG_KHOI_PHUC, hien_tai="", giai_doan="", cho=0)
+        with _RUN_LOCK:
+            _JOBS[khoa] = nj; _ULTIMA[0] = khoa
+    if not co:
         return None
-    conv = [str(c) for c in (d.get("conv") or []) if c]
-    for c in conv:
-        huy_cuoc_tro_chuyen(c)
-    if d.get("kho"):
-        shutil.rmtree(Path(d["kho"]) / "_tam" / "hoc-canh", ignore_errors=True)
-    with _RUN_LOCK:
-        _RUN["conv"].clear(); _RUN["kho"] = str(d.get("kho") or "")
-    JOB.update(job)
-    JOB.update(dang_chay=False, dung=True, dang_dung=False, trang_thai="dung", thong_bao=MSG_KHOI_PHUC, hien_tai="", giai_doan="")
     _luu()
-    return len(conv)
+    return tong
 
 
 def doc_cau_hinh():
@@ -587,6 +728,42 @@ def doc_cau_hinh():
         return cfg_hub().get("hoc_canh", {})
     except Exception:
         return {}
+
+
+def doc_toi_da_sp():
+    """Số sản phẩm học cùng lúc tối đa (hoc_canh.toi_da_sp, 1–10, mặc định 3)."""
+    try:
+        return max(1, min(10, int(doc_cau_hinh().get("toi_da_sp") or TOI_DA_SP_MAC_DINH)))
+    except Exception:
+        return TOI_DA_SP_MAC_DINH
+
+
+def _cho_luot(khoa, run):
+    """Xếp hàng FIFO lấy 1 lượt chạy (tối đa hoc_canh.toi_da_sp sản phẩm cùng lúc). → True khi tới lượt, False nếu bấm Dừng lúc đang chờ."""
+    huy, jb = run["huy"], run["job"]
+    with _SLOT:
+        _HANG.append(khoa)
+        try:
+            while True:
+                if huy.is_set():
+                    return False
+                if _HANG[0] == khoa and len(_DANG) < doc_toi_da_sp():
+                    _HANG.pop(0); _DANG.add(khoa); jb.update(cho=0)
+                    _SLOT.notify_all()
+                    return True
+                vt = _HANG.index(khoa) + 1
+                jb.update(cho=vt, thong_bao=f"Đang chờ tới lượt (xếp thứ {vt}) — đang có {len(_DANG)} sản phẩm học…")
+                _SLOT.wait(0.5)
+        finally:
+            if khoa in _HANG:
+                _HANG.remove(khoa)
+                _SLOT.notify_all()
+
+
+def _nha_luot(khoa):
+    with _SLOT:
+        _DANG.discard(khoa)
+        _SLOT.notify_all()
 
 
 def chuan_model(m):
@@ -758,15 +935,19 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
     ban_san_xuat = ban_san_xuat or (lambda: False)
     cat = cat or cat_canh.cat
     to_anh = to_anh or cat_canh.to_anh
+    khoa = _khoa(ma_hoac_kho)
     with _LOCK:
-        if JOB["dang_chay"]:
+        if (_JOBS.get(khoa) or {}).get("dang_chay"):
             return {"ok": False, "loi": "Đang học rồi."}
-        huy = threading.Event()
+        job = dict(_job_rong(), ma=khoa, dang_chay=True, trang_thai="dang_chay", thong_bao="Đang kiểm kho…", bat_dau=time.time(), giai_doan="cat", model=model)
+        run = _run_moi(khoa, kho, job); huy = run["huy"]
         with _RUN_LOCK:
-            _RUN.update(huy=huy, conv=set(), kho=str(kho))
-        JOB.update(dang_chay=True, ma=str(ma_hoac_kho), tong=0, xong=0, hien_tai="", loi=[], trang_thai="dang_chay", thong_bao="Đang kiểm kho…",
-                   bat_dau=time.time(), dung=False, dang_dung=False, canh_bao="", giai_doan="cat", model=model, canh_tong=0, canh_xong=0)
+            _RUNS[khoa] = run; _JOBS[khoa] = job; _ULTIMA[0] = khoa
+    tok = _CUR.set(run)                                   # luồng này (và các luồng con được sao ngữ cảnh) thuộc việc học của sản phẩm này
     _luu()
+
+    def cap(**kw):
+        job.update(**kw); _luu()
     kq = {"ok": True, "da_hoc": 0, "loi": [], "tat_ca_xong": False, "chi_tiet": [], "lo": 0, "project": None, "canh": 0, "model": model}
     st = {"qua_han_lien": 0, "dung_vi": None, "lo_dang": 0, "kieu1_ghi": 0}
     kl = threading.Lock()
@@ -778,12 +959,12 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         with kl:
             if isinstance(v_hoac_rel, dict):
                 v_hoac_rel["xong"] = True
-            JOB["xong"] += 1
+            job["xong"] += 1
             kq["chi_tiet"].append({"video": rel, "ok": ok, "giay": giay, "canh": canh})
             if ok:
-                kq["da_hoc"] += 1; kq["canh"] += canh; JOB["canh_xong"] += canh
+                kq["da_hoc"] += 1; kq["canh"] += canh; job["canh_xong"] += canh
             if loi:
-                JOB["loi"].append({"video": rel, "loi": str(loi)[:240]}); kq["loi"].append(rel)
+                job["loi"].append({"video": rel, "loi": str(loi)[:240]}); kq["loi"].append(rel)
         _luu()
 
     def ghi_video(v):
@@ -833,7 +1014,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                     st["lo_dang"] += 1
                     for v, _ in lo:
                         dang[Path(v["rel"]).name] = so
-                    JOB.update(hien_tai=", ".join(dang))
+                    job.update(hien_tai=", ".join(dang))
                     break
             huy.wait(2)
         try:
@@ -906,18 +1087,21 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                 st["lo_dang"] -= 1
                 for v, _ in lo:
                     dang.pop(Path(v["rel"]).name, None)
-                JOB.update(hien_tai=", ".join(dang))
+                job.update(hien_tai=", ".join(dang))
 
     def chay_cac_lo(muc, lan, pj):
         cac = chia_lo(muc, co_lo())
         kq["lo"] += len(cac)
         with ThreadPoolExecutor(max_workers=song_song) as ex:
-            fs = [ex.submit(chay_mot_lo, c, i + 1, len(cac), pj, lan) for i, c in enumerate(cac)]
+            fs = [ex.submit(contextvars.copy_context().run, chay_mot_lo, c, i + 1, len(cac), pj, lan) for i, c in enumerate(cac)]
             for f in fs:
                 f.result()
 
     ten_sp = ten_sp_cho_phieu(ma) if ma else "sản phẩm của chủ hàng"
     try:
+        if not _cho_luot(khoa, run):                                        # xếp hàng nếu đang có đủ sản phẩm học cùng lúc
+            raise Huy()
+        cap(thong_bao="Đang kiểm kho…", giai_doan="cat")
         def _td(i, n, ten_f):
             if huy.is_set():
                 raise Huy()
@@ -934,7 +1118,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         elif lai:                                                            # học lại mọi video chưa phải kiểu 2
             co = {r for r, _f, _k in viec}
             viec += [(r, f, 1) for r, (k, f) in sorted(kieu_kho(kho).items()) if k != 2 and r not in co]
-        cap_nhat(tong=len(viec), thong_bao="Đang cắt cảnh bằng máy…" if viec else "Đang kiểm kho…")
+        cap(tong=len(viec), thong_bao="Đang cắt cảnh bằng máy…" if viec else "Đang kiểm kho…")
         if viec and not kiem_mo():
             st["dung_vi"] = ("can_mo", _msg_chua_mo())
         elif viec:
@@ -956,48 +1140,53 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                         continue
                     cac_video.append({"rel": rel, "file_cu": fc, "kieu_cu": kc, "dai": float((r or {}).get("dai") or 0) or max(c["den"] for c in canh),
                                       "canh": canh, "kq": {}, "loi_canh": {}, "info": None, "t0": time.time(), "xong": False})
-                    cap_nhat(thong_bao=f"Đang cắt cảnh bằng máy… {k}/{len(viec)} video", canh_tong=sum(len(x["canh"]) for x in cac_video))
+                    cap(thong_bao=f"Đang cắt cảnh bằng máy… {k}/{len(viec)} video", canh_tong=sum(len(x["canh"]) for x in cac_video))
             if not cac_video:
                 pass
             else:
-                cap_nhat(giai_doan="hoc", thong_bao=f"Antigravity đang điền phiếu {JOB['canh_tong']} cảnh của {len(cac_video)} video…")
+                cap(giai_doan="hoc", thong_bao=f"Antigravity đang điền phiếu {job['canh_tong']} cảnh của {len(cac_video)} video…")
                 pj = tim_project(kho) if project is not False else None
                 kq["project"] = pj
                 chay_cac_lo([(v, list(range(len(v["canh"])))) for v in cac_video], 1, pj)
                 con = [(v, [i for i in range(len(v["canh"])) if i not in v["kq"]]) for v in cac_video if not v["xong"]]
                 if con and not st["dung_vi"] and not huy.is_set():
-                    cap_nhat(thong_bao=f"Hỏi lại {sum(len(i) for _, i in con)} cảnh chưa đạt…")
+                    cap(thong_bao=f"Hỏi lại {sum(len(i) for _, i in con)} cảnh chưa đạt…")
                     chay_cac_lo(con, 2, pj)
-        cap_nhat(giai_doan="ghi")
+        cap(giai_doan="ghi")
         if lai and ma and st["kieu1_ghi"] and not st["dung_vi"] and not huy.is_set():
             _cat_lich_su_canh(ma)
         con_lai = len(viec) - kq["da_hoc"]
         if st["dung_vi"]:
-            cap_nhat(trang_thai=st["dung_vi"][0], thong_bao=f"{st['dung_vi'][1]} Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
-        elif huy.is_set() and JOB["xong"] < len(viec):
-            cap_nhat(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
+            cap(trang_thai=st["dung_vi"][0], thong_bao=f"{st['dung_vi'][1]} Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
+        elif huy.is_set() and job["xong"] < len(viec):
+            cap(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {con_lai} video chưa học.")
         else:
             kq["tat_ca_xong"] = True
-            cap_nhat(trang_thai="xong", thong_bao="Kho đã đủ mô tả." if not viec else
+            cap(trang_thai="xong", thong_bao="Kho đã đủ mô tả." if not viec else
                      (f"Học xong {kq['da_hoc']} video ({kq['canh']} cảnh)" if kq["da_hoc"] else "Chưa học được video nào") +
                      (f", {len(kq['loi'])} video có lỗi" if kq["loi"] else "") + ".")
     except Huy:
-        cap_nhat(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {max(0, JOB['tong'] - kq['da_hoc'])} video chưa học.")
+        cap(trang_thai="dung", thong_bao=f"Đã dừng. Đã học {kq['da_hoc']} video (giữ nguyên), còn {max(0, job['tong'] - kq['da_hoc'])} video chưa học.")
     except Exception as e:
-        cap_nhat(trang_thai="loi", thong_bao=f"Lỗi: {str(e)[:200]}"); kq.update(ok=False, tat_ca_xong=False)
+        cap(trang_thai="loi", thong_bao=f"Lỗi: {str(e)[:200]}"); kq.update(ok=False, tat_ca_xong=False)
     finally:
+        _nha_luot(khoa)
         with _RUN_LOCK:
-            con_cuoc = list(_RUN["conv"]); _RUN["conv"].clear()
+            con_cuoc = list(run["conv"]); run["conv"].clear()
         if huy.is_set():
             for c in con_cuoc:                                  # còn cuộc trò chuyện nào chưa huỷ thì huỷ nốt
                 huy_cuoc_tro_chuyen(c)
         shutil.rmtree(kho / "_tam" / "hoc-canh", ignore_errors=True)
-        cap_nhat(dang_chay=False, dang_dung=False, hien_tai="", giai_doan="")
+        cap(dang_chay=False, dang_dung=False, hien_tai="", giai_doan="", cho=0)
+        with _RUN_LOCK:
+            if _RUNS.get(khoa) is run:
+                del _RUNS[khoa]
+        _CUR.reset(tok)
     if kq.get("tat_ca_xong") and khi_xong:
         try:
             khi_xong(kq)
         except Exception as e:
-            cap_nhat(thong_bao=JOB["thong_bao"] + f" (không tự chuẩn bị kho được: {str(e)[:80]})")
+            cap(thong_bao=job["thong_bao"] + f" (không tự chuẩn bị kho được: {str(e)[:80]})")
     return kq
 
 
@@ -1019,35 +1208,43 @@ def _cat_lich_su_canh(ma):
 
 
 def bat_dau_nen(ma, khi_xong=None, **kw):
-    """Bắt đầu học ở luồng nền (mỗi lần 1 việc). kw: lai=True → học lại cả video còn mô tả kiểu cũ."""
-    if JOB["dang_chay"]:
+    """Bắt đầu học ở luồng nền (mỗi sản phẩm 1 việc; nhiều sản phẩm học cùng lúc được). kw: lai=True → học lại cả video còn mô tả kiểu cũ."""
+    khoa = _khoa(ma)
+    if (_JOBS.get(khoa) or {}).get("dang_chay"):
         return {"ok": False, "loi": "Đang học rồi."}
     kw.setdefault("project", None)
     t = threading.Thread(target=hoc_kho, args=(ma,), kwargs=dict(khi_xong=khi_xong, **kw), daemon=True)
     t.start()
     for _ in range(50):                                          # chờ luồng nhận việc (để trả lời API thấy ngay "đang chạy")
-        if JOB["dang_chay"]:
+        if (_JOBS.get(khoa) or {}).get("dang_chay"):
             break
         time.sleep(0.02)
     return {"ok": True}
 
 
-def dung():
+def dung(ma=None):
     """Dừng THẬT: đặt cờ huỷ (các luồng thôi chờ trong ≤1 giây), huỷ ngay các cuộc trò chuyện Antigravity đang làm, giết tiến trình agentapi
-    đang treo. Giao diện hiện 'Đang dừng…' (JOB.dang_dung) tới khi luồng học thoát hẳn (dang_chay=False)."""
-    if not JOB["dang_chay"]:
-        return {"ok": True, "dang_dung": False}
-    huy = _RUN["huy"]
-    cap_nhat(dung=True, dang_dung=True, thong_bao="Đang dừng…")
-    huy.set()
+    đang treo. ma=None → dừng TẤT CẢ sản phẩm (hub tắt / tương thích cũ); có ma → chỉ sản phẩm đó. Giao diện hiện 'Đang dừng…' (job.dang_dung)
+    tới khi luồng học thoát hẳn (dang_chay=False)."""
     with _RUN_LOCK:
-        cac = list(_RUN["conv"])
+        cac = [(k, r) for k, r in _RUNS.items() if (ma is None or k == _khoa(ma)) and (_JOBS.get(k) or {}).get("dang_chay")]
+    if not cac:
+        return {"ok": True, "dang_dung": False}
+    for k, r in cac:
+        r["job"].update(dung=True, dang_dung=True, thong_bao="Đang dừng…")
+        r["huy"].set()
+        with _RUN_LOCK:
+            convs = list(r["conv"])
 
-    def lam():
-        for c in cac:
-            huy_cuoc_tro_chuyen(c)
-    if cac:
-        threading.Thread(target=lam, daemon=True, name="hoc-canh-huy").start()
-    return {"ok": True, "dang_dung": True}
+        def lam(convs=convs):
+            for c in convs:
+                huy_cuoc_tro_chuyen(c)
+        if convs:
+            threading.Thread(target=lam, daemon=True, name="hoc-canh-huy").start()
+    _luu()
+    return {"ok": True, "dang_dung": True, "so": len(cac)}
 
 
+def dung_het():
+    """Dừng mọi sản phẩm đang học (hub tắt)."""
+    return dung(None)

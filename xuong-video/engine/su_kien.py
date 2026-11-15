@@ -164,10 +164,16 @@ def ghi(vai, loai, msg="", video=None, f=None, **them):
                 ev["msg"] = str(msg)[:200]
             ev.update({k: v for k, v in them.items() if v is not None})
             f.parent.mkdir(parents=True, exist_ok=True)
-            with open(f, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
-            if f.stat().st_size > BYTE:           # kiểm kích thước rẻ trước khi đếm dòng
-                _cat(f)
+            dong = json.dumps(ev, ensure_ascii=False, default=str) + "\n"
+            try:                                  # nhiều lô (nhiều tiến trình) cùng ghi sổ: khoá file để việc cắt bớt không nuốt dòng của lô khác
+                with khoa_tep(f, 3):
+                    with open(f, "a", encoding="utf-8") as fh:
+                        fh.write(dong)
+                    if f.stat().st_size > BYTE:   # kiểm kích thước rẻ trước khi đếm dòng
+                        _cat(f)
+            except TimeoutError:
+                with open(f, "a", encoding="utf-8") as fh:
+                    fh.write(dong)
     except Exception:
         pass
 

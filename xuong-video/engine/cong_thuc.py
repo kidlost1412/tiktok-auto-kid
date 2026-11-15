@@ -42,6 +42,8 @@ ZONE = {"lower_third": "LOWER"}           # còn lại đều ở vùng TOP (tr�
 SO_HOP_LE = {1, 2, 3, 5, 10, 200, 250, 300, 500, 15000}   # số đã có trong sự thật sản phẩm/quà
 
 DATA_SPEC = """Nội dung khối (chữ IN HOA ngắn, đúng sự thật sản phẩm; mỗi dòng ≤ 26 ký tự):
+- chu_dap|chu_mat_na|chu_nghieng|chu_tang|chu_gach (chữ phá cách): {"text": "≤28 ký tự, ≤14/dòng", "nhan": <chỉ số chữ nhấn>}; chu_so: {"so": "240", "don_vi": "ML", "nhan_tren": "tuỳ chọn"}
+- mỗi mục khối có thể thêm "tu"/"den" (chỉ số từ đầu/cuối trong lời), "vi_tri": "tren"|"giua"|"duoi", "am": "<họ âm>"|"khong"
 - hook_*: {"text": "<câu mở ≤ 28 ký tự>"}; hook_dap thêm "nhan": <chỉ số chữ cần tô, 0-based>; hook_bang thêm "mau": "do"|"xanh"
 - checklist: {"tieu_de": "<tuỳ chọn>", "items": ["<2–4 ý ≤ 22 ký tự>"]}
 - so_dem: {"nhan_trai": "1 CHAI", "so": <số có trong sự thật: 200, 300, 500, 15000…>, "don_vi": "LÍT"}
@@ -62,6 +64,9 @@ def _txt(x, n=34):
     return re.sub(r"\s+", " ", str(x or "")).strip()[:n]
 
 
+KHOI_CHU_LON_TAM = {"chu_dap", "chu_mat_na", "chu_nghieng", "chu_tang", "chu_so", "chu_gach"}
+
+
 def clean_data(loai, d):
     """Kiểm/cắt nội dung khối; trả None nếu khối không dùng được."""
     d = dict(d or {})
@@ -69,6 +74,19 @@ def clean_data(loai, d):
         if not d.get("text"):
             return None
         d["text"] = _txt(d["text"], 30)
+    elif loai in KHOI_CHU_LON_TAM:
+        if loai == "chu_so":
+            so = re.sub(r"[^0-9.,–\-/ ]", "", str(d.get("so") if d.get("so") is not None else d.get("text") or "")).strip()[:8]
+            if not so:
+                return None
+            d["so"] = so
+            d["don_vi"] = _txt(d.get("don_vi"), 12); d["nhan_tren"] = _txt(d.get("nhan_tren"), 20)
+        else:
+            if not d.get("text"):
+                return None
+            d["text"] = _cat_tu(d["text"], 28)
+        if d.get("nhan") is not None:
+            d["nhan"] = _nguyen(d["nhan"], -1)
     elif loai == "checklist":
         items = [_txt(i, 24) for i in d.get("items", []) if i][:4]
         if len(items) < 2:
@@ -97,71 +115,219 @@ def clean_data(loai, d):
     return d
 
 
-def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu):
-    """→ danh sách block {loai,f0,f1,data} đã xếp vùng, không đè; luôn có 1 câu mở + 1 khối chốt."""
+def _nguyen(v, mac=None):
+    try:
+        return int(float(str(v).strip()))
+    except Exception:
+        return mac
+
+
+def _cat_tu(x, n):
+    """Cắt ở ranh giới từ, tối đa n ký tự."""
+    t = _txt(x, 400)
+    if len(t) <= n:
+        return t
+    c = t[:n]
+    return c.rsplit(" ", 1)[0] if " " in c and t[n] != " " else c
+
+
+def mo_ta_khoi():
+    """Mô tả từng loại khối (đạo diễn đọc để chọn): {loai: {nhom, mo_ta, du_lieu, toi_da}}. Prompt đạo diễn sinh từ đây."""
+    m = {}
+
+    def them(loai, nhom, mo_ta, du_lieu, toi_da):
+        m[loai] = {"nhom": nhom, "mo_ta": mo_ta, "du_lieu": du_lieu, "toi_da": toi_da}
+    CL = "chữ rất to (khoảng 100–150 px), viền dày, 1–2 dòng, một chữ nhấn màu"
+    them("chu_dap", "chu_lon", f"Chữ phá cách kiểu ĐẬP: {CL}; phóng to rồi đập vào màn, rung nhẹ. Hợp câu mở, lời khẳng định, cảnh báo mạnh; dùng được ở bất kỳ đâu.",
+         {"text": "chữ chính", "nhan": "số thứ tự chữ tô ô vàng (0 là chữ đầu, -1 không tô)"}, "28 ký tự, ≤14 ký tự/dòng")
+    them("chu_mat_na", "chu_lon", f"Chữ phá cách kiểu MẶT NẠ: {CL}; thanh màu quét ngang lộ chữ dần. Hợp ý chính sang trọng, tên riêng, ý mới bắt đầu.",
+         {"text": "chữ chính", "nhan": "chữ tô màu nhấn"}, "28 ký tự, ≤14 ký tự/dòng")
+    them("chu_nghieng", "chu_lon", f"Chữ phá cách kiểu NGHIÊNG: {CL}; cả cụm nghiêng nhẹ, chữ nhấn nằm trong ô màu nghiêng ngược. Hợp lời nhắn vui, nhắc nhở, 'đừng…'.",
+         {"text": "chữ chính", "nhan": "chữ nằm trong ô màu"}, "28 ký tự, ≤14 ký tự/dòng")
+    them("chu_tang", "chu_lon", "Chữ phá cách kiểu XẾP TẦNG: dòng trên nhỏ, dòng dưới rất to màu nhấn, hai dòng vào từ hai phía. Hợp cụm 'một việc + kết quả' (ĐỪNG ĐỂ / BÔNG RỤNG).",
+         {"text": "2–4 từ; từ cuối thành dòng to"}, "28 ký tự, ≤14 ký tự/dòng")
+    them("chu_so", "chu_lon", "Chữ phá cách kiểu SỐ + ĐƠN VỊ: con số cực to (~240 px) màu nhấn, đơn vị bên dưới, nhãn nhỏ phía trên tuỳ chọn. Hợp liều pha, số lượng, giá. Số phải có trong sự thật sản phẩm.",
+         {"so": "240 | 3–5", "don_vi": "ML | CON / LÁ", "nhan_tren": "tuỳ chọn"}, "số ≤8 ký tự; đơn vị ≤12; nhãn ≤20")
+    them("chu_gach", "chu_lon", f"Chữ phá cách kiểu GẠCH CHÂN: {CL}; nét gạch tô vẽ dần dưới chữ nhấn. Hợp điều cần ghi nhớ.",
+         {"text": "chữ chính", "nhan": "chữ được gạch chân"}, "28 ký tự, ≤14 ký tự/dòng")
+    them("hook_dap", "mo", "Câu mở 118 px đập vào giữa màn hình, chữ nhấn trong ô vàng. Hợp câu mở gây sốc.", {"text": "câu mở", "nhan": "chỉ số chữ tô"}, "30 ký tự")
+    them("hook_tung_tu", "mo", "Câu mở từng chữ xếp tầng, so le trái phải (84–100 px). Hợp câu mở 2–4 chữ ngắn.", {"text": "câu mở"}, "30 ký tự")
+    them("hook_go_may", "mo", "Câu mở gõ chữ trong ô trắng kiểu tin nhắn (64 px). Hợp câu hỏi, lời bí mật. Âm: tiếng phím.", {"text": "câu mở"}, "30 ký tự")
+    them("hook_mat_na", "mo", "Câu mở 92 px lộ sau thanh màu quét. Hợp câu mở sang, kể chuyện.", {"text": "câu mở"}, "30 ký tự")
+    them("hook_tem", "mo", "Câu mở trong con tem đỏ đóng dấu nghiêng (76 px). Hợp tin nhanh, cảnh báo.", {"text": "câu mở"}, "30 ký tự")
+    them("hook_bang", "mo", "Câu mở trên dải băng đỏ/xanh chạy vào từ trái (70 px).", {"text": "câu mở", "mau": "do|xanh"}, "30 ký tự")
+    them("hook_hoi", "mo", "Câu hỏi trong bong bóng thoại trắng viền vàng (66 px).", {"text": "câu hỏi"}, "30 ký tự")
+    them("checklist", "giua", "Bảng tích xanh 2–4 ý hiện lần lượt (52 px). Hợp liệt kê lý do/bước.", {"tieu_de": "tuỳ chọn", "items": ["ý ngắn"]}, "4 ý, 24 ký tự/ý")
+    them("so_dem", "giua", "Nhãn trái → số đếm chạy lên (132 px) + đơn vị. Số phải có trong sự thật sản phẩm.", {"nhan_trai": "1 CHAI", "so": "số", "don_vi": "LÍT"}, "số trong danh sách hợp lệ")
+    them("so_sanh", "giua", "Bảng 2 cột ✗ thường / ✓ sản phẩm (40–44 px). Hợp so sánh; không nêu tên hãng khác.", {"trai_tieu_de": "", "trai": ["ý"], "phai_tieu_de": "", "phai": ["ý"]}, "3 ý/cột")
+    them("vong_tron", "giua", "Vòng tròn vàng vẽ quanh sản phẩm giữa màn + nhãn nhỏ. Hợp khi sản phẩm đang ở giữa khung.", {"nhan": "nhãn"}, "22 ký tự")
+    them("lower_third", "giua", "Thanh tên sản phẩm góc dưới trái (58 px, nền đỏ), cố định y≈1160.", {"dong1": "TÊN SẢN PHẨM", "dong2": "ý phụ"}, "26 ký tự")
+    them("nhan_dan", "giua", "Nhãn dán răng cưa đỏ xoay, góc phải trên (44 px).", {"text": "ngắn"}, "16 ký tự")
+    them("da_quang", "giua", "Bút dạ quang: dải vàng quét phủ cả dòng (84 px), chữ đen. Hợp câu nhấn dài hơn chữ phá cách.", {"text": "câu"}, "36 ký tự, 18/dòng")
+    them("canh_bao", "giua", "Băng cảnh báo vàng-đen có tiêu đề + dòng chữ (58 px). Hợp lỗi sai/điều cấm.", {"tieu_de": "LƯU Ý", "text": "nội dung"}, "30 ký tự")
+    them("dai_chay", "giua", "Dải chữ chạy ngang nền vàng nghiêng (56 px). Ít dùng — dễ rối.", {"text": "ngắn"}, "30 ký tự")
+    them("bong_chu", "giua", "Chữ nổ trên ngôi sao vàng quay (84 px). Ít dùng.", {"text": "ngắn"}, "14 ký tự")
+    them("mui_ten_chi", "giua", "Nhãn trắng + mũi tên vàng chỉ xuống sản phẩm.", {"text": "ngắn"}, "22 ký tự")
+    them("hop_qua", "chot", "Hộp quà bật nắp + pháo giấy, bảng 2 dòng (60/42 px). Hợp chốt khi quà là chính.", {"dong1": "quà", "dong2": "điều kiện"}, "26 ký tự/dòng")
+    them("bang_qua", "chot", "Bảng các mức quà 2–4 dòng (40 px) lấy từ hồ sơ sản phẩm.", {"tieu_de": "", "cac_muc": ["Mua 1 chai: …"]}, "4 mức")
+    them("nut_gio_hang", "chot", "Nút giỏ hàng đỏ nhấp nháy (70 px) + dòng trên. Chốt gọn nhất.", {"dong1": "", "text": "BẤM GIỎ HÀNG"}, "26 ký tự")
+    them("the_qua", "chot", "Thẻ quà 2 dòng (70/52 px), kiểu hop_do|hop_xanh|nhan_vang|the_trang.", {"dong1": "", "dong2": "", "kieu": "hop_do|hop_xanh|nhan_vang|the_trang"}, "26 ký tự/dòng")
+    return m
+
+
+KHOI_CHU_LON = ["chu_dap", "chu_mat_na", "chu_nghieng", "chu_tang", "chu_so", "chu_gach"]
+KHOI_TAT_CA = sorted(mo_ta_khoi())                   # mọi loại khối Remotion đã đăng ký (REGISTRY trong Blocks.tsx)
+KHOI_NOI_BAT = {"bong_chu", "da_quang", "so_dem", "canh_bao"} | set(KHOI_CHU_LON)   # cộng thêm mọi hook_* và khối chốt
+MAX_KHOI = 8
+VI_TRI_ZONE = {"tren": "TOP", "giua": "MID", "duoi": "LOWER"}
+VI_TRI_TOP = {"tren": 250, "giua": 720, "duoi": 1060}
+
+
+def _xung(a, b):
+    return a == b or "CENTER" in (a, b)
+
+
+def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu, words=None):
+    """→ (blocks, cta_f0). Khối {loai,f0,f1,data,zone[,top,am,vi_tri,co_dinh]} đã xếp vùng, không đè nhau trong cùng vùng.
+    Đạo diễn đặt tối đa MAX_KHOI khối; mỗi mục: {"loai","tu","den" (chỉ số TỪ trong lời, gồm cả "den"),"du_lieu",["vi_tri": tren|giua|duoi],["am"]}
+    hoặc kiểu cũ {"loai","cau"}. Loại nào đã đăng ký cũng dùng được; danh sách trong công thức chỉ dùng cho dự phòng khi đạo diễn không nêu."""
     R = RECIPES[recipe_key]
     dur_f = int(round(total * FPS))
     S = lambda i: sents[max(0, min(i, len(sents) - 1))]
-    hook, mids, cta = None, [], None
+    nw = len(words or [])
     sach = []                                         # đạo diễn trả rác → bỏ/ép kiểu an toàn (lỗi rà soát #2)
     for k in khoi_ai or []:
-        if not isinstance(k, dict) or not isinstance(k.get("loai"), str):
+        if not isinstance(k, dict) or not isinstance(k.get("loai"), str) or k["loai"] not in KHOI_TAT_CA:
             continue
-        try:
-            cau = int(float(str(k.get("cau", 1)).strip()))
-        except Exception:
-            cau = 1
-        sach.append({"loai": k["loai"], "cau": cau, "du_lieu": k.get("du_lieu") if isinstance(k.get("du_lieu"), dict) else {}})
-    for k in sach:
-        loai = k.get("loai")
-        d = clean_data(loai, k.get("du_lieu"))
+        d = clean_data(k["loai"], k.get("du_lieu") if isinstance(k.get("du_lieu"), dict) else {})
         if d is None:
             continue
-        if loai in KHOI_MO and hook is None:
-            hook = (loai if loai in R["mo"] else rng.choice(R["mo"]), d)
-        elif loai in R["giua"] and len(mids) < 2:     # khối giữa ngoài công thức → bỏ (dữ liệu không khớp loại khác)
-            mids.append((loai, d, int(k.get("cau", 1))))
-        elif loai in KHOI_CHOT and cta is None:
-            cta = (loai if loai in R["chot"] else rng.choice(R["chot"]), d)
-    if not mids and len(sents) >= 4:                 # luôn có ít nhất 1 khối nhấn giữa bài
+        it = {"loai": k["loai"], "du_lieu": d, "cau": _nguyen(k.get("cau"), 1), "tu": None, "den": None,
+              "vi_tri": k.get("vi_tri") if k.get("vi_tri") in VI_TRI_ZONE else None,
+              "am": k.get("am") if isinstance(k.get("am"), str) and k.get("am") else None}
+        tu = _nguyen(k.get("tu"))
+        if tu is not None and nw:                     # mốc theo chỉ số từ của lời
+            tu = max(0, min(tu, nw - 1))
+            den = _nguyen(k.get("den"), tu + 3)
+            den = max(tu, min(den, nw - 1))
+            it["tu"], it["den"] = tu, den
+        sach.append(it)
+    sach = sach[:MAX_KHOI]
+    toi_thieu = lambda loai: int((1.0 if loai.startswith("hook_") or loai in KHOI_NOI_BAT else 1.4) * FPS)
+
+    def khung(it):                                    # (f0, f1) theo từ, None nếu kiểu cũ
+        if it["tu"] is None:
+            return None
+        a = max(0, int(round(words[it["tu"]]["s"] * FPS)))
+        b = int(round(words[it["den"]]["e"] * FPS)) + int(0.3 * FPS)
+        return a, max(b, a + toi_thieu(it["loai"]))
+
+    hook, cta, mids = None, None, []
+    for it in sach:
+        fr = khung(it)
+        if hook is None and it["loai"] in KHOI_MO and (fr is None or fr[0] <= 3 * FPS):
+            hook = (it, fr)
+        elif cta is None and it["loai"] in KHOI_CHOT:
+            cta = (it, fr)
+        else:
+            mids.append((it, fr))
+    if not mids and not sach and len(sents) >= 4:    # đạo diễn không nêu gì → dự phòng theo công thức (luôn có 1 khối nhấn giữa bài)
         fb = fallback(ten_thuong_hieu)
         hop = [m for m in R["giua"] if m in fb]
-        if hop:                                       # không có loại hợp công thức → bỏ khối giữa, không bịa chữ
+        if hop:
             loai = rng.choice(hop)
-            mids.append((loai, dict(fb[loai]), rng.choice(range(1, len(sents) - 1))))
-    hook_text = hook[1] if hook else {"text": _txt(st.get("chu_the_mo") or ten_thuong_hieu, 30), "nhan": 0}
-    hook = (st.get("ep_mo") or (hook[0] if hook else rng.choice(R["mo"])), hook_text)
+            mids.append(({"loai": loai, "du_lieu": dict(fb[loai]), "cau": rng.choice(range(1, len(sents) - 1)), "tu": None, "den": None, "vi_tri": None, "am": None}, None))
+    som = any(fr and fr[0] < int(1.5 * FPS) for _, fr in mids)         # đạo diễn đã đặt khối ngay đầu bài → không chèn câu mở dự phòng
+    h_it = h_fr = hook_loai = hook_data = None
+    if hook:
+        h_it, h_fr = hook
+        hook_loai, hook_data = h_it["loai"], h_it["du_lieu"]
+    elif not som:
+        h_it = {"vi_tri": None, "am": None}
+        hook_data = {"text": _txt(st.get("chu_the_mo") or ten_thuong_hieu, 30), "nhan": 0}
+        hook_loai = st.get("ep_mo") or rng.choice(R["mo"])
     d1, d2 = st.get("chu_chot_1") or "QUÀ TẶNG THEO ĐƠN", st.get("chu_chot_2") or "BẤM GIỎ HÀNG"
-    loai_chot = st.get("ep_chot") or (cta[0] if cta else "the_qua")
-    data = dict(cta[1]) if cta else {}
+    c_it = cta[0] if cta else {"vi_tri": None, "am": None}
+    loai_chot = cta[0]["loai"] if cta else (st.get("ep_chot") or "the_qua")
+    data = dict(cta[0]["du_lieu"]) if cta else {}
     data.setdefault("dong1", d1); data.setdefault("dong2", d2); data.setdefault("text", d2)
-    data.setdefault("kieu", rng.choice(["hop_do", "hop_xanh", "nhan_vang", "the_trang"]))
+    if "kieu" not in data:
+        data["kieu"] = rng.choice(["hop_do", "hop_xanh", "nhan_vang", "the_trang"])
     if loai_chot == "bang_qua" and not data.get("cac_muc"):
         data["cac_muc"] = st.get("_qua") or []          # lấy đúng các mức quà trong hồ sơ sản phẩm
         if not data["cac_muc"]:
             loai_chot = "hop_qua"
-    cta = (loai_chot, data)
-    blocks = []
-    h_end = 1.5 if hook[0] == "hook_dap" else min(S(0)["e"] + 0.3, 3.2)
-    blocks.append({"loai": hook[0], "f0": 2, "f1": int(h_end * FPS), "data": hook[1], "zone": "CENTER" if hook[0] == "hook_dap" else "TOP"})
     cta_f0 = max(int(round((sents[-1]["s"] - 0.15) * FPS)), dur_f - 5 * FPS)
-    for loai, d, ci in mids:
-        ci = max(1, min(ci, len(sents) - 2)) if len(sents) > 2 else 0
-        a = int(S(ci)["s"] * FPS)
-        b = int(min(S(ci)["e"] + 0.4, S(ci)["s"] + 4.2) * FPS)
-        b = max(b, a + int(1.8 * FPS))
-        zone = ZONE.get(loai, "TOP")
-        clash = [x for x in blocks if x["zone"] in (zone, "CENTER") and not (b <= x["f0"] or a >= x["f1"])]
+    if cta and cta[1]:                                  # đạo diễn nêu mốc chốt → tôn trọng, nhưng chốt không dài quá 7 s
+        cta_f0 = max(dur_f - 7 * FPS, cta[1][0])
+    blocks = []
+
+    def gan(b, it):
+        if it.get("am"):
+            b["am"] = it["am"]
+        if it.get("vi_tri"):
+            b["vi_tri"] = it["vi_tri"]; b["zone"] = VI_TRI_ZONE[it["vi_tri"]]; b["top"] = VI_TRI_TOP[it["vi_tri"]]; b["co_dinh"] = True
+        return b
+
+    if h_it is not None:
+        if h_fr:
+            f0, f1 = max(2, h_fr[0]), h_fr[1]
+        else:
+            h_end = 1.5 if hook_loai == "hook_dap" else min(S(0)["e"] + 0.3, 3.2)
+            f0, f1 = 2, int(h_end * FPS)
+        zone = "CENTER" if hook_loai == "hook_dap" else "TOP"
+        blocks.append(gan({"loai": hook_loai, "f0": f0, "f1": f1, "data": hook_data, "zone": zone}, h_it))
+    ds = []
+    for it, fr in mids:
+        if fr is None:                                  # kiểu cũ: theo câu
+            ci = it["cau"] if it["cau"] is not None else 1
+            ci = max(1, min(ci, len(sents) - 2)) if len(sents) > 2 else 0
+            a = int(S(ci)["s"] * FPS)
+            b = int(min(S(ci)["e"] + 0.4, S(ci)["s"] + 4.2) * FPS)
+            fr = (a, max(b, a + int(1.8 * FPS)))
+        ds.append((fr[0], fr[1], it))
+    ds.sort(key=lambda x: x[0])
+    for a, b, it in ds:
+        loai = it["loai"]
+        zone = VI_TRI_ZONE.get(it["vi_tri"]) or ZONE.get(loai, "TOP")
+        clash = [x for x in blocks if _xung(x["zone"], zone) and not (b <= x["f0"] or a >= x["f1"])]
         if clash:
-            a = max(x["f1"] for x in clash) + 3
-            b = max(b, a + int(1.6 * FPS))
+            moi = max(x["f1"] for x in clash) + 3
+            if moi - a > int(0.6 * FPS):               # phải chờ quá lâu → bỏ, không vẽ đè
+                continue
+            if it["tu"] is None:
+                b = max(b, moi + int(1.6 * FPS))
+            a = moi
         if b > cta_f0 - 3:
             b = cta_f0 - 3
-        if b - a < int(1.4 * FPS):
+        if b - a < min(toi_thieu(loai), int(1.4 * FPS)):
             continue
-        blocks.append({"loai": loai, "f0": a, "f1": b, "data": d, "zone": zone})
-    blocks.append({"loai": cta[0], "f0": cta_f0, "f1": dur_f, "data": cta[1], "zone": "TOP"})
+        blocks.append(gan({"loai": loai, "f0": a, "f1": b, "data": it["du_lieu"], "zone": zone}, it))
+    blocks.sort(key=lambda x: x["f0"])
+    c = {"loai": loai_chot, "f0": cta_f0, "f1": dur_f, "data": data, "zone": "TOP"}
+    blocks.append(gan(c, c_it))
     return blocks, cta_f0
+
+
+def khung_tron(doan, blocks, nguong=0.4, toi_thieu=1.2):
+    """Đoạn hình 'trơ': bố cục toàn màn (day/day_zoom) dài ≥ toi_thieu giây mà khối nổi bật (câu mở, chữ phá cách, chốt, chữ to)
+    phủ < nguong thời lượng. → [[t0, t1], ...] (giây). Chỉ báo, không tự thêm chữ."""
+    nb = [(b["f0"] / FPS, b["f1"] / FPS) for b in blocks or []
+          if b["loai"].startswith("hook_") or b["loai"] in KHOI_NOI_BAT or b["loai"] in KHOI_CHOT]
+    out = []
+    for d in doan or []:
+        t0, t1 = float(d["t0"]), float(d["t1"])
+        if d.get("bo_cuc") not in ("day", "day_zoom") or t1 - t0 < toi_thieu:
+            continue
+        ev = sorted((max(a, t0), min(b, t1)) for a, b in nb if b > t0 and a < t1)
+        phu, cuoi = 0.0, t0
+        for a, b in ev:                                  # hợp các khoảng (tránh tính trùng)
+            a = max(a, cuoi)
+            if b > a:
+                phu += b - a; cuoi = b
+        if phu / (t1 - t0) < nguong:
+            out.append([round(t0, 2), round(t1, 2)])
+    return out
 
 
 def chon_atmos(recipe_key, rng, cuts_f):
@@ -239,7 +405,7 @@ def chuan_hoa(st, rng, used_sigs, tu_do=False, dang=None, goc=None):
             key = rng.choice([k for k in thap if k in hop] or thap)
     doi = key != key0
     if doi:
-        st["khoi"] = [k for k in st.get("khoi", []) if k.get("loai") in RECIPES[key]["mo"] + RECIPES[key]["giua"] + RECIPES[key]["chot"]]
+        st["khoi"] = [k for k in st.get("khoi", []) if k.get("loai") in KHOI_TAT_CA]     # đổi công thức vẫn giữ khối đạo diễn đã nêu
     R = RECIPES[key]
     st["cong_thuc"] = key
     tu = tu_do and not doi                           # đổi công thức → các lựa chọn của AI thuộc công thức cũ, bốc lại theo công thức mới
@@ -251,8 +417,8 @@ def chuan_hoa(st, rng, used_sigs, tu_do=False, dang=None, goc=None):
     st["nhip"] = R["nhip"]
     ok_sfx = TAT_CA["sfx"] if tu else R["sfx"]
     st["sfx"] = st.get("sfx") if st.get("sfx") in ok_sfx or st.get("sfx") == "em" else rng.choice(R["sfx"])
-    ai_mo = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in R["mo"]]
-    ai_chot = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in R["chot"]]
+    ai_mo = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in KHOI_MO]
+    ai_chot = [k.get("loai") for k in st.get("khoi", []) if k.get("loai") in KHOI_CHOT]
     st["ep_mo"] = ai_mo[0] if ai_mo else rng.choice(R["mo"])
     st["ep_chot"] = ai_chot[0] if ai_chot else rng.choice(R["chot"])
     for _ in range(12):                          # đổi dần cho tới khi không trùng video nào trong ngày (luôn chạy, kể cả tu_do)

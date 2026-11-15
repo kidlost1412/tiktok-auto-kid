@@ -1,15 +1,19 @@
 """Ê-kíp AI: ĐẠO DIỄN (lên bảng dựng từng câu, NHÌN ảnh cảnh) + GIÁM KHẢO (xem bản dựng, chấm, yêu cầu sửa).
 Máy dựng (dung.py / dung_remotion.py) chỉ làm theo bảng dựng; mọi lựa chọn AI đều được máy kiểm lại."""
-import datetime, json, re, subprocess
+import datetime, json, re, subprocess, threading
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ai import goi, lay_json
 import prompt_mau
 from bo_cuc import SO_PHU, la_chai, ep_bo_cuc
+import bo_cuc as BC
+import cong_thuc as CT
+import sfx as SFX
 from cong_thuc import RECIPES, DATA_SPEC, ct_cho_dao_dien
 from dung import sentence_times, MENU as MENU_NEN
 from soat_kho import bad, nguoi_noi
+import kiem_may
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
@@ -201,6 +205,11 @@ def ung_vien(sents, y_canh, shots, rng, n_moi_cau=TOI_DA_MOI_CAU, tranh=(), dem_
         def diem(s):
             i = s["id"]
             d = rel[k].get(i, 0) - W_MET * met.get(i, 0) - 1.2 * hien.get(i, 0) - rng.random()
+            so = s.get("soat") or {}
+            if k == 0 and (so.get("chu_muc") or 0) >= 1:   # câu mở: tránh cảnh đã có chữ chèn sẵn (đè chữ móc câu)
+                d -= 2.0
+            if (so.get("dep") or 3) <= 2:                    # cảnh xấu (điểm máy ≤ 2) chỉ dùng khi thật cần
+                d -= 1.0
             return d - (PHAT_MO_CHOT if (k == 0 and i in mo_gan) or (k == n - 1 and i in chot_gan) else 0)
         xep = sorted(ok, key=lambda s: -diem(s))
         top = xep[:max(1, n_moi_cau - 1)]
@@ -236,10 +245,16 @@ def chon_ung_vien(ma, sents, y_canh, shots, rng, tranh=(), anh_em=None, qua=None
             if tu_khoa in cau and re.search(r"tặng|quà|kèm|biếu", cau):          # chỉ câu nói về QUÀ (lỗi rà soát #7)
                 for x in rng.sample(ds, k=min(3, len(ds))):
                     chon[x["id"]] = x; per[k].append(x["id"])
+    aff = sorted([s for s in shots if la_aff(s) and not bad(s, chinh=False) and not str(s["id"]).startswith(("Q-", "V-"))],
+                 key=lambda s: (met.get(s["id"], 0), -((s.get("soat") or {}).get("dep") or 3), rng.random()))[:SO_AFF]
+    for x in aff:
+        chon.setdefault(x["id"], x)
+    boi["aff"] = [x["id"] for x in aff]
     if len(chon) > MAX_ANH:                             # quá nhiều ảnh: bỏ cảnh MỆT NHẤT (không bỏ quà Q-) cho vừa 2 tờ
         for i in sorted([i for i in chon if not str(i).startswith("Q-")], key=lambda i: -met.get(i, 0))[:len(chon) - MAX_ANH]:
             del chon[i]
         per = [[i for i in p if i in chon] for p in per]
+        boi["aff"] = [i for i in boi["aff"] if i in chon]
     return per, chon, boi
 
 
@@ -250,8 +265,18 @@ def canh_qua(ma_sp, cfg_kho_qua):
     """Cảnh chai/gói QUÀ TẶNG thật từ kho các sản phẩm khác (đã Chuẩn bị kho). id dạng 'Q-<ma>-<id>', file đường dẫn tuyệt đối."""
     out = {}
     ho = lambda m: "-".join(m.split("-")[:2])
+    import unicodedata
+    def _chuan(s):
+        s = unicodedata.normalize("NFD", str(s).replace("đ", "d").replace("Đ", "D"))
+        return " ".join("".join(c for c in s if unicodedata.category(c) != "Mn").lower().split())
+    try:                                                # CHỈ quà sản phẩm này thật sự tặng (hồ sơ qua_tang) — không đưa chai sản phẩm khác làm "quà"
+        qua_sp = _chuan(" | ".join(json.loads((HUB / "san-pham" / ma_sp / "san-pham.json").read_text(encoding="utf-8")).get("qua_tang") or []))
+    except Exception:
+        qua_sp = ""
     for tu_khoa, ma in (cfg_kho_qua or {}).items():
         if ma == ma_sp or ho(ma) == ho(ma_sp):          # cùng họ sản phẩm (vd. đạm cá 1L ↔ can 5L) không làm "quà" của nhau
+            continue
+        if not _chuan(tu_khoa) or _chuan(tu_khoa) not in qua_sp:
             continue
         d = HUB / "san-pham" / ma
         if not (d / "canh.json").exists():
@@ -370,13 +395,50 @@ def to_ung_vien(ma, ids, out, cols=8):
 # ---------------------------------------------------------------- ĐẠO DIỄN
 def bai_hoc_cho(ma):
     """Bài học giám khảo gửi đạo diễn: luật CHUNG (mọi sản phẩm) + bài học RIÊNG của đúng sản phẩm đang làm — không lẫn sản phẩm khác."""
-    def doc(f, n):
-        return [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()][-n:] if f.exists() else []
+    def doc(f, n):          # bỏ bài học cũ về lỗi MÁY (chữ đè nhãn, phụ đề, giỏ hàng, lớp màu…: đạo diễn không sửa được) + gộp bài học na ná nhau
+        if not f.exists():
+            return []
+        dong = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not kiem_may.la_loi_may(l)]
+        return kiem_may.gop_tuong_tu(dong)[-n:]
     chung = doc(HUB / "lich-su" / "bai-hoc.txt", 20)
     rieng = doc(HUB / "lich-su" / f"bai-hoc-{ma}.txt", 15)
     if not chung and not rieng:
         return "(chưa có)"
     return "\n".join(chung + (["Riêng sản phẩm này:"] + rieng if rieng else []))
+
+
+SO_AFF = 10               # số cảnh AFF (người thật cầm/nói về sản phẩm) luôn có trong tờ ứng viên
+
+
+def la_aff(s):
+    """Cảnh AFF: người thật đang cầm / dùng / nói về sản phẩm — bằng chứng người khác cũng mua (Kid 15/11: quý nhất, lệch khẩu hình không sao)."""
+    return nguoi_noi(s) and not (s.get("soat") or {}).get("hang_khac")
+
+
+def tu_danh_so(sents):
+    """Lời đọc đánh số TỪNG TỪ (số thứ tự toàn bài) để đạo diễn canh điểm cắt và chữ theo từ: '[0] 0:Khoan 1:đổ …'."""
+    out, i = [], 0
+    for k, s in enumerate(sents):
+        ws = []
+        for w in s.get("words") or []:
+            ws.append(f"{i}:{w['w']}"); i += 1
+        out.append(f"[{k}] " + " ".join(ws))
+    return chr(10).join(out)
+
+
+def khoi_cho_dao_dien():
+    """Danh mục khối chữ (sinh từ cong_thuc.mo_ta_khoi) gửi đạo diễn: loại — mô tả | dữ liệu | giới hạn."""
+    dong = []
+    for loai, m in CT.mo_ta_khoi().items():
+        dong.append(f"- {loai} ({m.get('nhom')}): {m.get('mo_ta')} | du_lieu: {json.dumps(m.get('du_lieu'), ensure_ascii=False)} | {m.get('toi_da')}")
+    return chr(10).join(dong)
+
+
+def am_cho_dao_dien():
+    try:
+        return chr(10).join(f"- {k}: {v}" for k, v in SFX.mo_ta_am().items())
+    except Exception:
+        return "- khong: không có âm"
 
 
 COT_DS = "Cột: id | vai trò | cỡ cảnh | mô tả | nói: lời người trong clip lúc đó (chỉ để hiểu cảnh) | dài (s)"
@@ -387,10 +449,10 @@ def dong_ds(i, s):
     Cảnh học kiểu 2 (có phiếu): mô tả đầy đủ ≤ 90 ký tự + lời đang nói; cảnh cũ giữ cách ghi cũ."""
     kieu2 = s.get("kieu") == 2
     mo = (s.get("mo_ta") or "")[:90] if kieu2 and s.get("mo_ta") else ((s.get("soat") or {}).get("ghi") or s.get("mo_ta", "")[:60])
-    cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | NGƯỜI NÓI (chỉ đặt trong khung/ô)" if nguoi_noi(s) else "")]
+    cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | AFF người thật cầm/nói về sản phẩm" if la_aff(s) else "")]
     if s.get("co_canh"):
         cot.append(str(s["co_canh"]))
-    cot.append(mo)
+    cot.append(mo + (" [CÓ CHỮ GỐC trong hình]" if ((s_ := (s.get("soat") or {})).get("chu_muc") or 0) >= 1 else ""))
     if kieu2 and s.get("noi"):
         cot.append("nói: " + str(s["noi"])[:80])
     cot.append(str(s["dai"]))
@@ -428,7 +490,9 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
         total=total, nhan=script.get("nhan_tu", []),
         ds=COT_DS + "\n" + "\n".join(dong_ds(i, chon[i]) for i in ids),
         goi_y=json.dumps({k: v for k, v in enumerate(per)}),
-        bo_cuc=json.dumps(BO_CUC_MO_TA, ensure_ascii=False),
+        bo_cuc=chr(10).join(f"- {k}: {v['mo_ta']} (cảnh phụ: {v['phu']}" + (f"–{v['phu_toi_da']}" if v['phu_toi_da'] != v['phu'] else "") + ")" for k, v in BC.mo_ta_bo_cuc().items()),
+        tu=tu_danh_so(sents), khoi_mo_ta=khoi_cho_dao_dien(), am=am_cho_dao_dien(),
+        aff=json.dumps(boi.get("aff") or [], ensure_ascii=False), don_ban=(script.get("don_ban") or "(biên kịch không ghi)"),
         ct=json.dumps({k: {"ten": r["ten"], "mo": r["mo"], "giua": r["giua"], "chot": r["chot"], "phu_de": r.get("phu_de"), "sfx": r.get("sfx")}
                        for k, r in RECIPES.items() if k in ct_ds}, ensure_ascii=False),
         data_spec=DATA_SPEC, phu_de=["to_dan", "mo_sang", "o_nhay", "gach_chay", "nhich_len", "hop_mo", "quet_mau", "vien_day"],
@@ -479,6 +543,10 @@ def segs_tu_bang(edl, sents, total, shots):
             plan[int(d.get("cau", -1))] = d.get("canh") or []
         except Exception:
             continue
+    tu_s = [w["s"] for s in sents for w in (s.get("words") or [])]      # giây bắt đầu của từng từ (số thứ tự toàn bài)
+    tu_cau, _i = [], 0
+    for s in sents:
+        n_w = len(s.get("words") or []); tu_cau.append((_i, _i + n_w)); _i += n_w
     boi = edl.get("_boi") or {}
     met = boi.get("met") or {}
     mo_gan, chot_gan, anh = set(boi.get("mo") or []), set(boi.get("chot") or []), list(boi.get("anh_em") or [])
@@ -489,24 +557,30 @@ def segs_tu_bang(edl, sents, total, shots):
         items = [c for c in plan.get(k, []) if isinstance(c, dict) and k_id(c.get("id", "")) in by]
         items = [c for c in items if k_id(c["id"]) not in used and not bad(by[k_id(c["id"])])]
         span = b - a
-        items = items[:max(1, int(span // 1.8))]          # mỗi cảnh ≥ 1,8 s (Kid: chậm lại 0,5–1 s)
+        items = items[:max(1, int(span // 1.1))]          # mỗi cảnh ≥ ~1,1 s (lật nhanh thì dùng bố cục lat_trang)
         if not items:   # AI bỏ sót / chọn sai → máy chọn cảnh chai rõ chưa dùng
             sp_shots = [s for s in shots if not str(s["id"]).startswith(("Q-", "V-"))]       # dự phòng chỉ lấy cảnh của chính sản phẩm
             alt = [s for s in sp_shots if not bad(s) and s["id"] not in used and la_chai(s)] or [s for s in sp_shots if not bad(s)] or shots
             alt = sorted(alt, key=lambda s: (phat(s) + (PHAT_MO_CHOT if (k == 0 and s["id"] in mo_gan) or (k == len(sents) - 1 and s["id"] in chot_gan) else 0), -dep_(s)))
-            items = [{"id": alt[0]["id"], "bo_cuc": "khung_mo"}]; sua.append(f"câu {k}: thiếu cảnh hợp lệ")
+            items = [{"id": alt[0]["id"]}]; sua.append(f"câu {k}: thiếu cảnh hợp lệ")
         dur = span / len(items)
-        for c in items:
+        moc = [a + j * dur for j in range(len(items))] + [b]
+        try:                                   # đạo diễn ghi "tu" (số thứ tự từ) cho cảnh thứ 2 trở đi → cắt đúng lúc từ đó được đọc
+            lo, hi = tu_cau[k]
+            cat = [a] + [max(a, tu_s[int(c["tu"])] - 0.08) for c in items[1:]] + [b]
+            if all(lo <= int(c["tu"]) < hi for c in items[1:]) and all(cat[j + 1] - cat[j] >= 0.9 for j in range(len(items))):
+                moc = cat
+        except Exception:
+            pass
+        for j_c, c in enumerate(items):
+            dur = moc[j_c + 1] - moc[j_c]
             sh = by[k_id(c["id"])]; used.add(sh["id"])
             mid = (sh["dep"][0] + sh["dep"][1]) / 2
             start = min(max(sh["tu"], mid - dur / 2), max(sh["tu"], sh["den"] - dur))
-            L = c.get("bo_cuc") if c.get("bo_cuc") in SO_PHU else "day_zoom"
+            may = c.get("bo_cuc") not in SO_PHU          # đạo diễn không chọn (hoặc chọn sai tên) → máy tự gán, được chạy trần/sàn
+            L = c.get("bo_cuc") if not may else "day_zoom"
             if L in ("pip_troi", "pip_giua") and la_chai(sh):
                 L = "khung_mo"; sua.append(f"câu {k}: ô trời trên cảnh chai → khung")
-            if nguoi_noi(sh) and L in ("day", "day_zoom", "pip_troi", "pip_giua"):   # người nói: đặt trong khung, không full màn
-                L = "khung_nho"
-            if L == "day" and dur > 2.8:
-                L = "day_zoom"
             if L == "luoi_4" and (dur < 2.2 or any(sg.get("bo_cuc") == "luoi_4" for sg in segs)):
                 L = "chia_doi"
             phu = []
@@ -514,10 +588,12 @@ def segs_tu_bang(edl, sents, total, shots):
                 pid = k_id(pid)
                 if pid in by and pid not in used and not bad(by[pid], chinh=False):
                     phu.append(by[pid]); used.add(pid)
-            segs.append({"shot": sh, "src_start": round(start, 2), "dur": round(dur, 3), "bo_cuc": L, "phu_shots": phu[:SO_PHU[L]],
+            segs.append({"shot": sh, "src_start": round(start, 2), "dur": round(dur, 3), "bo_cuc": L, "phu_shots": phu[:BC.so_phu_toi_da(L)],
                          "cau": k})
+            if may:
+                segs[-1]["bo_cuc_may"] = True
     # Câu chốt PHẢI thấy chai sản phẩm (giám khảo bắt lỗi này nhiều nhất): đoạn cuối không phải cảnh chai → đổi sang cảnh chai đẹp chưa dùng
-    if segs and not la_chai(segs[-1]["shot"]):
+    if segs and not la_chai(segs[-1]["shot"]) and not la_aff(segs[-1]["shot"]):       # chốt bằng người thật cầm chai cũng đạt
         sp_chai = sorted([s for s in shots if not str(s["id"]).startswith(("Q-", "V-")) and la_chai(s) and not bad(s) and s["id"] not in used
                           and not nguoi_noi(s)], key=lambda s: (phat(s) + (PHAT_MO_CHOT if s["id"] in chot_gan else 0), -dep_(s)))
         if sp_chai:
@@ -540,8 +616,6 @@ def _dat_canh(sg, moi):
     sg["shot"] = moi
     if sg["bo_cuc"] in ("pip_troi", "pip_giua") and la_chai(moi):
         sg["bo_cuc"] = "khung_mo"; sg["phu_shots"] = []
-    if nguoi_noi(moi) and sg["bo_cuc"] in ("day", "day_zoom", "pip_troi", "pip_giua"):
-        sg["bo_cuc"] = "khung_nho"; sg["phu_shots"] = []
 
 
 def _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh):
@@ -606,7 +680,7 @@ def _bu_bo_cuc(segs, shots, used, met=None):
     for sg, k in zip(segs, L):
         if k != sg["bo_cuc"]:
             sg["bo_cuc"] = k
-        sg["phu_shots"] = list(sg.get("phu_shots", []))[:SO_PHU[k]]
+        sg["phu_shots"] = list(sg.get("phu_shots", []))[:BC.so_phu_toi_da(k)]
     return segs, ["bù bố cục: " + x for x in sua]
 
 
@@ -641,26 +715,145 @@ def to_ban_dung(video, sents, out, blocks=None):
     return out, ts
 
 
-def ctx_giam_khao(sp, sents, edl):
-    """Dữ liệu điền vào mẫu prompt/giam-khao.md. Không gọi AI."""
+def ctx_giam_khao(sp, sents, edl, may=()):
+    """Dữ liệu điền vào mẫu prompt/giam-khao.md. Không gọi AI. may: phát hiện của máy kiểm (kiem_may.kiem) — mục máy đã bắt trượt được báo cho AI bỏ qua."""
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     tom = {"cong_thuc": edl.get("cong_thuc"), "gu": edl.get("gu"), "khoi": [k.get("loai") for k in edl.get("khoi", []) if isinstance(k, dict)],
            "y_tuong": edl.get("ly_do")}
     return dict(so_tay=SO_TAY(), ten=sp.get("ten_ngan") or sp["ten_goi"], cau="\n".join(f"{s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for s in sents),
-                tom=json.dumps(tom, ensure_ascii=False),
+                tom=json.dumps(tom, ensure_ascii=False), muc=kiem_may.danh_sach_cau_hoi({f["muc"] for f in may or []}),
                 so_gu=("SỔ GU CỦA CHỦ HÀNG: " + so_gu_f.read_text(encoding="utf-8")[-2000:].strip() + chr(10)) if so_gu_f.exists() and so_gu_f.read_text(encoding="utf-8").strip() else "")
 
 
-def giam_khao(sp, video, sents, edl, work):
-    anh, _ = to_ban_dung(video, sents, Path(work) / "ban-dung.jpg")
-    p = prompt_mau.dien("giam-khao", **ctx_giam_khao(sp, sents, edl))
-    for lan in range(2):                 # trả sai định dạng → hỏi lại 1 lần; vẫn sai thì để trống điểm (không ghi 0 gây hiểu nhầm)
-        txt, _ = goi("giám khảo", p, anh=[anh])
+GK_SONG_SONG_MAC_DINH = 2           # số cuộc trò chuyện Antigravity chấm cùng lúc trong 1 tiến trình
+GK_HAN_S = 120                      # chờ Antigravity tối đa chừng này giây cho 1 video
+GK_MODEL = "gemini-4-hydrogen-high"
+_GK_KHOA = threading.Lock()
+_GK_SEM = {"n": 0, "sem": None}
+_GK_DA_BAO = set()                  # mỗi lý do chuyển sang Claude chỉ báo 1 lần / tiến trình
+
+
+def _gk_cau_hinh():
+    c = cfg_hub().get("giam_khao") or {}
+    c = c if isinstance(c, dict) else {}
+    may = str(c.get("may") or "gemini").lower()
+    try:
+        n = max(1, min(4, int(c.get("song_song") or GK_SONG_SONG_MAC_DINH)))
+    except Exception:
+        n = GK_SONG_SONG_MAC_DINH
+    try:
+        han = max(30, int(c.get("han_s") or GK_HAN_S))
+    except Exception:
+        han = GK_HAN_S
+    return {"may": "claude" if may == "claude" else "gemini", "model": str(c.get("model") or GK_MODEL), "song_song": n, "han_s": han}
+
+
+def _gk_sem(n):
+    with _GK_KHOA:
+        if _GK_SEM["sem"] is None or _GK_SEM["n"] != n:
+            _GK_SEM.update(n=n, sem=threading.BoundedSemaphore(n))
+        return _GK_SEM["sem"]
+
+
+def _gk_bao_mot_lan(khoa, msg):
+    if khoa not in _GK_DA_BAO:
+        _GK_DA_BAO.add(khoa)
+        print(f"  (giám khảo: {msg} → chuyển sang chấm bằng Claude)")
+
+
+def _gk_json(txt):
+    try:
+        kq = lay_json(txt)
+    except Exception:
+        return None
+    return kq if isinstance(kq, dict) and ("muc" in kq or "diem" in kq) else None
+
+
+def cham_gemini(p, anh, work, cfgg, runner=None):
+    """Chấm bằng Gemini qua Antigravity (không tốn API). → dict JSON thô của AI. Ném lỗi nếu Antigravity chưa mở / quá hạn / trả sai
+    (người gọi tự chuyển sang Claude). Ảnh + file kết quả đặt trong lich-su/_giam-khao (xoá sau khi đọc); tối đa cfgg['song_song'] cuộc cùng lúc."""
+    import hoc_canh as hc
+    if runner is None:
+        if not hc.trang_thai_agy().get("mo"):
+            raise hc.ChuaMo(hc._msg_chua_mo())
+        runner = hc.hoi_mot_lan
+    import uuid, shutil
+    d = HUB / "lich-su" / "_giam-khao"; d.mkdir(parents=True, exist_ok=True)
+    ma = uuid.uuid4().hex[:10]
+    f_anh, f_out = d / f"{ma}.jpg", d / f"{ma}.json"
+    try:
+        shutil.copyfile(anh, f_anh)
+        pj = None
         try:
-            kq = lay_json(txt)
-            if isinstance(kq, dict) and "diem" in kq:
-                return kq
+            if runner is hc.hoi_mot_lan:
+                pj = hc.tim_project(d)
         except Exception:
-            pass
-        p += "\n\nNHẮC: chỉ trả về đúng 1 đối tượng JSON theo mẫu, không chữ nào khác."
-    return {"diem": None, "dat": None, "loi": ["giám khảo chưa chấm được"], "sua": ""}
+            pj = None
+        goi_y = (f"\n\nTỜ ẢNH CẦN XEM nằm ở file này (mở và xem ảnh): {f_anh}\nGHI KẾT QUẢ vào đúng file này (UTF-8, chỉ JSON thuần, bắt đầu bằng {{ và kết thúc bằng }}): {f_out}\n"
+                 "CHỈ được dùng công cụ XEM ảnh nêu trên và công cụ GHI đúng 1 file kết quả. KHÔNG chạy lệnh terminal/PowerShell/script, không tìm web, "
+                 "không tạo kế hoạch/ghi chú/artifact, không đọc hay ghi file nào khác, không hỏi lại.")
+        with _gk_sem(cfgg["song_song"]):
+            txt = runner(cfgg["model"], p + goi_y, str(f_out), han=cfgg["han_s"], **({"project": pj} if pj else {}))
+        return txt
+    finally:
+        for f in (f_anh, f_out, f_out.with_name(f_out.name + ".tmp")):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+
+def _gk_ket(tho, may, co_canh_qua):
+    """JSON thô của AI → kết quả đã gộp với máy kiểm; None nếu AI trả hỏng. Đề bài cũ (chỉ có 'diem') vẫn dùng được."""
+    if not tho:
+        return None
+    if tho.get("muc"):
+        return kiem_may.hop_nhat(tho, may, co_canh_qua)
+    return kiem_may.hop_nhat_cu(tho, may) if tho.get("diem") is not None else None
+
+
+def cham_claude(p, anh, hop_le=lambda kq: True):
+    """Chấm bằng Claude (cách cũ): trả sai định dạng → hỏi lại 1 lần. → dict JSON thô hợp lệ hoặc None."""
+    for lan in range(2):
+        txt, _ = goi("giám khảo", p, anh=[anh])
+        kq = _gk_json(txt)
+        if kq is not None and hop_le(kq):
+            return kq
+        p += "\n\nNHẮC: chỉ trả về đúng 1 đối tượng JSON theo mẫu (có mảng \"muc\"), không chữ nào khác."
+    return None
+
+
+def giam_khao(sp, video, sents, edl, work, segs=None, info=None, props_f=None, co_canh_qua=False, runner=None):
+    """Chấm 1 video: (1) máy kiểm trước (kiem_may.kiem, cần segs), (2) AI trả lời danh sách kiểm — mặc định Gemini qua Antigravity, không được thì Claude,
+    (3) gộp thành {diem, dat, loi, sua, muc, may, nguon}. diem = 10 × số mục đạt / số mục xét."""
+    props = None
+    if props_f:
+        try:
+            props = json.loads(Path(props_f).read_text(encoding="utf-8"))
+        except Exception:
+            props = None
+    may = []
+    if segs:
+        try:
+            may = kiem_may.kiem(segs, sents, info, props, co_qua=bool(sp.get("qua_tang")), co_canh_qua=co_canh_qua)
+        except Exception as e:
+            print(f"  (máy kiểm trước lỗi: {type(e).__name__}: {str(e)[:80]})")
+    anh, _ = to_ban_dung(video, sents, Path(work) / "ban-dung.jpg")
+    p = prompt_mau.dien("giam-khao", **ctx_giam_khao(sp, sents, edl, may))
+    cg = _gk_cau_hinh()
+    kq, nguon = None, "claude"
+    if cg["may"] == "gemini":
+        try:
+            kq = _gk_ket(_gk_json(cham_gemini(p, anh, work, cg, runner)), may, co_canh_qua)
+            if kq is None:
+                _gk_bao_mot_lan("sai-dinh-dang", "Gemini trả sai định dạng / thiếu mục kiểm")
+            else:
+                nguon = "gemini"
+        except Exception as e:
+            _gk_bao_mot_lan(type(e).__name__, f"Antigravity không chấm được ({str(e)[:90]})")
+    if kq is None:
+        kq = _gk_ket(cham_claude(p, anh, lambda k: _gk_ket(k, may, co_canh_qua) is not None), may, co_canh_qua)
+    if kq is None:
+        return {"diem": None, "dat": None, "loi": ["giám khảo chưa chấm được"], "sua": "", "muc": [], "may": may, "nguon": nguon}
+    kq["nguon"] = nguon
+    return kq

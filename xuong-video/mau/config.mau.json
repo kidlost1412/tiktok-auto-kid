@@ -24,7 +24,9 @@
     "thoi_luong_max": 25.0
   },
   "lo": {
-    "video_moi_giong": 2
+    "video_moi_giong": 2,
+    "song_song": "tu_dong",
+    "khe_dung": "tu_dong"
   },
   "claude": {
     "model": "opus",
@@ -58,5 +60,20 @@
   "hoc_canh": {
     "model": "flash",
     "song_song": 2
+  },
+  "phu_de": {
+    "bat": true,
+    "co": 44,
+    "y": 1500,
+    "tu_moi_dong": [
+      2,
+      5
+    ]
+  },
+  "giam_khao": {
+    "may": "gemini",
+    "model": "gemini-4-hydrogen-high",
+    "song_song": 2,
+    "han_s": 120
   }
 }

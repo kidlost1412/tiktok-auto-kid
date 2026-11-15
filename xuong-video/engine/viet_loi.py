@@ -174,10 +174,8 @@ def dem_lich_su(ten, n=200):
 def _them_so(ten, dong):
     """Ghi thêm 1 dòng vào sổ lịch sử. Lỗi ghi file không bao giờ làm hỏng dây chuyền."""
     try:
-        f = HUB / "lich-su" / ten
-        f.parent.mkdir(parents=True, exist_ok=True)
-        with open(f, "a", encoding="utf-8") as fh:
-            fh.write(str(dong).replace("\n", " ") + "\n")
+        from su_kien import noi_them       # ghi nối có khoá file (sổ riêng từng sản phẩm, nhưng nhất quán với các sổ khác)
+        noi_them(HUB / "lich-su" / ten, str(dong).replace("\n", " ") + "\n")
     except Exception:
         pass
 
@@ -447,6 +445,7 @@ def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, 
         "san_pham": json.dumps({k: v for k, v in sp.items() if k not in ("ma", "ten_gio", "goc_ban", "cat_khung_ly_do", "thoi_luong") and v not in ("", [], {}, None)},
                                ensure_ascii=False, indent=1),
         "so_gu": so_gu,
+        "ban_hang": ban_hang(sp_day.get("ma")),
         "giong_that": giong_that(sp_day) if sp_day.get("kho_video") else "",
         "kho_canh": kho_canh(sp_day["ma"]) if sp_day.get("ma") else "",
         "so_lieu_tiktok": "" if not hieu_qua else chr(10) + "=== SỐ LIỆU THẬT TỪ TIKTOK (video đã đăng) ===" + chr(10) + hieu_qua + chr(10),
@@ -465,6 +464,80 @@ def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, 
         "cau_da_dung": json.dumps(used[-150:], ensure_ascii=False),
         "giong": "|".join(CFG["giong"]["danh_sach"]),
     }
+
+
+BAN_HANG_CHUNG_TOI_DA = 7000     # ký tự tối đa của tài liệu kiến thức bán hàng chung gửi cho AI
+BAN_HANG_RIENG_TOI_DA = 4000     # ... và của hồ sơ bán hàng riêng một sản phẩm (cũng là giới hạn khi lưu)
+
+
+def _cat_dong(t, toi_da):
+    """Cắt ở ranh giới dòng cho khỏi đứt giữa câu."""
+    t = t.strip()
+    if len(t) <= toi_da:
+        return t
+    return t[:toi_da].rsplit(chr(10), 1)[0].rstrip()
+
+
+def _ma_hop_le(ma):
+    return bool(re.fullmatch(r"[A-Za-z0-9_\-]+", str(ma or "")))
+
+
+def duong_dan_ban_hang_rieng(ma):
+    if not _ma_hop_le(ma):
+        raise ValueError("Mã sản phẩm không hợp lệ")
+    return HUB / "san-pham" / str(ma) / "ban-hang.md"
+
+
+def doc_ban_hang_rieng(ma):
+    """Nội dung hồ sơ bán hàng riêng của sản phẩm (san-pham/<ma>/ban-hang.md); chưa có/không đọc được → ""."""
+    try:
+        return duong_dan_ban_hang_rieng(ma).read_text(encoding="utf-8-sig").replace(chr(13) + chr(10), chr(10)).strip()
+    except (OSError, ValueError):
+        return ""
+
+
+def luu_ban_hang_rieng(ma, text):
+    """Lưu hồ sơ bán hàng riêng (ghi nguyên tử). Quá BAN_HANG_RIENG_TOI_DA ký tự → ValueError (không cắt lén). Text rỗng → xoá file. → số ký tự đã lưu."""
+    f = duong_dan_ban_hang_rieng(ma)
+    if not (f.parent / "san-pham.json").is_file():
+        raise ValueError("Không tìm thấy sản phẩm")
+    t = str(text or "").replace(chr(13) + chr(10), chr(10)).replace(chr(13), chr(10)).strip()
+    if len(t) > BAN_HANG_RIENG_TOI_DA:
+        raise ValueError(f"Hồ sơ bán hàng dài quá ({len(t)} ký tự, tối đa {BAN_HANG_RIENG_TOI_DA})")
+    if not t:
+        f.unlink(missing_ok=True)
+        return 0
+    tmp = f.with_name(f.name + f".{os.getpid()}.tmp")
+    tmp.write_text(t + chr(10), encoding="utf-8", newline=chr(10))
+    tmp.replace(f)
+    return len(t)
+
+
+def ban_hang(ma):
+    """Khối kiến thức bán hàng cho biên kịch: tài liệu chung (luat/KIEN-THUC-BAN-HANG.md, qua prompt_mau nên theo bản người dùng đã sửa/ghim)
+    + hồ sơ bán hàng riêng của sản phẩm. Thiếu phần nào bỏ phần đó; cả hai thiếu → "". Mỗi phần có giới hạn độ dài."""
+    out = []
+    try:
+        chung = prompt_mau.doc_luat("KIEN-THUC-BAN-HANG.md")
+    except Exception:
+        chung = ""
+    for tieu_de, t, toi_da in (("=== KIẾN THỨC BÁN HÀNG (cách nghĩ, không phải khuôn) ===", chung, BAN_HANG_CHUNG_TOI_DA),
+                               ("=== HỒ SƠ BÁN HÀNG RIÊNG CỦA SẢN PHẨM ===", doc_ban_hang_rieng(ma), BAN_HANG_RIENG_TOI_DA)):
+        t = _cat_dong(t, toi_da)
+        if t:
+            out.append(tieu_de + chr(10) + t)
+    return (chr(10) + chr(10)).join(out) + (chr(10) + chr(10) if out else "")
+
+
+def gon_don_ban(x, toi_da_tu=20):
+    """Đòn bán chính của bài: một câu gọn ≤ 20 từ. Thiếu/sai kiểu → "" (không làm hỏng bản)."""
+    if not isinstance(x, str):
+        return ""
+    t = re.sub(r"\s+", " ", x).strip()
+    tu = t.split(" ") if t else []
+    if len(tu) > toi_da_tu:
+        t = " ".join(tu[:toi_da_tu]).rstrip(" ,;:–-") + "…"
+    return t
 
 
 def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua="", truc=None, loi_truoc=None, sp_day=None):
@@ -616,6 +689,7 @@ def viet(ma_sp, so_ban, log=print):
                 used_norm.add(norm(s)); used.append(s)
             it["dang"] = t["than"]
             it["chu_mo"] = gon_chu_mo(it.get("chu_mo"))
+            it["don_ban"] = gon_don_ban(it.get("don_ban"))
             ten_qc = qc[i_it] if qc and i_it < len(qc) else None
             it["quy_cach"] = next((q["ma"] for q in sp.get("quy_cach") or [] if q["ten"] == ten_qc), None)
             if ten_qc:
