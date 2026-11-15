@@ -114,7 +114,8 @@ final class ChromePostWatcher
             }
 
             if ($job->state === 'posted') {
-                if ($job->note === self::SCHEDULED_WARNING) {
+                // Tới giờ đăng thì bài rời trạng thái "hẹn giờ" (đã lên TikTok): chuyện bình thường, không phải giờ bị đổi.
+                if ($job->note === self::SCHEDULED_WARNING || $post->status !== PostStatus::Scheduled) {
                     continue;
                 }
 
