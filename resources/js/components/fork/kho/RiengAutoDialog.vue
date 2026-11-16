@@ -393,7 +393,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                     >Kho riêng tự đăng theo khung</DialogTitle
                 >
                 <DialogDescription class="text-[13px] text-foreground/70">
-                    AI xem từng video mới (nhìn hình + nghe lời nói), chọn sản
+                    AI xem từng video mới (hình và chữ trên video), chọn sản
                     phẩm gắn giỏ và viết caption. Video sẵn sàng được xếp vào
                     giờ trống của khung đăng,
                     <b class="text-foreground">trước video Xưởng</b>. Mỗi video
@@ -451,13 +451,9 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                     />
                 </label>
 
-                <!-- Chuẩn bị: CLI, tài khoản, nghe lời nói -->
+                <!-- Chuẩn bị: chỉ hiện việc còn thiếu, xong hết thì ẩn cả khung -->
                 <section
-                    v-if="
-                        !data.codex_installed ||
-                        readyAccounts === 0 ||
-                        !data.speech_ready
-                    "
+                    v-if="!data.codex_installed || readyAccounts === 0"
                     class="flex flex-col gap-2.5 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
                     data-testid="fork-rieng-auto-setup"
                 >
@@ -465,29 +461,22 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         <IconAlertTriangle class="size-4" /> Cần chuẩn bị trước
                         khi AI xem được video
                     </h3>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <IconCircleCheckFilled
-                            v-if="data.codex_installed"
-                            class="size-5 shrink-0 text-emerald-600"
-                        />
+                    <div
+                        v-if="!data.codex_installed"
+                        class="flex flex-wrap items-center gap-2"
+                    >
                         <span
-                            v-else
-                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white"
-                            >1</span
-                        >
+                            class="size-2.5 shrink-0 rounded-full bg-amber-600"
+                        />
                         <span class="min-w-0 flex-1">
-                            <b>ChatGPT CLI (Codex)</b>
-                            <template v-if="data.codex_installed">
-                                — đã cài</template
-                            >
-                            <template v-else-if="installing">
+                            <b>Cài ChatGPT CLI (Codex)</b>
+                            <template v-if="installing">
                                 — đang tải và cài, khoảng 1–3 phút…</template
                             >
                             <template v-else-if="!data.cli.node">
                                 — máy chưa có Node.js: anh cài Node.js bản LTS ở
                                 nodejs.org trước rồi bấm Cài.</template
                             >
-                            <template v-else> — chưa cài</template>
                             <span
                                 v-if="data.cli.error && !installing"
                                 class="block text-xs text-red-700 dark:text-red-300"
@@ -495,7 +484,6 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             >
                         </span>
                         <Button
-                            v-if="!data.codex_installed"
                             size="sm"
                             :disabled="installing"
                             data-testid="fork-codex-install"
@@ -509,41 +497,16 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             {{ installing ? 'Đang cài…' : 'Cài ChatGPT CLI' }}
                         </Button>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <IconCircleCheckFilled
-                            v-if="readyAccounts > 0"
-                            class="size-5 shrink-0 text-emerald-600"
-                        />
+                    <div
+                        v-if="readyAccounts === 0"
+                        class="flex items-center gap-2"
+                    >
                         <span
-                            v-else
-                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white"
-                            >2</span
-                        >
-                        <span>
-                            <b>Tài khoản ChatGPT</b>
-                            {{
-                                readyAccounts > 0
-                                    ? `— ${readyAccounts} tài khoản sẵn sàng`
-                                    : '— bấm "Thêm tài khoản ChatGPT" ở cuối hộp này'
-                            }}
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <IconCircleCheckFilled
-                            v-if="data.speech_ready"
-                            class="size-5 shrink-0 text-emerald-600"
-                        />
-                        <IconAlertTriangle
-                            v-else
-                            class="size-5 shrink-0 text-amber-600"
+                            class="size-2.5 shrink-0 rounded-full bg-amber-600"
                         />
                         <span>
-                            <b>Nghe lời nói (ElevenLabs)</b>
-                            {{
-                                data.speech_ready
-                                    ? '— sẵn sàng'
-                                    : '— chưa có khoá: AI chỉ nhìn hình, đoán sản phẩm khó hơn'
-                            }}
+                            <b>Thêm tài khoản ChatGPT</b> — bấm "Thêm tài khoản
+                            ChatGPT" ở cuối hộp này
                         </span>
                     </div>
                 </section>
@@ -584,9 +547,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 />
                             </span>
                             <span class="min-w-0">
-                                <span class="block font-semibold"
-                                    >Anh tự viết</span
-                                >
+                                <span class="block font-semibold">Tự viết</span>
                                 <span :class="hintCls"
                                     >Viết trên thẻ từng video</span
                                 >

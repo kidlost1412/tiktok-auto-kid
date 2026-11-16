@@ -14,7 +14,6 @@ use App\Fork\AutoPost\Rieng\Ai\CodexRunner;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
-use App\Fork\AutoPost\Rieng\Ai\Speech;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
@@ -26,6 +25,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -203,26 +203,17 @@ test('a product with no valid cart on the channel is never attached there', func
 
 // ---------------------------------------------------------------- AI xem video
 
-/** Bộ xem video giả: không cần ffmpeg, lời nói cố định. */
-function fakeAnalyzer(CodexRunner $codex, string $speech = 'Nano Đồng rửa vườn'): RiengAnalyzer
+/** Bộ xem video giả: không cần ffmpeg. */
+function fakeAnalyzer(CodexRunner $codex): RiengAnalyzer
 {
-    return new class(app(ChatGptAccounts::class), $codex, app(Speech::class), app(RiengThumbs::class), $speech) extends RiengAnalyzer
+    return new class(app(ChatGptAccounts::class), $codex, app(RiengThumbs::class)) extends RiengAnalyzer
     {
-        public function __construct(ChatGptAccounts $a, CodexRunner $c, Speech $s, RiengThumbs $t, private string $said)
+        protected function grids(AutoVideo $video, string $work): array
         {
-            parent::__construct($a, $c, $s, $t);
-        }
+            file_put_contents($work.'/luoi-1.jpg', 'jpg');
+            file_put_contents($work.'/luoi-2.jpg', 'jpg');
 
-        protected function grid(AutoVideo $video, string $work): string
-        {
-            file_put_contents($work.'/luoi.jpg', 'jpg');
-
-            return $work.'/luoi.jpg';
-        }
-
-        protected function speechOf(AutoVideo $video, string $work): array
-        {
-            return [$this->said, null];
+            return [$work.'/luoi-1.jpg', $work.'/luoi-2.jpg'];
         }
     };
 }
@@ -267,7 +258,7 @@ test('the AI attaches the product only when sure, writes a short caption without
     $ai = $an->analyze($sure);
     expect($ai['state'])->toBe('ok')->and($sure->refresh()->product_code)->toBe('nano-dong')
         ->and($ai['caption'])->not->toContain('#')->and(mb_strlen($ai['caption']))->toBeLessThanOrEqual(90)
-        ->and($codex->calls[0][3])->toContain('Nano Đồng rửa vườn')->toContain('Một chai pha một phuy 200 lít')->toContain('Giá tiền')
+        ->and($codex->calls[0][3])->toContain('2 ẢNH LƯỚI')->not->toContain('LỜI NÓI')->toContain('Một chai pha một phuy 200 lít')->toContain('Giá tiền')
         ->and($codex->calls[0][1])->toBe('gpt-6.1-terra')
         ->and($ai['hashtags'])->toBe(['#nanodong', '#vuoncaphe', '#ruavuon']);
 
@@ -405,4 +396,36 @@ test('settings save, folder channels keep only own channels and the cards carry 
     // Về lại "theo AI".
     $this->actingAs($owner)->postJson('/auto/kho/rieng/video/'.$v->id.'/tu-dong', ['product_code' => null, 'caption' => ''])
         ->assertOk()->assertJsonPath('auto.product_code', 'nano-dong')->assertJsonPath('auto.product_by', 'ai')->assertJsonPath('auto.kid_caption', null);
+});
+
+// ---------------------------------------------------------------- Thư mục: đổi tên, thêm video, mở thư mục
+
+test('a folder can be renamed in the app and reset to its real name', function () {
+    $folder = RiengFolder::create(['path' => $this->own, 'name' => null]);
+
+    $this->actingAs($this->owner)->patchJson("/auto/kho/rieng/thu-muc/{$folder->id}", ['name' => '  Video tháng 11 '])
+        ->assertOk()->assertJsonPath('name', 'Video tháng 11');
+    expect($folder->refresh()->name)->toBe('Video tháng 11');
+
+    $this->actingAs($this->owner)->patchJson("/auto/kho/rieng/thu-muc/{$folder->id}", ['name' => ''])
+        ->assertOk()->assertJsonPath('name', basename($this->own));
+});
+
+test('videos added to a folder are copied in without overwriting and only video files are accepted', function () {
+    $folder = RiengFolder::create(['path' => $this->own, 'name' => null]);
+    file_put_contents($this->own.'/clip.mp4', 'old');
+
+    $this->actingAs($this->owner)->post("/auto/kho/rieng/thu-muc/{$folder->id}/video", ['file' => UploadedFile::fake()->create('clip.mp4', 20)], ['Accept' => 'application/json'])
+        ->assertOk()->assertJsonPath('name', 'clip (2).mp4');
+    expect(file_get_contents($this->own.'/clip.mp4'))->toBe('old')->and(is_file($this->own.'/clip (2).mp4'))->toBeTrue();
+
+    $this->actingAs($this->owner)->post("/auto/kho/rieng/thu-muc/{$folder->id}/video", ['file' => UploadedFile::fake()->create('note.txt', 1)], ['Accept' => 'application/json'])
+        ->assertStatus(422);
+    expect(is_file($this->own.'/note.txt'))->toBeFalse();
+});
+
+test('opening a folder that is gone says so', function () {
+    $folder = RiengFolder::create(['path' => $this->own.'/khong-co', 'name' => null]);
+
+    $this->actingAs($this->owner)->postJson("/auto/kho/rieng/thu-muc/{$folder->id}/mo")->assertStatus(422);
 });

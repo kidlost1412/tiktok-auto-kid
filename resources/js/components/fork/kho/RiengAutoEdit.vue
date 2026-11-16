@@ -235,16 +235,6 @@ const initial = (name: string) =>
                     <p v-if="auto?.ai_summary" class="mt-1 text-[13px]">
                         Video: {{ auto.ai_summary }}
                     </p>
-                    <details v-if="auto?.ai_speech" class="mt-1 text-[13px]">
-                        <summary
-                            class="cursor-pointer font-medium text-foreground/80"
-                        >
-                            Lời nói trong video
-                        </summary>
-                        <p class="mt-1 whitespace-pre-line">
-                            {{ auto.ai_speech }}
-                        </p>
-                    </details>
                 </section>
 
                 <!-- Sản phẩm -->

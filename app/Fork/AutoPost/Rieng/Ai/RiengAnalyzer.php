@@ -17,12 +17,12 @@ use Symfony\Component\Process\Process;
 use Throwable;
 
 /**
- * "AI xem video" cho Kho riêng: app tự cắt 12 khung thành 1 ảnh lưới + chép lời nói (ElevenLabs),
- * rồi hỏi ChatGPT (Codex CLI, tài khoản luân phiên) đoán sản phẩm và viết caption.
+ * "AI xem video" cho Kho riêng: app tự cắt 18 khung thành 2 ảnh lưới (không chép lời nói: tránh tốn tiền dịch vụ ngoài),
+ * rồi hỏi ChatGPT (Codex CLI, tài khoản luân phiên) đoán sản phẩm và viết caption từ hình + chữ trên video.
  *
  * Kết quả nằm ở meta.ai của video:
  *   state: ok (chắc sản phẩm) | unsure (chủ app phải chọn sản phẩm) | error (sẽ thử lại) | gave_up
- *   product_code, chac, ly_do, tom_tat, loi, caption, model, at, tries, next_try_at, error
+ *   product_code, chac, ly_do, tom_tat, caption, model, at, tries, next_try_at, error
  * AI chắc chắn ("cao") thì gắn luôn product_code cho video, trừ khi chủ app đã tự chọn (meta.product_by = kid).
  */
 class RiengAnalyzer
@@ -37,7 +37,6 @@ class RiengAnalyzer
     public function __construct(
         private readonly ChatGptAccounts $accounts,
         private readonly CodexRunner $codex,
-        private readonly Speech $speech,
         private readonly RiengThumbs $thumbs,
     ) {}
 
@@ -77,16 +76,15 @@ class RiengAnalyzer
             }
 
             @mkdir($work, 0775, true);
-            $grid = $this->grid($video, $work);
-            [$speech, $speechNote] = $this->speechOf($video, $work);
+            $grids = $this->grids($video, $work);
             $products = $this->products();
 
             if ($products === []) {
                 throw new RuntimeException('Chưa có sản phẩm nào đang bật để AI chọn.');
             }
 
-            $prompt = $this->prompt($speech, $products);
-            [$answer, $account] = $this->askAny($settings['model'], $settings['effort'], (bool) $settings['fast'], $prompt, [$grid], $work);
+            $prompt = $this->prompt($products, count($grids));
+            [$answer, $account] = $this->askAny($settings['model'], $settings['effort'], (bool) $settings['fast'], $prompt, $grids, $work);
             $parsed = $this->parse($answer, array_column($products, 'ma'));
 
             $ai = [
@@ -97,8 +95,6 @@ class RiengAnalyzer
                 'tom_tat' => $parsed['tom_tat'],
                 'caption' => $parsed['caption'],
                 'hashtags' => $parsed['hashtags'],
-                'loi' => mb_substr($speech, 0, 2000),
-                'loi_note' => $speechNote,
                 'model' => $settings['model'],
                 'effort' => $settings['effort'],
                 'fast' => (bool) $settings['fast'],
@@ -179,50 +175,26 @@ class RiengAnalyzer
         throw new RuntimeException($tried === [] ? 'Chưa có tài khoản ChatGPT nào sẵn sàng (chưa đăng nhập hoặc đang hết lượt).' : 'Mọi tài khoản ChatGPT đang hết lượt.');
     }
 
-    /** Ảnh lưới 4x3 = 12 khung cắt đều cả video. */
-    protected function grid(AutoVideo $video, string $work): string
+    /**
+     * 2 ảnh lưới 3x3 = 18 khung cắt đều cả video, khung đủ to để ChatGPT đọc được chữ trên video và nhãn chai.
+     *
+     * @return list<string>
+     */
+    protected function grids(AutoVideo $video, string $work): array
     {
         $ffmpeg = $this->thumbs->ffmpegPath() ?? throw new RuntimeException('Không tìm thấy ffmpeg.');
         $dur = max(1.0, (float) ($video->duration ?: 30));
-        $out = $work.DIRECTORY_SEPARATOR.'luoi.jpg';
-        $fps = number_format(12 / $dur, 4, '.', '');
-        $p = new Process([$ffmpeg, '-y', '-v', 'error', '-i', (string) $video->path, '-vf', "fps={$fps},scale=360:-2,tile=4x3", '-frames:v', '1', '-q:v', '3', $out]);
+        $fps = number_format(18 / $dur, 4, '.', '');
+        $pattern = $work.DIRECTORY_SEPARATOR.'luoi-%d.jpg';
+        $p = new Process([$ffmpeg, '-y', '-v', 'error', '-i', (string) $video->path, '-vf', "fps={$fps},scale=420:-2,tile=3x3", '-frames:v', '2', '-q:v', '3', $pattern]);
         $p->setTimeout(120)->run();
+        $out = array_values(array_filter([1, 2], fn (int $i): bool => is_file(sprintf($pattern, $i))));
 
-        if (! is_file($out)) {
+        if ($out === []) {
             throw new RuntimeException('Không cắt được khung hình từ video.');
         }
 
-        return $out;
-    }
-
-    /** @return array{0: string, 1: ?string} [lời nói, ghi chú khi không chép được] */
-    protected function speechOf(AutoVideo $video, string $work): array
-    {
-        $ffmpeg = $this->thumbs->ffmpegPath();
-        $audio = $work.DIRECTORY_SEPARATOR.'am.mp3';
-
-        if ($ffmpeg === null) {
-            return ['', 'không có ffmpeg'];
-        }
-
-        $p = new Process([$ffmpeg, '-y', '-v', 'error', '-i', (string) $video->path, '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', $audio]);
-        $p->setTimeout(120)->run();
-
-        if (! is_file($audio) || filesize($audio) < 1024) {
-            return ['', 'video không có tiếng'];
-        }
-
-        if ($this->speech->key() === null) {
-            return ['', 'chưa có khoá ElevenLabs'];
-        }
-
-        try {
-            return [$this->speech->transcribe($audio), null];
-        } catch (Throwable $e) {
-            // Không chép được lời vẫn cho AI xem hình (đoán khó hơn, có thể phải hỏi chủ app).
-            return ['', mb_substr($e->getMessage(), 0, 120)];
-        }
+        return array_map(fn (int $i): string => sprintf($pattern, $i), $out);
     }
 
     /**
@@ -251,22 +223,22 @@ class RiengAnalyzer
     }
 
     /** @param  list<array<string, mixed>>  $products */
-    public function prompt(string $speech, array $products): string
+    public function prompt(array $products, int $images = 2): string
     {
         $list = json_encode($products, JSON_UNESCAPED_UNICODE);
-        $speech = $speech === '' ? '(không có lời nói hoặc không chép được)' : $speech;
         $max = self::CAPTION_MAX;
+        $what = $images > 1 ? "{$images} ẢNH LƯỚI, mỗi ảnh 9 khung" : 'ẢNH LƯỚI 9 khung';
 
         return <<<TXT
-Bạn là người làm nội dung TikTok bán vật tư nông nghiệp, am hiểu nhà vườn. Ảnh đính kèm là ẢNH LƯỚI 12 khung cắt đều từ đầu đến cuối một video (đọc trái→phải, trên→dưới). Bên dưới là LỜI NÓI trong video (máy chép, có thể sai chính tả).
+Bạn là người làm nội dung TikTok bán vật tư nông nghiệp, am hiểu nhà vườn. Ảnh đính kèm là {$what}, cắt đều theo thời gian từ đầu đến cuối một video (ảnh 1 trước ảnh 2; trong mỗi ảnh đọc trái→phải, trên→dưới). Không có tiếng: hãy đọc kỹ CHỮ trên video (phụ đề, tiêu đề), chữ trên nhãn/bao bì và xem cảnh để hiểu video nói gì.
 
 Việc 1 — Video đang bán SẢN PHẨM nào trong DANH SÁCH?
-- Chỉ chọn khi thấy bao bì/nhãn khớp `nhan_dien`, hoặc lời nói nêu rõ tên sản phẩm.
+- Chỉ chọn khi thấy bao bì/nhãn khớp `nhan_dien`, hoặc chữ trên video nêu rõ tên sản phẩm.
 - Hai sản phẩm gần giống nhau (vd. cùng loại nhưng khác dung tích/bao bì) mà video không cho phân biệt được → "chac": "thap".
 - "chac": "cao" chỉ khi chắc chắn; không chắc thì "vua"/"thap"; không thấy sản phẩm nào trong danh sách → "ma": null.
 
 Việc 2 — Viết 1 caption TikTok tiếng Việt, tối đa {$max} ký tự, KHÔNG hashtag, KHÔNG emoji:
-- Bám đúng nội dung video (ý chính người nói, cảnh trong video), như người làm vườn nói với bà con; có lực, gợi tò mò hoặc nói trúng nỗi lo của nhà vườn.
+- Bám đúng nội dung video (chữ trên video, cảnh trong video), như người làm vườn nói với bà con; có lực, gợi tò mò hoặc nói trúng nỗi lo của nhà vườn.
 - Chỉ nói điều video nói rõ hoặc điều có trong `su_that` của sản phẩm đã chọn. Tuyệt đối tránh mọi điều trong `khong_duoc_noi` (giá tiền, "chữa khỏi", "số 1", "nhất", cam kết 100%...).
 - Không chắc sản phẩm thì viết caption theo nội dung chung của video, không nêu tên sản phẩm.
 
@@ -274,9 +246,6 @@ Việc 3 — Đúng 3 hashtag tiếng Việt KHÔNG DẤU, viết liền (vd. #n
 
 Trả về DUY NHẤT một JSON, không giải thích thêm:
 {"ma": "mã sản phẩm hoặc null", "chac": "cao|vua|thap", "ly_do": "1 câu vì sao chọn", "tom_tat": "1-2 câu video có gì", "caption": "...", "hashtag": ["#...", "#...", "#..."]}
-
-LỜI NÓI:
-{$speech}
 
 DANH SÁCH SẢN PHẨM:
 {$list}

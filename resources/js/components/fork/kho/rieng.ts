@@ -97,7 +97,6 @@ export interface RiengAuto {
     ai_summary: string | null;
     ai_caption: string | null;
     ai_hashtags: string[];
-    ai_speech: string | null;
     ai_error: string | null;
     ai_at: string | null;
     approved: boolean;
@@ -159,7 +158,6 @@ export interface AutoPayload {
     efforts: Record<string, string>;
     codex_installed: boolean;
     cli: CliStatus;
-    speech_ready: boolean;
     chatgpt: ChatGptAccount[];
     channels: {
         id: string;
