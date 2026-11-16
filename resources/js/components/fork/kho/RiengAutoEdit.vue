@@ -80,8 +80,20 @@ const sureText = computed(() => {
         return 'AI chưa xem video này.';
     }
 
+    if (a.ai_state === 'error' && !a.ai_tries) {
+        return 'AI sẽ xem video này trong vòng 2 phút.';
+    }
+
     if (a.ai_state === 'error' || a.ai_state === 'gave_up') {
-        return `AI chưa xem được: ${a.ai_error ?? 'lỗi'}`;
+        const due = a.ai_next_try_at ? new Date(a.ai_next_try_at) : null;
+        const when =
+            a.ai_state === 'gave_up' || !due
+                ? 'Đã thử nhiều lần chưa được, anh bấm "AI xem lại".'
+                : due.getTime() <= Date.now() + 60_000
+                  ? 'App sẽ thử lại trong vòng 2 phút.'
+                  : `App tự thử lại lúc ${due.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.`;
+
+        return `AI chưa xem được (${a.ai_error ?? 'lỗi'}). ${when}`;
     }
 
     if (!a.ai_product) {

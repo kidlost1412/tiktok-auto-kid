@@ -98,6 +98,8 @@ export interface RiengAuto {
     ai_caption: string | null;
     ai_hashtags: string[];
     ai_error: string | null;
+    ai_tries: number;
+    ai_next_try_at: string | null;
     ai_at: string | null;
     approved: boolean;
     product_by: 'kid' | 'ai' | null;
@@ -130,6 +132,8 @@ export interface AutoModel {
     name: string;
     note: string;
     efforts: string[];
+    /** Có chế độ Fast (chỉ biết khi lấy từ tài khoản; gói free không có). */
+    fast?: boolean;
 }
 
 /** Trạng thái cài ChatGPT CLI (Codex) của app. */
@@ -155,6 +159,10 @@ export interface ChatGptAccount {
 export interface AutoPayload {
     settings: AutoSettings;
     models: Record<string, AutoModel>;
+    /** true: danh sách model lấy từ tài khoản ChatGPT thật của anh. */
+    models_from_accounts: boolean;
+    /** Model app thật sự dùng khi model đã chọn không có ở tài khoản nào. */
+    model_effective: string | null;
     efforts: Record<string, string>;
     codex_installed: boolean;
     cli: CliStatus;

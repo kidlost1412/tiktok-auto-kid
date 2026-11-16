@@ -11,6 +11,7 @@ import {
     IconFolder,
     IconLoader2,
     IconPlus,
+    IconRefresh,
     IconTrash,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -88,8 +89,18 @@ const loadLimits = async () => {
 
         const r = await callJson<{
             limits: { windows: LimitWindow[]; reached: boolean } | null;
+            models?: AutoPayload['models'];
+            models_from_accounts?: boolean;
+            model_effective?: string | null;
         }>('GET', `/auto/kho/rieng/tu-dong/chatgpt/${a.id}/han-muc`);
         limits.value = { ...limits.value, [a.id]: r.data?.limits ?? null };
+
+        // Cùng lượt app biết luôn model tài khoản dùng được: cập nhật danh sách model.
+        if (data.value && r.data?.models) {
+            data.value.models = r.data.models;
+            data.value.models_from_accounts = !!r.data.models_from_accounts;
+            data.value.model_effective = r.data.model_effective ?? null;
+        }
     }
 };
 
@@ -381,10 +392,10 @@ const countLine = computed(() => {
     const parts = [
         c.ok ? `${c.ok} AI đã chọn sản phẩm` : '',
         c.unsure ? `${c.unsure} chờ anh chọn sản phẩm` : '',
-        (c.cho ?? 0) + (c.error ?? 0)
-            ? `${(c.cho ?? 0) + (c.error ?? 0)} chờ AI xem`
+        c.cho ? `${c.cho} chờ AI xem` : '',
+        (c.error ?? 0) + (c.gave_up ?? 0)
+            ? `${(c.error ?? 0) + (c.gave_up ?? 0)} AI chưa xem được`
             : '',
-        c.gave_up ? `${c.gave_up} AI không xem được` : '',
     ].filter(Boolean);
 
     return parts.length ? parts.join(' · ') : 'Chưa có video nào chờ đăng.';
@@ -396,14 +407,55 @@ onBeforeUnmount(() => {
 });
 
 // ---- Model + mức nghĩ: chỉ hiện mức nghĩ model đó có.
+// Model đang dùng thật: model đã chọn, hoặc model app thay vào khi tài khoản không có model đã chọn.
+const curModel = computed(
+    () => data.value?.model_effective ?? s.value?.model ?? '',
+);
+
 const modelEfforts = computed(() => {
-    const m = data.value?.models[s.value?.model ?? ''];
+    const m = data.value?.models[curModel.value];
 
     return (m?.efforts ?? []).map((key) => ({
         key,
         label: data.value?.efforts[key] ?? key,
     }));
 });
+
+// Fast: chỉ bật được khi model đó có Fast với gói ChatGPT của anh (gói free không có).
+const fastOk = computed(
+    () =>
+        data.value?.models[curModel.value]?.fast ??
+        !data.value?.models_from_accounts,
+);
+
+// ---- Video AI chưa xem được: cho thử lại ngay.
+const failed = computed(
+    () => (data.value?.counts.error ?? 0) + (data.value?.counts.gave_up ?? 0),
+);
+const retrying = ref(false);
+
+const retryAll = async () => {
+    retrying.value = true;
+    const r = await callJson<AutoPayload & { retried: number }>(
+        'POST',
+        '/auto/kho/rieng/tu-dong/ai-thu-lai',
+    );
+    retrying.value = false;
+
+    if (r.ok && r.data) {
+        const retried = r.data.retried;
+        data.value = r.data;
+        emit('changed', r.data);
+        loadLimits();
+        toast.success(
+            retried
+                ? `AI sẽ xem lại ${retried} video trong vòng 2 phút.`
+                : 'Không có video nào cần xem lại.',
+        );
+    } else {
+        toast.error('Chưa thử lại được, anh bấm lại nhé.');
+    }
+};
 
 const pickModel = (key: string) => {
     const efforts = data.value?.models[key]?.efforts ?? [];
@@ -510,6 +562,30 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         "
                     />
                 </label>
+
+                <div
+                    v-if="failed"
+                    class="-mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2 text-[13px] text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                    data-testid="fork-rieng-ai-failed"
+                >
+                    <span
+                        >{{ failed }} video AI chưa xem được. App tự thử lại sau
+                        ít phút; sửa xong lỗi thì bấm để xem lại ngay.</span
+                    >
+                    <Button
+                        size="sm"
+                        :disabled="retrying"
+                        data-testid="fork-rieng-ai-retry"
+                        @click="retryAll"
+                    >
+                        <IconLoader2
+                            v-if="retrying"
+                            class="size-4 animate-spin"
+                        />
+                        <IconRefresh v-else class="size-4" />
+                        Cho AI xem lại ngay
+                    </Button>
+                </div>
 
                 <!-- Chuẩn bị: chỉ hiện việc còn thiếu, xong hết thì ẩn cả khung -->
                 <section
@@ -797,14 +873,14 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 v-for="(m, key) in data.models"
                                 :key="key"
                                 type="button"
-                                :class="optionCls(s.model === key)"
-                                :aria-pressed="s.model === key"
+                                :class="optionCls(curModel === key)"
+                                :aria-pressed="curModel === key"
                                 :data-testid="`fork-rieng-model-${key}`"
                                 @click="pickModel(String(key))"
                             >
-                                <span :class="dotCls(s.model === key)">
+                                <span :class="dotCls(curModel === key)">
                                     <span
-                                        v-if="s.model === key"
+                                        v-if="curModel === key"
                                         class="size-1.5 rounded-full bg-white dark:bg-primary-foreground"
                                     />
                                 </span>
@@ -816,6 +892,23 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 </span>
                             </button>
                         </div>
+                        <span
+                            v-if="data.model_effective"
+                            class="text-[13px] text-amber-700 dark:text-amber-400"
+                            >Model chọn trước đây ({{ s.model }}) tài khoản của
+                            anh không dùng được, app tự dùng
+                            {{
+                                data.models[data.model_effective]?.name ??
+                                data.model_effective
+                            }}
+                            thay.</span
+                        >
+                        <span
+                            v-else-if="data.models_from_accounts"
+                            :class="hintCls"
+                            >Chỉ hiện model tài khoản ChatGPT của anh dùng
+                            được.</span
+                        >
                     </div>
 
                     <div class="flex flex-col gap-1.5">
@@ -852,7 +945,8 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         :class="
                             cn(
                                 'flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 px-3 py-2.5 transition',
-                                s.fast
+                                !fastOk && 'cursor-not-allowed opacity-60',
+                                s.fast && fastOk
                                     ? 'border-amber-500 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/40'
                                     : 'border-border',
                             )
@@ -863,7 +957,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 :class="
                                     cn(
                                         'mt-0.5 size-5 shrink-0',
-                                        s.fast
+                                        s.fast && fastOk
                                             ? 'fill-amber-400 text-amber-600'
                                             : 'text-foreground/60',
                                     )
@@ -873,13 +967,16 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 <span class="block font-semibold"
                                     >Chế độ Fast</span
                                 >
-                                <span :class="hintCls"
-                                    >Nhanh gấp 2 lần, tốn lượt ChatGPT hơn</span
-                                >
+                                <span :class="hintCls">{{
+                                    fastOk
+                                        ? 'Nhanh gấp 2 lần, tốn lượt ChatGPT hơn'
+                                        : 'Gói ChatGPT của anh chưa có Fast cho model này (cần gói trả phí)'
+                                }}</span>
                             </span>
                         </span>
                         <Switch
-                            :model-value="s.fast"
+                            :model-value="s.fast && fastOk"
+                            :disabled="!fastOk"
                             aria-label="Chế độ Fast"
                             data-testid="fork-rieng-auto-fast"
                             @update:model-value="

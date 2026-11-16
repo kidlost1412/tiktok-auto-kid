@@ -34,6 +34,9 @@ class RiengAnalyzer
 
     public const int CAPTION_MAX = 90;
 
+    /** Model thật đã dùng ở lần hỏi gần nhất (có thể khác model đã chọn nếu tài khoản không có). */
+    private ?string $usedModel = null;
+
     public function __construct(
         private readonly ChatGptAccounts $accounts,
         private readonly CodexRunner $codex,
@@ -58,6 +61,32 @@ class RiengAnalyzer
     }
 
     /**
+     * Cho các video AI đã lỗi (kể cả đã bỏ cuộc) được xem lại ngay ở lượt tới, đếm lại số lần thử từ đầu.
+     * Dùng khi chủ app bấm "Thử lại ngay", đổi model/mức nghĩ/Fast, hoặc app vừa lên bản mới (có thể đã sửa lỗi).
+     */
+    public function retryNow(?CarbonImmutable $now = null): int
+    {
+        $now ??= CarbonImmutable::now();
+        $n = 0;
+
+        AutoVideo::query()
+            ->where('source', AutoVideo::SOURCE_RIENG)
+            ->where('status', AutoVideo::NEW)
+            ->whereNull('files_deleted_at')
+            ->whereRaw("meta->'ai'->>'state' in ('error', 'gave_up')")
+            ->each(function (AutoVideo $v) use ($now, &$n): void {
+                $meta = (array) $v->meta;
+                $meta['ai'] = array_merge((array) ($meta['ai'] ?? []), ['state' => 'error', 'tries' => 0, 'next_try_at' => $now->utc()->toIso8601String()]);
+                $v->forceFill(['meta' => $meta])->save();
+                $n++;
+            });
+
+        $this->accounts->clearErrors();
+
+        return $n;
+    }
+
+    /**
      * Cho AI xem một video và lưu kết quả vào meta.ai. Trả về meta.ai mới.
      *
      * @return array<string, mixed>
@@ -65,6 +94,7 @@ class RiengAnalyzer
     public function analyze(AutoVideo $video, ?CarbonImmutable $now = null): array
     {
         $now ??= CarbonImmutable::now();
+        $this->usedModel = null;
         $prev = (array) data_get($video->meta, 'ai', []);
         $tries = (int) ($prev['tries'] ?? 0) + 1;
         $settings = RiengAutoSettings::get();
@@ -95,7 +125,7 @@ class RiengAnalyzer
                 'tom_tat' => $parsed['tom_tat'],
                 'caption' => $parsed['caption'],
                 'hashtags' => $parsed['hashtags'],
-                'model' => $settings['model'],
+                'model' => $this->usedModel ?? $settings['model'],
                 'effort' => $settings['effort'],
                 'fast' => (bool) $settings['fast'],
                 'account' => $account,
@@ -151,6 +181,28 @@ class RiengAnalyzer
      * @param  list<string>  $images
      * @return array{0: string, 1: string}
      */
+    /** Mức nghĩ model đó có; không có mức đã chọn thì lấy mức gần nhất thấp hơn. */
+    private function effortFor(string $id, string $model, string $effort): string
+    {
+        $efforts = $this->accounts->knownModels($id)[$model]['efforts'] ?? null;
+
+        if (! is_array($efforts) || $efforts === [] || in_array($effort, $efforts, true)) {
+            return $effort;
+        }
+
+        $order = array_keys(RiengAutoSettings::EFFORTS);
+        $want = (int) array_search($effort, $order, true);
+        $best = $efforts[0];
+
+        foreach ($efforts as $e) {
+            if ((int) array_search($e, $order, true) <= $want) {
+                $best = $e;
+            }
+        }
+
+        return $best;
+    }
+
     private function askAny(string $model, string $effort, bool $fast, string $prompt, array $images, string $work): array
     {
         $tried = [];
@@ -159,8 +211,28 @@ class RiengAnalyzer
             $tried[] = $id;
 
             try {
-                $answer = $this->codex->ask($id, $model, $effort, $prompt, $images, $work, $fast);
+                // Tài khoản không có model đã chọn (vd gói free) thì dùng model mặc định của tài khoản đó.
+                [$use, $canFast] = $this->accounts->modelFor($id, $model);
+
+                try {
+                    $answer = $this->codex->ask($id, $use, $this->effortFor($id, $use, $effort), $prompt, $images, $work, $fast && $canFast);
+                } catch (RuntimeException $e) {
+                    if (! $e instanceof CodexLimited && preg_match('/không dùng được model|model is not supported|model .* not (?:supported|available|found)|does not exist/iu', $e->getMessage()) === 1) {
+                        $alt = $this->accounts->fallbackModel($id, $use);
+
+                        if ($alt === null || $alt[0] === $use) {
+                            throw $e;
+                        }
+
+                        [$use, $canFast] = $alt;
+                        $answer = $this->codex->ask($id, $use, $this->effortFor($id, $use, $effort), $prompt, $images, $work, $fast && $canFast);
+                    } else {
+                        throw $e;
+                    }
+                }
+
                 $this->accounts->markUsed($id);
+                $this->usedModel = $use;
 
                 return [$answer, $id];
             } catch (CodexLimited $e) {

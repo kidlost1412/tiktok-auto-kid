@@ -259,7 +259,7 @@ test('the AI attaches the product only when sure, writes a short caption without
     expect($ai['state'])->toBe('ok')->and($sure->refresh()->product_code)->toBe('nano-dong')
         ->and($ai['caption'])->not->toContain('#')->and(mb_strlen($ai['caption']))->toBeLessThanOrEqual(90)
         ->and($codex->calls[0][3])->toContain('2 ẢNH LƯỚI')->not->toContain('LỜI NÓI')->toContain('Một chai pha một phuy 200 lít')->toContain('Giá tiền')
-        ->and($codex->calls[0][1])->toBe('gpt-6.1-terra')
+        ->and($codex->calls[0][1])->toBe('gpt-6-luna')
         ->and($ai['hashtags'])->toBe(['#nanodong', '#vuoncaphe', '#ruavuon']);
 
     expect($an->analyze($vague)['state'])->toBe('unsure')->and($vague->refresh()->product_code)->toBeNull();
@@ -446,4 +446,134 @@ test('reads ChatGPT quota windows from codex app-server', function () {
         ->and(ChatGptAccounts::parseLimits(['id' => 2, 'error' => ['message' => 'x']]))->toBeNull();
 
     $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/chatgpt/tk-zzzzzzzz/han-muc')->assertOk()->assertJson(['ok' => false, 'limits' => null]);
+});
+
+// ---------------------------------------------------------------- Model theo tài khoản, thử lại
+
+test('model list from codex keeps image models, translates notes and knows Fast', function () {
+    $msg = ['id' => 3, 'result' => ['data' => [
+        ['id' => 'gpt-6-luna', 'displayName' => 'GPT-6-Luna', 'description' => 'Fast and affordable', 'hidden' => false, 'isDefault' => true, 'inputModalities' => ['text', 'image'],
+            'supportedReasoningEfforts' => [['reasoningEffort' => 'low'], ['reasoningEffort' => 'medium']], 'serviceTiers' => [], 'additionalSpeedTiers' => []],
+        ['id' => 'gpt-5.6-terra', 'displayName' => 'GPT-5.6-Terra', 'description' => 'Older balanced model', 'hidden' => false, 'isDefault' => false, 'inputModalities' => ['text', 'image'],
+            'supportedReasoningEfforts' => [['reasoningEffort' => 'low']], 'serviceTiers' => ['priority'], 'additionalSpeedTiers' => []],
+        ['id' => 'text-only', 'displayName' => 'T', 'hidden' => false, 'inputModalities' => ['text'], 'supportedReasoningEfforts' => []],
+        ['id' => 'secret', 'displayName' => 'S', 'hidden' => true, 'inputModalities' => ['text', 'image'], 'supportedReasoningEfforts' => []],
+    ]]];
+
+    $m = ChatGptAccounts::parseModels($msg);
+    expect(array_keys($m))->toBe(['gpt-6-luna', 'gpt-5.6-terra'])
+        ->and($m['gpt-6-luna'])->toMatchArray(['name' => 'GPT-6-Luna', 'efforts' => ['low', 'medium'], 'fast' => false, 'default' => true])
+        ->and($m['gpt-5.6-terra']['fast'])->toBeTrue()
+        ->and($m['gpt-5.6-terra']['note'])->toContain('đời cũ');
+});
+
+test('an account without the chosen model uses its own default model, and a "not supported" answer switches model once', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    Cache::put('fork-rieng:chatgpt-models:tk-aaaaaaaa', [
+        'gpt-6-luna' => ['name' => 'GPT-6-Luna', 'note' => '', 'efforts' => ['low', 'medium'], 'fast' => false, 'default' => true],
+    ], now()->addHour());
+    RiengAutoSettings::update(['model' => 'gpt-6.1-terra', 'effort' => 'high', 'fast' => true]);
+    $acc = app(ChatGptAccounts::class);
+
+    expect($acc->modelFor('tk-aaaaaaaa', 'gpt-6.1-terra'))->toBe(['gpt-6-luna', false])
+        ->and($acc->modelFor('tk-aaaaaaaa', 'gpt-6-luna'))->toBe(['gpt-6-luna', false])
+        ->and($acc->modelFor('tk-bbbbbbbb', 'gpt-6.1-terra'))->toBe(['gpt-6.1-terra', true]); // chưa biết: giữ nguyên
+
+    $codex = fakeCodex(['{"ma":"nano-dong","chac":"cao","ly_do":"","tom_tat":"","caption":"c"}']);
+    $v = ($this->rieng)('m.mp4');
+    $ai = fakeAnalyzer($codex)->analyze($v);
+
+    // Model tài khoản có, mức nghĩ "high" không có thì hạ xuống mức gần nhất.
+    expect($ai['state'])->toBe('ok')->and($ai['model'])->toBe('gpt-6-luna')
+        ->and($codex->calls[0][1])->toBe('gpt-6-luna')->and($codex->calls[0][2])->toBe('medium');
+});
+
+test('retry now resets failed videos, clears account errors, and runs again after an app update', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $acc = app(ChatGptAccounts::class);
+    $acc->markError('tk-aaaaaaaa', 'lỗi cũ');
+    $later = CarbonImmutable::now()->addHours(5)->utc()->toIso8601String();
+    $err = ($this->rieng)('e.mp4', [], ['ai' => ['state' => 'error', 'tries' => 3, 'next_try_at' => $later, 'error' => 'x']]);
+    $gave = ($this->rieng)('g.mp4', [], ['ai' => ['state' => 'gave_up', 'tries' => 5, 'error' => 'x']]);
+    $ok = ($this->ready)('o.mp4');
+    $an = app(RiengAnalyzer::class);
+
+    expect($an->pending(10))->toHaveCount(0);
+
+    $r = $this->actingAs($this->owner)->postJson('/auto/kho/rieng/tu-dong/ai-thu-lai')->assertOk()->json();
+
+    expect($r['retried'])->toBe(2)->and($r['counts']['cho'] ?? 0)->toBe(2)->and($r['counts'])->not->toHaveKey('error')
+        ->and(collect($an->pending(10))->pluck('id')->all())->toEqualCanonicalizing([$err->id, $gave->id])
+        ->and(data_get($gave->refresh()->meta, 'ai.tries'))->toBe(0)
+        ->and(data_get($ok->refresh()->meta, 'ai.state'))->toBe('ok')
+        ->and(collect($acc->all())->firstWhere('id', 'tk-aaaaaaaa')['last_error'])->toBeNull();
+
+    // Đổi model: thử lại ngay.
+    $err->forceFill(['meta' => ['ai' => ['state' => 'error', 'tries' => 2, 'next_try_at' => $later]] + (array) $err->meta])->save();
+    $this->actingAs($this->owner)->patchJson('/auto/kho/rieng/tu-dong', ['model' => 'gpt-6.1-sol', 'effort' => 'low'])->assertOk();
+    expect(data_get($err->refresh()->meta, 'ai.tries'))->toBe(0);
+
+    // App lên bản mới: lượt AI đầu tiên cho video lỗi thử lại ngay (mỗi bản một lần).
+    $err->forceFill(['meta' => ['ai' => ['state' => 'error', 'tries' => 2, 'next_try_at' => $later]] + (array) $err->meta])->save();
+    $ver = $this->gpt.'/VERSION';
+    file_put_contents($ver, '9.9.9');
+    config(['fork-update.version_file' => $ver]);
+    Cache::forget('fork-rieng:ai-version');
+    RiengAutoSettings::update(['enabled' => true]);
+    app()->instance(RiengAnalyzer::class, $spy = new class(app(ChatGptAccounts::class), app(CodexRunner::class), app(RiengThumbs::class)) extends RiengAnalyzer
+    {
+        public int $retries = 0;
+
+        public function retryNow(?CarbonImmutable $now = null): int
+        {
+            $this->retries++;
+
+            return parent::retryNow($now);
+        }
+
+        public function pending(int $limit, ?CarbonImmutable $now = null): array
+        {
+            return [];
+        }
+    });
+    $this->artisan('fork:rieng-ai')->assertSuccessful();
+    $this->artisan('fork:rieng-ai')->assertSuccessful();
+    expect($spy->retries)->toBe(1)->and(data_get($err->refresh()->meta, 'ai.tries'))->toBe(0);
+});
+
+test('the settings payload offers the models the signed-in accounts really have', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    RiengAutoSettings::update(['model' => 'gpt-6.1-terra']);
+
+    $r = $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong')->assertOk()->json();
+    expect($r['models_from_accounts'])->toBeFalse()->and($r['models'])->toHaveKey('gpt-6.1-terra')->and($r['model_effective'])->toBeNull();
+
+    Cache::put('fork-rieng:chatgpt-models:tk-aaaaaaaa', [
+        'gpt-6-luna' => ['name' => 'GPT-6-Luna', 'note' => '', 'efforts' => ['low'], 'fast' => false, 'default' => true],
+        'gpt-5.6-terra' => ['name' => 'GPT-5.6-Terra', 'note' => '', 'efforts' => ['low'], 'fast' => false, 'default' => false],
+    ], now()->addHour());
+
+    $r = $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong')->assertOk()->json();
+    expect($r['models_from_accounts'])->toBeTrue()->and(array_keys($r['models']))->toBe(['gpt-6-luna', 'gpt-5.6-terra'])
+        ->and($r['model_effective'])->toBe('gpt-6-luna');
+
+    $this->actingAs($this->owner)->patchJson('/auto/kho/rieng/tu-dong', ['model' => 'gpt-5.6-terra'])->assertOk()->assertJsonPath('settings.model', 'gpt-5.6-terra')->assertJsonPath('model_effective', null);
+});
+
+test('when ChatGPT says the model is not available the app switches to another model of that account and retries once', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    Cache::put('fork-rieng:chatgpt-models:tk-aaaaaaaa', [
+        'gpt-6.1-terra' => ['name' => 'T', 'note' => '', 'efforts' => ['low'], 'fast' => true, 'default' => false],
+        'gpt-6-luna' => ['name' => 'L', 'note' => '', 'efforts' => ['low'], 'fast' => false, 'default' => true],
+    ], now()->addHour());
+    RiengAutoSettings::update(['model' => 'gpt-6.1-terra', 'effort' => 'low']);
+    // Codex giả không trả lời gì: app dùng danh sách đã nhớ, bỏ model bị từ chối.
+    file_put_contents($this->gpt.'/dummy-codex.cmd', "@echo off\r\nexit /b 1\r\n");
+    config(['fork.auto.codex_path' => $this->gpt.'/dummy-codex.cmd']);
+    $codex = fakeCodex([new RuntimeException('Tài khoản ChatGPT không dùng được model gpt-6.1-terra.'), '{"ma":"nano-dong","chac":"cao","ly_do":"","tom_tat":"","caption":"c"}']);
+
+    $ai = fakeAnalyzer($codex)->analyze(($this->rieng)('f.mp4'));
+
+    expect($ai['state'])->toBe('ok')->and(array_column($codex->calls, 1))->toBe(['gpt-6.1-terra', 'gpt-6-luna'])
+        ->and(app(ChatGptAccounts::class)->knownModels('tk-aaaaaaaa'))->not->toHaveKey('gpt-6.1-terra');
 });

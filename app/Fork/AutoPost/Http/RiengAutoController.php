@@ -39,7 +39,7 @@ final class RiengAutoController extends Controller
             'empty_caption_ok' => ['sometimes', 'boolean'],
             'approve_first' => ['sometimes', 'boolean'],
             'duplicates' => ['sometimes', 'in:ask,allow'],
-            'model' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::MODELS))],
+            'model' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::MODELS + self::accountModels($accounts)))],
             'effort' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::EFFORTS))],
             'fast' => ['sometimes', 'boolean'],
             'folder_channels' => ['sometimes', 'array'],
@@ -54,9 +54,28 @@ final class RiengAutoController extends Controller
                 ->all();
         }
 
+        $before = RiengAutoSettings::get();
         RiengAutoSettings::update($in);
+        $after = RiengAutoSettings::get();
+
+        // Đổi model / mức nghĩ / Fast, hoặc vừa bật: video lỗi trước đó được thử lại ngay với cài đặt mới.
+        foreach (['model', 'effort', 'fast', 'enabled'] as $k) {
+            if (($before[$k] ?? null) !== ($after[$k] ?? null)) {
+                app(RiengAnalyzer::class)->retryNow();
+                break;
+            }
+        }
 
         return response()->json($this->payload($accountId, $accounts));
+    }
+
+    /** Nút "Thử lại ngay": video AI chưa xem được sẽ được xem ở lượt tới (trong khoảng 2 phút). */
+    public function retryAi(Request $request, ChatGptAccounts $accounts, RiengAnalyzer $analyzer): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $n = $analyzer->retryNow();
+
+        return response()->json(['retried' => $n] + $this->payload($accountId, $accounts));
     }
 
     /** Tự cài ChatGPT CLI (Codex) vào thư mục của app. POST bắt đầu cài (chạy nền); trả trạng thái để trang hỏi lại. */
@@ -94,8 +113,9 @@ final class RiengAutoController extends Controller
     {
         $this->authorizeOwner($request);
         $limits = $accounts->limits($id);
+        $known = self::accountModels($accounts);
 
-        return response()->json(['ok' => $limits !== null, 'limits' => $limits]);
+        return response()->json(['ok' => $limits !== null, 'limits' => $limits, 'models' => $known === [] ? RiengAutoSettings::MODELS : $known, 'models_from_accounts' => $known !== [], 'model_effective' => $this->effectiveModel($accounts, $known)]);
     }
 
     public function removeChatGpt(Request $request, ChatGptAccounts $accounts, string $id): JsonResponse
@@ -215,6 +235,8 @@ final class RiengAutoController extends Controller
             'ai_caption' => $ai['caption'] ?? null,
             'ai_hashtags' => array_values(array_filter((array) ($ai['hashtags'] ?? []), 'is_string')),
             'ai_error' => $ai['error'] ?? null,
+            'ai_tries' => (int) ($ai['tries'] ?? 0),
+            'ai_next_try_at' => $ai['next_try_at'] ?? null,
             'ai_at' => $ai['at'] ?? null,
             'approved' => (bool) ($ai['approved'] ?? false),
             'product_by' => data_get($v->meta, 'product_by') === 'kid' ? 'kid' : (filled($v->product_code) ? 'ai' : null),
@@ -231,17 +253,60 @@ final class RiengAutoController extends Controller
         ];
     }
 
+    /**
+     * Model mà ít nhất một tài khoản đã đăng nhập dùng được (theo danh sách Codex trả về, đã nhớ). Rỗng nếu chưa biết.
+     *
+     * @return array<string, array{name: string, note: string, efforts: list<string>, fast: bool, default?: bool}>
+     */
+    private static function accountModels(ChatGptAccounts $accounts): array
+    {
+        $out = [];
+
+        foreach ($accounts->all() as $a) {
+            if ($a['ready']) {
+                foreach ($accounts->knownModels($a['id']) ?? [] as $mid => $m) {
+                    $out[$mid] ??= $m;
+                    $out[$mid]['fast'] = $out[$mid]['fast'] || $m['fast'];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /** Model app thật sự dùng khi model đã chọn không có ở tài khoản nào (null = dùng đúng model đã chọn). */
+    private function effectiveModel(ChatGptAccounts $accounts, array $known): ?string
+    {
+        $want = RiengAutoSettings::get()['model'];
+
+        if ($known === [] || isset($known[$want])) {
+            return null;
+        }
+
+        foreach ($accounts->all() as $a) {
+            if ($a['ready'] && $accounts->knownModels($a['id']) !== null) {
+                return $accounts->modelFor($a['id'], $want)[0];
+            }
+        }
+
+        return null;
+    }
+
     /** @return array<string, mixed> */
     private function payload(string $accountId, ChatGptAccounts $accounts): array
     {
         $autos = AutoAccount::query()->get()->keyBy('social_account_id');
         $products = AutoProduct::query()->where('enabled', true)->orderBy('code')->get();
         $counts = AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->where('status', AutoVideo::NEW)->whereNull('files_deleted_at')
-            ->selectRaw("coalesce(meta->'ai'->>'state', 'cho') as s, count(*) as n")->groupByRaw("coalesce(meta->'ai'->>'state', 'cho')")->pluck('n', 's');
+            // Video lỗi vừa được cho thử lại (tries = 0) tính là "chờ AI xem".
+            ->selectRaw("case when meta->'ai'->>'state' = 'error' and coalesce(meta->'ai'->>'tries', '0') = '0' then 'cho' else coalesce(meta->'ai'->>'state', 'cho') end as s, count(*) as n")->groupBy('s')->pluck('n', 's');
 
         return [
             'settings' => RiengAutoSettings::get(),
-            'models' => RiengAutoSettings::MODELS,
+            'models' => ($known = self::accountModels($accounts)) === [] ? RiengAutoSettings::MODELS : $known,
+            // Model tài khoản dùng được đã biết: model đã chọn không có thì app dùng model mặc định của tài khoản.
+            'models_from_accounts' => $known !== [],
+            'model_effective' => $this->effectiveModel($accounts, $known),
             'efforts' => RiengAutoSettings::EFFORTS,
             'codex_installed' => ($cli = $accounts->cliStatus())['installed'],
             'cli' => $cli,

@@ -36,6 +36,14 @@ class RiengAiCommand extends Command
             report($e);
         }
 
+        // App vừa lên bản mới (có thể đã sửa đúng lỗi làm AI hỏng): cho video lỗi thử lại ngay, không đợi giờ hẹn.
+        $version = trim((string) @file_get_contents((string) config('fork-update.version_file', base_path('VERSION'))));
+
+        if ($version !== '' && Cache::get('fork-rieng:ai-version') !== $version) {
+            Cache::forever('fork-rieng:ai-version', $version);
+            $analyzer->retryNow();
+        }
+
         foreach ($analyzer->pending(max(1, (int) $this->option('limit'))) as $video) {
             if ($accounts->pick() === null) {
                 $this->line('Chưa có tài khoản ChatGPT nào sẵn sàng.');
