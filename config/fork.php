@@ -47,6 +47,9 @@ return [
         ],
         // Tối đa bao nhiêu bài đã xếp trong tương lai (chưa đăng) mỗi kênh, chặn tải quá nhiều bài hẹn giờ lên TikTok.
         'max_future_posts' => (int) env('FORK_AUTO_MAX_FUTURE_POSTS', 100),
+        // Kho riêng tự đăng: lệnh codex (ChatGPT CLI) và thư mục chứa các tài khoản ChatGPT (mỗi tài khoản một CODEX_HOME).
+        'codex_path' => env('FORK_CODEX_PATH', ''),
+        'chatgpt_dir' => env('FORK_CHATGPT_DIR', ''),
         // TikTok chỉ cho mỗi kênh để chờ tối đa 50 bài hẹn giờ (quá thì báo status_code 3013021). Bài vượt mức được giữ trong
         // app và tự hẹn lên khi có chỗ trống (bài sớm nhất trước); tới giờ mà vẫn chưa hẹn được thì Chrome đăng ngay lúc đó.
         'tiktok_schedule_cap' => (int) env('FORK_TIKTOK_SCHEDULE_CAP', 50),

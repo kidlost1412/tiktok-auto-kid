@@ -1,0 +1,240 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Fork\AutoPost\Http;
+
+use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\AutoProduct;
+use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
+use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
+use App\Fork\AutoPost\Rieng\Ai\Speech;
+use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Shop\CartRules;
+use App\Http\Controllers\Controller;
+use App\Models\SocialAccount;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/** "Kho riêng tự đăng theo khung": cài đặt, tài khoản ChatGPT, và chỉnh sản phẩm/caption/kênh của từng video. */
+final class RiengAutoController extends Controller
+{
+    use ScopesToOwner;
+
+    public function show(Request $request, ChatGptAccounts $accounts, Speech $speech): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+
+        return response()->json($this->payload($accountId, $accounts, $speech));
+    }
+
+    public function update(Request $request, ChatGptAccounts $accounts, Speech $speech): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $in = $request->validate([
+            'enabled' => ['sometimes', 'boolean'],
+            'caption_mode' => ['sometimes', 'in:ai,kid'],
+            'empty_caption_ok' => ['sometimes', 'boolean'],
+            'approve_first' => ['sometimes', 'boolean'],
+            'duplicates' => ['sometimes', 'in:ask,allow'],
+            'model' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::MODELS))],
+            'effort' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::EFFORTS))],
+            'folder_channels' => ['sometimes', 'array'],
+        ]);
+
+        if (isset($in['folder_channels'])) {
+            $mine = $this->tiktokAccounts($accountId)->pluck('id')->map(fn ($id): string => (string) $id)->all();
+            $folders = RiengFolder::query()->pluck('id')->map(fn ($id): string => (string) $id)->all();
+            $in['folder_channels'] = collect($in['folder_channels'])
+                ->filter(fn ($list, $id): bool => in_array((string) $id, $folders, true))
+                ->map(fn ($list): array => array_values(array_intersect(RiengAutoSettings::ids($list), $mine)))
+                ->all();
+        }
+
+        RiengAutoSettings::update($in);
+
+        return response()->json($this->payload($accountId, $accounts, $speech));
+    }
+
+    public function addChatGpt(Request $request, ChatGptAccounts $accounts): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $r = $accounts->startLogin();
+
+        return response()->json($r, $r['ok'] ? 200 : 422);
+    }
+
+    public function chatGptStatus(Request $request, ChatGptAccounts $accounts, string $id): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $row = collect($accounts->all())->firstWhere('id', $id);
+
+        return response()->json(['account' => $row, 'url' => $row === null || $row['ready'] ? null : $accounts->loginUrl($id)]);
+    }
+
+    public function removeChatGpt(Request $request, ChatGptAccounts $accounts, string $id): JsonResponse
+    {
+        $this->authorizeOwner($request);
+
+        return response()->json(['ok' => $accounts->remove($id)]);
+    }
+
+    /** Chủ app chỉnh một video: sản phẩm (+ quy cách), caption tự viết, kênh, duyệt caption AI, cho đăng video trùng. */
+    public function updateVideo(Request $request, AutoVideo $video): JsonResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        abort_unless($video->isRieng(), 404);
+        $in = $request->validate([
+            'product_code' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'quy_cach' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'caption' => ['sometimes', 'nullable', 'string', 'max:2200'],
+            'channels' => ['sometimes', 'array'],
+            'approved' => ['sometimes', 'boolean'],
+            'dup_ok' => ['sometimes', 'boolean'],
+        ]);
+
+        if ($video->status !== AutoVideo::NEW) {
+            return response()->json(['ok' => false, 'error' => 'Video này đã hẹn giờ hoặc đã đăng, không sửa được ở đây.'], 422);
+        }
+
+        $meta = (array) $video->meta;
+        $changes = [];
+
+        if (array_key_exists('product_code', $in)) {
+            $code = filled($in['product_code']) ? (string) $in['product_code'] : null;
+
+            if ($code !== null && ! AutoProduct::query()->whereKey($code)->exists()) {
+                return response()->json(['ok' => false, 'error' => 'Không có sản phẩm này.'], 422);
+            }
+
+            $changes['product_code'] = $code;
+            $changes['quy_cach'] = filled($in['quy_cach'] ?? null) ? (string) $in['quy_cach'] : null;
+            // Chọn lại "theo AI" (null) thì AI được gắn lại lần xem sau; chọn một sản phẩm thì giữ, AI không đè.
+            if ($code === null) {
+                unset($meta['product_by']);
+                $changes['product_code'] = data_get($meta, 'ai.state') === 'ok' ? data_get($meta, 'ai.product_code') : null;
+            } else {
+                $meta['product_by'] = 'kid';
+            }
+        }
+
+        if (array_key_exists('caption', $in)) {
+            $caption = trim((string) ($in['caption'] ?? ''));
+            $changes['caption'] = $caption === '' ? null : $caption;
+            $changes['caption_source'] = $caption === '' ? null : 'kid';
+        }
+
+        if (array_key_exists('channels', $in)) {
+            $mine = $this->tiktokAccounts($accountId)->pluck('id')->map(fn ($id): string => (string) $id)->all();
+            $meta['channels'] = array_values(array_intersect(RiengAutoSettings::ids($in['channels']), $mine));
+        }
+
+        if (array_key_exists('approved', $in)) {
+            $meta['ai']['approved'] = (bool) $in['approved'];
+        }
+
+        if (array_key_exists('dup_ok', $in)) {
+            $meta['dup_ok'] = (bool) $in['dup_ok'];
+        }
+
+        // Chủ app vừa sửa: bỏ khoá "lần đăng trước lỗi" để app thử lại ngay lượt tới.
+        unset($meta['auto_error'], $meta['auto_error_at']);
+        $video->forceFill($changes + ['meta' => $meta])->save();
+
+        return response()->json(['ok' => true, 'auto' => self::videoAuto($video->refresh(), RiengAutoSettings::get())]);
+    }
+
+    /** Cho AI xem lại video ngay (đợi kết quả, khoảng 20 giây). */
+    public function reanalyze(Request $request, AutoVideo $video, RiengAnalyzer $analyzer): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        abort_unless($video->isRieng(), 404);
+        set_time_limit(300);
+
+        if ($video->status !== AutoVideo::NEW) {
+            return response()->json(['ok' => false, 'error' => 'Video này đã hẹn giờ hoặc đã đăng.'], 422);
+        }
+
+        $meta = (array) $video->meta;
+        $meta['ai'] = array_intersect_key((array) ($meta['ai'] ?? []), ['tries' => true]);
+        $meta['ai']['tries'] = 0;
+        $video->forceFill(['meta' => $meta])->save();
+        $ai = $analyzer->analyze($video);
+
+        return response()->json(['ok' => in_array($ai['state'], ['ok', 'unsure'], true), 'error' => $ai['error'] ?? null, 'auto' => self::videoAuto($video->refresh(), RiengAutoSettings::get())]);
+    }
+
+    /**
+     * Phần "tự đăng" của một video cho thẻ ở trang Kho riêng.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function videoAuto(AutoVideo $v, array $settings): ?array
+    {
+        if (! $v->isRieng()) {
+            return null;
+        }
+
+        $ai = (array) data_get($v->meta, 'ai', []);
+        $poster = app(RiengAutoPoster::class);
+        $isNew = $v->status === AutoVideo::NEW && $v->files_deleted_at === null;
+        $blocker = $isNew ? $poster->blocker($v, null, null, $settings) : null;
+
+        return [
+            'ai_state' => $ai['state'] ?? null,
+            'ai_product' => $ai['product_code'] ?? null,
+            'ai_sure' => $ai['chac'] ?? null,
+            'ai_reason' => $ai['ly_do'] ?? null,
+            'ai_summary' => $ai['tom_tat'] ?? null,
+            'ai_caption' => $ai['caption'] ?? null,
+            'ai_hashtags' => array_values(array_filter((array) ($ai['hashtags'] ?? []), 'is_string')),
+            'ai_speech' => $ai['loi'] ?? null,
+            'ai_error' => $ai['error'] ?? null,
+            'ai_at' => $ai['at'] ?? null,
+            'approved' => (bool) ($ai['approved'] ?? false),
+            'product_by' => data_get($v->meta, 'product_by') === 'kid' ? 'kid' : (filled($v->product_code) ? 'ai' : null),
+            'product_code' => $v->product_code,
+            'quy_cach' => $v->quy_cach,
+            'kid_caption' => $v->caption_source === 'kid' ? $v->caption : null,
+            'final_caption' => $isNew ? $poster->captionFor($v, $settings) : null,
+            'channels' => RiengAutoSettings::ids(data_get($v->meta, 'channels')),
+            'effective_channels' => $poster->channelsFor($v, $settings),
+            'dup_ok' => (bool) data_get($v->meta, 'dup_ok', false),
+            'auto_error' => data_get($v->meta, 'auto_error'),
+            'ready' => $isNew && $blocker === null,
+            'blocker' => $blocker,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function payload(string $accountId, ChatGptAccounts $accounts, Speech $speech): array
+    {
+        $autos = AutoAccount::query()->get()->keyBy('social_account_id');
+        $products = AutoProduct::query()->where('enabled', true)->orderBy('code')->get();
+        $counts = AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->where('status', AutoVideo::NEW)->whereNull('files_deleted_at')
+            ->selectRaw("coalesce(meta->'ai'->>'state', 'cho') as s, count(*) as n")->groupByRaw("coalesce(meta->'ai'->>'state', 'cho')")->pluck('n', 's');
+
+        return [
+            'settings' => RiengAutoSettings::get(),
+            'models' => RiengAutoSettings::MODELS,
+            'efforts' => RiengAutoSettings::EFFORTS,
+            'codex_installed' => $accounts->codexPath() !== null,
+            'speech_ready' => $speech->key() !== null,
+            'chatgpt' => $accounts->all(),
+            'channels' => $this->tiktokAccounts($accountId)
+                ->filter(fn (SocialAccount $a): bool => $autos->has($a->id))
+                ->map(fn (SocialAccount $a): array => ['id' => (string) $a->id, 'name' => '@'.($a->username ?: $a->display_name), 'avatar_url' => $a->avatar_url, 'auto_enabled' => (bool) $autos[$a->id]->enabled])
+                ->values()->all(),
+            'folders' => RiengFolder::query()->orderBy('id')->get()->map(fn (RiengFolder $f): array => ['id' => $f->id, 'name' => $f->displayName()])->all(),
+            'products' => $products->map(fn (AutoProduct $p): array => [
+                'code' => (string) $p->code,
+                'name' => (string) ($p->short_name ?: $p->code),
+                'quy_cach' => CartRules::quyCachList($p),
+            ])->all(),
+            'counts' => $counts->map(fn ($n): int => (int) $n)->all(),
+        ];
+    }
+}

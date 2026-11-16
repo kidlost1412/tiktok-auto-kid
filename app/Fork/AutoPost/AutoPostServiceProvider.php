@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Console\AutoCleanupCommand;
 use App\Fork\AutoPost\Console\AutoIngestCommand;
 use App\Fork\AutoPost\Console\AutoPlanCommand;
 use App\Fork\AutoPost\Console\AutoStatsCommand;
+use App\Fork\AutoPost\Console\RiengAiCommand;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 
@@ -36,12 +37,15 @@ final class AutoPostServiceProvider extends ServiceProvider
                 AutoPlanCommand::class,
                 AutoStatsCommand::class,
                 AutoCleanupCommand::class,
+                RiengAiCommand::class,
             ]);
         }
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->command(AutoIngestCommand::class)->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
             $schedule->command(AutoPlanCommand::class)->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
+            // Kho riêng tự đăng: AI xem video mới (đoán sản phẩm + viết caption); tự bỏ qua khi chưa bật.
+            $schedule->command(RiengAiCommand::class)->everyTwoMinutes()->withoutOverlapping(30)->onOneServer()->runInBackground();
             $schedule->command(AutoStatsCommand::class)->hourly()->withoutOverlapping(10)->onOneServer();
             // Mỗi ngày: xoá mp4/json quá hạn lưu giữ trong da-dang.
             $schedule->command(AutoCleanupCommand::class)->dailyAt('03:30')->withoutOverlapping(10)->onOneServer();
