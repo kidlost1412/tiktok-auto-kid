@@ -30,8 +30,6 @@ final class RiengAutoSettings
     public const array MODELS = [
         'gpt-6.1-terra' => ['name' => 'GPT-6.1 Terra', 'note' => 'Model Codex dòng 6.1', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
         'gpt-6.1-sol' => ['name' => 'GPT-6.1-Sol', 'note' => 'Model chính mới nhất', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
-        'gpt-6-astra' => ['name' => 'GPT-6-Astra', 'note' => 'Mạnh nhất, cho việc khó nhất', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
-        'gpt-6-sol' => ['name' => 'GPT-6-Sol', 'note' => 'Model chính đời trước', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
         'gpt-6-luna' => ['name' => 'GPT-6-Luna', 'note' => 'Nhanh, tiết kiệm, cho việc dễ', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max']],
     ];
 

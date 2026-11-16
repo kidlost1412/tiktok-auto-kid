@@ -7,13 +7,16 @@ import {
     IconClipboardList,
     IconDots,
     IconFolder,
+    IconFolderOpen,
     IconFolderPlus,
+    IconPencil,
     IconPlus,
     IconPlaylistAdd,
     IconRefresh,
     IconSend,
     IconSparkles,
     IconTrash,
+    IconUpload,
     IconVideoOff,
     IconX,
 } from '@tabler/icons-vue';
@@ -39,6 +42,7 @@ import RiengAutoEdit from '@/components/fork/kho/RiengAutoEdit.vue';
 import RiengCard from '@/components/fork/kho/RiengCard.vue';
 import RiengQueueDialog from '@/components/fork/kho/RiengQueueDialog.vue';
 import RiengSteps from '@/components/fork/kho/RiengSteps.vue';
+import RiengUploadDialog from '@/components/fork/kho/RiengUploadDialog.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import { cardCls } from '@/components/fork/shared/status';
@@ -95,6 +99,14 @@ const batchItems = ref<BatchItem[]>([]);
 const queueOpen = ref(false);
 const folderDialog = ref(false);
 const openMenu = ref<number | null>(null);
+const renameVal = ref('');
+const uploadOpen = ref(false);
+const uploadFolder = ref<number | null>(null);
+
+watch(openMenu, (id) => {
+    const f = props.folders.find((x) => x.id === id);
+    renameVal.value = f?.name ?? '';
+});
 
 // ---------------------------------------------------------------- Chọn video
 // Các video đã chọn (nhớ cả khi sang trang khác): id -> tên file + cờ trùng.
@@ -341,6 +353,11 @@ const removeListeners = () => {
     document.documentElement.classList.remove('rieng-dragging');
 };
 
+const swallowClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+};
+
 const endDrag = () => {
     removeListeners();
 
@@ -361,11 +378,13 @@ const endDrag = () => {
     drag = null;
     band.value = null;
 
-    // Vừa kéo xong: nuốt cú click đi kèm để không mở video ngoài ý muốn.
+    // Vừa kéo xong: nuốt cú click đi kèm (mở video, bấm nút trên thẻ) để không làm gì ngoài ý muốn.
     if (wasActive) {
         suppressClick = true;
+        window.addEventListener('click', swallowClick, true);
         setTimeout(() => {
             suppressClick = false;
+            window.removeEventListener('click', swallowClick, true);
         }, 0);
     }
 };
@@ -425,11 +444,41 @@ const onMove = (e: PointerEvent) => {
     refresh();
 };
 
+/**
+ * Nơi được bắt đầu quét chọn: trên thẻ video (kể cả nút trên thẻ: kéo đi thì không bấm nút) hoặc khoảng trống
+ * ngang hàng lưới (lề hai bên, khe giữa thẻ). Không bắt đầu trong ô nhập, link, hộp thoại hay thanh lọc.
+ */
+const canStartBand = (t: HTMLElement, e: PointerEvent): boolean => {
+    const g = grid.value;
+
+    if (
+        !g ||
+        t.closest(
+            'input, select, textarea, a, [contenteditable], [role="dialog"], [data-no-band], header, nav',
+        )
+    ) {
+        return false;
+    }
+
+    if (g.contains(t)) {
+        return true;
+    }
+
+    if (t.closest('button, [role="button"], [role="menu"], [role="listbox"]')) {
+        return false;
+    }
+
+    // Lề ngoài lưới: chỉ khi ngang hàng lưới (để không nhầm với phần trên/dưới trang).
+    const r = g.getBoundingClientRect();
+
+    return e.clientY >= r.top && e.clientY <= r.bottom;
+};
+
 const onPointerDown = (e: PointerEvent) => {
     const t = e.target as HTMLElement;
     const id = cardIdAt(t);
 
-    if (t.closest('button, a, input, select, textarea, [role="checkbox"]')) {
+    if (!canStartBand(t, e)) {
         return;
     }
 
@@ -845,6 +894,41 @@ const pickFolder = async () => {
     }
 };
 
+const renameFolder = async (f: Folder) => {
+    const r = await callJson<{ ok: boolean; name: string }>(
+        'PATCH',
+        `/auto/kho/rieng/thu-muc/${f.id}`,
+        { name: renameVal.value },
+    );
+
+    if (r.ok) {
+        openMenu.value = null;
+        toast.success(`Đã đổi tên thành "${r.data?.name ?? renameVal.value}".`);
+        reloadVideos();
+    } else {
+        toast.error('Chưa đổi được tên, anh thử lại.');
+    }
+};
+
+const openFolderOnDisk = async (f: Folder) => {
+    const r = await callJson<{ ok: boolean; error?: string }>(
+        'POST',
+        `/auto/kho/rieng/thu-muc/${f.id}/mo`,
+    );
+
+    if (r.ok) {
+        openMenu.value = null;
+    } else {
+        toast.error(r.data?.error ?? 'Không mở được thư mục.');
+    }
+};
+
+const openUpload = (folderId: number | null) => {
+    openMenu.value = null;
+    uploadFolder.value = folderId;
+    uploadOpen.value = true;
+};
+
 const removeFolder = async (f: Folder) => {
     openMenu.value = null;
 
@@ -1017,6 +1101,8 @@ onMounted(() => {
     pollTimer = setInterval(() => void poll(), 10000);
     document.addEventListener('visibilitychange', onVisible);
     grid.value?.addEventListener('touchmove', onTouchMove, { passive: false });
+    // Quét chọn bắt đầu được cả ở lề ngoài lưới (khi thẻ phủ kín màn hình vẫn kéo được).
+    document.addEventListener('pointerdown', onPointerDown);
 
     // Khung xem video: nút "Đăng / hẹn giờ" và "Thêm vào giỏ chờ" của trang này.
     viewerActions.post = postOne;
@@ -1029,6 +1115,7 @@ onBeforeUnmount(() => {
     clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', onVisible);
     grid.value?.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('pointerdown', onPointerDown);
     endDrag();
     viewerActions.post = null;
     viewerActions.toggleQueue = null;
@@ -1079,61 +1166,98 @@ defineExpose({ scan, busy });
             >
                 <IconFolder class="size-4" /> Thư mục
             </span>
-            <div
+            <Popover
                 v-for="f in folders"
                 :key="f.id"
-                class="flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 py-1 pr-1 pl-2.5 text-sm"
-                :title="f.path"
-                :data-testid="`fork-rieng-folder-${f.id}`"
+                :open="openMenu === f.id"
+                @update:open="(o: boolean) => (openMenu = o ? f.id : null)"
             >
-                <span
-                    v-if="!f.exists"
-                    class="size-2 shrink-0 rounded-full bg-red-500"
-                    title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
-                />
-                <span class="truncate font-medium">{{ f.name }}</span>
-                <span
-                    class="shrink-0 text-xs text-muted-foreground tabular-nums"
-                    >{{ f.count }} video</span
-                >
-                <Popover
-                    :open="openMenu === f.id"
-                    @update:open="(o: boolean) => (openMenu = o ? f.id : null)"
-                >
-                    <PopoverTrigger as-child>
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            class="size-7"
-                            :aria-label="`Tuỳ chọn thư mục ${f.name}`"
-                        >
-                            <IconDots class="size-4" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent class="w-72 p-3" align="end">
-                        <div
-                            class="mb-2 text-xs break-all text-muted-foreground"
-                        >
-                            {{ f.path }}
-                        </div>
-                        <div
+                <PopoverTrigger as-child>
+                    <button
+                        type="button"
+                        :class="
+                            cn(
+                                'flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 py-1 pr-1.5 pl-2.5 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
+                                openMenu === f.id &&
+                                    'border-violet-600 dark:border-primary',
+                            )
+                        "
+                        :title="f.path"
+                        :aria-label="`Tuỳ chọn thư mục ${f.name}`"
+                        :data-testid="`fork-rieng-folder-${f.id}`"
+                    >
+                        <span
                             v-if="!f.exists"
-                            class="mb-2 text-xs text-red-600 dark:text-red-400"
+                            class="size-2 shrink-0 rounded-full bg-red-500"
+                            title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
+                        />
+                        <span class="truncate font-medium">{{ f.name }}</span>
+                        <span
+                            class="shrink-0 text-xs text-muted-foreground tabular-nums"
+                            >{{ f.count }} video</span
                         >
-                            Không mở được thư mục này (ổ đĩa đang tắt hoặc đã
-                            đổi tên?).
-                        </div>
+                        <IconDots class="size-4 shrink-0 text-foreground/60" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent class="w-72 p-3" align="end">
+                    <div class="mb-2 text-xs break-all text-muted-foreground">
+                        {{ f.path }}
+                    </div>
+                    <div
+                        v-if="!f.exists"
+                        class="mb-2 text-xs text-red-600 dark:text-red-400"
+                    >
+                        Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi
+                        tên?).
+                    </div>
+                    <form
+                        class="mb-2 flex gap-1.5"
+                        @submit.prevent="renameFolder(f)"
+                    >
+                        <Input
+                            v-model="renameVal"
+                            class="h-8"
+                            maxlength="80"
+                            aria-label="Tên thư mục"
+                            placeholder="Tên hiện trong app"
+                        />
                         <Button
+                            type="submit"
                             size="sm"
-                            variant="ghost"
-                            class="w-full justify-start"
-                            @click="removeFolder(f)"
+                            class="h-8 shrink-0"
+                            :disabled="renameVal.trim() === f.name"
                         >
-                            <IconTrash class="size-4" /> Bỏ khỏi danh sách
+                            <IconPencil class="size-4" /> Đổi tên
                         </Button>
-                    </PopoverContent>
-                </Popover>
-            </div>
+                    </form>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        class="w-full justify-start"
+                        :disabled="!f.exists"
+                        @click="openUpload(f.id)"
+                    >
+                        <IconUpload class="size-4" /> Thêm video vào thư mục này
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        class="w-full justify-start"
+                        :disabled="!f.exists"
+                        @click="openFolderOnDisk(f)"
+                    >
+                        <IconFolderOpen class="size-4" /> Mở thư mục
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        class="w-full justify-start"
+                        @click="removeFolder(f)"
+                    >
+                        <IconTrash class="size-4" /> Bỏ khỏi danh sách
+                    </Button>
+                </PopoverContent>
+            </Popover>
             <Button
                 size="sm"
                 variant="outline"
@@ -1141,6 +1265,15 @@ defineExpose({ scan, busy });
                 @click="folderDialog = true"
             >
                 <IconPlus class="size-4" /> Thêm thư mục
+            </Button>
+            <Button
+                v-if="folders.length"
+                size="sm"
+                variant="outline"
+                data-testid="fork-rieng-upload-open"
+                @click="openUpload(null)"
+            >
+                <IconUpload class="size-4" /> Thêm video
             </Button>
             <Button
                 size="sm"
@@ -1156,6 +1289,13 @@ defineExpose({ scan, busy });
                 >Chưa có thư mục nào: thêm thư mục chứa video của bạn.</span
             >
         </section>
+
+        <RiengUploadDialog
+            v-model:open="uploadOpen"
+            :folders="folders"
+            :folder-id="uploadFolder"
+            @done="reloadVideos"
+        />
 
         <Dialog v-model:open="folderDialog">
             <DialogContent class="sm:max-w-xl">
@@ -1236,6 +1376,7 @@ defineExpose({ scan, busy });
                 )
             "
             data-testid="fork-rieng-filters"
+            data-no-band
         >
             <RiengSteps v-if="folders.length" :current="currentStep" />
             <div class="ml-auto flex flex-wrap items-center gap-2">
@@ -1329,7 +1470,6 @@ defineExpose({ scan, busy });
                 embedded ? 'gap-3! sm:grid-cols-5!' : '',
             ]"
             data-testid="fork-rieng-grid"
-            @pointerdown="onPointerDown"
             @dragstart="onDragStart"
             @contextmenu="onContextMenu"
         >
@@ -1450,6 +1590,7 @@ defineExpose({ scan, busy });
                 )
             "
             data-testid="fork-rieng-bar"
+            data-no-band
         >
             <div class="min-w-0 flex-1 text-sm">
                 <template v-if="pickedItems.length">

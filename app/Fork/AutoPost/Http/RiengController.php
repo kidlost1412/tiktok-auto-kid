@@ -38,6 +38,7 @@ use Inertia\Response;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+use Symfony\Component\Process\Process;
 
 /**
  * "Kho riêng": video chủ app tự làm. Quản lý thư mục, quét, danh sách và đăng hàng loạt (chọn nhiều video, gắn giỏ, hẹn giờ).
@@ -45,6 +46,9 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  */
 final class RiengController extends Controller
 {
+    /** Đuôi video Kho riêng nhận (giống RiengScanner). */
+    private const array VIDEO_EXT = ['mp4', 'mov', 'm4v', 'webm'];
+
     use ScopesToOwner;
 
     private const int PER_PAGE = 24;
@@ -374,6 +378,70 @@ final class RiengController extends Controller
         $folder->delete();
 
         return back()->with('flash.success', 'Đã bỏ thư mục khỏi Kho riêng. File video trong thư mục vẫn còn nguyên.');
+    }
+
+    /** Đổi tên hiển thị của thư mục (không đổi tên thư mục trên ổ đĩa). Tên trống = dùng tên thư mục thật. */
+    public function renameFolder(Request $request, RiengFolder $folder): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $data = $request->validate(['name' => ['nullable', 'string', 'max:80']]);
+        $name = trim((string) ($data['name'] ?? ''));
+        $folder->forceFill(['name' => $name !== '' ? $name : null])->save();
+
+        return response()->json(['ok' => true, 'name' => $folder->displayName()]);
+    }
+
+    /** Mở thư mục trong File Explorer của máy. */
+    public function openFolder(Request $request, RiengFolder $folder): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $path = str_replace('/', DIRECTORY_SEPARATOR, (string) $folder->path);
+
+        if (! is_dir($path)) {
+            return response()->json(['ok' => false, 'error' => 'Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?).'], 422);
+        }
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            // explorer.exe trả mã 1 cả khi mở được: không chờ, không xét mã.
+            (new Process(['explorer.exe', $path]))->setTimeout(null)->start();
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Thêm một video vào thư mục: chép file tải lên vào thư mục (không ghi đè, trùng tên thì thêm " (2)"), rồi quét.
+     * Mỗi lần một file để tải được video lớn và hiện tiến độ.
+     */
+    public function uploadToFolder(Request $request, RiengFolder $folder): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $request->validate(['file' => ['required', 'file', 'max:1048576']]);
+        $file = $request->file('file');
+        $dir = str_replace('/', DIRECTORY_SEPARATOR, (string) $folder->path);
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+
+        if (! in_array($ext, self::VIDEO_EXT, true)) {
+            return response()->json(['ok' => false, 'error' => 'Chỉ nhận video '.implode(', ', array_map(fn ($e) => '.'.$e, self::VIDEO_EXT)).'.'], 422);
+        }
+
+        if (! is_dir($dir)) {
+            return response()->json(['ok' => false, 'error' => 'Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?).'], 422);
+        }
+
+        $base = trim((string) preg_replace('/[\\\\\/:*?"<>|\x00-\x1f]+/u', ' ', pathinfo((string) $file->getClientOriginalName(), PATHINFO_FILENAME)), " .\t");
+        $base = $base !== '' && ! str_starts_with($base, '_') ? mb_substr($base, 0, 150) : 'video-'.now()->format('Ymd-His');
+        $name = $base.'.'.$ext;
+
+        for ($i = 2; file_exists($dir.DIRECTORY_SEPARATOR.$name); $i++) {
+            $name = "{$base} ({$i}).{$ext}";
+        }
+
+        set_time_limit(300);
+        $file->move($dir, $name);
+        app(RiengScanner::class)->scan();
+
+        return response()->json(['ok' => true, 'name' => $name]);
     }
 
     public function scan(Request $request): RedirectResponse

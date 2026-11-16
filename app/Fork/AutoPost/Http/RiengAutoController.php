@@ -11,7 +11,6 @@ use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
-use App\Fork\AutoPost\Rieng\Ai\Speech;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Http\Controllers\Controller;
@@ -24,14 +23,14 @@ final class RiengAutoController extends Controller
 {
     use ScopesToOwner;
 
-    public function show(Request $request, ChatGptAccounts $accounts, Speech $speech): JsonResponse
+    public function show(Request $request, ChatGptAccounts $accounts): JsonResponse
     {
         $accountId = $this->authorizeOwner($request);
 
-        return response()->json($this->payload($accountId, $accounts, $speech));
+        return response()->json($this->payload($accountId, $accounts));
     }
 
-    public function update(Request $request, ChatGptAccounts $accounts, Speech $speech): JsonResponse
+    public function update(Request $request, ChatGptAccounts $accounts): JsonResponse
     {
         $accountId = $this->authorizeOwner($request);
         $in = $request->validate([
@@ -57,7 +56,7 @@ final class RiengAutoController extends Controller
 
         RiengAutoSettings::update($in);
 
-        return response()->json($this->payload($accountId, $accounts, $speech));
+        return response()->json($this->payload($accountId, $accounts));
     }
 
     /** Tự cài ChatGPT CLI (Codex) vào thư mục của app. POST bắt đầu cài (chạy nền); trả trạng thái để trang hỏi lại. */
@@ -206,7 +205,6 @@ final class RiengAutoController extends Controller
             'ai_summary' => $ai['tom_tat'] ?? null,
             'ai_caption' => $ai['caption'] ?? null,
             'ai_hashtags' => array_values(array_filter((array) ($ai['hashtags'] ?? []), 'is_string')),
-            'ai_speech' => $ai['loi'] ?? null,
             'ai_error' => $ai['error'] ?? null,
             'ai_at' => $ai['at'] ?? null,
             'approved' => (bool) ($ai['approved'] ?? false),
@@ -225,7 +223,7 @@ final class RiengAutoController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function payload(string $accountId, ChatGptAccounts $accounts, Speech $speech): array
+    private function payload(string $accountId, ChatGptAccounts $accounts): array
     {
         $autos = AutoAccount::query()->get()->keyBy('social_account_id');
         $products = AutoProduct::query()->where('enabled', true)->orderBy('code')->get();
@@ -238,7 +236,6 @@ final class RiengAutoController extends Controller
             'efforts' => RiengAutoSettings::EFFORTS,
             'codex_installed' => ($cli = $accounts->cliStatus())['installed'],
             'cli' => $cli,
-            'speech_ready' => $speech->key() !== null,
             'chatgpt' => $accounts->all(),
             'channels' => $this->tiktokAccounts($accountId)
                 ->filter(fn (SocialAccount $a): bool => $autos->has($a->id))
