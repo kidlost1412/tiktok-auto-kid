@@ -122,7 +122,7 @@ test('failed chrome jobs are reported once with reason and caption', function ()
 
     $texts = sentTexts();
     expect($texts)->toHaveCount(1);
-    expect($texts[0])->toContain('Đăng lỗi')->toContain('video trùng')->toContain('Chú thích rất hay')->toContain('@kenh1')->toContain('Cách xử lý');
+    expect($texts[0])->toContain('Bài không đăng được')->toContain('video trùng')->toContain('Chú thích rất hay')->toContain('@kenh1')->toContain('Cách xử lý');
 });
 
 test('failed auto videos and paused cart links are reported', function () {

@@ -133,7 +133,7 @@ test('each message builder has a strong first line, key facts and escaped conten
     $m = Messages::samples();
 
     expect($m['posted']['message']->text)->toStartWith('✅ <b>Đã lên TikTok</b> · <b>@kenh_mau</b>')->toContain('Giờ đăng')->toContain('Phân bón hữu cơ')->toContain('tiktok.com/@kenh_mau/video/7000000000000000000')->toContain('/auto/kho?tab=dang&amp;video=1');
-    expect($m['failed']['message']->text)->toStartWith('❌ <b>Đăng lỗi</b>')->toContain('Sản phẩm trong giỏ đã hết hàng')->toContain('Cách xử lý');
+    expect($m['failed']['message']->text)->toStartWith('❌ <b>Bài không đăng được</b>')->toContain('Sản phẩm trong giỏ đã hết hàng')->toContain('Cách xử lý');
     expect($m['chrome_offline']['message']->text)->toStartWith('🔌 <b>Chrome mất kết nối</b>')->toContain('25 phút');
     expect($m['chrome_back']['message']->text)->toStartWith('✅ <b>Chrome đã kết nối lại</b>')->toContain('38 phút');
     expect($m['hub_offline']['message']->text)->toStartWith('🔌 <b>Hub Xưởng Video mất kết nối</b>');
