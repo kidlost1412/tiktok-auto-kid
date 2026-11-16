@@ -8,12 +8,14 @@ import { useMediaQuery } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import ChannelPanel from '@/components/fork/auto/ChannelPanel.vue';
+import FailedPostsBlock from '@/components/fork/auto/FailedPostsBlock.vue';
 import OnboardingCard from '@/components/fork/auto/OnboardingCard.vue';
 import RecentList from '@/components/fork/auto/RecentList.vue';
 import ScheduleBoard from '@/components/fork/auto/ScheduleBoard.vue';
 import TodayHero from '@/components/fork/auto/TodayHero.vue';
 import type {
     AccountRow,
+    FailedPostRow,
     FailedRow,
     Health,
     HubStatus,
@@ -49,6 +51,8 @@ const props = defineProps<{
     lich: Lich;
     recent: RecentRow[];
     failed_recent?: FailedRow[];
+    /** Bài không đăng được trong 3 ngày gần đây (Chrome báo lỗi hoặc đã chốt lỗi), kèm lý do tiếng Việt. */
+    failed_posts?: FailedPostRow[];
     /** 7 ngày gần nhất: số bài + lượt xem (biểu đồ nhỏ ở dải Hôm nay). */
     trend?: TrendDay[];
     /** Tải sau (hỏi hub); null = đã xong hoặc đã ẩn. */
@@ -56,6 +60,13 @@ const props = defineProps<{
 }>();
 
 const planning = ref(false);
+
+// Bài lỗi đã có trong khối đỏ thì khỏi lặp lại ở danh sách "Vừa đăng".
+const failedElsewhere = computed(() => {
+    const ids = new Set((props.failed_posts ?? []).map((r) => r.id));
+
+    return (props.failed_recent ?? []).filter((r) => !ids.has(r.id));
+});
 
 // "Xếp lịch ngay": chạy cùng bộ xếp lịch của cron, chỉ cho các kênh của chủ tài khoản.
 const planNow = () => {
@@ -164,6 +175,7 @@ onMounted(() => {
                     'stock',
                     'recent',
                     'failed_recent',
+                    'failed_posts',
                     'trend',
                     'onboarding',
                     'lich',
@@ -197,6 +209,11 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
         </template>
 
         <OnboardingCard v-if="onboarding" :onboarding="onboarding" />
+
+        <FailedPostsBlock
+            v-if="failed_posts?.length"
+            :rows="failed_posts"
+        />
 
         <TodayHero
             :accounts="accounts"
@@ -302,7 +319,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
 
                     <RecentList
                         :recent="recent"
-                        :failed="failed_recent ?? []"
+                        :failed="failedElsewhere"
                         :product-name="productName"
                         :limit="sideBySide ? 20 : 6"
                         class="xl:flex-1"

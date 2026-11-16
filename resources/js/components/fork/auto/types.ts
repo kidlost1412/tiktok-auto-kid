@@ -84,6 +84,8 @@ export interface LichItem {
     empty_reason?: string | null;
     link: string | null;
     error: string | null;
+    /** Lý do đầy đủ của bài không đăng được (hiện khi rê chuột vào dòng lỗi). */
+    error_full?: string | null;
     /** Ghi chú cảnh báo (vd. bài đang giữ trong app vì kênh đã đủ số bài hẹn giờ trên TikTok). */
     note?: string | null;
     /** Nguồn video: hub | rieng (Kho riêng) | ... */
@@ -214,4 +216,36 @@ export interface Onboarding {
     steps: OnboardingStep[];
     done: number;
     total: number;
+}
+
+/** Lý do một bài không đăng được, đã dịch sang tiếng Việt (máy chủ: FailureReasons). */
+export interface PostFailure {
+    code: string;
+    /** Chuyện gì xảy ra, 1 câu. */
+    title: string;
+    /** Nhãn rất ngắn cho dòng trong Lịch ("Hết hàng"). */
+    short: string;
+    /** Việc nên làm. */
+    fix: string;
+    /** title + fix, 1 câu liền. */
+    text: string;
+    /** job: bài còn hẹn giờ, lượt Chrome lỗi (Đăng lại = giao lại Chrome). video: bài đã chốt lỗi (Thử lại = về kho). */
+    kind: 'job' | 'video';
+    state: 'failed' | 'uncertain';
+    at: string | null;
+    failed_at: string | null;
+    can_retry: boolean;
+    retry_note: string | null;
+    can_confirm_retry: boolean;
+}
+
+/** Một dòng của khối "Bài không đăng được" ở Tổng quan. */
+export interface FailedPostRow extends PostFailure {
+    id: number;
+    username: string | null;
+    product_code: string | null;
+    product_label: string | null;
+    product_image?: string | null;
+    source?: string | null;
+    caption: string | null;
 }

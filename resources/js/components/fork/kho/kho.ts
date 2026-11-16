@@ -33,6 +33,8 @@ export interface KhoVideo {
     reason: string | null;
     /** Bài lỗi chắc chắn chưa lên TikTok: hiện nút "Thử lại". */
     can_retry?: boolean;
+    /** Bài không đăng được: lý do tiếng Việt + việc làm được (khung đỏ trong khung xem). */
+    failure?: import('@/components/fork/auto/types').PostFailure | null;
     readiness: Readiness | null;
     has_cover: boolean;
     duration: number | null;

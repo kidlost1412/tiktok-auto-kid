@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Khung xem video dùng chung cho mọi trang: phát video, caption + hashtag, sản phẩm, giỏ hàng, kênh, giờ đăng, số liệu.
 // ←/→ chuyển video trong danh sách đang xem, Esc đóng. File đã dọn thì hiện ảnh bìa + "Mở trên TikTok".
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import {
     IconAlertTriangle,
     IconCalendarEvent,
@@ -16,7 +16,9 @@ import {
     IconMessageCircle,
     IconBookmark,
     IconMovieOff,
+    IconPencil,
     IconPlaylistAdd,
+    IconRefresh,
     IconShare3,
     IconShoppingCart,
 } from '@tabler/icons-vue';
@@ -34,10 +36,16 @@ import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import { fmtNum, toneClasses } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
-import { stepVideo, viewer, viewerActions } from '@/components/fork/viewer';
+import {
+    loadVideo,
+    stepVideo,
+    viewer,
+    viewerActions,
+} from '@/components/fork/viewer';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import {
     Dialog,
     DialogContent,
@@ -133,6 +141,36 @@ const canEditPost = computed(() => {
             (v.status === 'new' && !!v.held))
     );
 });
+
+// Bài không đăng được: "Đăng lại" (bài hẹn giờ có lượt Chrome lỗi: giao lại Chrome) hoặc "Thử lại" (bài đã chốt lỗi: về kho).
+const failure = computed(() => video.value?.failure ?? null);
+const editPanel = ref<{ openEdit: () => void } | null>(null);
+const retrying = ref(false);
+const cartFix = computed(() => /^(product-|anchor-)/.test(failure.value?.code ?? ''));
+
+const retryPost = () => {
+    const v = video.value;
+    const f = failure.value;
+
+    if (!v || !f || retrying.value) {
+        return;
+    }
+
+    retrying.value = true;
+    router.post(
+        f.kind === 'job'
+            ? `/auto/videos/${v.id}/dang-lai`
+            : `/auto/videos/${v.id}/thu-lai`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                retrying.value = false;
+                void loadVideo(v.id, true);
+            },
+        },
+    );
+};
 
 const timeRow = computed<[string, string] | null>(() => {
     const v = video.value;
@@ -370,6 +408,55 @@ const statLine = computed(() => {
                         >
                     </div>
 
+                    <!-- Bài không đăng được: lý do + việc làm được -->
+                    <div
+                        v-if="failure"
+                        :class="cn('flex flex-col gap-2 rounded-lg border p-3 text-sm', toneClasses.danger.box)"
+                        data-testid="fork-viewer-failure"
+                    >
+                        <div class="flex items-start gap-2">
+                            <IconAlertTriangle class="mt-0.5 size-4 shrink-0" />
+                            <div class="min-w-0">
+                                <p class="font-semibold">
+                                    {{ failure.state === 'uncertain' ? 'Chưa rõ bài đã lên chưa' : 'Bài không đăng được' }}
+                                </p>
+                                <p data-testid="fork-viewer-failure-reason">{{ failure.title }}</p>
+                                <p class="mt-0.5 opacity-90">{{ failure.fix }}</p>
+                                <p v-if="!failure.can_retry && failure.retry_note" class="mt-1 text-xs opacity-80">
+                                    {{ failure.retry_note }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 pl-6">
+                            <Button
+                                v-if="failure.can_retry"
+                                size="sm"
+                                :disabled="retrying"
+                                data-testid="fork-viewer-failure-retry"
+                                @click="retryPost"
+                            >
+                                <Spinner v-if="retrying" class="size-4" />
+                                <IconRefresh v-else class="size-4" />
+                                {{ failure.kind === 'job' ? 'Đăng lại' : 'Thử lại' }}
+                            </Button>
+                            <Button
+                                v-if="canEditPost"
+                                size="sm"
+                                variant="outline"
+                                class="bg-background text-foreground"
+                                data-testid="fork-viewer-failure-edit"
+                                @click="editPanel?.openEdit()"
+                            >
+                                <IconPencil class="size-4" /> Sửa bài
+                            </Button>
+                            <Button v-if="cartFix" as-child size="sm" variant="outline" class="bg-background text-foreground">
+                                <Link href="/auto/gio-hang" @click="viewer.open = false">
+                                    <IconShoppingCart class="size-4" /> Đổi giỏ hàng
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
+
                     <div
                         v-if="video.readiness"
                         :class="
@@ -386,7 +473,7 @@ const statLine = computed(() => {
                         {{ video.readiness.reason }}
                     </div>
                     <div
-                        v-else-if="video.reason"
+                        v-else-if="video.reason && !failure"
                         :class="
                             cn(
                                 'rounded-lg border p-3 text-sm',
@@ -403,6 +490,7 @@ const statLine = computed(() => {
 
                     <PostEditPanel
                         v-if="canEditPost"
+                        ref="editPanel"
                         :key="`edit-${video.id}`"
                         :video-id="video.id"
                         :current-time="video.can_preview ? playerTime : undefined"

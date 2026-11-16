@@ -169,8 +169,21 @@ const fill = () => {
 
 const refreshAll = () => {
     void loadVideo(props.videoId, true);
-    router.reload({ only: ['lich', 'recent', 'upcoming'] });
+    router.reload({ only: ['lich', 'recent', 'upcoming', 'failed_posts'] });
 };
+
+// Cho khung xem video (nút "Sửa bài" trong khung lỗi) mở thẳng form sửa.
+const openEdit = () => {
+    if (!canEdit.value) {
+        return;
+    }
+
+    fill();
+    editing.value = true;
+    confirmUnschedule.value = false;
+};
+
+defineExpose({ openEdit });
 
 const poll = () => {
     stop();

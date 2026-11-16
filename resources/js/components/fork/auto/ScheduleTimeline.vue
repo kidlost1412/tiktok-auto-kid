@@ -418,7 +418,7 @@ const dayCount = (d: { real: number; planned: number }) => d.real + d.planned;
                                         v-if="r.e.error"
                                         class="line-clamp-2 text-sm"
                                         :class="toneClasses.danger.text"
-                                        :title="r.e.error"
+                                        :title="r.e.error_full ?? r.e.error"
                                     >
                                         {{ r.e.error }}
                                     </div>

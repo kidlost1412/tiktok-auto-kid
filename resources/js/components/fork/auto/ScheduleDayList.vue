@@ -334,7 +334,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                         toneClasses.danger.text,
                                     )
                                 "
-                                :title="e.error"
+                                :title="e.error_full ?? e.error"
                             >
                                 {{ e.error }}
                             </p>
