@@ -71,7 +71,7 @@ final class Reschedules
         'not_deleted' => 'TikTok chưa xoá bài hẹn cũ (vẫn thấy trong danh sách bài) — giữ nguyên lịch cũ, chưa đổi giờ.',
         'identity' => 'Chrome đang đăng nhập một tài khoản TikTok khác — không xoá gì, giữ nguyên lịch cũ.',
         'list_failed' => 'Chrome không đọc được danh sách bài của TikTok Studio — chưa xoá gì, giữ nguyên lịch cũ.',
-        'ui_failed' => 'Chrome không bấm được nút Xoá trong TikTok Studio (không thấy bài hoặc nút) — chưa xoá gì, giữ nguyên lịch cũ.',
+        'ui_failed' => 'TikTok không nhận lệnh xoá bài hẹn cũ (và Chrome cũng không bấm được nút Xoá trong TikTok Studio) — chưa xoá gì, giữ nguyên lịch cũ.',
         'delete_failed' =>'TikTok từ chối lệnh xoá bài hẹn cũ — giữ nguyên lịch cũ, chưa đổi giờ.',
         'unknown' => 'Đã gửi lệnh xoá nhưng không kiểm lại được danh sách bài — CHƯA đổi giờ. Hãy mở TikTok Studio xem bài hẹn cũ còn hay không trước khi làm gì thêm.',
     ];

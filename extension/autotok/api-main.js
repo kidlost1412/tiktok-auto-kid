@@ -512,22 +512,70 @@
     if (!row) { row = a; while (row && !row.querySelector('button[data-tt="components_ActionCell_Clickable"]')) row = row.parentElement; }
     return row && row.querySelectorAll('a[href*="/video/"]').length === 1 ? row : null;
   }
+  // The post list is a VIRTUAL list inside its own scroll box (only ~10 rows exist in the DOM at a time; window does not
+  // scroll). Checked live 16/11/2026: scheduled posts sit far down (sorted by post time), so walk the box from the top.
+  function scrollBoxOf(el) {
+    for (let p = el && el.parentElement; p; p = p.parentElement) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight + 50) return p;
+    }
+    return null;
+  }
   async function findRow(itemId) {
     const first = await waitFor(() => document.querySelector('a[href*="/video/"]'), 25000);
     if (!first) return null;
-    for (let i = 0; i < 25; i++) {
+    const box = scrollBoxOf(first);
+    if (box) { box.scrollTop = 0; await sleep(800); }
+    let stuck = 0;
+    for (let i = 0; i < 150; i++) {
       const row = rowOf(itemId);
       if (row) return row;
-      const links = document.querySelectorAll('a[href*="/video/"]');
-      const last = links[links.length - 1];
-      if (last) last.scrollIntoView({ block: 'end' });
-      window.scrollBy(0, 1200);
-      await sleep(1200);
+      if (box) {
+        const before = box.scrollTop;
+        box.scrollTop = before + Math.max(200, Math.floor(box.clientHeight * 0.7));
+        await sleep(700);
+        if (box.scrollTop <= before) { if (++stuck >= 4) break; await sleep(1500); } else stuck = 0; // end of list (or still loading more)
+      } else {
+        const links = document.querySelectorAll('a[href*="/video/"]');
+        const last = links[links.length - 1];
+        if (last) last.scrollIntoView({ block: 'end' });
+        window.scrollBy(0, 1200);
+        await sleep(1200);
+      }
     }
     return rowOf(itemId);
   }
+  // v1.4.8 API path (captured live 16/11/2026 while Studio deleted a real scheduled post Kid named): Studio deletes a
+  // SCHEDULED post with `POST /tiktok/post/edit/v1/` body {aweme_id, scene: 1 (EDIT_POST_SCENE_WEBAPP),
+  // delete: {delete_type: 0 (NORMAL; 1 = TRASH_BIN only when recyclable)}} — not item/delete/v1. A fetch from this page is
+  // signed by TikTok's own SDK (msToken/X-Bogus/_signature get added). Fake id answers JSON status_code 2054 "No item permission".
+  async function deleteViaApi(itemId) {
+    const endpoint = '/tiktok/post/edit/v1/';
+    try {
+      const r = await fetch(endpoint + '?aid=1988&app_name=tiktok_creator_center&device_platform=web_pc&channel=tiktok_web', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aweme_id: String(itemId), scene: 1, delete: { delete_type: 0 } }),
+      });
+      const text = await r.text();
+      let j = null;
+      try { j = JSON.parse(text); } catch (_) { /* HTML app shell = route not reached */ }
+      if (j && Number(j.status_code) === 0) return { sent: true, endpoint, step: 'api', http: r.status };
+      return { sent: false, endpoint, step: 'api', http: r.status, status_code: j ? j.status_code : null, error: j ? String(j.status_msg || '').slice(0, 200) : 'not json' };
+    } catch (e) {
+      // Network error: the request may have reached TikTok. Treat as sent so ONLY the item_list check decides.
+      return { sent: true, endpoint, step: 'api', error: 'network: ' + String(e && e.message).slice(0, 180) };
+    }
+  }
   async function deleteScheduledItemOnTikTok(itemId) {
-    const endpoint = 'studio-ui:/tiktok/creator/item/delete/v1/';
+    const api = await deleteViaApi(itemId);
+    if (api.sent) return api;
+    // The API answered "no" or was unreachable. If it answered JSON with a non-zero code TikTok refused: nothing was deleted,
+    // so falling back to Studio's buttons is safe (the item_list check afterwards decides the outcome either way).
+    const viaUi = await deleteViaUi(itemId);
+    return Object.assign({ api_error: api.error || null, api_status: api.status_code == null ? null : api.status_code }, viaUi);
+  }
+  async function deleteViaUi(itemId) {
+    const endpoint = 'studio-ui';
     const fail = (step, error) => ({ sent: false, endpoint, step, error });
     const row = await findRow(itemId);
     if (!row) return fail('row', 'item row not found on Studio content page');
@@ -603,7 +651,7 @@
       if (!chk.ok) return done({ outcome: 'failed', reason: 'not_scheduled', detail: chk.reason, delete_sent: false });
       // 4. the single delete (Studio's own buttons)
       const del = await deleteScheduledItemOnTikTok(itemId);
-      if (!del.sent) return done({ outcome: 'failed', reason: 'ui_failed', delete_sent: false, endpoint: del.endpoint, detail: (del.step || '') + ': ' + (del.error || '') });
+      if (!del.sent) return done({ outcome: 'failed', reason: 'ui_failed', delete_sent: false, endpoint: del.endpoint, status_code: del.api_status, detail: 'api: ' + (del.api_error || '') + ' | ui ' + (del.step || '') + ': ' + (del.error || '') });
       sent = true;
       // 5. verify: the item must be absent from a scan that reaches at least one page past where it was found
       let last = null, foundAgain = false;

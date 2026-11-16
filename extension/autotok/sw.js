@@ -901,6 +901,29 @@ let lastPollState = '';
 const setPoll = async (state) => { if (state !== lastPollState) { lastPollState = state; await chrome.storage.local.set({ poll: { at: Date.now(), state } }); } };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// v1.4.8 self-update: the extension is loaded unpacked from the app folder, so an app update replaces these files on disk
+// but Chrome keeps running the old code until a reload. Read our own manifest from disk (unpacked resources are served
+// from disk) and, only when nothing is running (callers check every recover*() first), reload to pick up the new code.
+const SELF_CHECK_MS = 2 * 60 * 1000;
+let selfCheckedAt = 0;
+function versionNewer(a, b) {
+  const pa = String(a).split('.').map((x) => parseInt(x, 10) || 0), pb = String(b).split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0); }
+  return false;
+}
+async function reloadIfUpdated() {
+  if (Date.now() - selfCheckedAt < SELF_CHECK_MS || typeof chrome.runtime.reload !== 'function' || typeof chrome.runtime.getURL !== 'function') return false;
+  selfCheckedAt = Date.now();
+  try {
+    const r = await fetch(chrome.runtime.getURL('manifest.json') + '?t=' + Date.now(), { cache: 'no-store' });
+    const disk = r && r.ok ? (await r.json()).version : null;
+    if (!disk || !versionNewer(disk, EXT_VERSION)) return false;
+    await log(`có bản tiện ích mới trên máy (${EXT_VERSION} → ${disk}) — tự tải lại`);
+    chrome.runtime.reload();
+    return true;
+  } catch (e) { console.warn('[autotok] self-check', e); return false; }
+}
+
 async function pollLoop() {
   if (polling) return;
   polling = true;
@@ -918,6 +941,7 @@ async function pollLoop() {
         }
         if (await recoverCollect()) { await setPoll('đang thu số liệu'); await wait(4000); continue; }
         if (await recoverDelete()) { await setPoll('đang xoá bài hẹn cũ để đổi giờ'); await wait(3000); continue; }   // v1.4.6
+        if (await reloadIfUpdated()) return;                      // v1.4.8: app updated the files on disk -> reload ourselves while idle
         const c = await getConn();
         if (c.state === 'unauthorized') { await setPoll('cần ghép nối lại'); return; }
         if (c.needReload) { await setPoll('cần tải lại tiện ích'); await wait(10000); continue; }   // never claim while out of protocol range
