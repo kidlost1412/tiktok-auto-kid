@@ -576,6 +576,35 @@ _RE_DEM_VAI = re.compile(r"(?<!\w)(?:nha|nè|á)(?!\w)")
 _MO_TEN_MUON = {"ket_qua_truoc", "dang_xay_ra"}       # mở bằng kết quả/khoảnh khắc: tên sản phẩm được lùi tới câu 3 (cùng kiểu thân chuyen_that_bai)
 
 
+_RE_TU_HOI = re.compile(r"(?:khách|người ta|bà con|anh chị)\s+(?:hay\s+|cũng\s+|thường\s+)?hỏi\s*:", re.I)
+_RE_TRA_LOI_CUT = re.compile(r"^(?:được|có|không|đúng|chắc chắn rồi|vì sao)\s*[.!?]?$", re.I)
+
+
+def tat_giong_may(item, sp, plain, sents):
+    """Tật cấu trúc làm lời đọc nghe như máy viết (phần NÓI NHƯ NGƯỜI THẬT của đề biên kịch) → danh sách lỗi.
+    Chỉ bắt những tật đo chắc được; còn lại để đề bài và giám khảo lo."""
+    errs = []
+    n_ba_cham = plain.count("…") + plain.count("...")
+    if n_ba_cham > 1:
+        errs.append(f"{n_ba_cham} dấu '…' (tối đa 1; muốn ngắt hơi thì dùng dấu phẩy hoặc tách câu)")
+    if _RE_TU_HOI.search(plain):
+        errs.append("khuôn tự hỏi tự đáp 'Khách hỏi: …?' (kể lại thành lời của người nói)")
+    for a, b in zip(sents, sents[1:]):
+        if a.rstrip().endswith("?") and _RE_TRA_LOI_CUT.match(b.strip()):
+            errs.append(f"tự hỏi rồi tự đáp cụt '{b.strip()}'")
+            break
+    if any(s.rstrip().endswith("?") and re.search(r",\s*hay\s+\w", s.lower()) for s in sents[-2:]):
+        errs.append("kết bằng câu hỏi ép chọn 'A, hay B?' (kết bằng một việc cụ thể)")
+    if len(sents) >= 3:
+        for s in sents[1:-1]:                          # câu mở và câu chốt được ngắn
+            if len(re.findall(r"\w+", s)) <= 3 and not s.rstrip().endswith("?"):
+                errs.append(f"câu cụt kiểu khẩu hiệu '{s.strip()}' (gộp vào câu trước hoặc bỏ)")
+                break
+    if (item.get("goc") or "") == "qua-tang" and sp.get("qua_tang") and not re.search(r"(?<!\w)(?:tặng|quà)(?!\w)", plain.lower()):
+        errs.append("góc quà tặng nhưng lời đọc không nói quà gì")
+    return errs
+
+
 def check(item, sp, used_norm, log=None):
     """→ (lỗi[], các câu). Lỗi không rỗng = loại bản. log(msg): ghi các nhận xét không loại bản."""
     errs = []
@@ -626,6 +655,7 @@ def check(item, sp, used_norm, log=None):
         errs.append("không nhắc giỏ hàng")
     elif gh >= 3:
         errs.append(f"nhắc giỏ hàng {gh} lần (chỉ một lần)")
+    errs += tat_giong_may(item, sp, plain, sents)
     if chot and chot != "qua_cu_the" and log and any(re.search(r"(?<!\w)tặng(?!\w)", s.lower()) for s in sents[-2:]):
         log(f"  lưu ý: kiểu chốt {chot} nhưng hai câu cuối có chữ 'tặng'")
     errs += [f"lặp câu: {s[:30]}" for s in sents if norm(s) in used_norm and len(s.split()) >= 4]

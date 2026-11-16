@@ -26,11 +26,11 @@ def kich_ban(i, sp, ten="Alpha Gold", gh="Bấm giỏ hàng nhé.", u=False, **t
     """Một kịch bản hợp lệ (đủ âm tiết, ≥ 3 tag, tên ở câu 2, giỏ hàng một lần); i làm các câu khác nhau giữa các bản."""
     nho, lon = vl.khung_am_tiet(sp)[2:4]
     muc = (nho + lon) // 2
-    c1, c2, c4, c5 = f"[curious] Vườn thứ {i} khựng lại.", f"[concerned] {ten} vào đúng lúc.", "[warm] Ngắn thôi.", f"[confident] {gh}"
+    c1, c2, c4, c5 = f"[curious] Vườn thứ {i} khựng lại.", f"[concerned] {ten} vào đúng lúc.", "[warm] Ngắn gọn thôi mà.", f"[confident] {gh}"
     if u:                     # mọi câu khác nhau giữa các bản (máy chống lặp câu nguyên văn)
-        c2, c4, c5 = c2[:-1] + f" lần {i}.", f"[warm] Ngắn thôi {i}.", c5[:-1] + f" {i}."
+        c2, c4, c5 = c2[:-1] + f" lần {i}.", f"[warm] Ngắn gọn thôi mà {i}.", c5[:-1] + f" {i}."
     dem = lambda *cs: sum(len(vl.re.findall(r"\w+", vl.re.sub(r"\[[^\]]*\]", "", c))) for c in cs)
-    pad = ["rễ", "gốc", "lá", "đọt", "cành"]
+    pad = ["rễ", "gốc", "lá", "đọt", "quà"]       # có chữ "quà": máy giao góc qua-tang ngẫu nhiên
     n3 = max(muc - dem(c1, c2, c4, c5) - 1, 3)
     c3 = f"[confident] Lô {i} " + " ".join(pad[k % 5] for k in range(n3)) + "."
     it = {"goc": "x", "text": " ".join([c1, c2, c3, c4, c5]), "dong": ["a"], "y_canh": ["a"] * 5, "chu_mo": "Một chữ móc", "nhan_tu": ["x"],
@@ -254,22 +254,22 @@ class CheckTest(Nen):
 
     def test_tu_cam_moi(self):
         for tu in ("giải pháp toàn diện", "hiệu quả vượt trội", "chất lượng hàng đầu"):
-            e = self.kiem(self.thay(lambda t: t.replace("Ngắn thôi.", f"Là {tu} đó."), mo="mat_mat"))
+            e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà.", f"Là {tu} đó."), mo="mat_mat"))
             self.assertTrue(any(tu in x for x in e), (tu, e))
 
     def test_nha_ne_khong_con_la_tu_cam_nhung_vai_ky_thuat_cam(self):
-        it = self.thay(lambda t: t.replace("Ngắn thôi.", "Cứ thử đi nha."), vai="nha_vuon")
+        it = self.thay(lambda t: t.replace("Ngắn gọn thôi mà.", "Cứ thử đi nha."), vai="nha_vuon")
         self.assertEqual(self.kiem(it), [])
-        e = self.kiem(self.thay(lambda t: t.replace("Ngắn thôi.", "Cứ thử đi nha."), vai="ky_thuat"))
+        e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà.", "Cứ thử đi nha."), vai="ky_thuat"))
         self.assertTrue(any("vai ky_thuat" in x for x in e), e)
-        e = self.kiem(self.thay(lambda t: t.replace("Ngắn thôi.", "Thử đi nè."), vai="dan_chuyen"))
+        e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà.", "Thử đi nè."), vai="dan_chuyen"))
         self.assertTrue(any("dan_chuyen" in x for x in e), e)
 
     def test_tieng_dem_toi_da_2(self):
-        ba = lambda t: t.replace("Ngắn thôi.", "Cứ thử đi ạ.").replace("khựng lại.", "khựng lại luôn nha.").replace("Lô 2", "Lô 2 chắc nha, ")
+        ba = lambda t: t.replace("Ngắn gọn thôi mà.", "Cứ thử đi ạ.").replace("khựng lại.", "khựng lại luôn nha.").replace("Lô 2", "Lô 2 chắc nha, ")
         e = self.kiem(self.thay(ba, vai="nha_vuon"))
         self.assertTrue(any("tiếng đệm" in x for x in e), e)
-        hai = lambda t: t.replace("Ngắn thôi.", "Cứ thử đi ạ.").replace("khựng lại.", "khựng lại luôn nha.")
+        hai = lambda t: t.replace("Ngắn gọn thôi mà.", "Cứ thử đi ạ.").replace("khựng lại.", "khựng lại luôn nha.")
         self.assertFalse(any("tiếng đệm" in x for x in self.kiem(self.thay(hai, vai="nha_vuon"))))
 
     def test_tag_it_nhat_3_khac_nhau(self):
