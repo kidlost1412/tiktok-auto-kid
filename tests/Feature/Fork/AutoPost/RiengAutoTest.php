@@ -238,7 +238,7 @@ function fakeCodex(array $answers): CodexRunner
             parent::__construct($a);
         }
 
-        public function ask(string $accountId, string $model, string $effort, string $prompt, array $images, string $workDir): string
+        public function ask(string $accountId, string $model, string $effort, string $prompt, array $images, string $workDir, bool $fast = false): string
         {
             $this->calls[] = [$accountId, $model, $effort, $prompt];
             $next = array_shift($this->answers);
@@ -335,6 +335,50 @@ test('the quota reset time is read from the ChatGPT message', function () {
     expect(CodexRunner::retryAt("You've hit your usage limit. Try again in 2 hours 5 minutes."))->toBe(125)
         ->and(CodexRunner::retryAt('try again in 37 minutes'))->toBe(37)
         ->and(CodexRunner::retryAt('nothing'))->toBeNull();
+});
+
+test('codex runs with the Fast tier when chosen and "out of credits" counts as out of quota', function () {
+    $bin = $this->gpt.'/fake-codex.cmd';
+    file_put_contents($bin, "@echo off\r\necho %* > \"%~dp0args.txt\"\r\necho ERROR: Your workspace is out of credits. Add credits to continue. 1>&2\r\nexit /b 1\r\n");
+    config(['fork.auto.codex_path' => $bin]);
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $work = $this->gpt.'/work';
+    File::ensureDirectoryExists($work);
+
+    expect(fn () => app(CodexRunner::class)->ask('tk-aaaaaaaa', 'gpt-6.1-terra', 'low', 'hi', [], $work, true))->toThrow(CodexLimited::class);
+    $args = (string) file_get_contents($this->gpt.'/args.txt');
+    expect($args)->toContain('service_tier')->toContain('fast')->toContain('model_reasoning_effort=low');
+
+    expect(fn () => app(CodexRunner::class)->ask('tk-aaaaaaaa', 'gpt-6.1-terra', 'low', 'hi', [], $work, false))->toThrow(CodexLimited::class)
+        ->and((string) file_get_contents($this->gpt.'/args.txt'))->not->toContain('service_tier');
+})->skip(PHP_OS_FAMILY !== 'Windows', 'cmd script');
+
+test('the app finds codex.exe it installed itself, without PATH or a global npm install', function () {
+    $dir = $this->gpt.'/cli';
+    $exe = $dir.'/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe';
+    File::ensureDirectoryExists(dirname($exe));
+    file_put_contents($exe, '');
+    config(['fork.auto.codex_path' => '', 'fork.auto.codex_dir' => $dir]);
+
+    $accounts = app(ChatGptAccounts::class);
+    expect(str_replace('\\', '/', (string) $accounts->codexPath()))->toBe($exe)
+        ->and($accounts->cliStatus())->toMatchArray(['installed' => true, 'installing' => false]);
+
+    $this->actingAs($this->owner)->postJson('/auto/kho/rieng/tu-dong/codex-cli', ['check' => true])
+        ->assertOk()->assertJsonPath('cli.installed', true);
+    $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong')->assertOk()->assertJsonPath('codex_installed', true)->assertJsonPath('cli.installed', true);
+});
+
+test('real Codex model names, efforts limited to what the model has, and the Fast switch', function () {
+    $r = $this->actingAs($this->owner)->patchJson('/auto/kho/rieng/tu-dong', ['model' => 'gpt-6-luna', 'effort' => 'xhigh', 'fast' => true])->assertOk()->json();
+
+    expect($r['settings'])->toMatchArray(['model' => 'gpt-6-luna', 'effort' => 'xhigh', 'fast' => true])
+        ->and($r['models']['gpt-6.1-sol']['name'])->toBe('GPT-6.1-Sol')
+        ->and($r['models']['gpt-6-luna']['efforts'])->not->toContain('ultra')
+        ->and($r['efforts']['xhigh'])->toBe('Extra high');
+
+    // Luna không có mức Ultra: về mức mặc định.
+    expect(RiengAutoSettings::update(['effort' => 'ultra'])['effort'])->toBe('low');
 });
 
 // ---------------------------------------------------------------- Trang cài đặt + sửa video

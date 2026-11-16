@@ -20,7 +20,7 @@ class CodexRunner
      * @throws CodexLimited khi tài khoản hết lượt
      * @throws RuntimeException lỗi khác
      */
-    public function ask(string $accountId, string $model, string $effort, string $prompt, array $images, string $workDir): string
+    public function ask(string $accountId, string $model, string $effort, string $prompt, array $images, string $workDir, bool $fast = false): string
     {
         $codex = $this->accounts->codexPath();
 
@@ -32,13 +32,18 @@ class CodexRunner
         @unlink($out);
         $cmd = [$codex, 'exec', '-m', $model, '-c', 'model_reasoning_effort='.$effort, '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-o', $out];
 
+        if ($fast) {
+            // Chế độ Fast của Codex: nhanh gấp đôi, tốn lượt hơn.
+            array_splice($cmd, 5, 0, ['-c', 'service_tier="fast"']);
+        }
+
         foreach ($images as $img) {
             $cmd[] = '-i';
             $cmd[] = $img;
         }
 
         $cmd[] = '-';
-        $p = new Process($cmd, $workDir, ['CODEX_HOME' => $this->accounts->home($accountId)], $prompt, self::TIMEOUT);
+        $p = new Process($cmd, $workDir, ['CODEX_HOME' => $this->accounts->home($accountId)] + $this->accounts->childEnv(), $prompt, self::TIMEOUT);
         $p->run();
         $answer = is_file($out) ? trim((string) file_get_contents($out)) : '';
         $log = $p->getOutput()."\n".$p->getErrorOutput();
@@ -47,7 +52,7 @@ class CodexRunner
             return $answer;
         }
 
-        if (preg_match('/usage limit|rate limit|too many requests|\b429\b|quota/i', $log) === 1) {
+        if (preg_match('/usage limit|rate limit|too many requests|\b429\b|quota|out of credits|add credits/i', $log) === 1) {
             throw new CodexLimited(self::retryAt($log));
         }
 

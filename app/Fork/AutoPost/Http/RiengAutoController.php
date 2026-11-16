@@ -42,6 +42,7 @@ final class RiengAutoController extends Controller
             'duplicates' => ['sometimes', 'in:ask,allow'],
             'model' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::MODELS))],
             'effort' => ['sometimes', 'string', 'in:'.implode(',', array_keys(RiengAutoSettings::EFFORTS))],
+            'fast' => ['sometimes', 'boolean'],
             'folder_channels' => ['sometimes', 'array'],
         ]);
 
@@ -57,6 +58,20 @@ final class RiengAutoController extends Controller
         RiengAutoSettings::update($in);
 
         return response()->json($this->payload($accountId, $accounts, $speech));
+    }
+
+    /** Tự cài ChatGPT CLI (Codex) vào thư mục của app. POST bắt đầu cài (chạy nền); trả trạng thái để trang hỏi lại. */
+    public function installCli(Request $request, ChatGptAccounts $accounts): JsonResponse
+    {
+        $this->authorizeOwner($request);
+
+        if ($request->boolean('check')) {
+            return response()->json(['cli' => $accounts->cliStatus()]);
+        }
+
+        $error = $accounts->installCli();
+
+        return response()->json(['cli' => $accounts->cliStatus(), 'error' => $error], $error === null ? 200 : 422);
     }
 
     public function addChatGpt(Request $request, ChatGptAccounts $accounts): JsonResponse
@@ -221,7 +236,8 @@ final class RiengAutoController extends Controller
             'settings' => RiengAutoSettings::get(),
             'models' => RiengAutoSettings::MODELS,
             'efforts' => RiengAutoSettings::EFFORTS,
-            'codex_installed' => $accounts->codexPath() !== null,
+            'codex_installed' => ($cli = $accounts->cliStatus())['installed'],
+            'cli' => $cli,
             'speech_ready' => $speech->key() !== null,
             'chatgpt' => $accounts->all(),
             'channels' => $this->tiktokAccounts($accountId)

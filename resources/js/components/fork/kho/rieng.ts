@@ -122,7 +122,23 @@ export interface AutoSettings {
     duplicates: 'ask' | 'allow';
     model: string;
     effort: string;
+    fast: boolean;
     folder_channels: Record<string, string[]>;
+}
+
+/** Một model ChatGPT trong Codex CLI. */
+export interface AutoModel {
+    name: string;
+    note: string;
+    efforts: string[];
+}
+
+/** Trạng thái cài ChatGPT CLI (Codex) của app. */
+export interface CliStatus {
+    installed: boolean;
+    installing: boolean;
+    node: boolean;
+    error: string | null;
 }
 
 export interface ChatGptAccount {
@@ -139,9 +155,10 @@ export interface ChatGptAccount {
 
 export interface AutoPayload {
     settings: AutoSettings;
-    models: Record<string, string>;
+    models: Record<string, AutoModel>;
     efforts: Record<string, string>;
     codex_installed: boolean;
+    cli: CliStatus;
     speech_ready: boolean;
     chatgpt: ChatGptAccount[];
     channels: {

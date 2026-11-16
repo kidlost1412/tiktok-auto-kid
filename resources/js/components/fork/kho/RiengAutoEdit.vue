@@ -1,6 +1,11 @@
 <script setup lang="ts">
 // Chỉnh "tự đăng" của một video riêng: xem AI thấy gì, chọn sản phẩm, sửa caption, duyệt, chọn kênh, cho đăng video trùng.
-import { IconLoader2, IconRefresh, IconSparkles } from '@tabler/icons-vue';
+import {
+    IconCheck,
+    IconLoader2,
+    IconRefresh,
+    IconSparkles,
+} from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -10,6 +15,7 @@ import {
     type RiengAuto,
     type RiengVideo,
 } from '@/components/fork/kho/rieng';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -172,11 +178,14 @@ const reanalyze = async () => {
 
 const chipCls = (on: boolean) =>
     cn(
-        'rounded-full border px-2.5 py-0.5 text-xs transition',
+        'inline-flex items-center gap-1.5 rounded-full border-2 py-0.5 pr-2.5 pl-0.5 text-[13px] font-medium transition',
         on
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'hover:bg-muted',
+            ? 'border-violet-600 bg-violet-50 text-foreground dark:border-primary dark:bg-primary/10'
+            : 'border-border bg-background text-foreground/80 hover:border-foreground/40',
     );
+
+const initial = (name: string) =>
+    name.replace(/^@/, '').charAt(0).toUpperCase() || '?';
 </script>
 
 <template>
@@ -196,9 +205,9 @@ const chipCls = (on: boolean) =>
 
             <div v-if="video" class="flex min-w-0 flex-col gap-4 text-sm">
                 <!-- AI thấy gì -->
-                <section class="rounded-xl border bg-muted/30 p-3">
+                <section class="rounded-xl border-2 bg-muted/30 p-3">
                     <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-1.5 font-medium">
+                        <div class="flex items-center gap-1.5 font-semibold">
                             <IconSparkles class="size-4 shrink-0" />
                             {{ sureText }}
                         </div>
@@ -219,15 +228,17 @@ const chipCls = (on: boolean) =>
                     </div>
                     <p
                         v-if="auto?.ai_reason"
-                        class="mt-1 text-xs text-muted-foreground"
+                        class="mt-1 text-[13px] text-foreground/70"
                     >
                         Vì: {{ auto.ai_reason }}
                     </p>
-                    <p v-if="auto?.ai_summary" class="mt-1 text-xs">
+                    <p v-if="auto?.ai_summary" class="mt-1 text-[13px]">
                         Video: {{ auto.ai_summary }}
                     </p>
-                    <details v-if="auto?.ai_speech" class="mt-1 text-xs">
-                        <summary class="cursor-pointer text-muted-foreground">
+                    <details v-if="auto?.ai_speech" class="mt-1 text-[13px]">
+                        <summary
+                            class="cursor-pointer font-medium text-foreground/80"
+                        >
                             Lời nói trong video
                         </summary>
                         <p class="mt-1 whitespace-pre-line">
@@ -238,7 +249,7 @@ const chipCls = (on: boolean) =>
 
                 <!-- Sản phẩm -->
                 <section class="flex flex-col gap-1.5">
-                    <h3 class="font-semibold">Sản phẩm gắn giỏ</h3>
+                    <h3 class="text-base font-semibold">Sản phẩm gắn giỏ</h3>
                     <NativeSelect
                         v-model="product"
                         aria-label="Sản phẩm"
@@ -280,7 +291,7 @@ const chipCls = (on: boolean) =>
 
                 <!-- Caption -->
                 <section class="flex flex-col gap-1.5">
-                    <h3 class="font-semibold">Caption</h3>
+                    <h3 class="text-base font-semibold">Caption</h3>
                     <textarea
                         v-model="caption"
                         rows="3"
@@ -293,7 +304,7 @@ const chipCls = (on: boolean) =>
                         "
                     />
                     <div
-                        class="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"
+                        class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-foreground/70"
                     >
                         <span
                             >{{ caption.length }} ký tự · hashtag sản phẩm app
@@ -314,7 +325,7 @@ const chipCls = (on: boolean) =>
                         v-if="settings?.approve_first && auto?.ai_caption"
                         class="flex items-center justify-between gap-3"
                     >
-                        <span>Đã duyệt caption AI</span>
+                        <span class="font-medium">Đã duyệt caption AI</span>
                         <Switch
                             :model-value="auto?.approved ?? false"
                             @update:model-value="
@@ -326,13 +337,21 @@ const chipCls = (on: boolean) =>
 
                 <!-- Kênh -->
                 <section class="flex flex-col gap-1.5">
-                    <h3 class="font-semibold">Kênh đăng video này</h3>
+                    <h3 class="text-base font-semibold">Kênh đăng video này</h3>
                     <div class="flex flex-wrap items-center gap-1.5">
                         <button
                             type="button"
-                            :class="chipCls(channels.length === 0)"
+                            :class="
+                                cn(chipCls(channels.length === 0), 'pl-2.5')
+                            "
+                            :aria-pressed="channels.length === 0"
                             @click="channels = []"
                         >
+                            <IconCheck
+                                v-if="channels.length === 0"
+                                class="size-3.5 text-violet-600 dark:text-primary"
+                                stroke-width="3"
+                            />
                             Theo thư mục / mọi kênh
                         </button>
                         <button
@@ -340,9 +359,26 @@ const chipCls = (on: boolean) =>
                             :key="c.id"
                             type="button"
                             :class="chipCls(channels.includes(c.id))"
+                            :aria-pressed="channels.includes(c.id)"
                             @click="toggleChannel(c.id)"
                         >
+                            <Avatar class="size-6 shrink-0">
+                                <AvatarImage
+                                    v-if="c.avatar_url"
+                                    :src="c.avatar_url"
+                                    alt=""
+                                />
+                                <AvatarFallback
+                                    class="text-[11px] font-semibold"
+                                    >{{ initial(c.name) }}</AvatarFallback
+                                >
+                            </Avatar>
                             {{ c.name }}
+                            <IconCheck
+                                v-if="channels.includes(c.id)"
+                                class="size-3.5 text-violet-600 dark:text-primary"
+                                stroke-width="3"
+                            />
                         </button>
                     </div>
                 </section>
@@ -350,9 +386,9 @@ const chipCls = (on: boolean) =>
                 <!-- Video trùng -->
                 <section
                     v-if="video.duplicate && settings?.duplicates === 'ask'"
-                    class="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    class="flex items-center justify-between gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
                 >
-                    <span class="text-xs"
+                    <span class="text-[13px] font-medium"
                         >{{ video.duplicate.text }}. Vẫn đăng?</span
                     >
                     <Switch
