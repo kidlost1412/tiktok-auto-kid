@@ -600,6 +600,15 @@ def tat_giong_may(item, sp, plain, sents):
     cut = [s.strip() for s in sents[1:-1] if len(re.findall(r"\w+", s)) <= 3 and not s.rstrip().endswith("?")]
     if len(cut) >= 2:
         errs.append(f"thân bài vụn, {len(cut)} câu cụt ({' / '.join(cut[:3])}) — gộp vào câu trước hoặc bỏ")
+    # luật riêng kiểu: Tên "Nano Đồng Toàn Cầu" (hoặc "chai Nano Đồng này") trong 5 giây đầu → một trong các tên trong ngoặc kép
+    # phải lọt vào khoảng âm tiết đầu tương ứng (đọc ~4 âm tiết/giây)
+    for luat in sp.get("luat_rieng") or []:
+        m = re.search(r"(\d+)\s*giây đầu", str(luat or ""))
+        ten = re.findall(r"[\"“]([^\"”]+)[\"”]", str(luat or "")) if m else []
+        if ten:
+            dau = " ".join(re.findall(r"\w+", plain)[:int(m.group(1)) * 4])
+            if not any(_chuan(t) in _chuan(dau) for t in ten):
+                errs.append(f"luật riêng: chưa đọc tên \"{ten[0]}\" trong {m.group(1)} giây đầu")
     if (item.get("goc") or "") == "qua-tang" and sp.get("qua_tang") and not re.search(r"(?<!\w)(?:tặng|quà)(?!\w)", plain.lower()):
         errs.append("góc quà tặng nhưng lời đọc không nói quà gì")
     return errs

@@ -42,5 +42,13 @@ class TatGiongMayTest(unittest.TestCase):
         self.assertEqual(loi(t, goc="qua-tang", sp={"qua_tang": []}), [])     # sản phẩm không có quà thì thôi
 
 
+    def test_luat_rieng_ten_trong_may_giay_dau(self):
+        sp = {"luat_rieng": ['Tên "Nano Đồng Toàn Cầu" (hoặc "chai Nano Đồng này") trong 5 giây đầu.', "Không nói lá xanh."]}
+        muon = "Ruộng lúa hay mất vì đúng một lượt phun chậm. Phun Nano Đồng ngay lúc vừa chớm, vì nhãn ghi trừ đạo ôn, khô vằn, cháy bìa lá. Nano Đồng Toàn Cầu có ở giỏ hàng."
+        self.co(loi(muon, sp=sp), "5 giây đầu")
+        self.assertEqual(loi("Thứ làm mai mất điểm, ít ai nói ra. Chai Nano Đồng này đánh bật rêu trên thân. Giỏ hàng có sẵn.", sp=sp), [])
+        self.assertEqual(loi(muon, sp={"luat_rieng": ["Không nói giá."]}), [])          # luật không nói giây đầu thì thôi
+
+
 if __name__ == "__main__":
     unittest.main()
