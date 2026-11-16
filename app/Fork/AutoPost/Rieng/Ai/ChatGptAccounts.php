@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Models\AutoSetting;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -304,6 +305,92 @@ final class ChatGptAccounts
         $log = @file_get_contents($this->home($id).DIRECTORY_SEPARATOR.'login.log');
 
         return is_string($log) && preg_match('#https://auth\.openai\.com/\S+#', $log, $m) === 1 ? rtrim($m[0], '.,') : null;
+    }
+
+    /**
+     * Hạn mức ChatGPT (Codex) của một tài khoản: hỏi `codex app-server` (account/rateLimits/read), không tốn lượt.
+     * Mỗi khung: phần trăm đã dùng, độ dài khung (phút), lúc đặt lại. null nếu không hỏi được.
+     *
+     * @return array{plan: ?string, windows: list<array{used: int, minutes: ?int, resets_at: ?string}>, reached: bool}|null
+     */
+    public function limits(string $id): ?array
+    {
+        $codex = $this->codexPath();
+
+        if ($codex === null || ! in_array($id, $this->ids(), true)) {
+            return null;
+        }
+
+        $input = implode("\n", [
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"tiktok-auto-kid","version":"1"}}}',
+            '{"jsonrpc":"2.0","method":"initialized"}',
+            '{"jsonrpc":"2.0","id":2,"method":"account/rateLimits/read"}',
+        ])."\n";
+        $p = new Process([$codex, 'app-server'], $this->home($id), ['CODEX_HOME' => $this->home($id)] + $this->childEnv(), null, 30);
+        $in = new InputStream;
+        $p->setInput($in);
+        $buf = '';
+        $result = null;
+
+        try {
+            $p->start();
+            $in->write($input);
+
+            while ($p->isRunning() && $result === null) {
+                usleep(50_000);
+                $p->checkTimeout();
+                $buf .= $p->getIncrementalOutput();
+
+                foreach (explode("\n", $buf) as $line) {
+                    $msg = json_decode(trim($line), true);
+
+                    if (is_array($msg) && ($msg['id'] ?? null) === 2) {
+                        $result = $msg;
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable) {
+            // hết giờ hoặc không chạy được: coi như không biết
+        } finally {
+            $in->close();
+            $p->stop(1);
+        }
+
+        return is_array($result) ? self::parseLimits($result) : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $msg  câu trả lời JSON-RPC của account/rateLimits/read
+     * @return array{plan: ?string, windows: list<array{used: int, minutes: ?int, resets_at: ?string}>, reached: bool}|null
+     */
+    public static function parseLimits(array $msg): ?array
+    {
+        $rl = data_get($msg, 'result.rateLimits');
+
+        if (! is_array($rl)) {
+            return null;
+        }
+
+        $windows = [];
+
+        foreach (['primary', 'secondary'] as $k) {
+            $w = $rl[$k] ?? null;
+
+            if (is_array($w) && isset($w['usedPercent'])) {
+                $windows[] = [
+                    'used' => (int) round((float) $w['usedPercent']),
+                    'minutes' => isset($w['windowDurationMins']) ? (int) $w['windowDurationMins'] : null,
+                    'resets_at' => isset($w['resetsAt']) ? CarbonImmutable::createFromTimestamp((int) $w['resetsAt'])->toIso8601String() : null,
+                ];
+            }
+        }
+
+        return [
+            'plan' => is_string($rl['planType'] ?? null) ? $rl['planType'] : null,
+            'windows' => $windows,
+            'reached' => filled($rl['rateLimitReachedType'] ?? null) || data_get($msg, 'result.ordinaryUsageAllowed') === false,
+        ];
     }
 
     /** Bỏ tài khoản: xoá thư mục CODEX_HOME của app (không đụng gì ngoài storage/app/chatgpt). */

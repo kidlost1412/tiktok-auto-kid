@@ -104,6 +104,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::post('tu-dong/codex-cli', [RiengAutoController::class, 'installCli'])->middleware('throttle:6,1')->name('auto.codex.install');
         Route::post('tu-dong/chatgpt', [RiengAutoController::class, 'addChatGpt'])->middleware('throttle:10,1')->name('auto.chatgpt.add');
         Route::get('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'chatGptStatus'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.status');
+        Route::get('tu-dong/chatgpt/{id}/han-muc', [RiengAutoController::class, 'chatGptLimits'])->where('id', 'tk-[a-z0-9]{8}')->middleware('throttle:30,1')->name('auto.chatgpt.limits');
         Route::delete('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'removeChatGpt'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.remove');
         Route::post('video/{video}/tu-dong', [RiengAutoController::class, 'updateVideo'])->whereNumber('video')->middleware('throttle:120,1')->name('auto.video');
         Route::post('video/{video}/ai-xem-lai', [RiengAutoController::class, 'reanalyze'])->whereNumber('video')->middleware('throttle:20,1')->name('auto.reanalyze');

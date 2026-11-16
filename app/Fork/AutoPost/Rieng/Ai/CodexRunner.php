@@ -34,7 +34,7 @@ class CodexRunner
 
         if ($fast) {
             // Chế độ Fast của Codex: nhanh gấp đôi, tốn lượt hơn.
-            array_splice($cmd, 5, 0, ['-c', 'service_tier="fast"']);
+            array_splice($cmd, 4, 0, ['-c', 'service_tier="fast"']);
         }
 
         foreach ($images as $img) {
