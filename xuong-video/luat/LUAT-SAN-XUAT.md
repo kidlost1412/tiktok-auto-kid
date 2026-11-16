@@ -3,9 +3,9 @@
 ## Mục tiêu
 Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VIỆC CẦN LÀM (mặc định 20–25 s), 9:16. Video để bán hàng qua giỏ hàng: không xin bình luận, không xin theo dõi.
 
-## Lời đọc (người bán ngoài chợ nói, giọng AI đọc lên)
-- Lời này do GIỌNG AI đọc, người nghe nghe MỘT lần trong lúc lướt. Câu nào nghe một lần không hiểu ngay là hỏng. Viết như người bán vật tư ngoài chợ nói với các bác nhà nông: chữ thường ngày, câu đủ ý, nói thẳng vào việc, chân chất, mộc mạc.
-- Xưng hô: khi cần gọi người nghe thì gọi "các bác", chỗ nào tự nhiên mới gọi (tối đa 2 lần "các bác", 2 lần "bà con" một bài). Không dùng "tôi", "bạn", "anh chị". Người kể xưng "mình" hoặc "em".
+## Lời đọc (người làm nội dung am hiểu nông nghiệp nói, giọng AI đọc lên)
+- Lời này do GIỌNG AI đọc, người nghe nghe MỘT lần trong lúc lướt. Câu nào nghe một lần không hiểu ngay là hỏng. Viết như người làm nội dung bán hàng am hiểu nông nghiệp và sản phẩm, nói với nhà nông: chữ thường ngày, câu đủ ý, nói thẳng vào việc, chân chất, mộc mạc. Nội dung đa dạng là quan trọng nhất.
+- Xưng hô: gọi người nghe "các bác" hoặc "bà con", ngang nhau, chỗ nào tự nhiên mới gọi (mỗi chữ tối đa 2 lần một bài). Không dùng "tôi", "bạn", "anh chị". Người làm nội dung xưng "em", nhà vườn kể chuyện xưng "mình".
 - Mỗi video MỘT ý bán chính, theo đúng KIỂU MỞ, KIỂU THÂN, KIỂU CHỐT và VAI NGƯỜI NÓI được giao.
 - 5 giây đầu là tất cả: câu mở là HOOK phải mạnh, giữ chân người đang lướt, như dân bán hàng chuyên nghiệp, không như nội dung AI nào cũng làm. Hook mở ra một chỗ hở (bí mật, câu đố, chuyện bỏ lửng, điều ngược đời, tiền đang bị phí, thua nhà bên, lời rao viral, quà, đúng người đúng lúc…) theo đúng KIỂU MỞ được giao. KHÔNG mở bằng kể vườn đang bị gì (bà con nghe tới ngán) trừ khi kiểu mở được giao là kiểu đó; vấn đề của vườn để xuống thân bài. Sản phẩm là câu trả lời cho câu mở, không phải câu mở. Sức hút của hook nằm ở Ý (điều lạ, chỗ hở, con số, chuyện bỏ lửng, cái mất), nói gọn và chắc; không nằm ở tiếng gọi. KHÔNG mở bằng tiếng gọi ("Các bác ơi", "Bà con ơi").
 - Tên sản phẩm (ten_ngan trong hồ sơ, không có thì ten_goi) xuất hiện chậm nhất ở câu thứ hai; luật riêng của sản phẩm (luat_rieng) nếu chặt hơn thì theo luật riêng.
@@ -14,9 +14,9 @@ Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VI�
 - Thông tin trên nhãn (hoạt chất, liều, công dụng) dùng bình thường khi bài cần, nhưng nói như người bán nói, không kể lể kiểu "đọc nhãn ta thấy", "đọc nhãn em thấy" nghe quê. Liều nói cho dễ hiểu (hồ sơ có "một nắp một bình" thì nói vậy); công dụng nói thành cây được gì.
 - Người nghe muốn biết: vườn mình bị vầy thì xài cái này được không; xài sao cho dễ; được gì; có lời không (một can xài được bao nhiêu); mua có yên tâm không (quà, cách giao nhận, đổi trả — chỉ theo hồ sơ). Mỗi bài trả lời vài điều trong số đó, đừng kể lan man.
 - CÂU CHUYỆN và HOOK được dựng: tình huống, nhân vật, con số trong chuyện (số gốc, số vụ, tên người) được đặt ra cho hấp dẫn. Lời rao viral kiểu dân bán hàng ("hơn một triệu nhà vườn tin dùng", "sáu mươi ba tỉnh thì sáu mươi hai tỉnh xài rồi") là HOOK, được dùng; chỉ tránh chữ cấm trong khong_duoc_noi ("số 1", "nhất", "duy nhất"…).
-- ĐIỀU NÓI VỀ SẢN PHẨM thì không: công dụng, liều, thành phần, cách dùng, quà chỉ lấy đúng trong hồ sơ SẢN PHẨM; không hứa kết quả chắc chắn; tôn trọng mục khong_duoc_noi. Không nói giá, không nói giá trị quà.
+- ĐIỀU NÓI VỀ SẢN PHẨM thì không: công dụng, liều, thành phần, cơ chế, cách dùng, quà chỉ lấy đúng trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG (kiến thức dùng thực tế); không hứa kết quả chắc chắn; tôn trọng mục khong_duoc_noi. Không nói giá, không nói giá trị quà.
 - Giỏ hàng nhắc đúng một lần, nói ngắn. Quà chỉ nhắc khi KIỂU CHỐT yêu cầu, và chỉ MỘT mức quà lấy đúng từ qua_tang.
-- Tiếng đệm (ạ, nha, đó, luôn, thiệt) chỉ dùng với vai nha_vuon và nguoi_ban_quay, tối đa hai lần một bài, đặt ở chỗ người thật sẽ nói.
+- Tiếng đệm (ạ, nha, đó, luôn, thiệt, nè) tối đa hai lần một bài, đặt ở chỗ người thật sẽ nói.
 - CẤM câu thuyết minh/báo cáo: "đây là điểm đáng cân nhắc", "với người quan tâm…", "quy cách rõ ràng", "đúng nhu cầu, đúng sản phẩm", "tham khảo / xem chi tiết / tìm hiểu thêm", "giải pháp toàn diện", "hiệu quả vượt trội".
 - Số âm tiết theo mục ĐỘ DÀI (không tính tag; ~3,9 âm tiết = 1 giây sau tốc độ 1,1×).
 - Câu mở không được giống hay na ná câu mở đã dùng (xem danh sách).

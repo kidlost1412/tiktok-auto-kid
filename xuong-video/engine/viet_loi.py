@@ -106,17 +106,20 @@ def norm(s):
 # ---------------------------------------------------------------- BỐN TRỤC (mỗi kịch bản một tổ hợp)
 MO = {   # kiểu câu mở (hook): khoá → (mô tả gửi biên kịch, ví dụ CẤU TRÚC — không chép). Hook mở ra một chỗ hở để người đang lướt nghe tiếp,
          # KHÔNG kể vườn đang bị gì (bà con nghe tới ngán); vấn đề của vườn để xuống thân bài. Nhóm hook: chưa biết · chuyện bỏ lửng · lật niềm tin ·
-         # mất mát kiểu mới · người khác đã làm · lời rao viral · đúng người đúng lúc.
+         # mất mát kiểu mới · người khác đã làm · lời rao viral · đúng người đúng lúc. Kiểu nào cũng được, miễn hook HAY: nội dung đa dạng là quan trọng nhất.
     # — mở ra điều người nghe chưa biết
-    'bi_mat_nghe': ('Bí mật người trong nghề: hứa một điều có giá mà ít ai nói ra; người nghe phải nghe hết mới biết.', 'Dân buôn mai có một chiêu… mà không ai chịu nói ra!'),
-    'cau_do': ('Câu đố cho người nghe tự đoán, đáp án bất ngờ (đáp án là sự thật trong hồ sơ).', 'Một can năm lít này xịt được mấy bình, đoán thử coi?'),
-    'vat_la': ('Cầm món đồ lên, chưa nói nó là gì, chỉ nói một điều lạ về nó.', 'Cái can này nhà mình xài nguyên mùa… mà chưa hết nữa!'),
-    'con_so': ('Một con số THẬT trong hồ sơ, nói gọn cho người ta tò mò.', 'Có một nắp nhỏ xíu thôi, mà ăn nguyên bình mười sáu lít!'),
+    'bi_mat_nghe': ('Bí mật người trong nghề: hứa một điều có giá mà ít ai nói ra; người nghe phải nghe hết mới biết.', 'Dân buôn mai có một bước… mà ít khi nói cho người ngoài.'),
+    'vach_tran': ('Vạch trần: một điều người bán, đại lý hay thói quen cũ không nói thật với nhà vườn; câu sau nói thẳng sự thật (đúng KIẾN THỨC sản phẩm).', 'Có một chuyện về đạm cá… chỗ bán ít khi nói thật.'),
+    'su_that_bat_ngo': ('Một sự thật bất ngờ lấy từ KIẾN THỨC thực tế của sản phẩm (cơ chế, cách dùng) mà nhà vườn lâu năm cũng chưa biết.', 'Đạm cá có mùi cá nhẹ… mới đúng là hàng thật.'),
+    'cau_do': ('Câu đố cho người nghe tự đoán, đáp án bất ngờ (đáp án là sự thật trong hồ sơ).', 'Một can năm lít pha được bao nhiêu bình, đoán thử coi?'),
+    'vat_la': ('Cầm món đồ lên, chưa nói nó là gì, chỉ nói một điều lạ về nó.', 'Cái can này xài nguyên mùa… mà vẫn chưa hết.'),
+    'con_so': ('Một con số THẬT trong hồ sơ, nói gọn cho người ta tò mò.', 'Một nắp nhỏ xíu… mà ăn nguyên bình mười sáu lít.'),
     # — câu chuyện bỏ lửng
-    'chuyen_lung': ('Kể một chuyện nhỏ có người thật, dừng ngay chỗ chưa biết kết quả.', 'Ông chú này chửi em một trận… tuần sau quay lại ôm hai can!'),
-    'noi_thiet': ('Người nói nói thiệt một câu thật lòng, hơi ngược chuyện bán hàng, nên nghe đáng tin.', 'Nói thiệt, món này em bán mà em còn bất ngờ.'),
-    'thu_nhan': ('Người nói tự nhận mình từng làm sai.', 'Năm ngoái mình tiếc có một chai thuốc… mà mất trắng đợt tiêu!'),
-    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đã làm gì.', 'Cây mai này ba tuần trước còn đầy rêu đó.'),
+    'chuyen_lung': ('Kể một chuyện nhỏ có người thật (khách, nhà vườn), dừng ngay chỗ chưa biết kết quả.', 'Ông khách chê em một trận… tuần sau quay lại ôm hai can.'),
+    'noi_thiet': ('Người nói nói thiệt một câu thật lòng, hơi ngược chuyện bán hàng, nên nghe đáng tin.', 'Nói thiệt, món này lúc đầu em cũng không tin.'),
+    'thu_nhan': ('Người nói (hoặc một nhà vườn) tự nhận từng làm sai.', 'Năm ngoái tiếc một chai thuốc… mà mất trắng đợt tiêu.'),
+    'giai_oan': ('Đồng cảm rồi giải oan: lỗi không nằm ở người trồng, mà ở một nguyên nhân họ không thấy.', 'Cây không ăn phân… đâu phải tại các bác bón ít.'),
+    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đã làm gì.', 'Cây mai này ba tuần trước còn đầy rêu.'),
     # — lật lại điều ai cũng tin
     'nghich_ly': ('Một câu nghe vô lý mà đúng, khiến người ta khựng lại; thân bài phải giải thích được.', 'Xịt thuốc càng nhiều… vườn lại càng hay bệnh.'),
     'pha_niem_tin': ('Phủ nhận một điều nhà nông tin lâu nay.', 'Ai nói phân hữu cơ phải bón cả bao mới ăn thua? Sai rồi!'),
@@ -127,7 +130,7 @@ MO = {   # kiểu câu mở (hook): khoá → (mô tả gửi biên kịch, ví 
     'hang_xom': ('Thua nhà bên: cùng làm như nhau mà người ta được hơn mình.', 'Cùng lứa mai, nhà bên bán sạch, nhà mình còn nguyên sân!'),
     'mat_mat': ('Một sai nhỏ ai cũng làm, mà hậu quả lớn.', 'Đổ nước trước hay thuốc trước? Sai một bước là hư nguyên bình!'),
     # — người khác đã làm, lời rao viral
-    'ca_xom': ('Người quanh mình đã xài: chuyện trong xóm, người quen hỏi xin, mua lại.', 'Bà Sáu đầu xóm qua xin chai này của mình hai lần rồi đó!'),
+    'ca_xom': ('Người quanh mình đã xài: chuyện trong xóm, người quen hỏi xin, mua lại.', 'Bà Sáu đầu xóm qua xin chai này hai lần rồi.'),
     'rao_viral': ('Lời rao viral kiểu dân bán hàng: nói lớn về độ phủ, độ tin dùng để kéo người nghe (đây là HOOK rao hàng; không dùng chữ cấm trong khong_duoc_noi như "số 1", "nhất", "duy nhất").',
                   'Sáu mươi ba tỉnh, hết sáu mươi hai tỉnh xài can này rồi!'),
     # — gọi đúng người, đúng lúc
@@ -152,6 +155,7 @@ THAN = {   # kiểu thân bài (cũng là DANG_BAI: trường `dang` của kịc
     'soi_nhan': 'Chỉ các bác cách nhận đúng hàng (tên, logo, chữ trên can/chai) như người bán chỉ khách quen; không đọc thông số.',
     'dau_hieu': 'Hai ba dấu hiệu nhìn thấy ngoài vườn → cùng một chai xử lý.',
     'khang_dinh': 'Lời khẳng định thương hiệu gọn, chắc, nói thường như người bán quen.',
+    'vi_sao': 'Giải thích MỘT cơ chế (vì sao nó làm được) lấy từ KIẾN THỨC thực tế của sản phẩm, bằng một ví von đời thường dễ hình dung.',
 }
 DANG_BAI = THAN
 CHOT = {   # kiểu câu chốt (bài nào cũng nhắc giỏ hàng MỘT lần, nói ngắn; quà chỉ nhắc khi kiểu chốt yêu cầu)
@@ -163,22 +167,21 @@ CHOT = {   # kiểu câu chốt (bài nào cũng nhắc giỏ hàng MỘT lần,
     'phep_tinh_chot': 'Nhắc lại con số tiện nhất rồi chỉ giỏ hàng.',
     'dong_hanh': 'Bên em gửi hàng từ kho, có gì cứ nhắn — rồi chỉ giỏ hàng (chỉ dùng khi hồ sơ cho phép nói "bên em").',
 }
-VAI = {   # người nói: một giọng đọc, đổi CÁCH NÓI (không dùng tag nhập vai)
-    'chu_hang': 'Chủ hàng nói thẳng, xưng "em" hoặc "bên em", gọi "các bác" (thỉnh thoảng "bà con"). Chắc, gọn, có trách nhiệm với món mình bán.',
-    'nha_vuon': 'Người làm vườn từng trải kể chuyện mình, xưng "mình", gọi người nghe "các bác". Từ ngữ ngoài vườn, nói chân chất, câu đủ ý. Chuyện kể được hư cấu; điều nói về sản phẩm phải đúng hồ sơ.',
-    'ky_thuat': 'Người làm kỹ thuật giải thích cho dễ hiểu, không xưng hô nhiều. Mỗi câu một ý, có lý do "vì…".',
-    'nguoi_ban_quay': 'Người đứng quầy vật tư kể chuyện khách, xưng "em", gọi người nghe "các bác". Nhanh, thực tế, hay nhắc "khách hỏi…".',
-    'dan_chuyen': 'Giọng người dẫn bán hàng, không xưng hô. Nói rõ ràng, chắc, dễ nghe; không văn vẻ, không tả cảnh.',
+VAI = {   # người nói: một giọng đọc (không dùng tag nhập vai). Giọng chính là người làm nội dung; nhà vườn kể chuyện chỉ thỉnh thoảng (≤ 1/5)
+    'nguoi_noi_dung': ('Người làm nội dung bán hàng viral, am hiểu nông nghiệp và hiểu sản phẩm tới nơi (làm được gì, vì sao, dùng sao cho đúng), '
+                       'nói với nhà nông chân chất, mộc mạc. Xưng "em"; gọi "các bác" hoặc "bà con" ở chỗ tự nhiên. Kể được chuyện khách, chuyện vườn người khác '
+                       '(nói theo vùng như "nhà vườn ở Tây Nguyên", tên người chỉ khi hợp). Chuyện kể được dựng; điều nói về sản phẩm phải đúng hồ sơ và kiến thức sản phẩm.'),
+    'nha_vuon': 'Một nhà vườn từng trải kể chuyện vườn mình, xưng "mình", gọi người nghe "các bác" hoặc "bà con". Từ ngữ ngoài vườn, chân chất, câu đủ ý. Chuyện kể được dựng; điều nói về sản phẩm phải đúng hồ sơ.',
 }
 LUAT_CAU_MO = ('≤ 14 âm tiết; 5 giây đầu là tất cả: hook mạnh, đúng kiểu mở được giao, khiến người đang lướt phải dừng lại nghe tiếp; '
                'sức hút nằm ở Ý của hook (điều lạ, chỗ hở, con số, chuyện bỏ lửng, cái mất), nói gọn và chắc; KHÔNG nằm ở tiếng gọi hay dấu "!"; '
                'câu đầu vào thẳng ý hook, KHÔNG mở bằng tiếng gọi ("Các bác ơi", "Bà con ơi") hay lời chào, '
                'không mở bằng tên sản phẩm (trừ kiểu qua_truoc, con_so, rao_viral); câu thứ hai trả ngay một phần chỗ hở, không vòng vo.')
-_NHA_VUON_QUAY = {"nha_vuon", "nguoi_ban_quay", "chu_hang"}
+_NHA_VUON_QUAY = {"nha_vuon", "nguoi_noi_dung"}
 _VAI_HOP = {   # ràng buộc tổ hợp: khoá (mo | than | chot) → các vai được phép
     "thu_nhan": _NHA_VUON_QUAY, "chuyen_lung": _NHA_VUON_QUAY, "noi_thiet": _NHA_VUON_QUAY, "hoai_nghi": _NHA_VUON_QUAY, "chuyen_that_bai": _NHA_VUON_QUAY,
-    "soi_nhan": {"chu_hang", "dan_chuyen", "ky_thuat"}, "khang_dinh": {"chu_hang", "dan_chuyen", "ky_thuat"},
-    "dong_hanh": {"chu_hang", "nguoi_ban_quay"},
+    "soi_nhan": {"nguoi_noi_dung"}, "khang_dinh": {"nguoi_noi_dung"}, "vi_sao": {"nguoi_noi_dung"},
+    "dong_hanh": {"nguoi_noi_dung"},
 }
 TRUC = {"mo": MO, "than": THAN, "chot": CHOT, "vai": VAI}
 _CHIEU_HIEU_QUA = {"goc": "goc", "mo": "mo", "than": "dang", "chot": "chot", "vai": "vai"}
@@ -234,7 +237,7 @@ def lo_moi():
 def gan_truc(sp, goc, need, dem, hs=None, lo=None, tong=None, rng=random):
     """Giao cho `need` kịch bản mỗi bản một tổ hợp {goc, mo, than, chot, vai}.
     - mỗi trục xoay vòng: ít dùng nhất trước, có ngẫu nhiên, nhân hệ số hiệu quả `hs[trục]` nếu có (dem, lo được cập nhật tại chỗ);
-    - trong MỘT lô (`lo`) không lặp mo cho tới khi dùng hết các kiểu; hook kể chuyện vườn (_MO_VUON) tối đa 1/10 số bản; không quá 1/4 số bản (`tong`) chốt qua_cu_the (trừ góc qua-tang); vai dan_chuyen tối đa 1/5;
+    - trong MỘT lô (`lo`) không lặp mo cho tới khi dùng hết các kiểu; hook kể chuyện vườn (_MO_VUON) tối đa 1/10 số bản; không quá 1/4 số bản (`tong`) chốt qua_cu_the (trừ góc qua-tang); vai nha_vuon tối đa 1/5 (giọng chính là người làm nội dung);
     - ràng buộc tổ hợp: qua_truoc ⇒ chot qua_cu_the; thu_nhan/hoai_nghi/chuyen_that_bai, soi_nhan/khang_dinh, dong_hanh giới hạn vai;
       dong_hanh cần hồ sơ có "bên em". Vi phạm → bốc lại trục đó (chỉ bốc trong các khoá hợp lệ)."""
     hs, lo = hs or {}, lo if lo is not None else lo_moi()
@@ -253,13 +256,15 @@ def gan_truc(sp, goc, need, dem, hs=None, lo=None, tong=None, rng=random):
         chot = "qua_cu_the" if mo == "qua_truoc" else _chon(list(CHOT), dem["chot"], hs.get("chot"), rng,
                                                               lambda k: (k != "qua_cu_the" or qua_ok) and (k != "dong_hanh" or ben_em))
         cho = _vai_cho_phep(mo, than, chot)
-        vai = _chon(list(VAI), dem["vai"], hs.get("vai"), rng, lambda k: k in cho and (k != "dan_chuyen" or lo["dan"] < gioi_dan))
+        hv = dict(hs.get("vai") or {})
+        hv["nha_vuon"] = (hv.get("nha_vuon") or 1.0) * 0.25     # nhà vườn kể chuyện chỉ thỉnh thoảng (~1/5), giọng chính là người làm nội dung
+        vai = _chon(list(VAI), dem["vai"], hv, rng, lambda k: k in cho and (k != "nha_vuon" or lo["dan"] < gioi_dan))
         lo["mo"].add(mo)
         if mo in _MO_VUON:
             lo["vuon"] = lo.get("vuon", 0) + 1
         if chot == "qua_cu_the" and g != "qua-tang":
             lo["qua"] += 1
-        if vai == "dan_chuyen":
+        if vai == "nha_vuon":
             lo["dan"] += 1
         for ax, k in (("goc", g), ("mo", mo), ("than", than), ("chot", chot), ("vai", vai)):
             dem[ax][k] += 1
@@ -553,6 +558,23 @@ def ban_hang(ma):
     return (chr(10) + chr(10)).join(out) + (chr(10) + chr(10) if out else "")
 
 
+def gon_hook_thu(x):
+    """Các hook biên kịch đã thử và tự chấm: tối đa 3 mục {cau, diem (0–10), vi_sao}. Sai kiểu → [] (không làm hỏng bản)."""
+    out = []
+    for h in (x if isinstance(x, list) else []):
+        if not isinstance(h, dict) or not str(h.get("cau") or "").strip():
+            continue
+        if len(out) >= 3:
+            break
+        try:
+            d = max(0.0, min(10.0, float(h.get("diem"))))
+        except (TypeError, ValueError):
+            d = None
+        out.append({"cau": re.sub(r"\s+", " ", str(h["cau"])).strip()[:160], "diem": d,
+                    "vi_sao": re.sub(r"\s+", " ", str(h.get("vi_sao") or "")).strip()[:160]})
+    return out
+
+
 def gon_don_ban(x, toi_da_tu=20):
     """Đòn bán chính của bài: một câu gọn ≤ 20 từ. Thiếu/sai kiểu → "" (không làm hỏng bản)."""
     if not isinstance(x, str):
@@ -697,8 +719,6 @@ def check(item, sp, used_norm, log=None):
     dem_dem = sum(1 for v in re.split(r"[.!?…,;:]+", plain) if _RE_DEM_CUOI.search(v.strip().lower()))
     if dem_dem > 2:
         errs.append(f"quá nhiều tiếng đệm cuối vế ({dem_dem} lần, tối đa 2)")
-    if vai in ("ky_thuat", "dan_chuyen") and _RE_DEM_VAI.search(plain.lower()):
-        errs.append(f"vai {vai} không dùng nha/nè/á")
     # giỏ hàng nhắc đúng một lần
     gh = len(re.findall(r"giỏ hàng", plain.lower()))
     if gh == 0:
@@ -770,6 +790,7 @@ def viet(ma_sp, so_ban, log=print):
             it["dang"] = t["than"]
             it["chu_mo"] = gon_chu_mo(it.get("chu_mo"))
             it["don_ban"] = gon_don_ban(it.get("don_ban"))
+            it["hook_thu"] = gon_hook_thu(it.get("hook_thu"))
             ten_qc = qc[i_it] if qc and i_it < len(qc) else None
             it["quy_cach"] = next((q["ma"] for q in sp.get("quy_cach") or [] if q["ten"] == ten_qc), None)
             if ten_qc:

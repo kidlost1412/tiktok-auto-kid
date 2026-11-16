@@ -82,17 +82,17 @@ class TrucTest(Nen):
                 self.assertEqual({t["mo"] for t in ts[:n]}, set(vl.MO), "mọi kiểu mở đều được dùng trước khi lặp")
                 self.assertEqual(len({t["mo"] for t in ts[:n]}), n)
                 self.assertLessEqual(sum(t["chot"] == "qua_cu_the" for t in ts), 10)
-                self.assertLessEqual(sum(t["vai"] == "dan_chuyen" for t in ts), 8)
+                self.assertLessEqual(sum(t["vai"] == "nha_vuon" for t in ts), 8)        # giọng chính là người làm nội dung
                 for t in ts:
                     if t["mo"] == "qua_truoc":
                         self.assertEqual(t["chot"], "qua_cu_the")
                     if t["mo"] == "thu_nhan" or t["than"] in ("hoai_nghi", "chuyen_that_bai"):
-                        self.assertIn(t["vai"], {"nha_vuon", "nguoi_ban_quay", "chu_hang"})
-                    if t["than"] in ("soi_nhan", "khang_dinh"):
-                        self.assertIn(t["vai"], {"chu_hang", "dan_chuyen", "ky_thuat"})
+                        self.assertIn(t["vai"], {"nha_vuon", "nguoi_noi_dung"})
+                    if t["than"] in ("soi_nhan", "khang_dinh", "vi_sao"):
+                        self.assertEqual(t["vai"], "nguoi_noi_dung")
                     if t["chot"] == "dong_hanh":
                         self.assertTrue(ben_em)
-                        self.assertIn(t["vai"], {"chu_hang", "nguoi_ban_quay"})
+                        self.assertEqual(t["vai"], "nguoi_noi_dung")
                     self.assertIn(t["mo"], vl.MO); self.assertIn(t["than"], vl.THAN); self.assertIn(t["chot"], vl.CHOT); self.assertIn(t["vai"], vl.VAI)
             self.assertEqual(any(t["chot"] == "dong_hanh" for s in range(25) for t in self.chay(sp, ["rua-vuon"], 40, s)), ben_em)
 
@@ -140,8 +140,8 @@ class DeBaiTest(Nen):
 
     def truc3(self):
         return [{"goc": "rua-vuon", "mo": "mat_mat", "than": "chuyen_that_bai", "chot": "thu_it", "vai": "nha_vuon"},
-                {"goc": "cach-dung", "mo": "con_so", "than": "phep_tinh", "chot": "phep_tinh_chot", "vai": "ky_thuat"},
-                {"goc": "qua-tang", "mo": "qua_truoc", "than": "khang_dinh", "chot": "qua_cu_the", "vai": "dan_chuyen"}]
+                {"goc": "cach-dung", "mo": "con_so", "than": "phep_tinh", "chot": "phep_tinh_chot", "vai": "nguoi_noi_dung"},
+                {"goc": "qua-tang", "mo": "qua_truoc", "than": "khang_dinh", "chot": "qua_cu_the", "vai": "nguoi_noi_dung"}]
 
     def test_mau_mac_dinh_dung_het_bien_da_dang_ky(self):
         mau = pm.mac_dinh("bien-kich")
@@ -160,7 +160,7 @@ class DeBaiTest(Nen):
         for t in self.truc3():
             for ax, bang in (("mo", {k: v[0] for k, v in vl.MO.items()}), ("than", vl.THAN), ("chot", vl.CHOT), ("vai", vl.VAI)):
                 self.assertIn(f"{t[ax]} — {bang[t[ax]]}", p)
-        for k in ("nghich_ly", "dung_tay", "ba_sai_lam", "kip_luc", "chu_hang"):
+        for k in ("nghich_ly", "dung_tay", "ba_sai_lam", "kip_luc"):
             self.assertNotIn(vl.MO[k][0] if k in vl.MO else (vl.THAN.get(k) or vl.CHOT.get(k) or vl.VAI[k]), p)
         self.assertIn('bai[0]: góc = rua-vuon (Rửa vườn sau thu hoạch (cà phê): đúng lúc, đúng việc.)', p)
         self.assertIn('(ví dụ cấu trúc, KHÔNG chép: "Đổ nước trước hay thuốc trước? Sai một bước là hư nguyên bình!")', p)
@@ -264,13 +264,22 @@ class CheckTest(Nen):
             e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà bà con.", f"Là {tu} đó."), mo="mat_mat"))
             self.assertTrue(any(tu in x for x in e), (tu, e))
 
-    def test_nha_ne_khong_con_la_tu_cam_nhung_vai_ky_thuat_cam(self):
-        it = self.thay(lambda t: t.replace("Ngắn gọn thôi mà bà con.", "Bà con cứ xài thử đi nha."), vai="nha_vuon")
-        self.assertEqual(self.kiem(it), [])
-        e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà bà con.", "Bà con cứ xài thử đi nha."), vai="ky_thuat"))
-        self.assertTrue(any("vai ky_thuat" in x for x in e), e)
-        e = self.kiem(self.thay(lambda t: t.replace("Ngắn gọn thôi mà bà con.", "Bà con cứ thử đi nè."), vai="dan_chuyen"))
-        self.assertTrue(any("dan_chuyen" in x for x in e), e)
+    def test_nha_ne_khong_con_la_tu_cam(self):
+        for vai in vl.VAI:
+            it = self.thay(lambda t: t.replace("Ngắn gọn thôi mà bà con.", "Bà con cứ xài thử đi nha."), vai=vai)
+            self.assertEqual(self.kiem(it), [], vai)
+
+    def test_vai_chi_con_nguoi_noi_dung_va_nha_vuon(self):
+        self.assertEqual(set(vl.VAI), {"nguoi_noi_dung", "nha_vuon"})
+        for k in ("vach_tran", "su_that_bat_ngo", "giai_oan"):
+            self.assertIn(k, vl.MO)
+        self.assertIn("vi_sao", vl.THAN)
+
+    def test_gon_hook_thu(self):
+        self.assertEqual(vl.gon_hook_thu(None), [])
+        h = vl.gon_hook_thu([{"cau": " Một   nắp… ", "diem": "8", "vi_sao": "lạ"}, {"cau": ""}, "x", {"cau": "B", "diem": 15}, {"cau": "C"}, {"cau": "D"}])
+        self.assertEqual([x["cau"] for x in h], ["Một nắp…", "B", "C"])
+        self.assertEqual([x["diem"] for x in h], [8.0, 10.0, None])
 
     def test_tieng_dem_toi_da_2(self):
         ba = lambda t: t.replace("Ngắn gọn thôi mà bà con.", "Bà con cứ thử đi ạ.").replace("khựng lại.", "khựng lại luôn nha.").replace("Lô 2", "Lô 2 chắc nha, ")
