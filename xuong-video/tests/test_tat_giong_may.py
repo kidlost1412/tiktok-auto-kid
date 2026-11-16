@@ -42,7 +42,13 @@ class TatGiongMayTest(unittest.TestCase):
         self.co(loi("Vườn bạn đang vàng lá phải không? Can ở giỏ hàng."), "xưng hô")
         self.co(loi("Anh chị nhớ xịt chiều mát cho cây ăn. Can ở giỏ hàng."), "xưng hô")
         self.co(loi("Bà con nghe nè. Bà con xịt chiều mát thì cây ăn. Bà con lấy ở giỏ hàng."), "bà con")
-        self.assertEqual(loi("Các bác nghe nè, bạn hàng em lấy hai can rồi. Bà con xịt chiều mát cho cây ăn. Can ở giỏ hàng."), [])
+        self.assertEqual(loi("Ông chú này chửi em một trận, bạn hàng em lấy hai can rồi. Bà con xịt chiều mát cho cây ăn. Can ở giỏ hàng các bác."), [])
+        self.co(loi("Mấy bữa nay các bác hỏi hoài. Các bác xịt chiều mát cho cây ăn. Can ở giỏ hàng các bác."), "\"các bác\"")
+
+    def test_khong_mo_bang_tieng_goi(self):
+        self.co(loi("Các bác ơi, cả xóm trồng cải mua lại chai này! Xịt chiều mát cho cây ăn. Can ở giỏ hàng."), "tiếng gọi")
+        self.co(loi("Bà con đoán thử coi, can này xịt được mấy bình? Xịt chiều mát cho cây ăn. Can ở giỏ hàng."), "tiếng gọi")
+        self.assertEqual(loi("Xịt thuốc càng nhiều… vườn lại càng hay bệnh. Xịt chiều mát cho cây ăn nha các bác. Can ở giỏ hàng."), [])
 
     def test_goc_qua_tang_phai_noi_qua(self):
         t = "Luống ớt này tháng trước còn rụng bông, giờ kín trái rồi. Phun chiều mát mười ngày một lượt. Can nằm sẵn ở giỏ hàng nha."
