@@ -3,13 +3,15 @@
 ## Mục tiêu
 Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VIỆC CẦN LÀM (mặc định 20–25 s), 9:16. Video để bán hàng qua giỏ hàng: không xin bình luận, không xin theo dõi.
 
-## Lời đọc (viết để NÓI, không phải để đọc)
+## Lời đọc (người bán ngoài chợ nói, giọng AI đọc lên)
+- Lời này do GIỌNG AI đọc, người nghe nghe MỘT lần trong lúc lướt. Câu nào nghe một lần không hiểu ngay là hỏng. Viết như người bán vật tư ngoài chợ nói với bà con: chữ thường ngày, câu đủ ý, nói thẳng vào việc.
 - Mỗi video MỘT ý bán chính, theo đúng KIỂU MỞ, KIỂU THÂN, KIỂU CHỐT và VAI NGƯỜI NÓI được giao.
-- Ba giây đầu là tất cả: câu mở phải khiến người đang lướt DỪNG LẠI. Sản phẩm là câu trả lời cho câu mở, không phải câu mở.
+- 5 giây đầu là tất cả: câu mở là hook phải mạnh, giữ chân người đang lướt. Đi theo đúng KIỂU MỞ được giao (mất mát, tò mò, nghịch lý, phủ nhận điều ai cũng tin, con số, quà, thời điểm…) để các bài khác hẳn nhau, đừng bài nào cũng mở bằng "vườn đang bị gì". Sản phẩm là câu trả lời cho câu mở, không phải câu mở.
 - Tên sản phẩm (ten_ngan trong hồ sơ, không có thì ten_goi) xuất hiện chậm nhất ở câu thứ hai; luật riêng của sản phẩm (luat_rieng) nếu chặt hơn thì theo luật riêng.
-- Nói như người thật: câu dài ngắn xen nhau, có ít nhất một câu rất ngắn (≤ 4 âm tiết); được bỏ chủ ngữ; không xếp quá ba vế liệt kê trong một câu; cụm chữ chép nguyên từ nhãn chỉ dùng một lần trong bài.
-- Một hình ảnh cụ thể, nhìn thấy được, cho mỗi bài (một cái cây, một bàn tay, một cái phuy) — nói điều mắt thấy, không nói khái niệm.
-- Cảm xúc phải ĐI: mở bằng lo, tò mò hoặc tiếc; giữa bài vững lại; chốt ấm hoặc dứt khoát. Không để cả bài một giọng tự tin.
+- Câu nào cũng đủ ý, có đầu có đuôi. Không câu cụt kiểu khẩu hiệu, không bỏ lửng.
+- Tránh chữ văn vẻ, chữ hoa mỹ, từ láy tả hình kiểu "lấm tấm", "nắng hầm", "rũ dần" và những chữ cùng loại: giọng AI đọc nghe lớ ngớ, người nghe không nghe rõ. Thay bằng chữ thật bà con hay nói ("rụng nhiều", "nắng gắt", "héo lá").
+- Thông tin trên nhãn (hoạt chất, liều, công dụng) dùng bình thường khi bài cần, nhưng nói như người bán nói, không kể lể kiểu "đọc nhãn ta thấy", "đọc nhãn em thấy" nghe quê. Liều nói cho dễ hiểu (hồ sơ có "một nắp một bình" thì nói vậy); công dụng nói thành cây được gì.
+- Người nghe muốn biết: vườn mình bị vầy thì xài cái này được không; xài sao cho dễ; được gì; có lời không (một can xài được bao nhiêu); mua có yên tâm không (quà, cách giao nhận, đổi trả — chỉ theo hồ sơ). Mỗi bài trả lời vài điều trong số đó, đừng kể lan man.
 - CÂU CHUYỆN được hư cấu: tình huống, nhân vật, con số trong chuyện (số gốc, số vụ, tên người) được đặt ra cho hấp dẫn.
 - ĐIỀU NÓI VỀ SẢN PHẨM thì không: công dụng, liều, thành phần, cách dùng, quà chỉ lấy đúng trong hồ sơ SẢN PHẨM; không hứa kết quả chắc chắn; tôn trọng mục khong_duoc_noi. Không nói giá, không nói giá trị quà.
 - Giỏ hàng nhắc đúng một lần, nói ngắn. Quà chỉ nhắc khi KIỂU CHỐT yêu cầu, và chỉ MỘT mức quà lấy đúng từ qua_tang.
@@ -22,7 +24,7 @@ Video TikTok bán hàng giỏ hàng, độ dài theo mục ĐỘ DÀI trong VI�
 - Mỗi câu một tag NGẮN tiếng Anh, cảm xúc vừa phải. Được dùng: [confident], [warm], [warm, confident], [serious], [matter-of-fact], [curious], [concerned], [surprised], [relieved], [proud], [satisfied], [excited], [upbeat], [urgent], [confident, slightly frustrated].
 - Trong một bài phải có ít nhất BA tag khác nhau và đi theo đường cảm xúc của bài; không quá hai câu liền cùng một tag.
 - CẤM tag nhập vai/mô tả nhân vật hay cách thở (like a farmer…, tired, whispering, sighing, lower voice, storytelling…): làm đổi giọng, thở giả.
-- Dùng "…" để ngắt/nhấn (tối đa 4 lần/bài). Có thể viết HOA một chữ cần nhấn.
+- "…" dùng đúng chỗ người thật ngập ngừng hay nhấn (thường ở hook), không lạm dụng: tối đa 2 lần một bài. Có thể viết HOA một chữ cần nhấn.
 
 ## Dựng (chuẩn chỉn chu, KHÔNG lặp một khuôn)
 - Font chuẩn: DT Phudu (Black) cho mọi chữ trên hình. FFmpeg dựng nền; Remotion dựng lớp chữ; không dùng CapCut.

@@ -105,34 +105,34 @@ def norm(s):
 
 # ---------------------------------------------------------------- BỐN TRỤC (mỗi kịch bản một tổ hợp)
 MO = {   # kiểu câu mở (hook): khoá → (mô tả gửi biên kịch, ví dụ CẤU TRÚC — không chép)
-    'mat_mat': ('Mở bằng thứ người xem sắp mất hoặc vừa mất vì một việc nhỏ làm sai.', 'Nguyên một lứa cành giâm… chết vì đúng một bước.'),
-    'nghich_ly': ('Một điều ngược đời nhưng đúng, khiến người ta khựng lại.', 'Tưới càng siêng, rễ càng thối.'),
-    'dung_tay': ('Bảo người xem KHOAN làm việc họ sắp làm.', 'Khoan phun đã… xem trời hôm nay cái đã.'),
-    'pha_niem_tin': ('Phủ nhận một điều ai cũng tin là đúng.', 'Lá vàng chưa chắc là thiếu phân.'),
-    'hang_xom': ('Đặt vườn mình cạnh vườn bên: cùng đất, cùng giống, khác kết quả.', 'Cùng một bờ rào… bên kia bung đọt, bên này đứng im.'),
-    'bi_mat_nghe': ('Điều người trong nghề biết mà ít nói ra.', 'Thợ giâm cành lâu năm… ít ai chỉ bước này.'),
-    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đường đi tới đó.', 'Bộ rễ trắng này… ba tuần trước chưa có.'),
-    'con_so': ('Một con số THẬT trong hồ sơ, nói cụt để gây tò mò.', 'Một chai. Hai trăm lít nước.'),
-    'hoi_dung_noi_lo': ('Câu hỏi chạm đúng nỗi lo đang có ngoài vườn.', 'Rêu bám kín thân rồi… giờ tính sao?'),
-    'dung_luc': ('Một thời điểm mùa vụ đang tới, lỡ là mất.', 'Mưa đầu mùa xuống… là nấm lên theo.'),
-    'thu_nhan': ('Người nói tự nhận mình từng làm sai.', 'Năm ngoái tiếc một chai thuốc… mất luôn đợt tiêu.'),
-    'goi_dung_nguoi': ('Gọi thẳng đúng nhóm người cần nghe.', 'Ai đang hái cà phê… nghe cái này.'),
-    'thach_nhin': ('Thách người xem nhìn lại một chi tiết ở vườn nhà mình.', 'Ra vạch thử gốc cây nhà mình mà coi.'),
-    'dang_xay_ra': ('Kéo người xem vào một khoảnh khắc đang diễn ra.', 'Sáng ra vườn… đọt xoăn hết một hàng.'),
-    'qua_truoc': ('Mở thẳng bằng món quà đi kèm đơn.', 'Lấy ba chai… về tay bốn chai.'),
+    'mat_mat': ('Mở bằng thứ người xem sắp mất hoặc vừa mất vì một việc nhỏ làm sai.', 'Trễ một lần xịt thôi… là mất nguyên lứa trái non.'),
+    'nghich_ly': ('Một điều ngược đời nhưng đúng, khiến người ta khựng lại.', 'Tưới càng siêng, rễ cây càng thối.'),
+    'dung_tay': ('Bảo người xem KHOAN làm việc họ sắp làm.', 'Khoan, đừng xịt thuốc đồng lúc trưa nắng.'),
+    'pha_niem_tin': ('Phủ nhận một điều ai cũng tin là đúng.', 'Lá vàng chưa chắc là do thiếu phân.'),
+    'hang_xom': ('Đặt vườn mình cạnh vườn bên: cùng đất, cùng giống, khác kết quả.', 'Cùng trồng một ngày, sao vườn bên kia trái đã đậu kín?'),
+    'bi_mat_nghe': ('Điều người trong nghề biết mà ít ai nói ra.', 'Cái mẹo giữ trái non này, ít ai chịu chỉ cho mình.'),
+    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đường đi tới đó.', 'Vườn ớt này tháng trước rụng bông gần hết, giờ trái đậu kín.'),
+    'con_so': ('Một con số THẬT trong hồ sơ, nói gọn cho người ta tò mò.', 'Một chai, pha được nguyên phuy hai trăm lít.'),
+    'hoi_dung_noi_lo': ('Câu hỏi chạm đúng nỗi lo đang có ngoài vườn.', 'Mai sắp chưng Tết mà thân còn đầy rêu, làm sao đây?'),
+    'dung_luc': ('Một thời điểm mùa vụ đang tới, lỡ là mất.', 'Mưa đầu mùa xuống là nấm lên liền, xịt bây giờ còn kịp.'),
+    'thu_nhan': ('Người nói tự nhận mình từng làm sai.', 'Năm ngoái tôi tiếc một chai thuốc, mất luôn đợt tiêu.'),
+    'goi_dung_nguoi': ('Gọi thẳng đúng nhóm người cần nghe.', 'Nhà nào trồng sầu riêng đang ra bông thì đừng lướt qua.'),
+    'thach_nhin': ('Thách người xem nhìn lại một chi tiết ở vườn nhà mình.', 'Ra lật mặt dưới lá nhà mình coi, có đốm không?'),
+    'dang_xay_ra': ('Kéo người xem vào chuyện đang xảy ra ngoài vườn lúc này, nói bằng lời thường.', 'Đọt sầu riêng xoăn hết một hàng rồi bà con ơi.'),
+    'qua_truoc': ('Mở thẳng bằng món quà đi kèm đơn.', 'Lấy ba chai, bên em tặng thêm một chai nữa.'),
 }
 THAN = {   # kiểu thân bài (cũng là DANG_BAI: trường `dang` của kịch bản = khoá THAN, thống kê cũ còn chạy)
     'van_de_giai_phap': 'Vấn đề → một câu khoét hậu quả nếu để yên → sản phẩm vào → dùng thế nào.',
-    'truoc_sau': 'Trước khi dùng ra sao → điều gì thay đổi → vì sao (đúng sự thật nhãn, không hứa chắc).',
+    'truoc_sau': 'Trước khi dùng ra sao → điều gì thay đổi → vì sao (đúng hồ sơ, không hứa chắc).',
     'chuyen_that_bai': 'Chuyện một nhà vườn làm sai, trả giá, rồi đổi cách (người và tình tiết được hư cấu).',
     'ba_sai_lam': 'Ba cái sai hay gặp, cái thứ ba dẫn thẳng tới sản phẩm.',
-    'hoai_nghi': '"Hồi đầu không tin…" → một điều cụ thể trên nhãn/cách dùng làm đổi ý.',
+    'hoai_nghi': '"Hồi đầu không tin" → một điều cụ thể (cách dùng, cái thấy được ngoài vườn) làm đổi ý.',
     'phep_tinh': 'Một phép tính tiện/đỡ công bằng con số thật (một chai pha bao nhiêu, phun được bao nhiêu) — không nói giá.',
     'tung_buoc': 'Hai hoặc ba bước làm, bước nào cũng thấy được bằng hình.',
     'khach_hoi': 'Kể lại một câu khách hay hỏi rồi trả lời gọn như đang đứng ở quầy.',
-    'soi_nhan': 'Cùng người xem đọc nhãn chai để nhận đúng hàng, đúng công dụng.',
+    'soi_nhan': 'Chỉ bà con cách nhận đúng hàng (tên, logo, chữ trên can/chai) như người bán chỉ khách quen; không đọc thông số.',
     'dau_hieu': 'Hai ba dấu hiệu nhìn thấy ngoài vườn → cùng một chai xử lý.',
-    'khang_dinh': 'Lời khẳng định thương hiệu gọn, chắc, kiểu TVC.',
+    'khang_dinh': 'Lời khẳng định thương hiệu gọn, chắc, nói thường như người bán quen.',
 }
 DANG_BAI = THAN
 CHOT = {   # kiểu câu chốt (bài nào cũng nhắc giỏ hàng MỘT lần, nói ngắn; quà chỉ nhắc khi kiểu chốt yêu cầu)
@@ -146,12 +146,12 @@ CHOT = {   # kiểu câu chốt (bài nào cũng nhắc giỏ hàng MỘT lần,
 }
 VAI = {   # người nói: một giọng đọc, đổi CÁCH NÓI (không dùng tag nhập vai)
     'chu_hang': 'Chủ hàng nói thẳng, xưng "bên em", gọi "bà con/anh chị". Chắc, gọn, có trách nhiệm với món mình bán.',
-    'nha_vuon': 'Người làm vườn từng trải kể chuyện mình, xưng "tôi" hoặc "mình". Từ ngữ ngoài vườn, câu ngắn, có chỗ ngập ngừng. Chuyện kể được hư cấu; điều nói về sản phẩm phải đúng hồ sơ.',
+    'nha_vuon': 'Người làm vườn từng trải kể chuyện mình, xưng "tôi" hoặc "mình". Từ ngữ ngoài vườn, nói chân chất, câu đủ ý. Chuyện kể được hư cấu; điều nói về sản phẩm phải đúng hồ sơ.',
     'ky_thuat': 'Người làm kỹ thuật giải thích cho dễ hiểu, không xưng hô nhiều. Mỗi câu một ý, có lý do "vì…".',
     'nguoi_ban_quay': 'Người đứng quầy vật tư kể chuyện khách, xưng "em". Nhanh, thực tế, hay nhắc "khách hỏi…".',
-    'dan_chuyen': 'Giọng dẫn kiểu TVC, không xưng hô. Câu có lực, hình ảnh rõ.',
+    'dan_chuyen': 'Giọng người dẫn bán hàng, không xưng hô. Nói rõ ràng, chắc, dễ nghe; không văn vẻ, không tả cảnh.',
 }
-LUAT_CAU_MO = ('≤ 10 âm tiết thì tốt nhất; phải để lại một CHỖ HỞ khiến người ta muốn nghe câu sau; không mở bằng lời chào, '
+LUAT_CAU_MO = ('≤ 14 âm tiết; 5 giây đầu là tất cả: hook mạnh, đúng kiểu mở được giao, khiến người đang lướt phải dừng lại nghe tiếp; không mở bằng lời chào, '
                'không mở bằng tên sản phẩm (trừ kiểu qua_truoc, con_so); câu thứ hai trả ngay một phần chỗ hở, không vòng vo.')
 _NHA_VUON_QUAY = {"nha_vuon", "nguoi_ban_quay", "chu_hang"}
 _VAI_HOP = {   # ràng buộc tổ hợp: khoá (mo | than | chot) → các vai được phép
@@ -580,13 +580,19 @@ _RE_TU_HOI = re.compile(r"(?:khách|người ta|bà con|anh chị)\s+(?:hay\s+|c
 _RE_TRA_LOI_CUT = re.compile(r"^(?:được|có|không|đúng|chắc chắn rồi|vì sao)\s*[.!?]?$", re.I)
 
 
+_RE_KE_NHAN = re.compile(r"(?<!\w)(?:đọc|nhìn|coi|xem)\s+(?:trên\s+)?nhãn\s+(?:thì\s+)?(?:ta|em|mình|tôi|bà con|anh chị)?\s*(?:sẽ\s+)?thấy(?!\w)", re.I)
+
+
 def tat_giong_may(item, sp, plain, sents):
-    """Tật cấu trúc làm lời đọc nghe như máy viết (phần NÓI NHƯ NGƯỜI THẬT của đề biên kịch) → danh sách lỗi.
+    """Tật làm lời đọc nghe như văn viết / máy viết (phần NÓI NHƯ NGƯỜI BÁN NGOÀI CHỢ của đề biên kịch) → danh sách lỗi.
     Chỉ bắt những tật đo chắc được; còn lại để đề bài và giám khảo lo."""
     errs = []
     n_ba_cham = plain.count("…") + plain.count("...")
-    if n_ba_cham > 1:
-        errs.append(f"{n_ba_cham} dấu '…' (tối đa 1; muốn ngắt hơi thì dùng dấu phẩy hoặc tách câu)")
+    if n_ba_cham > 2:
+        errs.append(f"{n_ba_cham} dấu '…' (tối đa 2, chỉ ở chỗ ngập ngừng hay nhấn thật)")
+    ke = _RE_KE_NHAN.search(plain)
+    if ke:
+        errs.append(f"kể lể '{ke.group(0)}' nghe quê — nói thẳng thông tin như người bán nói")
     if _RE_TU_HOI.search(plain):
         errs.append("khuôn tự hỏi tự đáp 'Khách hỏi: …?' (kể lại thành lời của người nói)")
     for a, b in zip(sents, sents[1:]):
@@ -595,11 +601,10 @@ def tat_giong_may(item, sp, plain, sents):
             break
     if any(s.rstrip().endswith("?") and re.search(r",\s*hay\s+\w", s.lower()) for s in sents[-2:]):
         errs.append("kết bằng câu hỏi ép chọn 'A, hay B?' (kết bằng một việc cụ thể)")
-    # câu cụt: một câu ngắn ("Phun chiều mát.") là lời dặn tự nhiên, máy không phân biệt được với khẩu hiệu ("Ít mà đủ.") —
-    # chỉ loại khi thân bài vụn từ 2 câu ≤ 3 chữ trở lên; câu mở và câu chốt được ngắn
-    cut = [s.strip() for s in sents[1:-1] if len(re.findall(r"\w+", s)) <= 3 and not s.rstrip().endswith("?")]
-    if len(cut) >= 2:
-        errs.append(f"thân bài vụn, {len(cut)} câu cụt ({' / '.join(cut[:3])}) — gộp vào câu trước hoặc bỏ")
+    # câu cụt (≤ 4 chữ) ở thân bài: giọng AI đọc nghe giật, người nghe hụt ý → gộp vào câu trước; câu mở và câu chốt được ngắn
+    cut = [s.strip() for s in sents[1:-1] if len(re.findall(r"\w+", s)) <= 4 and not s.rstrip().endswith("?")]
+    if cut:
+        errs.append(f"câu cụt ({' / '.join(cut[:3])}) — câu nào cũng phải đủ ý, gộp vào câu trước")
     # luật riêng kiểu: Tên "Nano Đồng Toàn Cầu" (hoặc "chai Nano Đồng này") trong 5 giây đầu → một trong các tên trong ngoặc kép
     # phải lọt vào khoảng âm tiết đầu tương ứng (đọc ~4 âm tiết/giây)
     for luat in sp.get("luat_rieng") or []:

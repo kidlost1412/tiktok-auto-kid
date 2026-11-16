@@ -19,8 +19,8 @@ class TatGiongMayTest(unittest.TestCase):
         self.assertTrue(any(chu in e for e in errs), errs)
 
     def test_ba_cham(self):
-        self.co(loi("Trễ một cữ phun… mất trái. Để yên vài tuần… công cả năm theo trái rụng. Can ở giỏ hàng nha."), "dấu '…'")
-        self.assertEqual(loi("Bóp thử nắm đất coi… có tơi không? Đất chai thì rễ khó ăn lắm. Can ở giỏ hàng nha."), [])
+        self.co(loi("Trễ một cữ… mất trái. Để yên vài tuần… công cả năm… theo trái rụng hết. Can ở giỏ hàng nha."), "dấu '…'")
+        self.assertEqual(loi("Trễ một lần xịt thôi… là mất nguyên lứa trái non. Đất chai thì rễ khó ăn lắm bà con. Can ở giỏ hàng nha."), [])   # dùng đúng chỗ thì được
 
     def test_tu_hoi_tu_dap(self):
         e = loi("Đất chai thì rễ khó ăn. Khách hay hỏi: rau mới trồng, phun được chưa? Được. Đợi bảy ngày rồi phun nha bà con.")
@@ -32,7 +32,8 @@ class TatGiongMayTest(unittest.TestCase):
 
     def test_cau_cut(self):
         self.co(loi("Pha đậm tay đâu phải là thương cây. Ít mà đủ. Một can pha được ba nghìn lít nước. Thử trước đã. Giỏ hàng có sẵn."), "câu cụt")
-        self.assertEqual(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít. Phun chiều mát. Giỏ hàng có sẵn."), [])  # một câu dặn ngắn là tự nhiên
+        self.co(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít. Trưa nắng thì nghỉ. Giỏ hàng có sẵn."), "câu cụt")
+        self.assertEqual(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít nước, xịt chiều mát là được. Giỏ hàng có sẵn."), [])
         self.assertEqual(loi("Đốm lá lan nhanh. Phun sớm thì đỡ mất hạt lắm. Lấy ở giỏ hàng."), [])   # câu mở/câu chốt ngắn được phép
 
     def test_goc_qua_tang_phai_noi_qua(self):
@@ -42,11 +43,17 @@ class TatGiongMayTest(unittest.TestCase):
         self.assertEqual(loi(t, goc="qua-tang", sp={"qua_tang": []}), [])     # sản phẩm không có quà thì thôi
 
 
+    def test_ke_le_doc_nhan(self):
+        self.co(loi("Sầu riêng đang rụng bông nhiều. Đọc nhãn ta thấy có ghi chống rụng hoa rụng quả non. Lấy ở giỏ hàng."), "kể lể")
+        self.co(loi("Sầu riêng đang rụng bông nhiều. Nhìn trên nhãn em thấy ghi chống rụng trái non. Lấy ở giỏ hàng."), "kể lể")
+        # thông tin trên nhãn, liều, hoạt chất thì được nói
+        self.assertEqual(loi("Sầu riêng đang rụng bông nhiều thì bà con xịt cái này. Nhãn ghi chống rụng hoa rụng quả non, hai mươi lăm mi li một bình. Lấy ở giỏ hàng."), [])
+
     def test_luat_rieng_ten_trong_may_giay_dau(self):
         sp = {"luat_rieng": ['Tên "Nano Đồng Toàn Cầu" (hoặc "chai Nano Đồng này") trong 5 giây đầu.', "Không nói lá xanh."]}
-        muon = "Ruộng lúa hay mất vì đúng một lượt phun chậm. Phun Nano Đồng ngay lúc vừa chớm, vì nhãn ghi trừ đạo ôn, khô vằn, cháy bìa lá. Nano Đồng Toàn Cầu có ở giỏ hàng."
+        muon = "Ruộng lúa hay mất vì đúng một lượt phun chậm. Phun Nano Đồng ngay lúc vừa chớm, vì nó trừ được đạo ôn, khô vằn, cháy bìa lá. Nano Đồng Toàn Cầu có ở giỏ hàng."
         self.co(loi(muon, sp=sp), "5 giây đầu")
-        self.assertEqual(loi("Thứ làm mai mất điểm, ít ai nói ra. Chai Nano Đồng này đánh bật rêu trên thân. Giỏ hàng có sẵn.", sp=sp), [])
+        self.assertEqual(loi("Thứ làm mai mất điểm, ít ai nói ra. Chai Nano Đồng này rửa sạch rêu trên thân mai. Giỏ hàng có sẵn.", sp=sp), [])
         self.assertEqual(loi(muon, sp={"luat_rieng": ["Không nói giá."]}), [])          # luật không nói giây đầu thì thôi
 
 

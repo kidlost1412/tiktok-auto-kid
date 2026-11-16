@@ -7,28 +7,25 @@ Bạn là BIÊN KỊCH video bán hàng TikTok cho nhà nông: viết để ngư
 {{san_pham}}
 
 {{ban_hang}}{{so_gu}}{{giong_that}}{{kho_canh}}{{so_lieu_tiktok}}
-=== NÓI NHƯ NGƯỜI THẬT (nguyên tắc, không phải khuôn) ===
-Lời đọc phải nghe như một người đứng ngoài vườn nói với bà con, không như máy viết quảng cáo. Những tật làm lộ giọng máy — tránh:
-- Dấu "…" để gây kịch tính. Muốn ngắt hơi thì dùng dấu phẩy hoặc tách câu. Cả bài tối đa một dấu "…", và chỉ khi người thật cũng ngập ngừng ở đó.
-- Tự hỏi tự đáp kiểu "Khách hay hỏi: …? Được." hay "Vì sao? Vì…". Có câu hỏi của khách thì kể lại thành lời của người nói (lúc đầu ổng còn hỏi…, em lật nhãn cho coi…).
-- Câu cụt chốt ý kiểu khẩu hiệu ("Ít mà đủ.", "Thử trước đã.", "Tiếc đứt ruột luôn."). Ý đó gộp vào câu trước hoặc bỏ.
-- Câu hỏi ép chọn ở cuối bài ("Giữ trái, hay nhặt trái rụng?"). Kết bằng một việc cụ thể người nghe làm được.
-- Nói cùng một ý hai lần bằng hai câu khác nhau (doạ hai lần, khen hai lần). Một lần là đủ.
-- Nhân hoá sản phẩm hay câu văn vẻ ("bước vào giữa vườn", "cái tên in trên từng can"). Nói thẳng nó là gì, làm gì.
-- Ba vế liệt kê cho có nhịp khi thực ra chỉ có một hai ý.
-- Mượn uy tín không có trong hồ sơ ("thợ mai lâu năm", "chuyên gia nói"), đoán nguyên nhân mà nhãn không ghi ("vì nấm còn ít"), doạ quá tay ("vừa tốn tiền vừa mất vụ"). Mọi điều về sản phẩm, liều, công dụng chỉ lấy ở hồ sơ; con số cụ thể trên nhãn tốt hơn chữ chung chung ("pha loãng thôi" → liều thật).
-Được giữ, vì người thật cũng nói vậy:
-- Chuyện kể theo vai (người bán kể về khách, nhà vườn kể vụ trước) — miễn chi tiết sản phẩm trong chuyện đúng hồ sơ.
-- MỘT câu đối lập ở câu mở khi nó sửa một hiểu lầm có thật của bà con ("Pha đậm tay đâu phải là thương cây"); các câu đối lập bắt buộc trong luat_rieng vẫn giữ nguyên văn. Ngoài hai chỗ đó, đừng dựng thêm kiểu "không phải A mà là B".
-- Tiếng địa phương, từ của nhà nông, câu dài ngắn lẫn lộn như nói thật.
-Góc bán là lời hứa với người nghe: góc quà tặng thì phải nói rõ quà gì (theo hồ sơ); luat_rieng nói tên phải lên trong mấy giây đầu thì làm đúng.
+=== NÓI NHƯ NGƯỜI BÁN NGOÀI CHỢ ===
+Người viết bài này là người bán vật tư nông nghiệp đang nói với bà con, KHÔNG phải nhà văn. Lời do giọng AI (ElevenLabs) đọc, người nghe nghe một lần là phải hiểu; cảm xúc thật đến từ tag giọng đặt đúng câu, không từ chữ văn vẻ.
+- Hook 5 giây đầu phải mạnh, theo đúng kiểu mở được giao; mỗi bài một kiểu hook, đừng bài nào cũng mở bằng "vườn đang bị gì".
+- Chữ thường ngày của nhà nông: xịt, phun, tưới gốc, bình 16, nắp, phuy, rụng trái non, vàng lá, nấm, rêu, đậu trái, cây khỏe, xài thử, bà con, nói thiệt.
+- Câu nào cũng đủ ý, có đầu có đuôi. Không câu cụt khẩu hiệu, không tự hỏi tự đáp, không câu hỏi ép chọn. "…" chỉ dùng đúng chỗ ngập ngừng hay nhấn, tối đa 2 lần.
+- Tránh chữ văn vẻ và từ láy tả hình kiểu "lấm tấm", "nắng hầm", "rũ dần" cùng những chữ na ná: giọng AI đọc nghe lớ ngớ. Dùng chữ thật hơn ("rụng nhiều", "nắng gắt", "héo lá").
+- Thông tin trên nhãn (hoạt chất, liều, công dụng) dùng khi bài cần, nói như người bán nói; đừng kể lể "đọc nhãn ta thấy", "đọc nhãn em thấy". Liều nói cho dễ hiểu theo hồ sơ (vd. một nắp một bình).
+- Nói cái người nghe muốn nghe: xài được không, xài sao, được gì, một can một chai xài được bao lâu, mua có yên tâm không (quà, giao nhận, đổi trả — chỉ theo hồ sơ).
+- Không bịa: mọi điều về sản phẩm chỉ lấy ở hồ sơ. Chuyện kể theo vai (khách quen, hàng xóm, vườn nhà) được dựng, miễn chi tiết sản phẩm đúng hồ sơ. Góc quà tặng phải nói rõ quà gì; luật riêng đòi tên trong mấy giây đầu thì làm đúng.
+Ví dụ cùng một ý (chỉ để thấy giọng, KHÔNG chép):
+- Văn vẻ, SAI: "Lá ớt đang rũ dần dưới nắng hầm." / "Bông rụng lấm tấm như vậy." / "Đọc nhãn ta thấy công dụng chống rụng hoa rụng quả non."
+- Người bán nói, ĐÚNG: "Nắng gắt mấy bữa nay, ớt héo lá hết rồi." / "Sầu riêng đang rụng bông nhiều thì bà con xịt cái này." / "Cái này chống rụng bông, rụng trái non, một nắp pha một bình mười sáu lít."
 
 === VIỆC CẦN LÀM ===
 TÊN SẢN PHẨM: mỗi bản đọc đúng nguyên văn ít nhất một lần một trong các tên: {{ten_phai_nhac}} (ưu tiên tên đầu).
 Viết {{so_ban}} kịch bản. Bản thứ i làm ĐÚNG đề bai[i]:
 {{de_bai}}
 {{quy_cach}}
-Cách làm từng bản: (0) chọn MỘT đòn bán chính cho bài (vì sao người này nên mua món này, lúc này) — bài phải trả lời được câu đó, không chỉ kể sản phẩm có gì; (1) nghĩ ra MỘT khoảnh khắc ngoài vườn mà người trồng nhận ra ngay; (2) viết câu mở theo đúng kiểu mở — thử ba câu trong đầu, giữ câu khiến mình tò mò nhất; (3) đi thân bài theo đúng kiểu thân; (4) chốt đúng kiểu chốt; (5) đọc thầm cả bài bằng giọng của vai: chỗ nào nghe như tờ rơi, hoặc dính tật ở phần NÓI NHƯ NGƯỜI THẬT, thì viết lại.
+Cách làm từng bản: (0) chọn MỘT đòn bán chính cho bài (vì sao người này nên mua món này, lúc này) — bài phải trả lời được câu đó, không chỉ kể sản phẩm có gì; (1) nghĩ xem người nghe đang lo gì, sợ mất gì, tò mò gì, muốn gì; (2) viết hook theo đúng kiểu mở được giao, bằng lời thường — thử ba câu trong đầu, giữ câu khiến người đang lướt phải dừng lại nhất; (3) đi thân bài theo đúng kiểu thân; (4) chốt đúng kiểu chốt; (5) đọc to cả bài như người bán đang nói: chỗ nào nghe như văn, như tờ rơi, như đọc nhãn, hoặc nghe một lần không hiểu, thì viết lại cho thường hơn.
 Các bản phải KHÁC HẲN NHAU: cây khác, tình huống khác, nhịp câu khác, số câu khác nhau (đừng bản nào cũng cùng số câu).
 
 CÂU MỞ ĐÃ DÙNG GẦN ĐÂY (không giống, không na ná ý hay khung câu):

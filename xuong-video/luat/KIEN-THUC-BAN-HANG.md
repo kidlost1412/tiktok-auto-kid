@@ -6,7 +6,7 @@ Giới hạn không đổi: điều nói về sản phẩm chỉ lấy trong h�
 ## 1. Bán cái vườn sau khi dùng, không bán cái chai
 Người trồng không mua thành phần, họ mua lứa bông giữ được, một lượt phun đỡ phải đi, một đêm ngủ yên. Mỗi chi tiết trên nhãn chỉ đáng nói khi trả lời được câu "vậy thì vườn tôi được gì?".
 - Yếu: "Sản phẩm có hai hoạt chất, lưu dẫn hai chiều."
-- Mạnh: nói điều đó thay đổi gì ngoài vườn, bằng một hình ảnh người trồng từng thấy.
+- Mạnh: nói điều đó thay đổi gì ngoài vườn, bằng lời bà con hay nói ("xịt vô là cây khỏe, ít bệnh").
 
 ## 2. Nói mình KHÁC ở đâu
 Người xem đã có sẵn một cách làm hoặc một món đang xài. Họ chỉ đổi khi thấy rõ chỗ khác. So với "cách cũ", "loại đang xài", "lượt phun trước" — không nêu tên hãng, không chê ai. Chỗ khác phải là sự thật trong hồ sơ, nói bằng lời ngoài vườn.

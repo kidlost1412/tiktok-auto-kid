@@ -4,8 +4,8 @@
   "ver": "1.2.4"
  },
  "bien-kich": {
-  "hash": "9ed3108a905f8a9b",
-  "ver": "1.2.19"
+  "hash": "cdc72349749d3be4",
+  "ver": "1.2.20"
  },
  "dao-dien": {
   "hash": "83d88397158a05f7",
@@ -40,12 +40,12 @@
   "ver": "1.2.4"
  },
  "luat-san-xuat": {
-  "hash": "fe36762b5b4a6057",
-  "ver": "1.2.13"
+  "hash": "56e07bd017eaf02b",
+  "ver": "1.2.20"
  },
  "kien-thuc-ban-hang": {
-  "hash": "4ad8e39cee176164",
-  "ver": "1.2.15"
+  "hash": "c148dbdacbc87e7c",
+  "ver": "1.2.20"
  },
  "so-tay-editor": {
   "hash": "5bea8606409e48f2",

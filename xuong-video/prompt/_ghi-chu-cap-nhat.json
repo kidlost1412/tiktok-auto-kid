@@ -3,10 +3,12 @@
  "bien-kich": {
   "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
   "1.2.15": "Biên kịch được học cách nghĩ của người bán giỏi: mỗi bài chọn MỘT đòn bán chính (vì sao người này nên mua món này, lúc này) rồi ghi lại thành một câu ngắn. Có thêm hồ sơ bán hàng riêng của từng sản phẩm. Dù bạn đang giữ đề bài cũ, máy vẫn tự gắn phần kiến thức này vào.",
-  "1.2.19": "Biên kịch có thêm phần \"Nói như người thật\": bớt dấu \"…\", bỏ kiểu tự hỏi tự đáp, câu cụt khẩu hiệu, câu hỏi ép chọn, nói quá hồ sơ. Vẫn giữ chuyện kể theo vai và tiếng địa phương. Máy cũng tự loại bản dính các tật này rồi bắt viết lại."
+  "1.2.19": "Biên kịch có thêm phần \"Nói như người thật\": bớt dấu \"…\", bỏ kiểu tự hỏi tự đáp, câu cụt khẩu hiệu, câu hỏi ép chọn, nói quá hồ sơ. Vẫn giữ chuyện kể theo vai và tiếng địa phương. Máy cũng tự loại bản dính các tật này rồi bắt viết lại.",
+  "1.2.20": "Đổi cách viết lời đọc sang giọng người bán ngoài chợ, vì lời do giọng AI đọc: câu đủ ý, chữ thường ngày, tránh chữ văn vẻ và từ láy tả hình; thông tin trên nhãn nói như người bán nói (không \"đọc nhãn ta thấy\"), liều theo nắp và bình; \"…\" chỉ đúng chỗ, tối đa 2. Hook 5 giây đầu vẫn mạnh và đa dạng theo kiểu mở. Máy tự loại bản quá 2 dấu \"…\", câu cụt, kể lể đọc nhãn."
  },
  "luat-san-xuat": {
-  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu."
+  "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
+  "1.2.20": "Đổi cách viết lời đọc sang giọng người bán ngoài chợ, vì lời do giọng AI đọc: câu đủ ý, chữ thường ngày, tránh chữ văn vẻ và từ láy tả hình; thông tin trên nhãn nói như người bán nói (không \"đọc nhãn ta thấy\"), liều theo nắp và bình; \"…\" chỉ đúng chỗ, tối đa 2. Hook 5 giây đầu vẫn mạnh và đa dạng theo kiểu mở. Máy tự loại bản quá 2 dấu \"…\", câu cụt, kể lể đọc nhãn."
  },
  "dien-phieu": {
   "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng.",
@@ -25,6 +27,7 @@
   "1.2.15": "Giám khảo không chấm cảm tính 1–10 nữa mà trả lời một danh sách kiểm cố định (móc câu, nhãn rõ, chốt có chai/quà, không che nhãn…): điểm = 10 × số mục đạt / số mục nên không còn dồn ở 5–6. Máy tự đo trước những gì đo được (chữ đè nhãn, người nói full màn, lặp cảnh, thiếu cảnh quà). Lỗi do máy dựng/kho không còn thành bài học cho đạo diễn."
  },
  "kien-thuc-ban-hang": {
-  "1.2.15": "Tài liệu MỚI: kiến thức bán hàng cho biên kịch (bán cái vườn sau khi dùng, nói mình khác ở đâu, tâm lý mua, giúp nhớ thương hiệu, người quanh mình đang dùng). Là cách nghĩ chứ không phải khuôn; bạn sửa được như các tài liệu luật khác."
+  "1.2.15": "Tài liệu MỚI: kiến thức bán hàng cho biên kịch (bán cái vườn sau khi dùng, nói mình khác ở đâu, tâm lý mua, giúp nhớ thương hiệu, người quanh mình đang dùng). Là cách nghĩ chứ không phải khuôn; bạn sửa được như các tài liệu luật khác.",
+  "1.2.20": "Nói lợi ích bằng lời bà con hay nói, không bằng hình ảnh văn vẻ."
  }
 }
