@@ -89,6 +89,15 @@ final class RiengAutoController extends Controller
         return response()->json(['account' => $row, 'url' => $row === null || $row['ready'] ? null : $accounts->loginUrl($id)]);
     }
 
+    /** Hạn mức còn lại của một tài khoản ChatGPT (hỏi Codex, khoảng 1–3 giây, không tốn lượt). */
+    public function chatGptLimits(Request $request, ChatGptAccounts $accounts, string $id): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $limits = $accounts->limits($id);
+
+        return response()->json(['ok' => $limits !== null, 'limits' => $limits]);
+    }
+
     public function removeChatGpt(Request $request, ChatGptAccounts $accounts, string $id): JsonResponse
     {
         $this->authorizeOwner($request);

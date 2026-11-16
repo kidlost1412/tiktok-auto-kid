@@ -338,7 +338,8 @@ test('codex runs with the Fast tier when chosen and "out of credits" counts as o
 
     expect(fn () => app(CodexRunner::class)->ask('tk-aaaaaaaa', 'gpt-6.1-terra', 'low', 'hi', [], $work, true))->toThrow(CodexLimited::class);
     $args = (string) file_get_contents($this->gpt.'/args.txt');
-    expect($args)->toContain('service_tier')->toContain('fast')->toContain('model_reasoning_effort=low');
+    // Mỗi -c phải đi liền giá trị của nó (lỗi cũ: "-c -c service_tier=... model_reasoning_effort=low").
+    expect($args)->toMatch('/-c\s+"?service_tier=\\\\?"?fast/')->toMatch('/-c\s+"?model_reasoning_effort=low/')->not->toMatch('/-c\s+-c/');
 
     expect(fn () => app(CodexRunner::class)->ask('tk-aaaaaaaa', 'gpt-6.1-terra', 'low', 'hi', [], $work, false))->toThrow(CodexLimited::class)
         ->and((string) file_get_contents($this->gpt.'/args.txt'))->not->toContain('service_tier');
@@ -428,4 +429,21 @@ test('opening a folder that is gone says so', function () {
     $folder = RiengFolder::create(['path' => $this->own.'/khong-co', 'name' => null]);
 
     $this->actingAs($this->owner)->postJson("/auto/kho/rieng/thu-muc/{$folder->id}/mo")->assertStatus(422);
+});
+
+test('reads ChatGPT quota windows from codex app-server', function () {
+    $msg = ['id' => 2, 'result' => ['ordinaryUsageAllowed' => true, 'rateLimits' => [
+        'primary' => ['usedPercent' => 12.6, 'windowDurationMins' => 300, 'resetsAt' => 1797435673],
+        'secondary' => ['usedPercent' => 40, 'windowDurationMins' => 10080, 'resetsAt' => 1797435673],
+        'planType' => 'plus', 'rateLimitReachedType' => null,
+    ]]];
+
+    $l = ChatGptAccounts::parseLimits($msg);
+    expect($l['plan'])->toBe('plus')->and($l['reached'])->toBeFalse()
+        ->and($l['windows'])->toHaveCount(2)
+        ->and($l['windows'][0])->toMatchArray(['used' => 13, 'minutes' => 300])
+        ->and($l['windows'][1]['used'])->toBe(40)
+        ->and(ChatGptAccounts::parseLimits(['id' => 2, 'error' => ['message' => 'x']]))->toBeNull();
+
+    $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/chatgpt/tk-zzzzzzzz/han-muc')->assertOk()->assertJson(['ok' => false, 'limits' => null]);
 });

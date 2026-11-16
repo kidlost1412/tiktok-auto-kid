@@ -62,13 +62,73 @@ const load = async () => {
         if (r.data.cli.installing && !cliPoll) {
             watchInstall();
         }
+
+        loadLimits();
     } else {
         toast.error('Không tải được cài đặt tự đăng.');
     }
 };
 
+// ---- Hạn mức từng tài khoản ChatGPT (hỏi Codex riêng từng tài khoản, không tốn lượt).
+interface LimitWindow {
+    used: number;
+    minutes: number | null;
+    resets_at: string | null;
+}
+
+const limits = ref<
+    Record<string, { windows: LimitWindow[]; reached: boolean } | null>
+>({});
+
+const loadLimits = async () => {
+    for (const a of data.value?.chatgpt ?? []) {
+        if (!a.ready) {
+            continue;
+        }
+
+        const r = await callJson<{
+            limits: { windows: LimitWindow[]; reached: boolean } | null;
+        }>('GET', `/auto/kho/rieng/tu-dong/chatgpt/${a.id}/han-muc`);
+        limits.value = { ...limits.value, [a.id]: r.data?.limits ?? null };
+    }
+};
+
+const windowName = (m: number | null) => {
+    if (!m) {
+        return '';
+    }
+
+    if (m >= 60 * 24 * 25) {
+        return 'tháng';
+    }
+
+    if (m >= 60 * 24 * 6) {
+        return 'tuần';
+    }
+
+    if (m >= 60 * 24) {
+        return `${Math.round(m / 1440)} ngày`;
+    }
+
+    return `${Math.round(m / 60)} giờ`;
+};
+
+const fmtReset = (iso: string) => {
+    const d = new Date(iso);
+    const days = (d.getTime() - Date.now()) / 86_400_000;
+    const hm = d.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    return days < 1
+        ? `lúc ${hm}`
+        : `${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`;
+};
+
 watch(open, (o) => {
     if (o) {
+        limits.value = {};
         load();
     } else {
         stopPoll();
@@ -872,6 +932,80 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                                 ? ` · đã dùng ${a.uses} lần`
                                                 : ''
                                         }}
+                                    </div>
+                                    <div
+                                        v-if="a.ready"
+                                        class="mt-1.5 flex flex-col gap-1"
+                                        :data-testid="`fork-chatgpt-limits-${a.id}`"
+                                    >
+                                        <div
+                                            v-if="limits[a.id] === undefined"
+                                            :class="cn(hintCls, 'text-xs')"
+                                        >
+                                            Đang xem hạn mức…
+                                        </div>
+                                        <div
+                                            v-else-if="limits[a.id] === null"
+                                            :class="cn(hintCls, 'text-xs')"
+                                        >
+                                            Chưa xem được hạn mức.
+                                        </div>
+                                        <div
+                                            v-for="(w, wi) in limits[a.id]
+                                                ?.windows ?? []"
+                                            v-else
+                                            :key="wi"
+                                            class="flex flex-col gap-0.5"
+                                        >
+                                            <div
+                                                class="flex justify-between gap-2 text-xs text-foreground/75"
+                                            >
+                                                <span
+                                                    >Hạn mức
+                                                    {{ windowName(w.minutes) }}:
+                                                    còn
+                                                    <b class="text-foreground"
+                                                        >{{
+                                                            Math.max(
+                                                                0,
+                                                                100 - w.used,
+                                                            )
+                                                        }}%</b
+                                                    ></span
+                                                >
+                                                <span
+                                                    v-if="w.resets_at"
+                                                    class="shrink-0"
+                                                    >đặt lại
+                                                    {{
+                                                        fmtReset(w.resets_at)
+                                                    }}</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="h-1.5 overflow-hidden rounded-full bg-muted"
+                                            >
+                                                <div
+                                                    :class="
+                                                        cn(
+                                                            'h-full rounded-full',
+                                                            w.used >= 90
+                                                                ? 'bg-red-500'
+                                                                : w.used >= 70
+                                                                  ? 'bg-amber-500'
+                                                                  : 'bg-emerald-500',
+                                                        )
+                                                    "
+                                                    :style="{
+                                                        width:
+                                                            Math.max(
+                                                                0,
+                                                                100 - w.used,
+                                                            ) + '%',
+                                                    }"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <Button

@@ -402,8 +402,9 @@ final class RiengController extends Controller
         }
 
         if (PHP_OS_FAMILY === 'Windows') {
-            // explorer.exe trả mã 1 cả khi mở được: không chờ, không xét mã.
-            (new Process(['explorer.exe', $path]))->setTimeout(null)->start();
+            // Phải chờ explorer.exe chạy xong (nó chỉ báo Explorer đang chạy mở cửa sổ rồi thoát ngay):
+            // nếu chỉ start() thì hết request PHP giết nó trước khi kịp mở. Nó trả mã 1 cả khi mở được: không xét mã.
+            (new Process(['explorer.exe', $path]))->setTimeout(15)->run();
         }
 
         return response()->json(['ok' => true]);
