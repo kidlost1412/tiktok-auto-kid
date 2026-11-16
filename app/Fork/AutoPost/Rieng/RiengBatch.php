@@ -564,7 +564,7 @@ final class RiengBatch
                 continue;
             }
 
-            $error = $this->applyOne($social, (int) $row['id'], $code, $qc, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
+            $error = $this->postOne($social, (int) $row['id'], $code, $qc, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
 
             if ($error === null) {
                 $done++;
@@ -594,8 +594,12 @@ final class RiengBatch
         return ['ok' => true, 'error' => null, 'committed' => true, 'needs_confirm' => false, 'mode' => $plan['mode'], 'channel' => $plan['channel'], 'rows' => $rows, 'left' => $plan['left'], 'done' => $done, 'failed' => $failed];
     }
 
-    /** @return string|null lỗi (tiếng Việt) hoặc null khi đã hẹn xong */
-    private function applyOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null): ?string
+    /**
+     * Giữ chỗ một video riêng rồi tạo bài hẹn giờ (dùng cho Đăng hàng loạt và Kho riêng tự đăng theo khung).
+     *
+     * @return string|null lỗi (tiếng Việt) hoặc null khi đã hẹn xong
+     */
+    public function postOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null): ?string
     {
         $video = AutoVideo::query()->whereKey($id)->where('source', AutoVideo::SOURCE_RIENG)->first();
 

@@ -10,6 +10,7 @@ use App\Enums\SocialAccount\Status as AccountStatus;
 use App\Fork\AutoPost\CaptionService;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\VideoLibrary;
 use App\Fork\Chrome\ChromeJobs;
@@ -307,7 +308,20 @@ final class Planner
         $created = 0;
         $failed = 0;
 
+        $rieng = app(RiengAutoPoster::class);
+
         foreach ($slots as $slot) {
+            // Kho riêng tự đăng theo khung: video riêng sẵn sàng được ưu tiên trước video Xưởng.
+            try {
+                if ($rieng->postNext($social, $cart['allowed'], $slot, $now)) {
+                    $created++;
+
+                    continue;
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+
             $video = $this->library->reserveClaimed($social, $cart['allowed'], $slot);
 
             if ($video === null) {

@@ -9,6 +9,7 @@ use App\Fork\AutoPost\Http\MediaController;
 use App\Fork\AutoPost\Http\PersonaliseController;
 use App\Fork\AutoPost\Http\PostEditController;
 use App\Fork\AutoPost\Http\RescheduleController;
+use App\Fork\AutoPost\Http\RiengAutoController;
 use App\Fork\AutoPost\Http\RiengController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
@@ -94,6 +95,14 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::post('dat-lich/goi-y', [RiengController::class, 'batchPropose'])->middleware('throttle:120,1')->name('batch.propose');
         Route::post('dat-lich/xem', [RiengController::class, 'batchPreview'])->middleware('throttle:60,1')->name('batch.preview');
         Route::post('dat-lich', [RiengController::class, 'batchCommit'])->middleware('throttle:20,1')->name('batch.commit');
+        // Kho riêng tự đăng theo khung: cài đặt, tài khoản ChatGPT, chỉnh sản phẩm/caption/kênh từng video.
+        Route::get('tu-dong', [RiengAutoController::class, 'show'])->name('auto.show');
+        Route::patch('tu-dong', [RiengAutoController::class, 'update'])->middleware('throttle:60,1')->name('auto.update');
+        Route::post('tu-dong/chatgpt', [RiengAutoController::class, 'addChatGpt'])->middleware('throttle:10,1')->name('auto.chatgpt.add');
+        Route::get('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'chatGptStatus'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.status');
+        Route::delete('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'removeChatGpt'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.remove');
+        Route::post('video/{video}/tu-dong', [RiengAutoController::class, 'updateVideo'])->whereNumber('video')->middleware('throttle:120,1')->name('auto.video');
+        Route::post('video/{video}/ai-xem-lai', [RiengAutoController::class, 'reanalyze'])->whereNumber('video')->middleware('throttle:20,1')->name('auto.reanalyze');
     });
 });
 

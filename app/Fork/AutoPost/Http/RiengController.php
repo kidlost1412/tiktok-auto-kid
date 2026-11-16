@@ -12,6 +12,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\HashtagSuggestions;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengCoverMemory;
 use App\Fork\AutoPost\Rieng\RiengCovers;
@@ -125,9 +126,11 @@ final class RiengController extends Controller
                 $page = $videos();
                 $products = AutoProduct::query()->get()->keyBy('code');
                 $images = ProductImages::lookup();
+                $autoSettings = RiengAutoSettings::get();
 
                 return [
-                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups()[$v->id] ?? null, $info->product($v, $products, $images)))->values()->all(),
+                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups()[$v->id] ?? null, $info->product($v, $products, $images))
+                        + ['auto' => RiengAutoController::videoAuto($v, $autoSettings)])->values()->all(),
                     'current_page' => $page->currentPage(),
                     'last_page' => $page->lastPage(),
                     'total' => $page->total(),

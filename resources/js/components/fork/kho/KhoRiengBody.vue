@@ -12,6 +12,7 @@ import {
     IconPlaylistAdd,
     IconRefresh,
     IconSend,
+    IconSparkles,
     IconTrash,
     IconVideoOff,
     IconX,
@@ -22,14 +23,19 @@ import { toast } from 'vue-sonner';
 import BatchDialog from '@/components/fork/kho/BatchDialog.vue';
 import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
 import {
+    type AutoPayload,
     type BatchItem,
+    callJson,
     type Folder,
     postJson,
     type QueueItem,
+    type RiengAuto,
     type RiengPageProps,
     type RiengVideo,
     xsrf,
 } from '@/components/fork/kho/rieng';
+import RiengAutoDialog from '@/components/fork/kho/RiengAutoDialog.vue';
+import RiengAutoEdit from '@/components/fork/kho/RiengAutoEdit.vue';
 import RiengCard from '@/components/fork/kho/RiengCard.vue';
 import RiengQueueDialog from '@/components/fork/kho/RiengQueueDialog.vue';
 import RiengSteps from '@/components/fork/kho/RiengSteps.vue';
@@ -857,6 +863,62 @@ const removeFolder = async (f: Folder) => {
     router.delete(`/auto/kho/rieng/thu-muc/${f.id}`, mk('quet'));
 };
 
+// ---- Tự đăng theo khung (Kho riêng): hộp cài đặt + hộp chỉnh từng video.
+const autoOpen = ref(false);
+const autoEditOpen = ref(false);
+const autoVideo = ref<RiengVideo | null>(null);
+const autoPayload = ref<AutoPayload | null>(null);
+const autoEnabled = computed(
+    () => autoPayload.value?.settings.enabled ?? false,
+);
+
+const loadAuto = async () => {
+    const r = await callJson<AutoPayload>('GET', '/auto/kho/rieng/tu-dong');
+
+    if (r.ok && r.data) {
+        autoPayload.value = r.data;
+    }
+};
+
+onMounted(loadAuto);
+
+const reloadVideos = () => {
+    if (props.embedded) {
+        emit('refresh', RELOAD_ONLY);
+    } else {
+        router.reload({
+            only: RELOAD_ONLY,
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }
+};
+
+const onAutoChanged = (p: AutoPayload) => {
+    autoPayload.value = p;
+    reloadVideos();
+};
+
+const openAutoEdit = async (v: RiengVideo) => {
+    autoVideo.value = v;
+
+    if (!autoPayload.value) {
+        await loadAuto();
+    }
+
+    autoEditOpen.value = true;
+};
+
+const onAutoSaved = (id: number, a: RiengAuto) => {
+    const v = props.videos.data.find((x) => x.id === id);
+
+    if (v) {
+        v.auto = a;
+    }
+
+    reloadVideos();
+};
+
 const retry = (v: RiengVideo) =>
     router.post(`/auto/videos/${v.id}/thu-lai`, {}, mk('xem'));
 
@@ -1080,6 +1142,16 @@ defineExpose({ scan, busy });
             >
                 <IconPlus class="size-4" /> Thêm thư mục
             </Button>
+            <Button
+                size="sm"
+                :variant="autoEnabled ? 'default' : 'outline'"
+                class="ml-auto"
+                data-testid="fork-rieng-auto-open"
+                @click="autoOpen = true"
+            >
+                <IconSparkles class="size-4" />
+                Tự đăng theo khung: {{ autoEnabled ? 'Bật' : 'Tắt' }}
+            </Button>
             <span v-if="!folders.length" class="text-sm text-muted-foreground"
                 >Chưa có thư mục nào: thêm thư mục chứa video của bạn.</span
             >
@@ -1273,6 +1345,7 @@ defineExpose({ scan, busy });
                 @toggle="(shift: boolean) => onCardClick(v, shift)"
                 @queue="toggleQueue(v.id)"
                 @retry="retry(v)"
+                @auto="openAutoEdit(v)"
             />
         </section>
 
@@ -1436,6 +1509,14 @@ defineExpose({ scan, busy });
             @clear="clearQueue"
             @post="postQueue"
             @view="viewFromQueue"
+        />
+
+        <RiengAutoDialog v-model:open="autoOpen" @changed="onAutoChanged" />
+        <RiengAutoEdit
+            v-model:open="autoEditOpen"
+            :video="autoVideo"
+            :payload="autoPayload"
+            @saved="onAutoSaved"
         />
 
         <BatchDialog

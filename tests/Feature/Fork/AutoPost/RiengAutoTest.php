@@ -1,0 +1,364 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\SocialAccount\Status as AccountStatus;
+use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\AutoProduct;
+use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductLink;
+use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
+use App\Fork\AutoPost\Rieng\Ai\CodexLimited;
+use App\Fork\AutoPost\Rieng\Ai\CodexRunner;
+use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
+use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
+use App\Fork\AutoPost\Rieng\Ai\Speech;
+use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Rieng\RiengReady;
+use App\Fork\AutoPost\Rieng\RiengThumbs;
+use App\Fork\AutoPost\Scheduling\Planner;
+use App\Fork\Chrome\Models\ChromeAccount;
+use App\Models\Account;
+use App\Models\Post;
+use App\Models\SocialAccount;
+use App\Models\User;
+use App\Models\Workspace;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function (): void {
+    Storage::fake();
+    Cache::flush();
+    $tmp = str_replace('\\', '/', sys_get_temp_dir());
+    $this->hub = $tmp.'/rieng-auto-hub-'.bin2hex(random_bytes(4));
+    $this->own = $tmp.'/rieng-auto-own-'.bin2hex(random_bytes(4));
+    $this->gpt = $tmp.'/rieng-auto-gpt-'.bin2hex(random_bytes(4));
+    File::ensureDirectoryExists($this->hub.'/san-pham/nano-dong');
+    File::ensureDirectoryExists($this->own);
+    File::ensureDirectoryExists($this->gpt);
+    file_put_contents($this->hub.'/san-pham/nano-dong/san-pham.json', json_encode([
+        'ma' => 'nano-dong', 'ten_goi' => 'Nano Đồng Toàn Cầu', 'nhan_dien_chai' => 'Chai trắng 500 ml',
+        'su_that_duoc_noi' => ['Một chai pha một phuy 200 lít.'], 'khong_duoc_noi' => ['Giá tiền.'],
+    ], JSON_UNESCAPED_UNICODE));
+    config(['fork.auto.hub_path' => $this->hub, 'fork.auto.chatgpt_dir' => $this->gpt, 'fork.auto.settle_seconds' => 0, 'fork.auto.hub_api.key' => '', 'trypost.self_hosted' => true]);
+    app()->instance(RiengReady::class, new RiengReady(fn (string $p): ?float => 5.0, fn () => null));
+
+    $acct = Account::factory()->create();
+    $this->owner = User::factory()->create(['account_id' => $acct->id]);
+    $acct->update(['owner_id' => $this->owner->id]);
+    $this->workspace = Workspace::factory()->create(['account_id' => $acct->id, 'user_id' => $this->owner->id]);
+    $this->owner->update(['current_workspace_id' => $this->workspace->id]);
+    $this->now = CarbonImmutable::now('UTC')->addDays(2)->setTime(3, 0);
+
+    AutoProduct::create(['code' => 'nano-dong', 'name' => 'Nano Đồng', 'short_name' => 'NanoĐồng', 'facts' => [], 'enabled' => true]);
+    AutoProduct::create(['code' => 'tc01', 'name' => 'TC01', 'short_name' => 'TC01', 'facts' => [], 'enabled' => true]);
+
+    $this->account = function (array $auto = []): SocialAccount {
+        $account = SocialAccount::factory()->tiktok()->create([
+            'workspace_id' => $this->workspace->id, 'status' => AccountStatus::Connected, 'timezone' => 'Asia/Ho_Chi_Minh',
+        ]);
+        ChromeAccount::create(['social_account_id' => $account->id, 'enabled' => true, 'tiktok_user_id' => '777'.random_int(100, 999)]);
+        AutoAccount::create(['social_account_id' => $account->id, 'enabled' => true, 'daily_cap' => 3, 'window_start' => 6, 'window_end' => 23, ...$auto]);
+        $pid = '17293847560'.random_int(10000000, 99999999);
+        ShopProduct::create(['social_account_id' => $account->id, 'product_id' => $pid, 'source' => 'my_shop', 'title' => 'Nano Đồng 1L', 'stock_num' => 5, 'synced_at' => now()]);
+        ProductLink::create(['social_account_id' => $account->id, 'auto_product_id' => 'nano-dong', 'shop_product_id' => $pid, 'display_name' => 'Nano Đồng 1L']);
+
+        return $account;
+    };
+
+    $this->rieng = function (string $name, array $attrs = [], array $meta = []): AutoVideo {
+        $path = $this->own.'/'.$name;
+        file_put_contents($path, 'video-'.$name);
+
+        return AutoVideo::create([
+            'hash' => hash('sha256', $name), 'path' => $path, 'source' => 'rieng', 'batch_date' => '2026-11-09',
+            'file_name' => $name, 'status' => 'new', 'meta' => ['folder_id' => 1, 'rel_path' => $name, ...$meta], ...$attrs,
+        ]);
+    };
+
+    // Video AI đã xem xong và chắc chắn sản phẩm.
+    $this->ready = fn (string $name, array $ai = [], array $meta = [], array $attrs = []): AutoVideo => ($this->rieng)($name, ['product_code' => 'nano-dong', ...$attrs], [
+        'ai' => ['state' => 'ok', 'product_code' => 'nano-dong', 'chac' => 'cao', 'caption' => 'Rửa vườn sau thu hoạch cho sạch nấm', 'approved' => false, ...$ai], ...$meta,
+    ]);
+
+    // Tài khoản ChatGPT giả (đã đăng nhập).
+    $this->gptAccount = function (string $id, string $email = 'a@example.test'): void {
+        File::ensureDirectoryExists($this->gpt.'/'.$id);
+        $claims = rtrim(strtr(base64_encode(json_encode(['email' => $email, 'https://api.openai.com/auth' => ['chatgpt_plan_type' => 'plus']])), '+/', '-_'), '=');
+        file_put_contents($this->gpt.'/'.$id.'/auth.json', json_encode(['tokens' => ['id_token' => 'h.'.$claims.'.s', 'refresh_token' => 'r']]));
+    };
+});
+
+afterEach(function (): void {
+    File::deleteDirectory($this->hub);
+    File::deleteDirectory($this->own);
+    File::deleteDirectory($this->gpt);
+});
+
+// ---------------------------------------------------------------- Planner: kho riêng trước, chỉ khi bật
+
+test('the planner posts a ready private video before hub videos, but only when auto posting for kho riêng is on', function () {
+    $account = ($this->account)();
+    $v = ($this->ready)('a.mp4', ['hashtags' => ['#nanodong', '#ruavuon']]);
+    $hub = AutoVideo::create(['hash' => 'h1', 'path' => $this->own.'/h.mp4', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'NanoĐồng_x_MIXKIT_1.mp4', 'status' => 'new', 'product_code' => 'nano-dong', 'caption' => 'hub cap', 'hashtags' => []]);
+    file_put_contents($this->own.'/h.mp4', 'h');
+
+    // Chưa bật: chỉ kiểm, không chạy planner (planner sẽ lấy video hub).
+    expect(app(RiengAutoPoster::class)->postNext(SocialAccount::query()->findOrFail($account->id), ['nano-dong' => [null]], $this->now->addHour()))->toBeFalse()
+        ->and($v->refresh()->status)->toBe('new');
+
+    RiengAutoSettings::update(['enabled' => true]);
+    app(Planner::class)->planAll($this->now);
+
+    $v->refresh();
+    $hub->refresh();
+    expect($v->status)->toBe('scheduled')->and($v->social_account_id)->toBe($account->id)
+        ->and($v->caption)->toBe('Rửa vườn sau thu hoạch cho sạch nấm')
+        ->and(Post::query()->findOrFail($v->post_id)->content)->toContain('#nanodong')->toContain('#ruavuon')
+        ->and($hub->status)->toBe('scheduled')
+        ->and($v->scheduled_for->lessThan($hub->scheduled_for))->toBeTrue();
+});
+
+test('a video without a sure product, an unapproved caption or an unconfirmed duplicate waits', function () {
+    ($this->account)();
+    RiengAutoSettings::update(['enabled' => true, 'approve_first' => true]);
+    $unsure = ($this->rieng)('unsure.mp4', [], ['ai' => ['state' => 'unsure', 'product_code' => 'nano-dong', 'chac' => 'vua', 'caption' => 'x']]);
+    $unapproved = ($this->ready)('cho-duyet.mp4');
+    $dup = ($this->ready)('trung.mp4', ['approved' => true], ['duplicate_of' => 999]);
+
+    app(Planner::class)->planAll($this->now);
+
+    expect($unsure->refresh()->status)->toBe('new')->and($unapproved->refresh()->status)->toBe('new')->and($dup->refresh()->status)->toBe('new');
+
+    $s = RiengAutoSettings::get();
+    $poster = app(RiengAutoPoster::class);
+    expect($poster->blocker($unsure, null, null, $s))->toBe('Anh chọn sản phẩm')
+        ->and($poster->blocker($unapproved, null, null, $s))->toBe('Chờ anh duyệt caption')
+        ->and($poster->blocker($dup, null, null, $s))->toContain('Vẫn đăng');
+
+    // Duyệt + cho đăng video trùng → lượt sau đăng cả hai.
+    $owner = $this->owner;
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/video/'.$unapproved->id.'/tu-dong', ['approved' => true])->assertOk();
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/video/'.$dup->id.'/tu-dong', ['dup_ok' => true])->assertOk()->assertJsonPath('auto.ready', true);
+    app(Planner::class)->planAll($this->now);
+
+    expect($unapproved->refresh()->status)->toBe('scheduled')->and($dup->refresh()->status)->toBe('scheduled')->and($unsure->refresh()->status)->toBe('new');
+});
+
+test('duplicates may be set to post anyway, still flagged on the card', function () {
+    ($this->account)();
+    RiengAutoSettings::update(['enabled' => true, 'duplicates' => 'allow']);
+    $dup = ($this->ready)('trung.mp4', [], ['duplicate_of' => 5]);
+
+    app(Planner::class)->planAll($this->now);
+
+    expect($dup->refresh()->status)->toBe('scheduled');
+});
+
+test('caption options: own caption wins, empty caption posts when allowed and waits when not', function () {
+    ($this->account)();
+    RiengAutoSettings::update(['enabled' => true, 'caption_mode' => 'kid', 'empty_caption_ok' => false]);
+    $own = ($this->ready)('tu-viet.mp4', [], [], ['caption' => 'Anh tự viết', 'caption_source' => 'kid']);
+    $none = ($this->ready)('khong-cap.mp4');
+
+    app(Planner::class)->planAll($this->now);
+    expect($own->refresh()->status)->toBe('scheduled')->and($own->caption)->toBe('Anh tự viết')
+        ->and($none->refresh()->status)->toBe('new')
+        ->and(app(RiengAutoPoster::class)->blocker($none, null, null, RiengAutoSettings::get()))->toBe('Chờ anh viết caption');
+
+    RiengAutoSettings::update(['empty_caption_ok' => true]);
+    app(Planner::class)->planAll($this->now);
+    $post = Post::query()->findOrFail($none->refresh()->post_id);
+    expect($none->status)->toBe('scheduled')->and($none->caption)->toBe('')->and($post->meta['fork_caption_optional'] ?? false)->toBeTrue();
+});
+
+test('channel choice: a video set to another channel or a folder set to another channel is never posted here', function () {
+    $a = ($this->account)();
+    $b = ($this->account)();
+    RiengAutoSettings::update(['enabled' => true]);
+    $forB = ($this->ready)('cho-b.mp4', [], ['channels' => [$b->id]]);
+    $folderB = ($this->ready)('thu-muc-b.mp4', [], ['folder_id' => 7]);
+    RiengAutoSettings::update(['folder_channels' => ['7' => [$b->id]]]);
+
+    app(Planner::class)->planAll($this->now, [$a->id]);
+    expect($forB->refresh()->status)->toBe('new')->and($folderB->refresh()->status)->toBe('new');
+
+    app(Planner::class)->planAll($this->now, [$b->id]);
+    expect($forB->refresh()->social_account_id)->toBe($b->id)->and($folderB->refresh()->social_account_id)->toBe($b->id);
+});
+
+test('a product with no valid cart on the channel is never attached there', function () {
+    ($this->account)();
+    RiengAutoSettings::update(['enabled' => true]);
+    $tc = ($this->ready)('tc.mp4', ['product_code' => 'tc01'], [], ['product_code' => 'tc01']);
+
+    app(Planner::class)->planAll($this->now);
+
+    expect($tc->refresh()->status)->toBe('new');
+});
+
+// ---------------------------------------------------------------- AI xem video
+
+/** Bộ xem video giả: không cần ffmpeg, lời nói cố định. */
+function fakeAnalyzer(CodexRunner $codex, string $speech = 'Nano Đồng rửa vườn'): RiengAnalyzer
+{
+    return new class(app(ChatGptAccounts::class), $codex, app(Speech::class), app(RiengThumbs::class), $speech) extends RiengAnalyzer
+    {
+        public function __construct(ChatGptAccounts $a, CodexRunner $c, Speech $s, RiengThumbs $t, private string $said)
+        {
+            parent::__construct($a, $c, $s, $t);
+        }
+
+        protected function grid(AutoVideo $video, string $work): string
+        {
+            file_put_contents($work.'/luoi.jpg', 'jpg');
+
+            return $work.'/luoi.jpg';
+        }
+
+        protected function speechOf(AutoVideo $video, string $work): array
+        {
+            return [$this->said, null];
+        }
+    };
+}
+
+function fakeCodex(array $answers): CodexRunner
+{
+    return new class(app(ChatGptAccounts::class), $answers) extends CodexRunner
+    {
+        public array $calls = [];
+
+        public function __construct(ChatGptAccounts $a, private array $answers)
+        {
+            parent::__construct($a);
+        }
+
+        public function ask(string $accountId, string $model, string $effort, string $prompt, array $images, string $workDir): string
+        {
+            $this->calls[] = [$accountId, $model, $effort, $prompt];
+            $next = array_shift($this->answers);
+
+            if ($next instanceof Throwable) {
+                throw $next;
+            }
+
+            return (string) $next;
+        }
+    };
+}
+
+test('the AI attaches the product only when sure, writes a short caption without hashtags and never overrides the owner pick', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $codex = fakeCodex([
+        '{"ma":"nano-dong","chac":"cao","ly_do":"thấy nhãn","tom_tat":"rửa vườn","hashtag":["#nanođồng","vườn cà phê","#ruavuon","#thua"],"caption":"#rua Rửa vườn sau thu hoạch, sạch nấm hồng rong rêu trên thân cành cà phê cho mùa sau ra hoa đều hơn nhiều lắm"}',
+        '{"ma":"nano-dong","chac":"vua","ly_do":"","tom_tat":"","caption":"c2"}',
+        '{"ma":"tc01","chac":"cao","ly_do":"","tom_tat":"","caption":"c3"}',
+    ]);
+    $an = fakeAnalyzer($codex);
+    $sure = ($this->rieng)('a.mp4');
+    $vague = ($this->rieng)('b.mp4');
+    $mine = ($this->rieng)('c.mp4', ['product_code' => 'nano-dong'], ['product_by' => 'kid']);
+
+    $ai = $an->analyze($sure);
+    expect($ai['state'])->toBe('ok')->and($sure->refresh()->product_code)->toBe('nano-dong')
+        ->and($ai['caption'])->not->toContain('#')->and(mb_strlen($ai['caption']))->toBeLessThanOrEqual(90)
+        ->and($codex->calls[0][3])->toContain('Nano Đồng rửa vườn')->toContain('Một chai pha một phuy 200 lít')->toContain('Giá tiền')
+        ->and($codex->calls[0][1])->toBe('gpt-6.1-terra')
+        ->and($ai['hashtags'])->toBe(['#nanodong', '#vuoncaphe', '#ruavuon']);
+
+    expect($an->analyze($vague)['state'])->toBe('unsure')->and($vague->refresh()->product_code)->toBeNull();
+    expect($an->analyze($mine)['product_code'])->toBe('tc01')->and($mine->refresh()->product_code)->toBe('nano-dong');
+});
+
+test('an account out of quota rests and the next account takes over; no account left means retry later', function () {
+    ($this->gptAccount)('tk-aaaaaaaa', 'a@x.test');
+    ($this->gptAccount)('tk-bbbbbbbb', 'b@x.test');
+    $codex = fakeCodex([new CodexLimited(90), '{"ma":"nano-dong","chac":"cao","ly_do":"","tom_tat":"","caption":"ok"}']);
+    $v = ($this->rieng)('a.mp4');
+
+    $ai = fakeAnalyzer($codex)->analyze($v);
+
+    $accounts = collect(app(ChatGptAccounts::class)->all())->keyBy('id');
+    expect($ai['state'])->toBe('ok')->and($codex->calls[0][0])->not->toBe($codex->calls[1][0])
+        ->and($accounts[$codex->calls[0][0]]['cooldown_until'])->not->toBeNull()
+        ->and($accounts[$codex->calls[1][0]]['uses'])->toBe(1);
+
+    // Cả hai tài khoản nghỉ → lỗi, hẹn thử lại, chưa bỏ cuộc.
+    app(ChatGptAccounts::class)->markLimited($codex->calls[1][0]);
+    $w = ($this->rieng)('b.mp4');
+    $err = fakeAnalyzer(fakeCodex([]))->analyze($w);
+    expect($err['state'])->toBe('error')->and($err['next_try_at'])->not->toBeNull()
+        ->and(app(RiengAnalyzer::class)->pending(10, CarbonImmutable::now()))->toHaveCount(0)
+        ->and(app(RiengAnalyzer::class)->pending(10, CarbonImmutable::now()->addHour()))->toHaveCount(1);
+});
+
+test('accounts rotate in turn and show the signed-in email', function () {
+    ($this->gptAccount)('tk-aaaaaaaa', 'a@x.test');
+    touch($this->gpt.'/tk-aaaaaaaa', time() - 100);
+    ($this->gptAccount)('tk-bbbbbbbb', 'b@x.test');
+    File::ensureDirectoryExists($this->gpt.'/tk-cccccccc'); // đang đăng nhập dở: chưa dùng
+    $acc = app(ChatGptAccounts::class);
+
+    $first = $acc->pick();
+    $acc->markUsed($first);
+    $second = $acc->pick();
+    $acc->markUsed($second);
+
+    expect([$first, $second])->toEqualCanonicalizing(['tk-aaaaaaaa', 'tk-bbbbbbbb'])->and($acc->pick())->toBe($first)
+        ->and(collect($acc->all())->pluck('email')->filter()->values()->all())->toEqualCanonicalizing(['a@x.test', 'b@x.test'])
+        ->and(collect($acc->all())->firstWhere('id', 'tk-cccccccc')['ready'])->toBeFalse();
+
+    expect($acc->remove('tk-bbbbbbbb'))->toBeTrue()->and(is_dir($this->gpt.'/tk-bbbbbbbb'))->toBeFalse()
+        ->and($acc->remove('../x'))->toBeFalse();
+});
+
+test('wrong answers are rejected and the retry wait grows', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $v = ($this->rieng)('a.mp4');
+    $an = fakeAnalyzer(fakeCodex(['không phải json', 'cũng không']));
+
+    $one = $an->analyze($v, CarbonImmutable::parse('2026-11-16 10:00:00'));
+    $two = $an->analyze($v->refresh(), CarbonImmutable::parse('2026-11-16 11:00:00'));
+
+    expect($one['state'])->toBe('error')->and($one['error'])->toContain('sai định dạng')
+        ->and(CarbonImmutable::parse($one['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 10:00:00'), true))->toEqual(10)
+        ->and(CarbonImmutable::parse($two['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 11:00:00'), true))->toEqual(30)
+        ->and($two['tries'])->toBe(2);
+});
+
+test('the quota reset time is read from the ChatGPT message', function () {
+    expect(CodexRunner::retryAt("You've hit your usage limit. Try again in 2 hours 5 minutes."))->toBe(125)
+        ->and(CodexRunner::retryAt('try again in 37 minutes'))->toBe(37)
+        ->and(CodexRunner::retryAt('nothing'))->toBeNull();
+});
+
+// ---------------------------------------------------------------- Trang cài đặt + sửa video
+
+test('settings save, folder channels keep only own channels and the cards carry the auto status', function () {
+    $owner = $this->owner;
+    $a = ($this->account)();
+    $folder = RiengFolder::create(['path' => $this->own, 'name' => 'Của tôi']);
+
+    $r = $this->actingAs($owner)->patchJson('/auto/kho/rieng/tu-dong', [
+        'enabled' => true, 'caption_mode' => 'ai', 'approve_first' => true, 'model' => 'gpt-6.1-sol', 'effort' => 'high',
+        'folder_channels' => [(string) $folder->id => [$a->id, 'kenh-la'], '999' => [$a->id]],
+    ])->assertOk()->json();
+
+    expect($r['settings']['model'])->toBe('gpt-6.1-sol')->and($r['settings']['folder_channels'])->toBe([(string) $folder->id => [$a->id]])
+        ->and($r['channels'][0]['id'])->toBe($a->id)->and($r['products'])->toHaveCount(2);
+
+    $this->actingAs($owner)->patchJson('/auto/kho/rieng/tu-dong', ['model' => 'gpt-4'])->assertUnprocessable();
+
+    $v = ($this->ready)('a.mp4');
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/video/'.$v->id.'/tu-dong', ['product_code' => 'tc01', 'caption' => 'Của anh'])
+        ->assertOk()->assertJsonPath('auto.product_by', 'kid')->assertJsonPath('auto.kid_caption', 'Của anh')->assertJsonPath('auto.final_caption', 'Của anh');
+
+    // Về lại "theo AI".
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/video/'.$v->id.'/tu-dong', ['product_code' => null, 'caption' => ''])
+        ->assertOk()->assertJsonPath('auto.product_code', 'nano-dong')->assertJsonPath('auto.product_by', 'ai')->assertJsonPath('auto.kid_caption', null);
+});

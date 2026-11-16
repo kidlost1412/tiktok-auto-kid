@@ -5,6 +5,7 @@ import {
     IconCheck,
     IconMovie,
     IconPlaylistAdd,
+    IconSparkles,
 } from '@tabler/icons-vue';
 import { ref } from 'vue';
 
@@ -30,11 +31,17 @@ const emit = defineEmits<{
     toggle: [shift: boolean];
     queue: [];
     retry: [];
+    auto: [];
 }>();
+
+// Phần "tự đăng theo khung" chỉ hiện cho video còn chờ đăng.
+const auto = () =>
+    props.video.status === 'new' && !props.video.gone ? props.video.auto : null;
 
 const thumbFailed = ref(false);
 const thumbLoaded = ref(false);
-const fmt = (iso: string | null) => (iso ? dayjs(iso).format('HH:mm DD/MM') : '—');
+const fmt = (iso: string | null) =>
+    iso ? dayjs(iso).format('HH:mm DD/MM') : '—';
 
 const status = (): { label: string; tone: Tone } => {
     const v = props.video;
@@ -59,11 +66,11 @@ const detail = (): string => {
     const v = props.video;
 
     if (v.status === 'scheduled' || v.status === 'reserved') {
-        return `${fmt(v.scheduled_for)}${v.channel ? ` · ${v.channel}` : ''}`;
+        return `${v.channel ? `Kênh ${v.channel} · ` : ''}hẹn ${fmt(v.scheduled_for)}`;
     }
 
     if (v.status === 'posted') {
-        return `${fmt(v.posted_at)}${v.channel ? ` · ${v.channel}` : ''}`;
+        return `${v.channel ? `Kênh ${v.channel} · ` : ''}đăng ${fmt(v.posted_at)}`;
     }
 
     return v.reason ?? '';
@@ -98,7 +105,10 @@ const onClick = (e: MouseEvent) => {
             :class="
                 cn(
                     'relative aspect-[9/16] w-full cursor-pointer overflow-hidden bg-muted',
-                    !thumbFailed && !video.gone && !thumbLoaded && 'animate-pulse',
+                    !thumbFailed &&
+                        !video.gone &&
+                        !thumbLoaded &&
+                        'animate-pulse',
                 )
             "
             @click="onClick"
@@ -199,6 +209,74 @@ const onClick = (e: MouseEvent) => {
                 <ProductThumb :src="video.product.image" class="size-6" />
                 <span class="truncate">{{ video.product.name }}</span>
             </div>
+
+            <!-- Tự đăng theo khung: sẵn sàng / đang chờ gì, caption sẽ đăng -->
+            <button
+                v-if="auto()"
+                type="button"
+                :class="
+                    cn(
+                        'mt-1 flex flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs leading-snug transition hover:bg-muted/60',
+                        auto()!.ready
+                            ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/30'
+                            : 'border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/30',
+                    )
+                "
+                :title="'Bấm để xem AI thấy gì, chọn sản phẩm, sửa caption, chọn kênh'"
+                :data-testid="`fork-rieng-auto-${video.id}`"
+                @click.stop="emit('auto')"
+            >
+                <span
+                    :class="
+                        cn(
+                            'flex items-center gap-1 font-medium',
+                            auto()!.ready
+                                ? 'text-emerald-800 dark:text-emerald-300'
+                                : 'text-amber-900 dark:text-amber-200',
+                        )
+                    "
+                >
+                    <IconSparkles class="size-3.5 shrink-0" />
+                    <span class="min-w-0 flex-1">{{
+                        auto()!.ready ? 'Sẵn sàng tự đăng' : auto()!.blocker
+                    }}</span>
+                    <span
+                        v-if="auto()!.product_by"
+                        class="shrink-0 self-start font-normal whitespace-nowrap text-muted-foreground"
+                        >{{
+                            auto()!.product_by === 'kid'
+                                ? 'anh chọn'
+                                : 'AI chọn'
+                        }}</span
+                    >
+                </span>
+                <span
+                    v-if="
+                        auto()!.final_caption ??
+                        auto()!.kid_caption ??
+                        auto()!.ai_caption
+                    "
+                    class="line-clamp-2 text-foreground/80 italic"
+                    >“{{
+                        auto()!.final_caption ??
+                        auto()!.kid_caption ??
+                        auto()!.ai_caption
+                    }}”</span
+                >
+                <span
+                    v-else-if="auto()!.final_caption === ''"
+                    class="text-muted-foreground"
+                    >Đăng không caption</span
+                >
+                <span
+                    v-if="
+                        auto()!.ai_hashtags?.length &&
+                        auto()!.final_caption !== ''
+                    "
+                    class="truncate text-sky-700 dark:text-sky-300"
+                    >{{ auto()!.ai_hashtags.join(' ') }}</span
+                >
+            </button>
 
             <!-- Cờ trùng video -->
             <div
