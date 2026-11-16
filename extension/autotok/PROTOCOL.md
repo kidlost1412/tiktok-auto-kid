@@ -427,14 +427,28 @@ Needs the protocol in range (409 `need_reload`). 404 `unknown_job`, 403 `bad_non
 1. Passport identity must equal `expect_account` / `expect_user_id` (else `failed`, reason `identity`).
 2. Pre-check: read item_list pages until `item_id` is found. Not found -> `failed` `not_found`; listed but not a future scheduled
    item at `schedule_unix` (+/- 15 min, more than 3 min away) -> `failed` `not_scheduled`. Nothing is deleted in these cases.
-3. ONE delete (1.4.7), done with Studio's OWN buttons on `/tiktokstudio/content`: the row holding the link `/video/<item_id>`
-   (`[data-tt="components_RowLayout_FlexRow"]`, scrolled into the virtual list if needed) -> its last
-   `button[data-tt="components_ActionCell_Clickable"]` ("⋯") -> menu item "Delete" -> dialog "Delete post?" button "Delete".
-   Row/menu/dialog not found -> `failed` `ui_failed` (nothing sent). Studio's real call is
-   `DELETE /tiktok/creator/item/delete/v1/?item_id=<id>` (main.js `tiktok_creator_item_delete_v1`), but a hand-made fetch/XHR to
-   it returns the HTML app shell, and 1.4.6's guessed `POST /api/aweme/delete/` returned HTTP 403 — so no direct call is made.
-   Studio sends its request from a context a page-level XHR/fetch patch does NOT see (a block-by-patching test deleted a post
-   for real on 15/11/2026): never rely on monkey-patching to "dry-run" a Studio delete.
+3. ONE delete (1.4.8): first by API, then (only if TikTok refused or the route was not reached) by Studio's buttons.
+   - API (captured live 16/11/2026 while Studio deleted a real scheduled post the owner named): `POST /tiktok/post/edit/v1/
+     ?aid=1988&app_name=tiktok_creator_center&device_platform=web_pc&channel=tiktok_web` with JSON
+     `{aweme_id: "<item_id>", scene: 1, delete: {delete_type: 0}}`.
+     - `scene`: 1 is EDIT_POST_SCENE_WEBAPP; 4 is used for an async project still in progress.
+     - `delete_type`: 0 is NORMAL; 1 (TRASH_BIN) only when Studio says the item is recyclable.
+     - Studio itself first does `GET /api/v1/post/detail/?item_id=`. A fetch from the Studio page is signed by TikTok's own SDK
+       (`msToken`, `X-Bogus`, `_signature` are added), so no signing code is needed.
+     - Results: `status_code 0` means sent. A fake id answers `status_code 2054 "No item permission"`, which counts as refused.
+     - On a network error the request may have reached TikTok, so it counts as sent and only step 4 decides.
+   - Fallback UI on `/tiktokstudio/content`. The posts table is a VIRTUAL list inside its own scroll box, so walk that box from
+     the top, not `window`:
+     1. find the row holding the link `/video/<item_id>` (`[data-tt="components_RowLayout_FlexRow"]`);
+     2. click its last `button[data-tt="components_ActionCell_Clickable"]` ("⋯");
+     3. pick the menu item "Delete";
+     4. in the "Delete post?" dialog, press "Delete".
+     - In a narrow window the menu shows icons only.
+     - Row, menu or dialog not found: `failed` `ui_failed`, nothing sent.
+   - Dead ends: `DELETE /tiktok/creator/item/delete/v1/` (main.js `tiktok_creator_item_delete_v1`) returns the HTML app shell from
+     the page, and 1.4.6's guessed `POST /api/aweme/delete/` returned HTTP 403.
+   - Page-level XHR/fetch patches do NOT block Studio's own delete: a block-by-patching test deleted a real post on 15/11/2026.
+     Never "dry-run" a delete with a real id. Probe with fake ids only.
 4. Verify after 2.5 s, 4 s, 7 s: item_list scanned from the top until the list ends, or until at least one page past where the item
    was found AND a post older than `schedule_unix - 1 day` was seen. Absent -> `deleted` + `verified: true`. Still listed ->
    `not_deleted`. Lists unreadable -> `unknown`.
