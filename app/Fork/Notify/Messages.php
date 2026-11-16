@@ -125,20 +125,69 @@ final class Messages
         };
     }
 
-    /** @param  array{user?: ?string, reason?: ?string, caption?: ?string, state?: string, file?: ?string, link?: ?string}  $d */
+    /**
+     * `failure` (từ FailureReasons) có thì dùng thay cho việc đoán lý do từ câu chữ; `at` là giờ hẹn của bài.
+     *
+     * @param  array{user?: ?string, reason?: ?string, caption?: ?string, state?: string, file?: ?string, link?: ?string, link_label?: ?string, at?: ?CarbonInterface, failure?: ?array{code: string, title: string, short: string, fix: string, text: string}}  $d
+     */
     public static function failed(array $d, string $key): Message
     {
-        [$why, $fix] = self::friendlyReason((string) ($d['reason'] ?? ''), (string) ($d['state'] ?? 'failed'));
+        $failure = $d['failure'] ?? null;
+        [$why, $fix] = $failure !== null
+            ? [$failure['title'], $failure['fix']]
+            : self::friendlyReason((string) ($d['reason'] ?? ''), (string) ($d['state'] ?? 'failed'));
         $uncertain = ($d['state'] ?? '') === 'uncertain';
-        $title = $uncertain ? '⚠️ <b>Chưa rõ kết quả đăng</b>' : '❌ <b>Đăng lỗi</b>';
+        $title = $uncertain ? '⚠️ <b>Chưa rõ kết quả đăng</b>' : '❌ <b>Bài không đăng được</b>';
+        $at = $d['at'] ?? null;
 
         $text = $title.self::who($d['user'] ?? null)
             ."\n<b>Lý do:</b> ".self::e($why)
+            .($at !== null ? "\n🕘 <b>Giờ hẹn:</b> <code>".$at->format('H:i d/m').'</code>' : '')
             ."\n🎬 ".self::e(self::snippet($d['caption'] ?? $d['file'] ?? null))
             ."\n👉 <b>Cách xử lý:</b> ".self::e($fix)
-            .self::links([self::link('Mở Kết nối Chrome', $d['link'] ?? self::appUrl('/settings/chrome'))]);
+            .self::links([self::link($d['link_label'] ?? 'Mở Kết nối Chrome', $d['link'] ?? self::appUrl('/settings/chrome'))]);
 
-        return new Message('failed', $key, '@'.self::e(ltrim((string) ($d['user'] ?? '?'), '@')).' · '.self::e(mb_strimwidth($why, 0, 50, '…')), $text);
+        return new Message('failed', $key, '@'.self::e(ltrim((string) ($d['user'] ?? '?'), '@')).' · '.self::e(mb_strimwidth($why, 0, 50, '…')), $text, 604800, [
+            'user' => $d['user'] ?? null,
+            'fix' => $fix,
+            'short' => $failure['short'] ?? mb_strimwidth($why, 0, 40, '…'),
+            'product' => $d['product'] ?? null,
+            'at' => $at,
+            'caption' => $d['caption'] ?? $d['file'] ?? null,
+        ]);
+    }
+
+    /**
+     * Nhiều bài không đăng được trong cùng một lượt kiểm tra: MỘT tin, mỗi bài một dòng (giờ hẹn, kênh, lý do ngắn),
+     * rồi các cách xử lý (mỗi cách một lần).
+     *
+     * @param  list<Message>  $items  tin do failed() dựng (dùng `data` của chúng)
+     */
+    public static function failedGroup(array $items, string $key): Message
+    {
+        $lines = ['❌ <b>'.count($items).' bài không đăng được</b>'];
+
+        foreach (array_slice($items, 0, 10) as $m) {
+            $d = $m->data;
+            $at = ($d['at'] ?? null) instanceof CarbonInterface ? $d['at']->format('H:i d/m').' · ' : '';
+            $user = filled($d['user'] ?? null) ? '@'.ltrim((string) $d['user'], '@').' · ' : '';
+            $product = filled($d['product'] ?? null) ? ' ('.self::snippet($d['product'], 30).')' : '';
+            $lines[] = '• '.self::e($at.$user.($d['short'] ?? '').$product).' — '.self::e(self::snippet($d['caption'] ?? null, 40));
+        }
+
+        if (count($items) > 10) {
+            $lines[] = '… và '.(count($items) - 10).' bài nữa';
+        }
+
+        $fixes = collect($items)->map(fn (Message $m): string => (string) ($m->data['fix'] ?? ''))->filter()->unique()->values();
+
+        foreach ($fixes->take(3) as $fix) {
+            $lines[] = '👉 <b>Cách xử lý:</b> '.self::e($fix);
+        }
+
+        $lines[] = self::link('Mở Tổng quan để xem và đăng lại', self::appUrl('/auto'));
+
+        return new Message('failed', $key, count($items).' bài không đăng được', implode("\n", $lines));
     }
 
     public static function chromeOffline(string $who, ?CarbonInterface $since, string $key): Message

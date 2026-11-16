@@ -12,9 +12,11 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\VideoComment;
 use App\Fork\AutoPost\Models\VideoStat;
 use App\Fork\Chrome\ChromeJobs;
+use App\Fork\Chrome\FailureReasons;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
+use App\Models\Post;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -268,13 +270,24 @@ final class AlertsCommand extends Command
             ->reject(fn (ChromeJob $job): bool => ChromeJobs::isQuotaRejection($job));
 
         $names = $this->usernames($jobs->pluck('social_account_id'));
+        $posts = Post::query()->whereIn('id', $jobs->pluck('post_id')->filter())->get()->keyBy('id');
 
-        return Notifier::dispatch('failed', $jobs->map(fn (ChromeJob $job): Message => Messages::failed([
-            'user' => $names[$job->social_account_id] ?? null,
-            'state' => $job->state,
-            'reason' => trim((string) ($job->note ?: data_get($job->result, 'message', data_get($job->result, 'reason', '')))),
-            'caption' => $job->caption,
-        ], "job:{$job->id}:{$job->state}")));
+        // Mỗi job một khoá chống trùng (báo đúng một lần); nhiều bài lỗi trong cùng một lượt thì gộp thành MỘT tin.
+        return Notifier::dispatch('failed', $jobs->map(function (ChromeJob $job) use ($names, $posts): Message {
+            $post = $posts[$job->post_id] ?? null;
+            $product = data_get($post?->meta, 'fork_shop_product_name');
+
+            return Messages::failed([
+                'user' => $names[$job->social_account_id] ?? null,
+                'state' => $job->state,
+                'failure' => FailureReasons::forJob($job, $product),
+                'product' => $product,
+                'at' => $post?->scheduled_at?->copy()->timezone($this->tz()),
+                'caption' => $job->caption,
+                'link' => Messages::appUrl('/auto'),
+                'link_label' => 'Mở Tổng quan để xem và đăng lại',
+            ], "job:{$job->id}:{$job->state}");
+        }), fn (array $items, string $key): Message => Messages::failedGroup($items, $key), 1);
     }
 
     private function failedVideos(): int
@@ -298,6 +311,8 @@ final class AlertsCommand extends Command
         return Notifier::dispatch('failed', $videos->map(fn (AutoVideo $v): Message => Messages::failed([
             'user' => $names[$v->social_account_id] ?? null,
             'reason' => (string) $v->skip_reason,
+            'failure' => FailureReasons::fromText($v->skip_reason, $v->product_name),
+            'at' => $v->scheduled_for?->copy()->timezone($this->tz()),
             'caption' => $v->caption,
             'file' => $v->file_name,
             'link' => Messages::appUrl("/auto/kho?tab=loi&video={$v->id}"),
