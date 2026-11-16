@@ -14,22 +14,35 @@ use App\Fork\AutoPost\Models\AutoSetting;
  * - empty_caption_ok: video chưa có caption vẫn đăng (TikTok cho bài không chữ).
  * - approve_first: caption AI phải được chủ app bấm "Duyệt" mới đăng.
  * - duplicates: ask = video trùng phải bấm "Vẫn đăng"; allow = cứ đăng (thẻ vẫn cảnh báo).
- * - model / effort: model ChatGPT (Codex CLI) và mức nghĩ.
+ * - model / effort / fast: model ChatGPT (Codex CLI), mức nghĩ và chế độ Fast (nhanh gấp đôi, tốn lượt hơn).
  * - folder_channels: kênh được đăng cho từng thư mục (id thư mục => list social_account_id); trống = mọi kênh có giỏ.
  */
 final class RiengAutoSettings
 {
     public const string KEY = 'rieng.auto';
 
+    /**
+     * Model ChatGPT trong Codex CLI (tên, mô tả và mức nghĩ theo `codex debug models`). Mọi model đều có chế độ Fast
+     * (service_tier "fast": nhanh gấp đôi, tốn lượt hơn).
+     *
+     * @var array<string, array{name: string, note: string, efforts: list<string>}>
+     */
     public const array MODELS = [
-        'gpt-6.1-terra' => 'GPT-6.1 Terra',
-        'gpt-6.1-sol' => 'GPT-6.1 Sol',
+        'gpt-6.1-terra' => ['name' => 'GPT-6.1 Terra', 'note' => 'Model Codex dòng 6.1', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
+        'gpt-6.1-sol' => ['name' => 'GPT-6.1-Sol', 'note' => 'Model chính mới nhất', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
+        'gpt-6-astra' => ['name' => 'GPT-6-Astra', 'note' => 'Mạnh nhất, cho việc khó nhất', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
+        'gpt-6-sol' => ['name' => 'GPT-6-Sol', 'note' => 'Model chính đời trước', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']],
+        'gpt-6-luna' => ['name' => 'GPT-6-Luna', 'note' => 'Nhanh, tiết kiệm, cho việc dễ', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max']],
     ];
 
+    /** Mức nghĩ (reasoning effort) của Codex, tên như trong Codex. */
     public const array EFFORTS = [
-        'low' => 'Nghĩ nhanh',
-        'medium' => 'Vừa',
-        'high' => 'Nghĩ kỹ',
+        'low' => 'Low',
+        'medium' => 'Medium',
+        'high' => 'High',
+        'xhigh' => 'Extra high',
+        'max' => 'Max',
+        'ultra' => 'Ultra',
     ];
 
     public const array DEFAULTS = [
@@ -40,10 +53,11 @@ final class RiengAutoSettings
         'duplicates' => 'ask',
         'model' => 'gpt-6.1-terra',
         'effort' => 'low',
+        'fast' => false,
         'folder_channels' => [],
     ];
 
-    /** @return array{enabled: bool, caption_mode: string, empty_caption_ok: bool, approve_first: bool, duplicates: string, model: string, effort: string, folder_channels: array<string, list<string>>} */
+    /** @return array{enabled: bool, caption_mode: string, empty_caption_ok: bool, approve_first: bool, duplicates: string, model: string, effort: string, fast: bool, folder_channels: array<string, list<string>>} */
     public static function get(): array
     {
         $raw = json_decode((string) AutoSetting::read(self::KEY, '{}'), true);
@@ -85,14 +99,17 @@ final class RiengAutoSettings
             }
         }
 
+        $model = array_key_exists((string) $s['model'], self::MODELS) ? (string) $s['model'] : self::DEFAULTS['model'];
+
         return [
             'enabled' => (bool) $s['enabled'],
             'caption_mode' => in_array($s['caption_mode'], ['ai', 'kid'], true) ? $s['caption_mode'] : 'ai',
             'empty_caption_ok' => (bool) $s['empty_caption_ok'],
             'approve_first' => (bool) $s['approve_first'],
             'duplicates' => in_array($s['duplicates'], ['ask', 'allow'], true) ? $s['duplicates'] : 'ask',
-            'model' => array_key_exists((string) $s['model'], self::MODELS) ? (string) $s['model'] : self::DEFAULTS['model'],
-            'effort' => array_key_exists((string) $s['effort'], self::EFFORTS) ? (string) $s['effort'] : self::DEFAULTS['effort'],
+            'model' => $model,
+            'effort' => in_array((string) $s['effort'], self::MODELS[$model]['efforts'], true) ? (string) $s['effort'] : self::DEFAULTS['effort'],
+            'fast' => (bool) $s['fast'],
             'folder_channels' => $folders,
         ];
     }

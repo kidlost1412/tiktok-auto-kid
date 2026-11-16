@@ -86,7 +86,7 @@ class RiengAnalyzer
             }
 
             $prompt = $this->prompt($speech, $products);
-            [$answer, $account] = $this->askAny($settings['model'], $settings['effort'], $prompt, [$grid], $work);
+            [$answer, $account] = $this->askAny($settings['model'], $settings['effort'], (bool) $settings['fast'], $prompt, [$grid], $work);
             $parsed = $this->parse($answer, array_column($products, 'ma'));
 
             $ai = [
@@ -100,6 +100,8 @@ class RiengAnalyzer
                 'loi' => mb_substr($speech, 0, 2000),
                 'loi_note' => $speechNote,
                 'model' => $settings['model'],
+                'effort' => $settings['effort'],
+                'fast' => (bool) $settings['fast'],
                 'account' => $account,
                 'at' => $now->toIso8601String(),
                 'tries' => $tries,
@@ -153,7 +155,7 @@ class RiengAnalyzer
      * @param  list<string>  $images
      * @return array{0: string, 1: string}
      */
-    private function askAny(string $model, string $effort, string $prompt, array $images, string $work): array
+    private function askAny(string $model, string $effort, bool $fast, string $prompt, array $images, string $work): array
     {
         $tried = [];
 
@@ -161,7 +163,7 @@ class RiengAnalyzer
             $tried[] = $id;
 
             try {
-                $answer = $this->codex->ask($id, $model, $effort, $prompt, $images, $work);
+                $answer = $this->codex->ask($id, $model, $effort, $prompt, $images, $work, $fast);
                 $this->accounts->markUsed($id);
 
                 return [$answer, $id];

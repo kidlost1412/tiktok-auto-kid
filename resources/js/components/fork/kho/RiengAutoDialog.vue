@@ -2,8 +2,13 @@
 // Hộp "Tự đăng theo khung" của Kho riêng: bật/tắt, cách viết caption, video trùng, kênh theo thư mục, AI ChatGPT + tài khoản luân phiên.
 import {
     IconAlertTriangle,
+    IconBolt,
     IconBrandOpenai,
+    IconCheck,
+    IconCircleCheckFilled,
+    IconDownload,
     IconExternalLink,
+    IconFolder,
     IconLoader2,
     IconPlus,
     IconTrash,
@@ -16,7 +21,9 @@ import {
     type AutoPayload,
     type AutoSettings,
     type ChatGptAccount,
+    type CliStatus,
 } from '@/components/fork/kho/rieng';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,7 +32,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { NativeSelect } from '@/components/ui/native-select';
 import { Switch } from '@/components/ui/switch';
 import { confirm as confirmDialog } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
@@ -39,7 +45,9 @@ const loading = ref(false);
 const saving = ref(false);
 const adding = ref<string | null>(null);
 const loginUrl = ref<string | null>(null);
+const installing = ref(false);
 let poll: ReturnType<typeof setInterval> | null = null;
+let cliPoll: ReturnType<typeof setInterval> | null = null;
 
 const s = computed(() => data.value?.settings);
 
@@ -50,6 +58,10 @@ const load = async () => {
 
     if (r.ok && r.data) {
         data.value = r.data;
+
+        if (r.data.cli.installing && !cliPoll) {
+            watchInstall();
+        }
     } else {
         toast.error('Không tải được cài đặt tự đăng.');
     }
@@ -60,6 +72,7 @@ watch(open, (o) => {
         load();
     } else {
         stopPoll();
+        stopCliPoll();
     }
 });
 
@@ -87,9 +100,88 @@ const save = async (changes: Partial<AutoSettings>) => {
     }
 };
 
+// ---- Cài ChatGPT CLI (Codex) vào thư mục của app.
+const stopCliPoll = () => {
+    if (cliPoll) {
+        clearInterval(cliPoll);
+        cliPoll = null;
+    }
+
+    installing.value = false;
+};
+
+const setCli = (cli: CliStatus) => {
+    if (data.value) {
+        data.value.cli = cli;
+        data.value.codex_installed = cli.installed;
+    }
+};
+
+const installCli = async () => {
+    installing.value = true;
+    const r = await callJson<{ cli: CliStatus; error: string | null }>(
+        'POST',
+        '/auto/kho/rieng/tu-dong/codex-cli',
+    );
+
+    if (r.data?.cli) {
+        setCli(r.data.cli);
+    }
+
+    if (!r.ok) {
+        installing.value = false;
+        toast.error(r.data?.error ?? 'Chưa cài được ChatGPT CLI.');
+
+        return;
+    }
+
+    if (r.data?.cli.installed) {
+        installing.value = false;
+        toast.success('Đã cài ChatGPT CLI.');
+
+        return;
+    }
+
+    watchInstall();
+};
+
+const watchInstall = () => {
+    installing.value = true;
+
+    if (cliPoll) {
+        clearInterval(cliPoll);
+    }
+
+    let ticks = 0;
+    cliPoll = setInterval(async () => {
+        ticks++;
+        const r = await callJson<{ cli: CliStatus }>(
+            'POST',
+            '/auto/kho/rieng/tu-dong/codex-cli',
+            { check: true },
+        );
+        const cli = r.data?.cli;
+
+        if (cli) {
+            setCli(cli);
+        }
+
+        if (cli?.installed) {
+            stopCliPoll();
+            toast.success('Đã cài xong ChatGPT CLI.');
+        } else if ((cli && !cli.installing) || ticks > 400) {
+            stopCliPoll();
+            toast.error(cli?.error ?? 'Cài ChatGPT CLI chưa xong.');
+        }
+    }, 3000);
+};
+
 // ---- Kênh theo thư mục: không chọn kênh nào = mọi kênh có giỏ của sản phẩm.
 const folderHas = (folderId: number, channelId: string) =>
     (s.value?.folder_channels[String(folderId)] ?? []).includes(channelId);
+
+const folderAll = (folderId: number) =>
+    !(s.value?.folder_channels[String(folderId)] ?? []).length;
 
 const toggleFolderChannel = (folderId: number, channelId: string) => {
     const map = { ...(s.value?.folder_channels ?? {}) };
@@ -99,6 +191,15 @@ const toggleFolderChannel = (folderId: number, channelId: string) => {
         : [...cur, channelId];
     save({ folder_channels: map });
 };
+
+const setFolderAll = (folderId: number) => {
+    const map = { ...(s.value?.folder_channels ?? {}) };
+    map[String(folderId)] = [];
+    save({ folder_channels: map });
+};
+
+const initial = (name: string) =>
+    name.replace(/^@/, '').charAt(0).toUpperCase() || '?';
 
 // ---- Tài khoản ChatGPT
 const stopPoll = () => {
@@ -191,7 +292,10 @@ const accountStatus = (a: ChatGptAccount): { text: string; cls: string } => {
                   text: 'Đang chờ anh đăng nhập…',
                   cls: 'text-amber-700 dark:text-amber-300',
               }
-            : { text: 'Chưa đăng nhập xong', cls: 'text-muted-foreground' };
+            : {
+                  text: 'Chưa đăng nhập xong',
+                  cls: 'text-foreground/70',
+              };
     }
 
     if (a.cooldown_until) {
@@ -226,22 +330,56 @@ const countLine = computed(() => {
     return parts.length ? parts.join(' · ') : 'Chưa có video nào chờ đăng.';
 });
 
-onBeforeUnmount(stopPoll);
-
-const modelSel = computed({
-    get: () => s.value?.model ?? '',
-    set: (v: string) => save({ model: v }),
-});
-const effortSel = computed({
-    get: () => s.value?.effort ?? '',
-    set: (v: string) => save({ effort: v }),
+onBeforeUnmount(() => {
+    stopPoll();
+    stopCliPoll();
 });
 
-const radioCls = (on: boolean) =>
+// ---- Model + mức nghĩ: chỉ hiện mức nghĩ model đó có.
+const modelEfforts = computed(() => {
+    const m = data.value?.models[s.value?.model ?? ''];
+
+    return (m?.efforts ?? []).map((key) => ({
+        key,
+        label: data.value?.efforts[key] ?? key,
+    }));
+});
+
+const pickModel = (key: string) => {
+    const efforts = data.value?.models[key]?.efforts ?? [];
+    const effort = efforts.includes(s.value?.effort ?? '')
+        ? s.value?.effort
+        : 'low';
+    save({ model: key, effort });
+};
+
+// ---- Kiểu chung: lựa chọn dạng thẻ, đang chọn = viền đậm + chấm tròn đầy.
+const optionCls = (on: boolean) =>
     cn(
-        'flex-1 rounded-lg border px-3 py-2 text-left text-sm transition',
-        on ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted/60',
+        'flex min-w-0 flex-1 items-start gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition',
+        on
+            ? 'border-violet-600 bg-violet-50 shadow-sm dark:border-primary dark:bg-primary/10'
+            : 'border-border bg-background hover:border-foreground/40 hover:bg-muted/50',
     );
+
+const dotCls = (on: boolean) =>
+    cn(
+        'mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2',
+        on
+            ? 'border-violet-600 bg-violet-600 dark:border-primary dark:bg-primary'
+            : 'border-foreground/40 bg-background',
+    );
+
+const chipCls = (on: boolean) =>
+    cn(
+        'inline-flex items-center gap-1.5 rounded-full border-2 py-0.5 pr-2.5 pl-0.5 text-[13px] font-medium transition',
+        on
+            ? 'border-violet-600 bg-violet-50 text-foreground dark:border-primary dark:bg-primary/10'
+            : 'border-border bg-background text-foreground/80 hover:border-foreground/40',
+    );
+
+const sectionCls = 'flex flex-col gap-3 rounded-2xl border bg-card p-4';
+const hintCls = 'text-[13px] leading-snug text-foreground/70';
 </script>
 
 <template>
@@ -251,33 +389,55 @@ const radioCls = (on: boolean) =>
             data-testid="fork-rieng-auto-dialog"
         >
             <DialogHeader>
-                <DialogTitle>Kho riêng tự đăng theo khung</DialogTitle>
-                <DialogDescription>
+                <DialogTitle class="text-lg"
+                    >Kho riêng tự đăng theo khung</DialogTitle
+                >
+                <DialogDescription class="text-[13px] text-foreground/70">
                     AI xem từng video mới (nhìn hình + nghe lời nói), chọn sản
                     phẩm gắn giỏ và viết caption. Video sẵn sàng được xếp vào
                     giờ trống của khung đăng,
-                    <b>trước video Xưởng</b>. Mỗi video chỉ đăng một lần trên
-                    một kênh.
+                    <b class="text-foreground">trước video Xưởng</b>. Mỗi video
+                    chỉ đăng một lần trên một kênh.
                 </DialogDescription>
             </DialogHeader>
 
             <div
                 v-if="!data"
-                class="flex items-center gap-2 py-8 text-sm text-muted-foreground"
+                class="flex items-center gap-2 py-8 text-sm text-foreground/70"
             >
                 <IconLoader2 class="size-4 animate-spin" /> Đang tải…
             </div>
 
-            <div v-else-if="s" class="flex min-w-0 flex-col gap-5 text-sm">
+            <div v-else-if="s" class="flex min-w-0 flex-col gap-4 text-sm">
                 <!-- Bật / tắt -->
                 <label
-                    class="flex items-center justify-between gap-3 rounded-xl border p-3"
+                    :class="
+                        cn(
+                            'flex cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 p-4 transition',
+                            s.enabled
+                                ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/40'
+                                : 'border-border bg-card',
+                        )
+                    "
                 >
-                    <span>
-                        <span class="block font-semibold"
-                            >Tự đăng kho riêng</span
+                    <span class="min-w-0">
+                        <span
+                            class="flex items-center gap-2 text-base font-semibold"
                         >
-                        <span class="text-xs text-muted-foreground">{{
+                            Tự đăng kho riêng
+                            <span
+                                :class="
+                                    cn(
+                                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                                        s.enabled
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-muted text-foreground/70',
+                                    )
+                                "
+                                >{{ s.enabled ? 'Đang bật' : 'Đang tắt' }}</span
+                            >
+                        </span>
+                        <span :class="cn(hintCls, 'mt-0.5 block')">{{
                             countLine
                         }}</span>
                     </span>
@@ -291,75 +451,190 @@ const radioCls = (on: boolean) =>
                     />
                 </label>
 
-                <div
+                <!-- Chuẩn bị: CLI, tài khoản, nghe lời nói -->
+                <section
                     v-if="
                         !data.codex_installed ||
                         readyAccounts === 0 ||
                         !data.speech_ready
                     "
-                    class="flex flex-col gap-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    class="flex flex-col gap-2.5 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                    data-testid="fork-rieng-auto-setup"
                 >
-                    <div v-if="!data.codex_installed" class="flex gap-1.5">
-                        <IconAlertTriangle class="size-4 shrink-0" />
-                        Máy chưa cài ChatGPT CLI (Codex). Cần cài trước khi AI
-                        xem được video.
+                    <h3 class="flex items-center gap-1.5 font-semibold">
+                        <IconAlertTriangle class="size-4" /> Cần chuẩn bị trước
+                        khi AI xem được video
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <IconCircleCheckFilled
+                            v-if="data.codex_installed"
+                            class="size-5 shrink-0 text-emerald-600"
+                        />
+                        <span
+                            v-else
+                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white"
+                            >1</span
+                        >
+                        <span class="min-w-0 flex-1">
+                            <b>ChatGPT CLI (Codex)</b>
+                            <template v-if="data.codex_installed">
+                                — đã cài</template
+                            >
+                            <template v-else-if="installing">
+                                — đang tải và cài, khoảng 1–3 phút…</template
+                            >
+                            <template v-else-if="!data.cli.node">
+                                — máy chưa có Node.js: anh cài Node.js bản LTS ở
+                                nodejs.org trước rồi bấm Cài.</template
+                            >
+                            <template v-else> — chưa cài</template>
+                            <span
+                                v-if="data.cli.error && !installing"
+                                class="block text-xs text-red-700 dark:text-red-300"
+                                >{{ data.cli.error }}</span
+                            >
+                        </span>
+                        <Button
+                            v-if="!data.codex_installed"
+                            size="sm"
+                            :disabled="installing"
+                            data-testid="fork-codex-install"
+                            @click="installCli"
+                        >
+                            <IconLoader2
+                                v-if="installing"
+                                class="size-4 animate-spin"
+                            />
+                            <IconDownload v-else class="size-4" />
+                            {{ installing ? 'Đang cài…' : 'Cài ChatGPT CLI' }}
+                        </Button>
                     </div>
-                    <div v-else-if="readyAccounts === 0" class="flex gap-1.5">
-                        <IconAlertTriangle class="size-4 shrink-0" />
-                        Chưa có tài khoản ChatGPT nào: bấm "Thêm tài khoản
-                        ChatGPT" ở dưới.
+                    <div class="flex items-center gap-2">
+                        <IconCircleCheckFilled
+                            v-if="readyAccounts > 0"
+                            class="size-5 shrink-0 text-emerald-600"
+                        />
+                        <span
+                            v-else
+                            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white"
+                            >2</span
+                        >
+                        <span>
+                            <b>Tài khoản ChatGPT</b>
+                            {{
+                                readyAccounts > 0
+                                    ? `— ${readyAccounts} tài khoản sẵn sàng`
+                                    : '— bấm "Thêm tài khoản ChatGPT" ở cuối hộp này'
+                            }}
+                        </span>
                     </div>
-                    <div v-if="!data.speech_ready" class="flex gap-1.5">
-                        <IconAlertTriangle class="size-4 shrink-0" />
-                        Chưa có khoá ElevenLabs nên AI chỉ nhìn hình, không nghe
-                        được lời nói (đoán sản phẩm khó hơn).
+                    <div class="flex items-center gap-2">
+                        <IconCircleCheckFilled
+                            v-if="data.speech_ready"
+                            class="size-5 shrink-0 text-emerald-600"
+                        />
+                        <IconAlertTriangle
+                            v-else
+                            class="size-5 shrink-0 text-amber-600"
+                        />
+                        <span>
+                            <b>Nghe lời nói (ElevenLabs)</b>
+                            {{
+                                data.speech_ready
+                                    ? '— sẵn sàng'
+                                    : '— chưa có khoá: AI chỉ nhìn hình, đoán sản phẩm khó hơn'
+                            }}
+                        </span>
                     </div>
-                </div>
+                </section>
 
                 <!-- Caption -->
-                <section class="flex flex-col gap-2">
-                    <h3 class="font-semibold">Caption</h3>
-                    <div class="flex gap-2">
+                <section :class="sectionCls">
+                    <h3 class="text-base font-semibold">Caption</h3>
+                    <div class="flex flex-col gap-2 sm:flex-row">
                         <button
                             type="button"
-                            :class="radioCls(s.caption_mode === 'ai')"
+                            :class="optionCls(s.caption_mode === 'ai')"
+                            :aria-pressed="s.caption_mode === 'ai'"
                             @click="save({ caption_mode: 'ai' })"
                         >
-                            AI viết từ nội dung video
+                            <span :class="dotCls(s.caption_mode === 'ai')">
+                                <span
+                                    v-if="s.caption_mode === 'ai'"
+                                    class="size-1.5 rounded-full bg-white dark:bg-primary-foreground"
+                                />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-semibold">AI viết</span>
+                                <span :class="hintCls"
+                                    >Từ nội dung video, kèm 3 hashtag</span
+                                >
+                            </span>
                         </button>
                         <button
                             type="button"
-                            :class="radioCls(s.caption_mode === 'kid')"
+                            :class="optionCls(s.caption_mode === 'kid')"
+                            :aria-pressed="s.caption_mode === 'kid'"
                             @click="save({ caption_mode: 'kid' })"
                         >
-                            Anh tự viết
+                            <span :class="dotCls(s.caption_mode === 'kid')">
+                                <span
+                                    v-if="s.caption_mode === 'kid'"
+                                    class="size-1.5 rounded-full bg-white dark:bg-primary-foreground"
+                                />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-semibold"
+                                    >Anh tự viết</span
+                                >
+                                <span :class="hintCls"
+                                    >Viết trên thẻ từng video</span
+                                >
+                            </span>
                         </button>
                     </div>
-                    <label class="flex items-center justify-between gap-3">
-                        <span
-                            >Video chưa có caption vẫn đăng (đăng không
-                            chữ)</span
+                    <div class="flex flex-col divide-y rounded-xl border">
+                        <label
+                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5"
                         >
-                        <Switch
-                            :model-value="s.empty_caption_ok"
-                            @update:model-value="
-                                (v: boolean) => save({ empty_caption_ok: v })
-                            "
-                        />
-                    </label>
-                    <label
-                        v-if="s.caption_mode === 'ai'"
-                        class="flex items-center justify-between gap-3"
-                    >
-                        <span>Duyệt caption AI trước khi đăng</span>
-                        <Switch
-                            :model-value="s.approve_first"
-                            @update:model-value="
-                                (v: boolean) => save({ approve_first: v })
-                            "
-                        />
-                    </label>
-                    <p class="text-xs text-muted-foreground">
+                            <span>
+                                <span class="block font-medium"
+                                    >Chưa có caption vẫn đăng</span
+                                >
+                                <span :class="hintCls"
+                                    >Đăng không chữ thay vì chờ</span
+                                >
+                            </span>
+                            <Switch
+                                :model-value="s.empty_caption_ok"
+                                @update:model-value="
+                                    (v: boolean) =>
+                                        save({ empty_caption_ok: v })
+                                "
+                            />
+                        </label>
+                        <label
+                            v-if="s.caption_mode === 'ai'"
+                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5"
+                        >
+                            <span>
+                                <span class="block font-medium"
+                                    >Duyệt caption AI trước khi đăng</span
+                                >
+                                <span :class="hintCls"
+                                    >Bấm "Duyệt" trên thẻ video thì mới
+                                    đăng</span
+                                >
+                            </span>
+                            <Switch
+                                :model-value="s.approve_first"
+                                @update:model-value="
+                                    (v: boolean) => save({ approve_first: v })
+                                "
+                            />
+                        </label>
+                    </div>
+                    <p :class="hintCls">
                         Caption anh tự sửa trên thẻ video luôn được dùng.
                         Hashtag và ảnh bìa theo cài đặt của từng sản phẩm (mặc
                         định / một ảnh cố định / xoay vòng), giống video Xưởng.
@@ -367,157 +642,299 @@ const radioCls = (on: boolean) =>
                 </section>
 
                 <!-- Video trùng -->
-                <section class="flex flex-col gap-2">
-                    <h3 class="font-semibold">Video trùng video đã có</h3>
-                    <div class="flex gap-2">
+                <section :class="sectionCls">
+                    <h3 class="text-base font-semibold">
+                        Video trùng video đã có
+                    </h3>
+                    <div class="flex flex-col gap-2 sm:flex-row">
                         <button
+                            v-for="o in [
+                                {
+                                    key: 'ask' as const,
+                                    title: 'Hỏi anh trước',
+                                    note: 'Chờ anh bấm “Vẫn đăng” trên thẻ',
+                                },
+                                {
+                                    key: 'allow' as const,
+                                    title: 'Cứ đăng',
+                                    note: 'Thẻ video vẫn hiện cảnh báo trùng',
+                                },
+                            ]"
+                            :key="o.key"
                             type="button"
-                            :class="radioCls(s.duplicates === 'ask')"
-                            @click="save({ duplicates: 'ask' })"
+                            :class="optionCls(s.duplicates === o.key)"
+                            :aria-pressed="s.duplicates === o.key"
+                            @click="save({ duplicates: o.key })"
                         >
-                            Hỏi anh trước (bấm "Vẫn đăng")
-                        </button>
-                        <button
-                            type="button"
-                            :class="radioCls(s.duplicates === 'allow')"
-                            @click="save({ duplicates: 'allow' })"
-                        >
-                            Cứ đăng, chỉ cảnh báo
+                            <span :class="dotCls(s.duplicates === o.key)">
+                                <span
+                                    v-if="s.duplicates === o.key"
+                                    class="size-1.5 rounded-full bg-white dark:bg-primary-foreground"
+                                />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-semibold">{{
+                                    o.title
+                                }}</span>
+                                <span :class="hintCls">{{ o.note }}</span>
+                            </span>
                         </button>
                     </div>
                 </section>
 
                 <!-- Kênh theo thư mục -->
-                <section class="flex flex-col gap-2">
-                    <h3 class="font-semibold">Kênh được đăng</h3>
-                    <p class="text-xs text-muted-foreground">
-                        Mặc định: kênh nào có giỏ hàng của sản phẩm đó đều được
-                        đăng. Chọn kênh cho từng thư mục nếu muốn; muốn riêng
-                        từng video thì chỉnh ngay trên thẻ video.
+                <section :class="sectionCls">
+                    <h3 class="text-base font-semibold">Kênh được đăng</h3>
+                    <p :class="hintCls">
+                        Mặc định kênh nào có giỏ hàng của sản phẩm đều được
+                        đăng. Chọn kênh cho từng thư mục nếu muốn; riêng từng
+                        video thì chỉnh trên thẻ video.
                     </p>
-                    <div
-                        v-if="!data.channels.length"
-                        class="text-xs text-muted-foreground"
-                    >
+                    <div v-if="!data.channels.length" :class="hintCls">
                         Chưa có kênh TikTok nào bật tự động đăng.
                     </div>
                     <div
-                        v-for="f in data.folders"
-                        :key="f.id"
-                        class="flex flex-wrap items-center gap-1.5"
+                        v-else
+                        class="flex flex-col divide-y rounded-xl border"
                     >
-                        <span class="mr-1 max-w-48 truncate font-medium">{{
-                            f.name
-                        }}</span>
-                        <span
-                            v-if="
-                                !(s.folder_channels[String(f.id)] ?? []).length
-                            "
-                            class="rounded-full bg-muted px-2 py-0.5 text-xs"
-                            >Mọi kênh</span
+                        <div
+                            v-for="f in data.folders"
+                            :key="f.id"
+                            class="flex flex-col gap-2 px-3 py-2.5"
+                            :data-testid="`fork-rieng-auto-folder-${f.id}`"
                         >
-                        <button
-                            v-for="c in data.channels"
-                            :key="c.id"
-                            type="button"
-                            :class="
-                                cn(
-                                    'rounded-full border px-2.5 py-0.5 text-xs transition',
-                                    folderHas(f.id, c.id)
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'hover:bg-muted',
-                                )
-                            "
-                            @click="toggleFolderChannel(f.id, c.id)"
-                        >
-                            {{ c.name }}
-                        </button>
+                            <div
+                                class="flex min-w-0 items-center gap-1.5 font-semibold"
+                            >
+                                <IconFolder
+                                    class="size-4 shrink-0 text-foreground/60"
+                                />
+                                <span class="truncate">{{ f.name }}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button
+                                    type="button"
+                                    :class="
+                                        cn(chipCls(folderAll(f.id)), 'pl-2.5')
+                                    "
+                                    :aria-pressed="folderAll(f.id)"
+                                    @click="setFolderAll(f.id)"
+                                >
+                                    <IconCheck
+                                        v-if="folderAll(f.id)"
+                                        class="size-3.5 text-violet-600 dark:text-primary"
+                                        stroke-width="3"
+                                    />
+                                    Mọi kênh có giỏ
+                                </button>
+                                <button
+                                    v-for="c in data.channels"
+                                    :key="c.id"
+                                    type="button"
+                                    :class="chipCls(folderHas(f.id, c.id))"
+                                    :aria-pressed="folderHas(f.id, c.id)"
+                                    @click="toggleFolderChannel(f.id, c.id)"
+                                >
+                                    <Avatar class="size-6 shrink-0">
+                                        <AvatarImage
+                                            v-if="c.avatar_url"
+                                            :src="c.avatar_url"
+                                            alt=""
+                                        />
+                                        <AvatarFallback
+                                            class="text-[11px] font-semibold"
+                                            >{{
+                                                initial(c.name)
+                                            }}</AvatarFallback
+                                        >
+                                    </Avatar>
+                                    {{ c.name }}
+                                    <IconCheck
+                                        v-if="folderHas(f.id, c.id)"
+                                        class="size-3.5 text-violet-600 dark:text-primary"
+                                        stroke-width="3"
+                                    />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
                 <!-- AI -->
-                <section class="flex flex-col gap-2">
-                    <h3 class="flex items-center gap-1.5 font-semibold">
-                        <IconBrandOpenai class="size-4" /> AI ChatGPT
+                <section :class="sectionCls">
+                    <h3
+                        class="flex items-center gap-1.5 text-base font-semibold"
+                    >
+                        <IconBrandOpenai class="size-5" /> AI ChatGPT (Codex
+                        CLI)
                     </h3>
-                    <div class="flex flex-wrap gap-2">
-                        <NativeSelect
-                            v-model="modelSel"
-                            aria-label="Model ChatGPT"
-                        >
-                            <option
-                                v-for="(label, key) in data.models"
+
+                    <div class="flex flex-col gap-1.5">
+                        <span class="font-medium">Model</span>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            <button
+                                v-for="(m, key) in data.models"
                                 :key="key"
-                                :value="key"
+                                type="button"
+                                :class="optionCls(s.model === key)"
+                                :aria-pressed="s.model === key"
+                                :data-testid="`fork-rieng-model-${key}`"
+                                @click="pickModel(String(key))"
                             >
-                                {{ label }}
-                            </option>
-                        </NativeSelect>
-                        <NativeSelect
-                            v-model="effortSel"
-                            aria-label="Mức nghĩ"
-                        >
-                            <option
-                                v-for="(label, key) in data.efforts"
-                                :key="key"
-                                :value="key"
-                            >
-                                {{ label }}
-                            </option>
-                        </NativeSelect>
+                                <span :class="dotCls(s.model === key)">
+                                    <span
+                                        v-if="s.model === key"
+                                        class="size-1.5 rounded-full bg-white dark:bg-primary-foreground"
+                                    />
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block font-semibold">{{
+                                        m.name
+                                    }}</span>
+                                    <span :class="hintCls">{{ m.note }}</span>
+                                </span>
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="flex flex-col divide-y rounded-xl border">
-                        <div
-                            v-for="a in data.chatgpt"
-                            :key="a.id"
-                            class="flex items-center gap-3 px-3 py-2"
-                            :data-testid="`fork-chatgpt-${a.id}`"
+                    <div class="flex flex-col gap-1.5">
+                        <span class="font-medium"
+                            >Mức nghĩ
+                            <span class="font-normal text-foreground/70"
+                                >(cao hơn = chậm hơn, tốn lượt hơn)</span
+                            ></span
                         >
-                            <div class="min-w-0 flex-1">
-                                <div class="truncate font-medium">
-                                    {{ a.email ?? 'Tài khoản mới' }}
-                                    <span
-                                        v-if="a.plan"
-                                        class="ml-1 rounded bg-muted px-1.5 py-0.5 text-[0.7rem] uppercase"
-                                        >{{ a.plan }}</span
-                                    >
-                                </div>
-                                <div
-                                    :class="
-                                        cn(
-                                            'truncate text-xs',
-                                            accountStatus(a).cls,
-                                        )
-                                    "
-                                >
-                                    {{ accountStatus(a).text
-                                    }}{{
-                                        a.uses ? ` · đã dùng ${a.uses} lần` : ''
-                                    }}
-                                </div>
-                            </div>
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                class="size-8"
-                                :aria-label="`Bỏ tài khoản ${a.email ?? ''}`"
-                                @click="removeAccount(a)"
+                        <div
+                            class="flex flex-wrap gap-1 rounded-xl border-2 bg-muted/40 p-1"
+                        >
+                            <button
+                                v-for="e in modelEfforts"
+                                :key="e.key"
+                                type="button"
+                                :class="
+                                    cn(
+                                        'flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition',
+                                        s.effort === e.key
+                                            ? 'bg-violet-600 text-white shadow dark:bg-primary dark:text-primary-foreground'
+                                            : 'text-foreground/80 hover:bg-background',
+                                    )
+                                "
+                                :aria-pressed="s.effort === e.key"
+                                @click="save({ effort: e.key })"
                             >
-                                <IconTrash class="size-4" />
-                            </Button>
+                                {{ e.label }}
+                            </button>
                         </div>
-                        <div
-                            v-if="!data.chatgpt.length"
-                            class="px-3 py-3 text-xs text-muted-foreground"
-                        >
-                            Chưa có tài khoản nào.
+                    </div>
+
+                    <label
+                        :class="
+                            cn(
+                                'flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 px-3 py-2.5 transition',
+                                s.fast
+                                    ? 'border-amber-500 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/40'
+                                    : 'border-border',
+                            )
+                        "
+                    >
+                        <span class="flex items-start gap-2">
+                            <IconBolt
+                                :class="
+                                    cn(
+                                        'mt-0.5 size-5 shrink-0',
+                                        s.fast
+                                            ? 'fill-amber-400 text-amber-600'
+                                            : 'text-foreground/60',
+                                    )
+                                "
+                            />
+                            <span>
+                                <span class="block font-semibold"
+                                    >Chế độ Fast</span
+                                >
+                                <span :class="hintCls"
+                                    >Nhanh gấp 2 lần, tốn lượt ChatGPT hơn</span
+                                >
+                            </span>
+                        </span>
+                        <Switch
+                            :model-value="s.fast"
+                            aria-label="Chế độ Fast"
+                            data-testid="fork-rieng-auto-fast"
+                            @update:model-value="
+                                (v: boolean) => save({ fast: v })
+                            "
+                        />
+                    </label>
+
+                    <div class="flex flex-col gap-1.5">
+                        <span class="font-medium">Tài khoản ChatGPT</span>
+                        <div class="flex flex-col divide-y rounded-xl border">
+                            <div
+                                v-for="a in data.chatgpt"
+                                :key="a.id"
+                                class="flex items-center gap-3 px-3 py-2.5"
+                                :data-testid="`fork-chatgpt-${a.id}`"
+                            >
+                                <IconCircleCheckFilled
+                                    v-if="
+                                        a.ready &&
+                                        !a.cooldown_until &&
+                                        !a.last_error
+                                    "
+                                    class="size-5 shrink-0 text-emerald-600"
+                                />
+                                <IconAlertTriangle
+                                    v-else
+                                    class="size-5 shrink-0 text-amber-600"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate font-semibold">
+                                        {{ a.email ?? 'Tài khoản mới' }}
+                                        <span
+                                            v-if="a.plan"
+                                            class="ml-1 rounded bg-foreground/10 px-1.5 py-0.5 text-[11px] uppercase"
+                                            >{{ a.plan }}</span
+                                        >
+                                    </div>
+                                    <div
+                                        :class="
+                                            cn(
+                                                'truncate text-[13px]',
+                                                accountStatus(a).cls,
+                                            )
+                                        "
+                                    >
+                                        {{ accountStatus(a).text
+                                        }}{{
+                                            a.uses
+                                                ? ` · đã dùng ${a.uses} lần`
+                                                : ''
+                                        }}
+                                    </div>
+                                </div>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    class="size-8"
+                                    :aria-label="`Bỏ tài khoản ${a.email ?? ''}`"
+                                    @click="removeAccount(a)"
+                                >
+                                    <IconTrash class="size-4" />
+                                </Button>
+                            </div>
+                            <div
+                                v-if="!data.chatgpt.length"
+                                :class="cn(hintCls, 'px-3 py-3')"
+                            >
+                                Chưa có tài khoản nào.
+                            </div>
                         </div>
                     </div>
 
                     <div
                         v-if="adding"
-                        class="rounded-lg border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200"
+                        class="rounded-xl border-2 border-sky-400 bg-sky-50 p-3 text-[13px] text-sky-950 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100"
                     >
                         Đăng nhập ChatGPT trong trình duyệt vừa mở, xong quay
                         lại đây (app tự nhận).
@@ -526,7 +943,7 @@ const radioCls = (on: boolean) =>
                             :href="loginUrl"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="ml-1 inline-flex items-center gap-0.5 font-medium underline"
+                            class="ml-1 inline-flex items-center gap-0.5 font-semibold underline"
                             >Trình duyệt không tự mở? Bấm vào đây
                             <IconExternalLink class="size-3"
                         /></a>
@@ -535,7 +952,6 @@ const radioCls = (on: boolean) =>
                     <div class="flex flex-wrap items-center gap-2">
                         <Button
                             size="sm"
-                            variant="outline"
                             :disabled="!data.codex_installed || !!adding"
                             data-testid="fork-chatgpt-add"
                             @click="addAccount"
@@ -547,16 +963,17 @@ const radioCls = (on: boolean) =>
                             <IconPlus v-else class="size-4" />
                             Thêm tài khoản ChatGPT
                         </Button>
-                        <span class="text-xs text-muted-foreground"
-                            >Nhiều tài khoản thì app dùng luân phiên; tài khoản
-                            hết lượt tự nghỉ, đổi sang tài khoản khác.</span
-                        >
+                        <span :class="cn(hintCls, 'min-w-0 flex-1')">{{
+                            data.codex_installed
+                                ? 'Nhiều tài khoản thì app dùng luân phiên; tài khoản hết lượt tự nghỉ, đổi sang tài khoản khác.'
+                                : 'Cài ChatGPT CLI ở trên trước.'
+                        }}</span>
                     </div>
                 </section>
 
                 <div
                     v-if="saving || loading"
-                    class="text-xs text-muted-foreground"
+                    class="text-xs text-foreground/70"
                 >
                     Đang lưu…
                 </div>

@@ -35,7 +35,19 @@ final class ChatGptAccounts
         return $this->dir().DIRECTORY_SEPARATOR.$id;
     }
 
-    /** Đường dẫn lệnh codex (Codex CLI); null nếu máy chưa cài. */
+    /** codex.exe trong gói bản chạy Windows (npm đặt gói này lồng trong @openai/codex khi cài toàn máy, hoặc ngang hàng khi cài vào một thư mục). */
+    private const string NATIVE_EXE = '@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe';
+
+    /** Thư mục app tự cài Codex CLI vào (nằm trong storage nên giữ qua các bản cập nhật). */
+    public function cliDir(): string
+    {
+        return rtrim((string) (config('fork.auto.codex_dir') ?: storage_path('app/codex-cli')), '/\\');
+    }
+
+    /**
+     * Đường dẫn lệnh codex (Codex CLI); null nếu máy chưa cài.
+     * Ưu tiên codex.exe chạy thẳng (không cần node, không phụ thuộc PATH): bản app tự cài, rồi bản cài toàn máy bằng npm.
+     */
     public function codexPath(): ?string
     {
         $configured = (string) config('fork.auto.codex_path', '');
@@ -44,14 +56,18 @@ final class ChatGptAccounts
             return $configured;
         }
 
+        $sep = DIRECTORY_SEPARATOR;
+        $native = str_replace('/', $sep, self::NATIVE_EXE);
         $candidates = [];
 
-        foreach (['APPDATA' => '', 'USERPROFILE' => DIRECTORY_SEPARATOR.'AppData'.DIRECTORY_SEPARATOR.'Roaming'] as $env => $suffix) {
-            $base = (string) (getenv($env) ?: '');
+        foreach ([$this->cliDir(), ...$this->npmGlobalDirs()] as $root) {
+            $modules = $root.$sep.'node_modules';
+            $candidates[] = $modules.$sep.$native;
+            $candidates[] = $modules.$sep.'@openai'.$sep.'codex'.$sep.'node_modules'.$sep.$native;
+        }
 
-            if ($base !== '') {
-                $candidates[] = $base.$suffix.DIRECTORY_SEPARATOR.'npm'.DIRECTORY_SEPARATOR.'codex.cmd';
-            }
+        foreach ($this->npmGlobalDirs() as $npm) {
+            $candidates[] = $npm.$sep.'codex.cmd';
         }
 
         foreach ($candidates as $c) {
@@ -61,6 +77,117 @@ final class ChatGptAccounts
         }
 
         return (new ExecutableFinder)->find('codex');
+    }
+
+    /** Thư mục npm toàn máy của người dùng (nơi `npm i -g` đặt lệnh). @return list<string> */
+    private function npmGlobalDirs(): array
+    {
+        $dirs = [];
+
+        foreach (['APPDATA' => '', 'USERPROFILE' => '\\AppData\\Roaming'] as $env => $suffix) {
+            $base = (string) (getenv($env, true) ?: getenv($env) ?: ($_SERVER[$env] ?? ''));
+
+            if ($base !== '') {
+                $dirs[] = rtrim($base, '/\\').str_replace('\\', DIRECTORY_SEPARATOR, $suffix).DIRECTORY_SEPARATOR.'npm';
+            }
+        }
+
+        return array_values(array_unique($dirs));
+    }
+
+    /**
+     * Biến môi trường cho tiến trình con (codex, npm): php-cgi dưới launcher có thể thiếu PATH tới node.
+     *
+     * @return array<string, string>
+     */
+    public function childEnv(): array
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return [];
+        }
+
+        $path = (string) (getenv('PATH', true) ?: getenv('PATH') ?: '');
+        $extra = array_filter([
+            ...$this->npmGlobalDirs(),
+            ($pf = getenv('ProgramFiles', true) ?: 'C:\\Program Files') ? $pf.'\\nodejs' : null,
+        ], fn ($d): bool => is_string($d) && is_dir($d) && stripos($path, $d) === false);
+
+        return $extra === [] ? [] : ['PATH' => implode(';', [...$extra, $path])];
+    }
+
+    /** Lệnh npm của máy (cần Node.js) để tự cài Codex CLI; null nếu máy không có Node.js. */
+    public function npmPath(): ?string
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return (new ExecutableFinder)->find('npm');
+        }
+
+        foreach (['ProgramFiles', 'ProgramW6432', 'ProgramFiles(x86)'] as $env) {
+            $base = (string) (getenv($env, true) ?: '');
+
+            if ($base !== '' && is_file($base.'\\nodejs\\npm.cmd')) {
+                return $base.'\\nodejs\\npm.cmd';
+            }
+        }
+
+        $found = (new ExecutableFinder)->find('npm');
+
+        return $found !== null && is_file($found) ? $found : null;
+    }
+
+    /**
+     * Trạng thái cài Codex CLI cho app.
+     *
+     * @return array{installed: bool, installing: bool, node: bool, error: ?string}
+     */
+    public function cliStatus(): array
+    {
+        $installed = $this->codexPath() !== null;
+        $marker = $this->cliDir().DIRECTORY_SEPARATOR.'install.running';
+        $installing = ! $installed && is_file($marker) && time() - (int) @filemtime($marker) < 20 * 60;
+        $error = null;
+
+        if (! $installed && ! $installing) {
+            @unlink($marker);
+            $log = (string) @file_get_contents($this->cliDir().DIRECTORY_SEPARATOR.'install.log');
+
+            if (trim($log) !== '') {
+                $lines = array_values(array_filter(array_map('trim', preg_split('/\R/', $log) ?: []), fn (string $l): bool => $l !== '' && stripos($l, 'npm warn') !== 0));
+                $error = 'Cài chưa xong: '.mb_substr((string) end($lines), 0, 200);
+            }
+        }
+
+        return ['installed' => $installed, 'installing' => $installing, 'node' => $this->npmPath() !== null, 'error' => $error];
+    }
+
+    /**
+     * Cài Codex CLI vào thư mục của app (npm, chạy nền ~1-3 phút). Trả về lỗi tiếng Việt, null = đã bắt đầu.
+     */
+    public function installCli(): ?string
+    {
+        if ($this->codexPath() !== null) {
+            return null;
+        }
+
+        $npm = $this->npmPath();
+
+        if ($npm === null) {
+            return 'Máy chưa có Node.js nên chưa cài được. Anh cài Node.js (nodejs.org, bản LTS) rồi bấm lại.';
+        }
+
+        if ($this->cliStatus()['installing']) {
+            return null;
+        }
+
+        $dir = $this->cliDir();
+        @mkdir($dir, 0775, true);
+        $marker = $dir.DIRECTORY_SEPARATOR.'install.running';
+        $env = $this->childEnv();
+        $lines = $env !== [] ? ['set "PATH='.$env['PATH'].'"'] : [];
+        $lines[] = 'call "'.$npm.'" install --prefix "'.$dir.'" @openai/codex@latest --no-audit --no-fund --loglevel=error';
+        $this->spawn($dir, $marker, $lines, $dir.DIRECTORY_SEPARATOR.'install.log');
+
+        return null;
     }
 
     /**
@@ -162,7 +289,11 @@ final class ChatGptAccounts
         $id = 'tk-'.Str::lower(Str::random(8));
         $home = $this->home($id);
         @mkdir($home, 0775, true);
-        $this->spawn($home, ['set "CODEX_HOME='.$home.'"', 'call "'.$codex.'" login'], $home.DIRECTORY_SEPARATOR.'login.log');
+        $env = $this->childEnv();
+        $lines = $env !== [] ? ['set "PATH='.$env['PATH'].'"'] : [];
+        $lines[] = 'set "CODEX_HOME='.$home.'"';
+        $lines[] = 'call "'.$codex.'" login';
+        $this->spawn($home, $home.DIRECTORY_SEPARATOR.'login.running', $lines, $home.DIRECTORY_SEPARATOR.'login.log');
 
         return ['ok' => true, 'id' => $id, 'error' => null];
     }
@@ -275,16 +406,15 @@ final class ChatGptAccounts
      *
      * @param  list<string>  $lines  các dòng lệnh cmd
      */
-    private function spawn(string $home, array $lines, string $log): void
+    private function spawn(string $dir, string $marker, array $lines, string $log): void
     {
-        $marker = $home.DIRECTORY_SEPARATOR.'login.running';
         @file_put_contents($marker, (string) time());
 
         if (PHP_OS_FAMILY !== 'Windows') {
             return;
         }
 
-        $script = $home.DIRECTORY_SEPARATOR.'login.cmd';
+        $script = $dir.DIRECTORY_SEPARATOR.basename($marker, '.running').'.cmd';
         // Dòng cuối của $lines là lệnh codex: phần ghi log gắn vào đúng dòng đó.
         $body = "@echo off\r\nchcp 65001 >nul\r\n".implode("\r\n", $lines).' > "'.$log.'" 2>&1'."\r\n".'del "'.$marker.'" >nul 2>&1'."\r\n";
         file_put_contents($script, $body);
