@@ -78,8 +78,9 @@ class TrucTest(Nen):
             for seed in range(25):
                 ts = self.chay(sp, ["rua-vuon", "cach-dung"], 40, seed)
                 self.assertEqual(len(ts), 40)
-                self.assertEqual({t["mo"] for t in ts[:15]}, set(vl.MO), "15 kiểu mở đều được dùng trước khi lặp")
-                self.assertEqual(len({t["mo"] for t in ts[:15]}), 15)
+                n = len(vl.MO)
+                self.assertEqual({t["mo"] for t in ts[:n]}, set(vl.MO), "mọi kiểu mở đều được dùng trước khi lặp")
+                self.assertEqual(len({t["mo"] for t in ts[:n]}), n)
                 self.assertLessEqual(sum(t["chot"] == "qua_cu_the" for t in ts), 10)
                 self.assertLessEqual(sum(t["vai"] == "dan_chuyen" for t in ts), 8)
                 for t in ts:
@@ -94,6 +95,12 @@ class TrucTest(Nen):
                         self.assertIn(t["vai"], {"chu_hang", "nguoi_ban_quay"})
                     self.assertIn(t["mo"], vl.MO); self.assertIn(t["than"], vl.THAN); self.assertIn(t["chot"], vl.CHOT); self.assertIn(t["vai"], vl.VAI)
             self.assertEqual(any(t["chot"] == "dong_hanh" for s in range(25) for t in self.chay(sp, ["rua-vuon"], 40, s)), ben_em)
+
+    def test_hook_ke_chuyen_vuon_toi_da_mot_phan_muoi(self):
+        for seed in range(20):
+            ts = self.chay(self.sp, ["rua-vuon", "cach-dung"], 20, seed)
+            self.assertLessEqual(sum(t["mo"] in vl._MO_VUON for t in ts), 2)
+            self.assertEqual(len({t["mo"] for t in ts}), 20, "20 bản: 20 kiểu hook khác nhau")
 
     def test_xoay_deu_cac_khoa_va_goc(self):
         ts = self.chay(self.sp, ["rua-vuon", "cach-dung", "qua-tang"], 33, 3)
@@ -156,7 +163,7 @@ class DeBaiTest(Nen):
         for k in ("nghich_ly", "dung_tay", "ba_sai_lam", "kip_luc", "chu_hang"):
             self.assertNotIn(vl.MO[k][0] if k in vl.MO else (vl.THAN.get(k) or vl.CHOT.get(k) or vl.VAI[k]), p)
         self.assertIn('bai[0]: góc = rua-vuon (Rửa vườn sau thu hoạch (cà phê): đúng lúc, đúng việc.)', p)
-        self.assertIn('(ví dụ cấu trúc, KHÔNG chép: "Trễ một lần xịt thôi… là mất nguyên lứa trái non.")', p)
+        self.assertIn('(ví dụ cấu trúc, KHÔNG chép: "Đổ thuốc trước hay đổ nước trước, sai một bước là đóng cặn nguyên bình.")', p)
         self.assertIn("Luật câu mở: ≤ 14 âm tiết", p)
         self.assertNotIn("goc_ban", p); self.assertNotIn("cat_khung_ly_do", p); self.assertNotIn("thoi_luong", p)
         self.assertNotIn("CAU-DA-DUNG-SENTINEL", p)                              # 150 câu đã dùng không còn gửi

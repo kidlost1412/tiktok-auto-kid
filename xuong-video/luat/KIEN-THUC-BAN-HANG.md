@@ -37,6 +37,6 @@ Người làm vườn NGHE chứ ít đọc, vừa lướt vừa làm việc kh�
 ## 7. Người quanh mình đang dùng
 Nhà nông tin cái mình thấy người khác làm hơn cái người bán nói. Thấy ông hàng xóm, anh bạn cùng xã, cô chủ vườn bên kia đang xài một món thì lòng ngại đổi đã bớt quá nửa.
 - Bài có thể dựa vào khoảnh khắc "người quanh mình": nghe hàng xóm nhắc, thấy bà con trong xóm cầm chai ra vườn, một ông chủ vườn kể lại. Nhân vật được hư cấu, miễn không gán cho họ điều sản phẩm không có trong hồ sơ.
-- Điều nói về SẢN PHẨM vẫn chỉ lấy ở hồ sơ. Không bịa số người dùng, không bịa "bán chạy nhất", không bịa kết quả của ai.
+- Điều nói về SẢN PHẨM (công dụng, liều, thành phần, quà) vẫn chỉ lấy ở hồ sơ, không hứa kết quả chắc chắn. Lời rao viral về độ tin dùng ("hơn một triệu nhà vườn tin dùng", "sáu mươi ba tỉnh thì sáu mươi hai tỉnh xài rồi") là hook rao hàng, được dùng — khác với bịa công dụng; chỉ tránh chữ cấm trong khong_duoc_noi.
 - Cảnh người thật cầm, xài, kể về sản phẩm (nếu kho có) chính là bằng chứng loại này: để hình làm việc đó, lời đừng nhắc lại điều hình đã thấy.
 - Nói như chuyện kể ngoài vườn, không như lời quảng cáo thuê người khen.
