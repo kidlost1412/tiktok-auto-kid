@@ -25,6 +25,7 @@ class TatGiongMayTest(unittest.TestCase):
     def test_tu_hoi_tu_dap(self):
         e = loi("Đất chai thì rễ khó ăn. Khách hay hỏi: rau mới trồng, phun được chưa? Được. Đợi bảy ngày rồi phun nha bà con.")
         self.co(e, "Khách hỏi"); self.co(e, "tự đáp cụt")
+        self.co(loi("Đoán thử coi, thứ gì từ chợ cá mà cây lại cần? Khách hay hỏi xịt lúc ra bông được không? Được, vì nó chống rụng bông. Can ở giỏ hàng."), "tự đáp")
 
     def test_hoi_ep_chon(self):
         self.co(loi("Cây gồng trái mà đói thì buông trái. Giữ trái, hay nhặt trái rụng? Can ở giỏ hàng."), "ép chọn")

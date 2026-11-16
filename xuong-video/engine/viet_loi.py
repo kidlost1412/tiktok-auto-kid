@@ -618,7 +618,7 @@ def tat_giong_may(item, sp, plain, sents):
     if _RE_TU_HOI.search(plain):
         errs.append("khuôn tự hỏi tự đáp 'Khách hỏi: …?' (kể lại thành lời của người nói)")
     for a, b in zip(sents, sents[1:]):
-        if a.rstrip().endswith("?") and _RE_TRA_LOI_CUT.match(b.strip()):
+        if a.rstrip().endswith("?") and (_RE_TRA_LOI_CUT.match(b.strip()) or re.match(r"(?:được|có|không|đúng)\s*,", b.strip().lower())):
             errs.append(f"tự hỏi rồi tự đáp cụt '{b.strip()}'")
             break
     if any(s.rstrip().endswith("?") and re.search(r",\s*hay\s+\w", s.lower()) for s in sents[-2:]):
