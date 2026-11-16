@@ -6,6 +6,7 @@ namespace App\Fork\AutoPost\Rieng\Ai;
 
 use App\Fork\AutoPost\Models\AutoSetting;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\InputStream;
@@ -25,6 +26,8 @@ final class ChatGptAccounts
 
     /** Hết lượt mà không đọc được giờ mở lại thì nghỉ ngần này phút. */
     public const int LIMIT_COOLDOWN_MINUTES = 60;
+
+    private const string MODELS_CACHE = 'fork-rieng:chatgpt-models:';
 
     public function dir(): string
     {
@@ -260,6 +263,16 @@ final class ChatGptAccounts
         });
     }
 
+    /** Xoá lỗi cũ của mọi tài khoản (sau khi đã sửa nguyên nhân); lỗi thật sẽ hiện lại ở lượt sau. */
+    public function clearErrors(): void
+    {
+        $this->mutate(function (array &$s): void {
+            foreach (array_keys((array) ($s['accounts'] ?? [])) as $id) {
+                $s['accounts'][$id]['last_error'] = null;
+            }
+        });
+    }
+
     public function markError(string $id, string $error): void
     {
         $this->mutate(function (array &$s) use ($id, $error): void {
@@ -309,34 +322,183 @@ final class ChatGptAccounts
 
     /**
      * Hạn mức ChatGPT (Codex) của một tài khoản: hỏi `codex app-server` (account/rateLimits/read), không tốn lượt.
+     * Cùng lượt hỏi luôn danh sách model tài khoản dùng được (model/list) và nhớ lại (gói free ít model hơn, không có Fast).
      * Mỗi khung: phần trăm đã dùng, độ dài khung (phút), lúc đặt lại. null nếu không hỏi được.
      *
      * @return array{plan: ?string, windows: list<array{used: int, minutes: ?int, resets_at: ?string}>, reached: bool}|null
      */
     public function limits(string $id): ?array
     {
-        $codex = $this->codexPath();
+        $r = $this->rpc($id, [2 => ['account/rateLimits/read', null], 3 => ['model/list', []]]);
 
-        if ($codex === null || ! in_array($id, $this->ids(), true)) {
+        if (isset($r[3]) && ($models = self::parseModels($r[3])) !== null) {
+            Cache::put(self::MODELS_CACHE.$id, $models, now()->addHours(12));
+        }
+
+        return isset($r[2]) ? self::parseLimits($r[2]) : null;
+    }
+
+    /**
+     * Model tài khoản này dùng được (đã nhớ; hỏi lại Codex nếu chưa có hoặc $refresh). null nếu không biết.
+     *
+     * @return array<string, array{name: string, note: string, efforts: list<string>, fast: bool, default: bool}>|null
+     */
+    public function models(string $id, bool $refresh = false): ?array
+    {
+        $cached = Cache::get(self::MODELS_CACHE.$id);
+
+        if (is_array($cached) && ! $refresh) {
+            return $cached;
+        }
+
+        $r = $this->rpc($id, [2 => ['model/list', []]]);
+        $models = isset($r[2]) ? self::parseModels($r[2]) : null;
+
+        if ($models !== null) {
+            Cache::put(self::MODELS_CACHE.$id, $models, now()->addHours(12));
+        }
+
+        return $models ?? (is_array($cached) ? $cached : null);
+    }
+
+    /** Model đã nhớ của tài khoản (không hỏi Codex); null nếu chưa biết. */
+    public function knownModels(string $id): ?array
+    {
+        $cached = Cache::get(self::MODELS_CACHE.$id);
+
+        return is_array($cached) ? $cached : null;
+    }
+
+    /**
+     * Model thật sẽ dùng với tài khoản: model chủ app chọn nếu tài khoản có; không thì model mặc định của tài khoản.
+     *
+     * @return array{0: string, 1: bool} [model, có Fast không]
+     */
+    public function modelFor(string $id, string $wanted, bool $refresh = false): array
+    {
+        $list = $refresh ? $this->models($id, true) : $this->knownModels($id);
+
+        if ($list === null || $list === []) {
+            return [$wanted, true];
+        }
+
+        if (isset($list[$wanted])) {
+            return [$wanted, $list[$wanted]['fast']];
+        }
+
+        foreach ($list as $mid => $m) {
+            if ($m['default']) {
+                return [$mid, $m['fast']];
+            }
+        }
+
+        $mid = (string) array_key_first($list);
+
+        return [$mid, $list[$mid]['fast']];
+    }
+
+    /**
+     * Model thay thế khi tài khoản báo không dùng được $bad: hỏi lại danh sách, bỏ $bad, lấy model mặc định còn lại.
+     *
+     * @return array{0: string, 1: bool}|null
+     */
+    public function fallbackModel(string $id, string $bad): ?array
+    {
+        $list = $this->models($id, true) ?? [];
+        unset($list[$bad]);
+
+        if ($list === []) {
             return null;
         }
 
-        $input = implode("\n", [
+        Cache::put(self::MODELS_CACHE.$id, $list, now()->addHours(12));
+
+        foreach ($list as $mid => $m) {
+            if ($m['default']) {
+                return [$mid, $m['fast']];
+            }
+        }
+
+        $mid = (string) array_key_first($list);
+
+        return [$mid, $list[$mid]['fast']];
+    }
+
+    /**
+     * @param  array<string, mixed>  $msg  câu trả lời JSON-RPC của model/list
+     * @return array<string, array{name: string, note: string, efforts: list<string>, fast: bool, default: bool}>|null
+     */
+    public static function parseModels(array $msg): ?array
+    {
+        $data = data_get($msg, 'result.data');
+
+        if (! is_array($data)) {
+            return null;
+        }
+
+        $out = [];
+
+        foreach ($data as $m) {
+            $mid = is_array($m) ? (string) ($m['id'] ?? $m['model'] ?? '') : '';
+
+            // Bỏ model ẩn và model không xem được ảnh (AI phải xem khung hình video).
+            if ($mid === '' || ($m['hidden'] ?? false) || ! in_array('image', (array) ($m['inputModalities'] ?? ['image']), true)) {
+                continue;
+            }
+
+            $desc = (string) ($m['description'] ?? '');
+            $kind = match (true) {
+                str_contains($mid, 'luna') => 'Nhanh, tiết kiệm lượt',
+                str_contains($mid, 'terra') => 'Cân bằng nhanh và giỏi',
+                str_contains($mid, 'sol') => 'Giỏi nhất, tốn lượt hơn',
+                default => 'Model của Codex',
+            };
+            $out[$mid] = [
+                'name' => (string) ($m['displayName'] ?? $mid),
+                'note' => $kind.(str_starts_with(strtolower($desc), 'older') ? ' · đời cũ' : ''),
+                'efforts' => array_values(array_filter(array_map(fn ($e): string => (string) (is_array($e) ? ($e['reasoningEffort'] ?? '') : $e), (array) ($m['supportedReasoningEfforts'] ?? [])))),
+                'fast' => (array) ($m['serviceTiers'] ?? []) !== [] || (array) ($m['additionalSpeedTiers'] ?? []) !== [],
+                'default' => (bool) ($m['isDefault'] ?? false),
+            ];
+        }
+
+        return $out === [] ? null : $out;
+    }
+
+    /**
+     * Hỏi `codex app-server` (JSON-RPC qua stdin/stdout) một lượt. $calls: [id => [method, params]]. Trả [id => câu trả lời].
+     *
+     * @param  array<int, array{0: string, 1: mixed}>  $calls
+     * @return array<int, array<string, mixed>>
+     */
+    private function rpc(string $id, array $calls): array
+    {
+        $codex = $this->codexPath();
+
+        if ($codex === null || ! in_array($id, $this->ids(), true)) {
+            return [];
+        }
+
+        $lines = [
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"tiktok-auto-kid","version":"1"}}}',
             '{"jsonrpc":"2.0","method":"initialized"}',
-            '{"jsonrpc":"2.0","id":2,"method":"account/rateLimits/read"}',
-        ])."\n";
+        ];
+
+        foreach ($calls as $cid => [$method, $params]) {
+            $lines[] = (string) json_encode(['jsonrpc' => '2.0', 'id' => $cid, 'method' => $method] + ($params === null ? [] : ['params' => (object) $params]));
+        }
+
         $p = new Process([$codex, 'app-server'], $this->home($id), ['CODEX_HOME' => $this->home($id)] + $this->childEnv(), null, 30);
         $in = new InputStream;
         $p->setInput($in);
         $buf = '';
-        $result = null;
+        $got = [];
 
         try {
             $p->start();
-            $in->write($input);
+            $in->write(implode("\n", $lines)."\n");
 
-            while ($p->isRunning() && $result === null) {
+            while ($p->isRunning() && count($got) < count($calls)) {
                 usleep(50_000);
                 $p->checkTimeout();
                 $buf .= $p->getIncrementalOutput();
@@ -344,20 +506,19 @@ final class ChatGptAccounts
                 foreach (explode("\n", $buf) as $line) {
                     $msg = json_decode(trim($line), true);
 
-                    if (is_array($msg) && ($msg['id'] ?? null) === 2) {
-                        $result = $msg;
-                        break;
+                    if (is_array($msg) && isset($msg['id']) && array_key_exists((int) $msg['id'], $calls)) {
+                        $got[(int) $msg['id']] = $msg;
                     }
                 }
             }
         } catch (Throwable) {
-            // hết giờ hoặc không chạy được: coi như không biết
+            // hết giờ hoặc không chạy được: trả những gì đã nhận
         } finally {
             $in->close();
             $p->stop(1);
         }
 
-        return is_array($result) ? self::parseLimits($result) : null;
+        return $got;
     }
 
     /**

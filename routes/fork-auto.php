@@ -102,6 +102,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::get('tu-dong', [RiengAutoController::class, 'show'])->name('auto.show');
         Route::patch('tu-dong', [RiengAutoController::class, 'update'])->middleware('throttle:60,1')->name('auto.update');
         Route::post('tu-dong/codex-cli', [RiengAutoController::class, 'installCli'])->middleware('throttle:6,1')->name('auto.codex.install');
+        Route::post('tu-dong/ai-thu-lai', [RiengAutoController::class, 'retryAi'])->middleware('throttle:10,1')->name('auto.rieng.ai.retry');
         Route::post('tu-dong/chatgpt', [RiengAutoController::class, 'addChatGpt'])->middleware('throttle:10,1')->name('auto.chatgpt.add');
         Route::get('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'chatGptStatus'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.status');
         Route::get('tu-dong/chatgpt/{id}/han-muc', [RiengAutoController::class, 'chatGptLimits'])->where('id', 'tk-[a-z0-9]{8}')->middleware('throttle:30,1')->name('auto.chatgpt.limits');

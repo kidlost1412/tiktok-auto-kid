@@ -49,7 +49,7 @@ final class RiengAutoSettings
         'empty_caption_ok' => true,
         'approve_first' => false,
         'duplicates' => 'ask',
-        'model' => 'gpt-6.1-terra',
+        'model' => 'gpt-6-luna',
         'effort' => 'low',
         'fast' => false,
         'folder_channels' => [],
@@ -97,7 +97,8 @@ final class RiengAutoSettings
             }
         }
 
-        $model = array_key_exists((string) $s['model'], self::MODELS) ? (string) $s['model'] : self::DEFAULTS['model'];
+        // Model có thể là model riêng của tài khoản (Codex trả về), không chỉ danh sách có sẵn.
+        $model = preg_match('/^[a-z0-9][a-z0-9.\-]{1,60}$/', (string) $s['model']) === 1 ? (string) $s['model'] : self::DEFAULTS['model'];
 
         return [
             'enabled' => (bool) $s['enabled'],
@@ -106,7 +107,7 @@ final class RiengAutoSettings
             'approve_first' => (bool) $s['approve_first'],
             'duplicates' => in_array($s['duplicates'], ['ask', 'allow'], true) ? $s['duplicates'] : 'ask',
             'model' => $model,
-            'effort' => in_array((string) $s['effort'], self::MODELS[$model]['efforts'], true) ? (string) $s['effort'] : self::DEFAULTS['effort'],
+            'effort' => in_array((string) $s['effort'], self::MODELS[$model]['efforts'] ?? array_keys(self::EFFORTS), true) ? (string) $s['effort'] : self::DEFAULTS['effort'],
             'fast' => (bool) $s['fast'],
             'folder_channels' => $folders,
         ];

@@ -60,7 +60,14 @@ class CodexRunner
             throw new RuntimeException('Tài khoản ChatGPT cần đăng nhập lại.');
         }
 
-        throw new RuntimeException('ChatGPT không trả lời'.($p->getExitCode() !== null ? ' (mã '.$p->getExitCode().')' : '').': '.mb_substr(trim(preg_replace('/\s+/', ' ', $log) ?? ''), -240));
+        if (preg_match('/model .{0,40}not supported|model .{0,40}not (?:available|found)|does not exist/i', $log) === 1) {
+            throw new RuntimeException("Tài khoản ChatGPT không dùng được model {$model}.");
+        }
+
+        // Chỉ giữ dòng ERROR cuối (codex in nhiều cảnh báo phía trước), không thì đuôi nhật ký.
+        $detail = preg_match_all('/ERROR:\s*(.+)/', $log, $m) > 0 ? trim((string) end($m[1])) : trim(preg_replace('/\s+/', ' ', $log) ?? '');
+
+        throw new RuntimeException('ChatGPT không trả lời'.($p->getExitCode() !== null ? ' (mã '.$p->getExitCode().')' : '').': '.mb_substr($detail, -200));
     }
 
     /** "try again in 2 hours 5 minutes" / "in 37 minutes" → số phút; null nếu không đọc được. */
