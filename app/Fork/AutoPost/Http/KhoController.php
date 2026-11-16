@@ -20,6 +20,7 @@ use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengInfo;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
+use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Readiness;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
@@ -321,6 +322,8 @@ final class KhoController extends Controller
 
         $row = $this->videoRow($video, $products, $this->singleAssessment($readiness, $video), ProductImages::lookup());
         $row['comments'] = $this->commentsOf($video);
+        // Bài không đăng được: lý do tiếng Việt + việc làm được (khung đỏ trong khung xem video).
+        $row['failure'] = app(FailedPosts::class)->forVideo($video);
 
         return response()->json($row);
     }

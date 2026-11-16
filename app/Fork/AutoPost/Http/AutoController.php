@@ -14,6 +14,7 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Onboarding;
+use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\AutoPost\Scheduling\FutureUploads;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PlanPreview;
@@ -139,16 +140,20 @@ final class AutoController extends Controller
             ];
         });
 
+        // Bài hẹn giờ mà Chrome báo lỗi (hết hàng, sai tài khoản...) hoặc đã chốt lỗi, trong 3 ngày gần đây.
+        $failedPosts = fn (): array => $once('failed_posts', fn (): array => app(FailedPosts::class)->forAccounts($accounts, $images()));
+
         return Inertia::render('fork/Auto', [
             'products' => fn (): array => $this->productRows($images()->byCode()),
             'stock' => $stock,
             'accounts' => $rows,
             'health' => fn (): array => $this->health($accounts, $chromeRows),
             'hub' => Inertia::defer(fn (): array => $this->hubStatus()),
-            'lich' => fn (): array => $this->lich($accounts, $autoAccounts, $images()),
+            'lich' => fn (): array => $this->lich($accounts, $autoAccounts, $images(), $failedPosts()),
             'upcoming' => fn (): array => $this->upcoming($accounts),
             'recent' => fn (): array => $this->recent($accounts, $images()),
             'failed_recent' => fn (): array => $this->failedRecent($accounts, $images()),
+            'failed_posts' => $failedPosts,
             'trend' => fn (): array => $this->trend($accounts),
             // Thẻ "Bắt đầu" hỏi hub (có thể chậm vài giây) nên tải sau, cùng nhóm với hub.
             'onboarding' => Inertia::defer(fn (): ?array => app(Onboarding::class)->forAccounts($ids())),
@@ -246,6 +251,25 @@ final class AutoController extends Controller
         }
 
         return back()->with('flash.success', 'Đã đưa video về kho. App sẽ xếp lịch đăng lại ở lượt kế tiếp (hoặc bấm "Xếp lịch ngay").');
+    }
+
+    /**
+     * "Đăng lại" bài hẹn giờ mà Chrome báo lỗi: giao lượt mới cho Chrome. Chỉ khi lượt cũ chắc chắn chưa gửi gì lên TikTok
+     * (xem FailedPosts::retryJob), còn nghi ngờ thì từ chối kèm lý do.
+     */
+    public function retryPost(Request $request, AutoVideo $video): RedirectResponse
+    {
+        $accounts = $this->tiktokAccounts($this->authorizeOwner($request));
+
+        abort_if($video->social_account_id === null || ! $accounts->contains('id', $video->social_account_id), 404);
+
+        $refusal = app(FailedPosts::class)->retryJob($video);
+
+        if ($refusal !== null) {
+            return back()->with('flash.error', $refusal);
+        }
+
+        return back()->with('flash.success', 'Đã giao lại cho Chrome. Nếu vẫn lỗi, app sẽ báo lại lý do.');
     }
 
     public function pause(Request $request, string $socialAccount): RedirectResponse
@@ -354,8 +378,9 @@ final class AutoController extends Controller
      * @param  Collection<string, AutoAccount>  $autoAccounts
      * @return array{days: list<array<string, string>>, channels: array<string, array<string, mixed>>}
      */
-    private function lich($accounts, $autoAccounts, ProductImageLookup $images): array
+    private function lich($accounts, $autoAccounts, ProductImageLookup $images, array $failedPosts = []): array
     {
+        $failures = collect($failedPosts)->keyBy('id');
         $now = CarbonImmutable::now();
         $firstTz = $accounts->first()?->timezone ?: self::DEFAULT_TZ;
         $labels = ['Hôm nay', 'Ngày mai', 'Ngày kia'];
@@ -386,11 +411,17 @@ final class AutoController extends Controller
             // "Đổi giờ": bài nào đã nằm trên TikTok (job Chrome hẹn giờ đã xong), đổi giờ được không, yêu cầu gần nhất.
             $moves = app(Reschedules::class)->calendarInfo($videos);
 
-            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves): array {
+            // Cảnh báo sớm theo dữ liệu shop đã có: giỏ của bài đã hết hàng / không còn trong shop.
+            $cartWarnings = app(FailedPosts::class)->cartWarnings($videos->filter(fn (AutoVideo $v): bool => in_array($v->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED], true)));
+
+            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves, $failures, $cartWarnings): array {
                 $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
                 $postStatus = $v->post?->status;
                 $move = $moves[$v->id] ?? ['on_tiktok' => false, 'held' => false, 'can_reschedule' => false, 'reschedule' => null];
+                $failure = $failures[$v->id] ?? null;
                 $state = match (true) {
+                    // Chrome đã báo lỗi bài hẹn giờ này (hết hàng...): hiện đỏ ngay, không đợi tới giờ đăng.
+                    $failure !== null => 'failed',
                     // Video đã hẹn giờ sẵn trên TikTok (posted_at là giờ hẹn, chưa tới): chưa đăng, chỉ là đã hẹn.
                     $v->status === AutoVideo::POSTED && $v->posted_at?->isFuture() => 'tiktok_scheduled',
                     // Chrome đã tải bài lên TikTok dưới dạng hẹn giờ (job hẹn giờ posted), bài trong app vẫn chờ tới giờ.
@@ -413,9 +444,10 @@ final class AutoController extends Controller
                     'product_image' => $images->forSlot((string) $a->id, $v->product_code, $v->quy_cach),
                     'caption' => $this->snippet($v->caption),
                     'link' => in_array($state, ['posted', 'tiktok_scheduled'], true) ? $this->safeLink(data_get($v->stats, 'link')) : null,
-                    'error' => $state === 'failed' ? $v->skip_reason : null,
+                    'error' => $failure !== null ? 'Lỗi: '.$failure['short'] : ($state === 'failed' ? $v->skip_reason : null),
+                    'error_full' => $failure['text'] ?? null,
                     // Bài chưa hẹn được lên TikTok vì kênh đã đủ số bài hẹn giờ: vẫn trong app, sẽ tự hẹn khi có chỗ.
-                    'note' => $state === 'scheduled' && ($move['held'] ?? false) ? ChromeJobs::QUOTA_HELD_TEXT : null,
+                    'note' => $state === 'scheduled' && ($move['held'] ?? false) ? ChromeJobs::QUOTA_HELD_TEXT : (in_array($state, ['scheduled', 'reserved'], true) ? ($cartWarnings[$v->id] ?? null) : null),
                     'source' => $v->source,
                     'can_reschedule' => $move['can_reschedule'],
                     'reschedule' => $move['reschedule'],
