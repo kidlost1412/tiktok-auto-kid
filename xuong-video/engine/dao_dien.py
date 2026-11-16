@@ -769,9 +769,10 @@ def _gk_json(txt):
     return kq if isinstance(kq, dict) and ("muc" in kq or "diem" in kq) else None
 
 
-def cham_gemini(p, anh, work, cfgg, runner=None):
+def cham_gemini(p, anh, work, cfgg, runner=None, video=None):
     """Chấm bằng Gemini qua Antigravity (không tốn API). → dict JSON thô của AI. Ném lỗi nếu Antigravity chưa mở / quá hạn / trả sai
-    (người gọi tự chuyển sang Claude). Ảnh + file kết quả đặt trong lich-su/_giam-khao (xoá sau khi đọc); tối đa cfgg['song_song'] cuộc cùng lúc."""
+    (người gọi tự chuyển sang Claude). Ảnh (+ video mp4 có tiếng nếu có `video`) + file kết quả đặt trong lich-su/_giam-khao (xoá sau khi đọc);
+    tối đa cfgg['song_song'] cuộc cùng lúc. Gemini xem được video và nghe được tiếng nên được đưa cả file video; Claude thì chỉ có ảnh."""
     import hoc_canh as hc
     if runner is None:
         if not hc.trang_thai_agy().get("mo"):
@@ -781,8 +782,11 @@ def cham_gemini(p, anh, work, cfgg, runner=None):
     d = HUB / "lich-su" / "_giam-khao"; d.mkdir(parents=True, exist_ok=True)
     ma = uuid.uuid4().hex[:10]
     f_anh, f_out = d / f"{ma}.jpg", d / f"{ma}.json"
+    f_vid = d / f"{ma}.mp4" if video and Path(video).is_file() else None
     try:
         shutil.copyfile(anh, f_anh)
+        if f_vid:
+            shutil.copyfile(video, f_vid)
         pj = None
         try:
             if runner is hc.hoi_mot_lan:
@@ -790,15 +794,20 @@ def cham_gemini(p, anh, work, cfgg, runner=None):
         except Exception:
             pj = None
         goi_y = (f"\n\nTỜ ẢNH CẦN XEM nằm ở file này (mở và xem ảnh): {f_anh}\nGHI KẾT QUẢ vào đúng file này (UTF-8, chỉ JSON thuần, bắt đầu bằng {{ và kết thúc bằng }}): {f_out}\n"
-                 "CHỈ được dùng công cụ XEM ảnh nêu trên và công cụ GHI đúng 1 file kết quả. KHÔNG chạy lệnh terminal/PowerShell/script, không tìm web, "
+                 "CHỈ được dùng công cụ XEM ảnh/video nêu trên và công cụ GHI đúng 1 file kết quả. KHÔNG chạy lệnh terminal/PowerShell/script, không tìm web, "
                  "không tạo kế hoạch/ghi chú/artifact, không đọc hay ghi file nào khác, không hỏi lại.")
+        if f_vid:
+            goi_y = (f"\n\nVIDEO THẬT (có tiếng) nằm ở file này — mở XEM và NGHE cả video, không chỉ tờ ảnh: {f_vid}\n"
+                     "Chú ý: giọng đọc có khớp hình đúng lúc không; nhạc nền với giọng có cân (nhạc không át giọng); hiệu ứng âm thanh có hợp cảnh; "
+                     "nhịp cắt cảnh; chữ trên màn hình có đọc kịp, rõ. Mục nào trượt vì nghe/xem video thì ghi giây xảy ra." + goi_y)
         with _gk_sem(cfgg["song_song"]):
             txt = runner(cfgg["model"], p + goi_y, str(f_out), han=cfgg["han_s"], **({"project": pj} if pj else {}))
         return txt
     finally:
-        for f in (f_anh, f_out, f_out.with_name(f_out.name + ".tmp")):
+        for f in (f_anh, f_vid, f_out, f_out.with_name(f_out.name + ".tmp")):
             try:
-                f.unlink()
+                if f:
+                    f.unlink()
             except OSError:
                 pass
 
@@ -844,7 +853,7 @@ def giam_khao(sp, video, sents, edl, work, segs=None, info=None, props_f=None, c
     kq, nguon = None, "claude"
     if cg["may"] == "gemini":
         try:
-            kq = _gk_ket(_gk_json(cham_gemini(p, anh, work, cg, runner)), may, co_canh_qua)
+            kq = _gk_ket(_gk_json(cham_gemini(p, anh, work, cg, runner, video=video)), may, co_canh_qua)
             if kq is None:
                 _gk_bao_mot_lan("sai-dinh-dang", "Gemini trả sai định dạng / thiếu mục kiểm")
             else:
