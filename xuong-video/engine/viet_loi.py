@@ -595,11 +595,11 @@ def tat_giong_may(item, sp, plain, sents):
             break
     if any(s.rstrip().endswith("?") and re.search(r",\s*hay\s+\w", s.lower()) for s in sents[-2:]):
         errs.append("kết bằng câu hỏi ép chọn 'A, hay B?' (kết bằng một việc cụ thể)")
-    if len(sents) >= 3:
-        for s in sents[1:-1]:                          # câu mở và câu chốt được ngắn
-            if len(re.findall(r"\w+", s)) <= 3 and not s.rstrip().endswith("?"):
-                errs.append(f"câu cụt kiểu khẩu hiệu '{s.strip()}' (gộp vào câu trước hoặc bỏ)")
-                break
+    # câu cụt: một câu ngắn ("Phun chiều mát.") là lời dặn tự nhiên, máy không phân biệt được với khẩu hiệu ("Ít mà đủ.") —
+    # chỉ loại khi thân bài vụn từ 2 câu ≤ 3 chữ trở lên; câu mở và câu chốt được ngắn
+    cut = [s.strip() for s in sents[1:-1] if len(re.findall(r"\w+", s)) <= 3 and not s.rstrip().endswith("?")]
+    if len(cut) >= 2:
+        errs.append(f"thân bài vụn, {len(cut)} câu cụt ({' / '.join(cut[:3])}) — gộp vào câu trước hoặc bỏ")
     if (item.get("goc") or "") == "qua-tang" and sp.get("qua_tang") and not re.search(r"(?<!\w)(?:tặng|quà)(?!\w)", plain.lower()):
         errs.append("góc quà tặng nhưng lời đọc không nói quà gì")
     return errs

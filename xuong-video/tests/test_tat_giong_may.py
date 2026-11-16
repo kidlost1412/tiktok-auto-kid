@@ -31,7 +31,8 @@ class TatGiongMayTest(unittest.TestCase):
         self.assertEqual(loi("Cây gồng trái mà đói thì buông trái. Vườn nhà mình đang ra sao rồi? Can ở giỏ hàng."), [])
 
     def test_cau_cut(self):
-        self.co(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít nước. Ít mà đủ. Giỏ hàng có sẵn."), "câu cụt")
+        self.co(loi("Pha đậm tay đâu phải là thương cây. Ít mà đủ. Một can pha được ba nghìn lít nước. Thử trước đã. Giỏ hàng có sẵn."), "câu cụt")
+        self.assertEqual(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít. Phun chiều mát. Giỏ hàng có sẵn."), [])  # một câu dặn ngắn là tự nhiên
         self.assertEqual(loi("Đốm lá lan nhanh. Phun sớm thì đỡ mất hạt lắm. Lấy ở giỏ hàng."), [])   # câu mở/câu chốt ngắn được phép
 
     def test_goc_qua_tang_phai_noi_qua(self):
