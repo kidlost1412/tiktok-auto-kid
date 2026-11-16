@@ -37,6 +37,13 @@ class TatGiongMayTest(unittest.TestCase):
         self.assertEqual(loi("Pha đậm tay đâu phải là thương cây. Một can pha được ba nghìn lít nước, xịt chiều mát là được. Giỏ hàng có sẵn."), [])
         self.assertEqual(loi("Đốm lá lan nhanh. Phun sớm thì đỡ mất hạt lắm. Lấy ở giỏ hàng."), [])   # câu mở/câu chốt ngắn được phép
 
+    def test_xung_ho(self):
+        self.co(loi("Năm ngoái tôi tiếc một chai thuốc mà mất đợt tiêu. Can ở giỏ hàng."), "xưng hô")
+        self.co(loi("Vườn bạn đang vàng lá phải không? Can ở giỏ hàng."), "xưng hô")
+        self.co(loi("Anh chị nhớ xịt chiều mát cho cây ăn. Can ở giỏ hàng."), "xưng hô")
+        self.co(loi("Bà con nghe nè. Bà con xịt chiều mát thì cây ăn. Bà con lấy ở giỏ hàng."), "bà con")
+        self.assertEqual(loi("Các bác nghe nè, bạn hàng em lấy hai can rồi. Bà con xịt chiều mát cho cây ăn. Can ở giỏ hàng."), [])
+
     def test_goc_qua_tang_phai_noi_qua(self):
         t = "Luống ớt này tháng trước còn rụng bông, giờ kín trái rồi. Phun chiều mát mười ngày một lượt. Can nằm sẵn ở giỏ hàng nha."
         self.co(loi(t, goc="qua-tang"), "quà tặng")

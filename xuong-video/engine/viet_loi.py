@@ -108,36 +108,36 @@ MO = {   # kiểu câu mở (hook): khoá → (mô tả gửi biên kịch, ví 
          # KHÔNG kể vườn đang bị gì (bà con nghe tới ngán); vấn đề của vườn để xuống thân bài. Nhóm hook: chưa biết · chuyện bỏ lửng · lật niềm tin ·
          # mất mát kiểu mới · người khác đã làm · lời rao viral · đúng người đúng lúc.
     # — mở ra điều người nghe chưa biết
-    'bi_mat_nghe': ('Bí mật người trong nghề: hứa một điều có giá mà ít ai nói ra; người nghe phải nghe hết mới biết.', 'Có một việc dân buôn mai làm… mà ít khi kể ra.'),
-    'cau_do': ('Câu đố cho người nghe tự đoán, đáp án bất ngờ (đáp án là sự thật trong hồ sơ).', 'Bà con đoán thử, một can năm lít này xịt được bao nhiêu bình?'),
-    'vat_la': ('Cầm món đồ lên, chưa nói nó là gì, chỉ nói một điều lạ về nó.', 'Cái can này nhà tôi xài nguyên mùa mà chưa hết.'),
-    'con_so': ('Một con số THẬT trong hồ sơ, nói gọn cho người ta tò mò.', 'Một nắp nhỏ xíu… mà pha được nguyên bình mười sáu lít.'),
+    'bi_mat_nghe': ('Bí mật người trong nghề: hứa một điều có giá mà ít ai nói ra; người nghe phải nghe hết mới biết.', 'Dân buôn mai có một chiêu… mà không ai chịu nói ra!'),
+    'cau_do': ('Câu đố cho người nghe tự đoán, đáp án bất ngờ (đáp án là sự thật trong hồ sơ).', 'Các bác đoán coi, một can này xịt được mấy bình?'),
+    'vat_la': ('Cầm món đồ lên, chưa nói nó là gì, chỉ nói một điều lạ về nó.', 'Cái can này nhà mình xài nguyên mùa… mà chưa hết nữa!'),
+    'con_so': ('Một con số THẬT trong hồ sơ, nói gọn cho người ta tò mò.', 'Có một nắp nhỏ xíu thôi, mà ăn nguyên bình mười sáu lít!'),
     # — câu chuyện bỏ lửng
-    'chuyen_lung': ('Kể một chuyện nhỏ có người thật, dừng ngay chỗ chưa biết kết quả.', 'Ông khách chê em một trận, tuần sau quay lại lấy thêm hai can.'),
-    'noi_thiet': ('Người nói nói thiệt một câu thật lòng, hơi ngược chuyện bán hàng, nên nghe đáng tin.', 'Nói thiệt, cái này em bán mà em cũng không ngờ khách quay lại nhiều vậy.'),
-    'thu_nhan': ('Người nói tự nhận mình từng làm sai.', 'Năm ngoái tôi tiếc một chai thuốc, mất luôn đợt tiêu.'),
-    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đã làm gì.', 'Cái thân mai này ba tuần trước còn phủ rêu xanh.'),
+    'chuyen_lung': ('Kể một chuyện nhỏ có người thật, dừng ngay chỗ chưa biết kết quả.', 'Ông chú này chửi em một trận… tuần sau quay lại ôm hai can!'),
+    'noi_thiet': ('Người nói nói thiệt một câu thật lòng, hơi ngược chuyện bán hàng, nên nghe đáng tin.', 'Nói thiệt với các bác, món này em bán mà em còn bất ngờ!'),
+    'thu_nhan': ('Người nói tự nhận mình từng làm sai.', 'Năm ngoái mình tiếc có một chai thuốc… mà mất trắng đợt tiêu!'),
+    'ket_qua_truoc': ('Cho thấy kết quả trước, rồi mới kể đã làm gì.', 'Các bác nhìn cây mai này đi, ba tuần trước còn đầy rêu đó!'),
     # — lật lại điều ai cũng tin
-    'nghich_ly': ('Một câu nghe vô lý mà đúng, khiến người ta khựng lại; thân bài phải giải thích được.', 'Vườn xịt thuốc nhiều nhất xóm lại hay bệnh nhiều nhất.'),
-    'pha_niem_tin': ('Phủ nhận một điều nhà nông tin lâu nay.', 'Phân hữu cơ đâu cần bón cả bao mới ăn thua.'),
-    'nguoc_tam_ly': ('Nói ngược kiểu "đừng mua nếu…" để người nghe tò mò mình có thuộc nhóm cần không.', 'Đừng mua can này… nếu vườn nhà mình đang ngon.'),
-    'dung_tay': ('Bảo người nghe KHOAN làm việc họ sắp làm.', 'Khoan, đừng xịt thuốc đồng lúc trưa nắng.'),
+    'nghich_ly': ('Một câu nghe vô lý mà đúng, khiến người ta khựng lại; thân bài phải giải thích được.', 'Xịt thuốc càng nhiều… vườn lại càng hay bệnh, lạ không các bác?'),
+    'pha_niem_tin': ('Phủ nhận một điều nhà nông tin lâu nay.', 'Ai nói phân hữu cơ phải bón cả bao mới ăn thua? Sai rồi!'),
+    'nguoc_tam_ly': ('Nói ngược kiểu "đừng mua nếu…" để người nghe tò mò mình có thuộc nhóm cần không.', 'Các bác đừng mua can này… nếu vườn nhà đang ngon!'),
+    'dung_tay': ('Bảo người nghe KHOAN làm việc họ sắp làm.', 'Dừng tay lại các bác ơi, đừng xịt đồng lúc trưa nắng!'),
     # — mất mát, nói kiểu mới (mất tiền, mất công, thua người quen — không kể bệnh)
-    'mat_tien': ('Tiền, công, thuốc đang bị phí mà không biết — thứ bà con xót nhất.', 'Bà con đang đổ tiền phân xuống đất mà cây ăn không hết.'),
-    'hang_xom': ('Thua nhà bên: cùng làm như nhau mà người ta được hơn mình.', 'Cùng một lứa mai, nhà bên bán hết trước Tết, nhà mình còn nguyên sân.'),
-    'mat_mat': ('Một sai nhỏ ai cũng làm, mà hậu quả lớn.', 'Đổ thuốc trước hay đổ nước trước, sai một bước là đóng cặn nguyên bình.'),
+    'mat_tien': ('Tiền, công, thuốc đang bị phí mà không biết — thứ nhà nông xót nhất.', 'Các bác đang đổ tiền phân xuống đất mà không hay đó!'),
+    'hang_xom': ('Thua nhà bên: cùng làm như nhau mà người ta được hơn mình.', 'Cùng lứa mai, nhà bên bán sạch, nhà mình còn nguyên sân!'),
+    'mat_mat': ('Một sai nhỏ ai cũng làm, mà hậu quả lớn.', 'Đổ nước trước hay thuốc trước? Sai một bước là hư nguyên bình!'),
     # — người khác đã làm, lời rao viral
-    'ca_xom': ('Người quanh mình đã xài: chuyện trong xóm, người quen hỏi xin, mua lại.', 'Bà Sáu đầu xóm hỏi tôi xin cái chai này hai lần rồi.'),
+    'ca_xom': ('Người quanh mình đã xài: chuyện trong xóm, người quen hỏi xin, mua lại.', 'Bà Sáu đầu xóm qua xin chai này của mình hai lần rồi đó!'),
     'rao_viral': ('Lời rao viral kiểu dân bán hàng: nói lớn về độ phủ, độ tin dùng để kéo người nghe (đây là HOOK rao hàng; không dùng chữ cấm trong khong_duoc_noi như "số 1", "nhất", "duy nhất").',
-                  'Sáu mươi ba tỉnh thành, sáu mươi hai tỉnh xài can này rồi.'),
+                  'Sáu mươi ba tỉnh, hết sáu mươi hai tỉnh xài can này rồi!'),
     # — gọi đúng người, đúng lúc
-    'goi_dung_nguoi': ('Gọi thẳng đúng nhóm người cần nghe, càng cụ thể càng tốt.', 'Ai trồng sầu riêng mà đang lo mùa nghịch thì nghe kỹ.'),
-    'dung_luc': ('Một mốc mùa vụ thật đang tới gần, lỡ là trễ.', 'Còn hơn tháng nữa là Tết, chậu mai nhà mình kịp sạch rêu không?'),
-    'qua_truoc': ('Mở thẳng bằng món quà có thật trong hồ sơ.', 'Lấy hai can, em tặng thêm một chai nữa.'),
+    'goi_dung_nguoi': ('Gọi thẳng đúng nhóm người cần nghe, càng cụ thể càng tốt.', 'Các bác trồng sầu riêng ơi, nghe kỹ mấy giây này nè!'),
+    'dung_luc': ('Một mốc mùa vụ thật đang tới gần, lỡ là trễ.', 'Còn hơn tháng nữa là Tết rồi các bác ơi, mai sạch rêu chưa?'),
+    'qua_truoc': ('Mở thẳng bằng món quà có thật trong hồ sơ.', 'Các bác lấy hai can, em tặng luôn một chai!'),
     # — mở bằng chuyện của vườn (bà con nghe nhiều rồi: máy giao ít, viết sao cho có chỗ hở)
-    'hoi_dung_noi_lo': ('Câu hỏi chạm nỗi lo ngoài vườn, nhưng phải có chỗ hở khiến người ta muốn nghe đáp án.', 'Mai sắp chưng Tết mà thân còn đầy rêu, làm sao đây?'),
-    'thach_nhin': ('Thách người nghe ra coi lại một chi tiết ở vườn nhà mình.', 'Ra lật mặt dưới lá nhà mình coi, có đốm không?'),
-    'dang_xay_ra': ('Kéo người nghe vào chuyện đang xảy ra ngoài vườn lúc này, nói bằng lời thường.', 'Đọt sầu riêng xoăn hết một hàng rồi bà con ơi.'),
+    'hoi_dung_noi_lo': ('Câu hỏi chạm nỗi lo ngoài vườn, nhưng phải có chỗ hở khiến người ta muốn nghe đáp án.', 'Mai sắp chưng Tết mà thân còn đầy rêu, tính sao đây các bác?'),
+    'thach_nhin': ('Thách người nghe ra coi lại một chi tiết ở vườn nhà mình.', 'Các bác ra lật mặt dưới lá coi liền, có đốm không?'),
+    'dang_xay_ra': ('Kéo người nghe vào chuyện đang xảy ra ngoài vườn lúc này, nói bằng lời thường.', 'Trời đất ơi, đọt sầu riêng xoăn hết một hàng rồi các bác!'),
 }
 _MO_VUON = {"hoi_dung_noi_lo", "thach_nhin", "dang_xay_ra"}     # hook kể chuyện vườn: bà con nghe ngán → hệ số dùng thấp
 THAN = {   # kiểu thân bài (cũng là DANG_BAI: trường `dang` của kịch bản = khoá THAN, thống kê cũ còn chạy)
@@ -149,7 +149,7 @@ THAN = {   # kiểu thân bài (cũng là DANG_BAI: trường `dang` của kịc
     'phep_tinh': 'Một phép tính tiện/đỡ công bằng con số thật (một chai pha bao nhiêu, phun được bao nhiêu) — không nói giá.',
     'tung_buoc': 'Hai hoặc ba bước làm, bước nào cũng thấy được bằng hình.',
     'khach_hoi': 'Kể lại một câu khách hay hỏi rồi trả lời gọn như đang đứng ở quầy.',
-    'soi_nhan': 'Chỉ bà con cách nhận đúng hàng (tên, logo, chữ trên can/chai) như người bán chỉ khách quen; không đọc thông số.',
+    'soi_nhan': 'Chỉ các bác cách nhận đúng hàng (tên, logo, chữ trên can/chai) như người bán chỉ khách quen; không đọc thông số.',
     'dau_hieu': 'Hai ba dấu hiệu nhìn thấy ngoài vườn → cùng một chai xử lý.',
     'khang_dinh': 'Lời khẳng định thương hiệu gọn, chắc, nói thường như người bán quen.',
 }
@@ -164,13 +164,15 @@ CHOT = {   # kiểu câu chốt (bài nào cũng nhắc giỏ hàng MỘT lần,
     'dong_hanh': 'Bên em gửi hàng từ kho, có gì cứ nhắn — rồi chỉ giỏ hàng (chỉ dùng khi hồ sơ cho phép nói "bên em").',
 }
 VAI = {   # người nói: một giọng đọc, đổi CÁCH NÓI (không dùng tag nhập vai)
-    'chu_hang': 'Chủ hàng nói thẳng, xưng "bên em", gọi "bà con/anh chị". Chắc, gọn, có trách nhiệm với món mình bán.',
-    'nha_vuon': 'Người làm vườn từng trải kể chuyện mình, xưng "tôi" hoặc "mình". Từ ngữ ngoài vườn, nói chân chất, câu đủ ý. Chuyện kể được hư cấu; điều nói về sản phẩm phải đúng hồ sơ.',
+    'chu_hang': 'Chủ hàng nói thẳng, xưng "em" hoặc "bên em", gọi "các bác" (thỉnh thoảng "bà con"). Chắc, gọn, có trách nhiệm với món mình bán.',
+    'nha_vuon': 'Người làm vườn từng trải kể chuyện mình, xưng "mình", gọi người nghe "các bác". Từ ngữ ngoài vườn, nói chân chất, câu đủ ý. Chuyện kể được hư cấu; điều nói về sản phẩm phải đúng hồ sơ.',
     'ky_thuat': 'Người làm kỹ thuật giải thích cho dễ hiểu, không xưng hô nhiều. Mỗi câu một ý, có lý do "vì…".',
-    'nguoi_ban_quay': 'Người đứng quầy vật tư kể chuyện khách, xưng "em". Nhanh, thực tế, hay nhắc "khách hỏi…".',
+    'nguoi_ban_quay': 'Người đứng quầy vật tư kể chuyện khách, xưng "em", gọi người nghe "các bác". Nhanh, thực tế, hay nhắc "khách hỏi…".',
     'dan_chuyen': 'Giọng người dẫn bán hàng, không xưng hô. Nói rõ ràng, chắc, dễ nghe; không văn vẻ, không tả cảnh.',
 }
-LUAT_CAU_MO = ('≤ 14 âm tiết; 5 giây đầu là tất cả: hook mạnh, đúng kiểu mở được giao, khiến người đang lướt phải dừng lại nghe tiếp; không mở bằng lời chào, '
+LUAT_CAU_MO = ('≤ 14 âm tiết; 5 giây đầu là tất cả: hook mạnh, đúng kiểu mở được giao, khiến người đang lướt phải dừng lại nghe tiếp; '
+               'có LỰC như người bán đang rao: gọi thẳng "các bác", nói chắc, có cảm xúc (ngạc nhiên, thách, tiếc, khoe), được dùng dấu "!"; '
+               'không khôn mà nhạt, không lịch sự kiểu đọc tin; không mở bằng lời chào, '
                'không mở bằng tên sản phẩm (trừ kiểu qua_truoc, con_so, rao_viral); câu thứ hai trả ngay một phần chỗ hở, không vòng vo.')
 _NHA_VUON_QUAY = {"nha_vuon", "nguoi_ban_quay", "chu_hang"}
 _VAI_HOP = {   # ràng buộc tổ hợp: khoá (mo | than | chot) → các vai được phép
@@ -638,6 +640,14 @@ def tat_giong_may(item, sp, plain, sents):
                 errs.append(f"luật riêng: chưa đọc tên \"{ten[0]}\" trong {m.group(1)} giây đầu")
     if (item.get("goc") or "") == "qua-tang" and sp.get("qua_tang") and not re.search(r"(?<!\w)(?:tặng|quà)(?!\w)", plain.lower()):
         errs.append("góc quà tặng nhưng lời đọc không nói quà gì")
+    # xưng hô với nhà nông: gọi "các bác", "bà con" thỉnh thoảng; không "tôi", "bạn", "anh chị" (nghe như quảng cáo thành phố)
+    low = plain.lower()
+    xa = sorted({m.group(0) for m in re.finditer(r"(?<!\w)(?:tôi|anh chị|bạn(?!\w)(?!\s+(?:hàng|bè)))(?!\w)", low)})
+    if xa:
+        errs.append(f"xưng hô '{', '.join(xa)}' nghe xa lạ — gọi \"các bác\", người kể xưng \"mình\"/\"em\"")
+    n_bc = len(re.findall(r"(?<!\w)bà con(?!\w)", low))
+    if n_bc > 2:
+        errs.append(f"{n_bc} lần \"bà con\" (tối đa 2, còn lại gọi \"các bác\")")
     return errs
 
 

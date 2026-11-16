@@ -163,7 +163,7 @@ class DeBaiTest(Nen):
         for k in ("nghich_ly", "dung_tay", "ba_sai_lam", "kip_luc", "chu_hang"):
             self.assertNotIn(vl.MO[k][0] if k in vl.MO else (vl.THAN.get(k) or vl.CHOT.get(k) or vl.VAI[k]), p)
         self.assertIn('bai[0]: góc = rua-vuon (Rửa vườn sau thu hoạch (cà phê): đúng lúc, đúng việc.)', p)
-        self.assertIn('(ví dụ cấu trúc, KHÔNG chép: "Đổ thuốc trước hay đổ nước trước, sai một bước là đóng cặn nguyên bình.")', p)
+        self.assertIn('(ví dụ cấu trúc, KHÔNG chép: "Đổ nước trước hay thuốc trước? Sai một bước là hư nguyên bình!")', p)
         self.assertIn("Luật câu mở: ≤ 14 âm tiết", p)
         self.assertNotIn("goc_ban", p); self.assertNotIn("cat_khung_ly_do", p); self.assertNotIn("thoi_luong", p)
         self.assertNotIn("CAU-DA-DUNG-SENTINEL", p)                              # 150 câu đã dùng không còn gửi
