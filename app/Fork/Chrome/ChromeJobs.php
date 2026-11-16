@@ -570,7 +570,7 @@ final class ChromeJobs
             case 'revoked':
                 return new ChromeOutcome(false, false, $j->note ?: self::CANCEL_TEXT);
             case 'failed':
-                return new ChromeOutcome(false, false, 'Chrome báo lỗi, chưa đăng: '.($reason !== '' ? $reason : 'failed').($detail !== '' ? ': '.$detail : ''));
+                return new ChromeOutcome(false, false, FailureReasons::forJob($j, \App\Models\Post::query()->whereKey($j->post_id)->first()?->meta['fork_shop_product_name'] ?? null)['title'].' — chưa đăng gì');
             default:
                 return new ChromeOutcome(false, false, 'Đang chờ Chrome đăng bài…');
         }
