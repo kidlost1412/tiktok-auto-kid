@@ -287,6 +287,50 @@ def huy_cuoc_tro_chuyen(cid):
     return a is not None or b is not None
 
 
+def _dir_cuoc_tro_chuyen():
+    return NHA / ".gemini" / "antigravity"
+
+
+def _xoa_file_cuoc(cid):
+    """Cách dự phòng khi Antigravity đã đóng: xoá ĐÚNG file của cuộc `cid` (conversations/<cid>.db và brain/<cid>), không đụng gì khác. → True nếu còn sót gì đó đã xoá."""
+    import re
+    if not re.fullmatch(r"[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", str(cid or "")):
+        return False
+    g = _dir_cuoc_tro_chuyen(); da = False
+    for f in (g / "conversations" / f"{cid}.db", g / "conversations" / f"{cid}.db-wal", g / "conversations" / f"{cid}.db-shm"):
+        try:
+            f.unlink(); da = True
+        except OSError:
+            pass
+    try:
+        b = g / "brain" / str(cid)
+        if b.is_dir():
+            shutil.rmtree(b); da = True
+    except OSError:
+        pass
+    return da
+
+
+def xoa_cuoc_tro_chuyen(cid):
+    """XOÁ hẳn cuộc trò chuyện `cid` khỏi Antigravity (để không chất đống chat). Dừng nó trước, rồi gọi RPC DeleteCascadeTrajectory {cascadeId}
+    (đã thử thật: xoá luôn conversations/<cid>.db và brain/<cid>). RPC không gọi được mà Antigravity đã đóng thì xoá file của đúng cuộc đó.
+    Cố gắng hết sức, KHÔNG ném lỗi. → True nếu đã xoá/gọi xoá được."""
+    if not cid:
+        return False
+    try:
+        try:
+            huy_cuoc_tro_chuyen(cid)
+        except Exception:
+            pass
+        if _goi_ls("DeleteCascadeTrajectory", {"cascadeId": str(cid)}) is not None:
+            return True
+        if tim_hub() is None:
+            return _xoa_file_cuoc(cid)
+    except Exception:
+        pass
+    return False
+
+
 def gui_hoi(model, prompt, tieu_de, project=None):
     """Mở 1 cuộc trò chuyện mới ở Antigravity → conversationId."""
     rc, out, err = _agentapi("new-conversation", f"--model={model}", f"--title={tieu_de}", prompt, project=project)
@@ -468,13 +512,14 @@ def loi_nhac_lo(viec):
 
 # ----------------------------------------------------------------------------------------------- 1 cuộc trò chuyện = 1 lô: gửi + chờ từng file (có thể thay bằng giả khi thử)
 def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=None, project=None, han_moi_video=HAN_MOI_VIDEO_S,
-            huy=None, huy_cuoc=None):
+            huy=None, huy_cuoc=None, xoa_cuoc=None):
     """Gửi 1 lần cho Antigravity rồi chờ MỖI file trong `outs` xuất hiện và ổn định (kích thước không đổi 2 lần kiểm liền).
     Mỗi file xong thì gọi khi_co(path, nội dung chữ) ngay. Quá hạn (= han_moi_video × số video, tối đa HAN_LO_TOI_DA_S) thì thôi.
     Anh bấm Dừng (`huy` được đặt) → huỷ ngay cuộc trò chuyện ở Antigravity, xoá file đầu ra dở dang, trả về phần đã xong. Quá hạn cũng huỷ.
     → danh sách path đã nhận được."""
     run = _run_hien()
     huy = huy or run["huy"]
+    xoa_cuoc = xoa_cuoc or (xoa_cuoc_tro_chuyen if (huy_cuoc is None and gui is gui_hoi) else None)     # thử với gui/huy giả thì không xoá chat thật
     huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
     ngu = ngu or (lambda giay: huy.wait(giay))
     outs = [Path(o) for o in outs]
@@ -531,18 +576,24 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
             except Exception:
                 pass
         if cid:
+            if xoa_cuoc:                                     # xong việc (đủ hay thiếu): xoá chat để Antigravity không chất đống
+                try:
+                    xoa_cuoc(cid)
+                except Exception:
+                    pass
             with _RUN_LOCK:
                 run["conv"].discard(cid)
             _luu()
     return xong
 
 
-def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy_cuoc=None, ngu=None, huy=None, tieu_de="Giám khảo"):
+def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy_cuoc=None, ngu=None, huy=None, tieu_de="Giám khảo", xoa_cuoc=None):
     """Hỏi Antigravity MỘT câu rồi chờ 1 file kết quả (JSON do AI ghi ra `out_file`) — dùng cho tiến trình KHÔNG thuộc việc học nào (vd. lô sản xuất
     chấm video). KHÔNG đụng job/run của Học cảnh và KHÔNG ghi hoc-canh-job.json (file đó của tiến trình hub). Chờ file có chữ và ổn định 2 lần kiểm
-    liền (kích thước không đổi). Luôn huỷ cuộc trò chuyện sau khi xong/quá hạn và xoá file kết quả. → nội dung chữ của file.
+    liền (kích thước không đổi). Luôn huỷ rồi XOÁ cuộc trò chuyện sau khi xong/lỗi/quá hạn (xoa_cuoc_tro_chuyen) và xoá file kết quả. → nội dung chữ của file.
     Lỗi: ChuaMo (Antigravity chưa mở), LoiTam (không nhận việc / quá hạn `han` giây), Huy (`huy` được đặt)."""
     huy = huy or threading.Event()
+    xoa_cuoc = xoa_cuoc or (xoa_cuoc_tro_chuyen if (huy_cuoc is None and gui is gui_hoi) else None)
     huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
     ngu = ngu or (lambda giay: huy.wait(giay))
     out = Path(out_file)
@@ -584,6 +635,11 @@ def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy
                 huy_cuoc(cid)
             except Exception:
                 pass
+            if xoa_cuoc:                                     # chấm xong / lỗi / quá hạn: xoá hẳn chat, lỗi xoá không làm hỏng việc chấm
+                try:
+                    xoa_cuoc(cid)
+                except Exception:
+                    pass
         don()
 
 
