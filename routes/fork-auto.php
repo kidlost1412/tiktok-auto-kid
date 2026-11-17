@@ -79,6 +79,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::post('thu-muc', [RiengController::class, 'addFolder'])->middleware('throttle:30,1')->name('folders.add');
         Route::post('chon-thu-muc', [RiengController::class, 'pickFolder'])->middleware('throttle:20,1')->name('folders.pick');
         Route::post('chon-thu-muc/ket-qua', [RiengController::class, 'pickFolderResult'])->middleware('throttle:120,1')->name('folders.pick.result');
+        Route::delete('video/{video}', [RiengController::class, 'forgetVideo'])->whereNumber('video')->middleware('throttle:60,1')->name('video.forget');
         Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
         Route::patch('thu-muc/{folder}', [RiengController::class, 'renameFolder'])->whereNumber('folder')->name('folders.rename');
         Route::post('thu-muc/{folder}/mo', [RiengController::class, 'openFolder'])->whereNumber('folder')->middleware('throttle:30,1')->name('folders.open');
@@ -102,6 +103,8 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::get('tu-dong', [RiengAutoController::class, 'show'])->name('auto.show');
         Route::patch('tu-dong', [RiengAutoController::class, 'update'])->middleware('throttle:60,1')->name('auto.update');
         Route::post('tu-dong/codex-cli', [RiengAutoController::class, 'installCli'])->middleware('throttle:6,1')->name('auto.codex.install');
+        Route::get('tu-dong/ai-trang-thai', [RiengAutoController::class, 'aiStatus'])->name('auto.rieng.ai.status');
+        Route::post('tu-dong/ai-chay-ngay', [RiengAutoController::class, 'aiRunNow'])->middleware('throttle:10,1')->name('auto.rieng.ai.run');
         Route::post('tu-dong/ai-thu-lai', [RiengAutoController::class, 'retryAi'])->middleware('throttle:10,1')->name('auto.rieng.ai.retry');
         Route::post('tu-dong/chatgpt', [RiengAutoController::class, 'addChatGpt'])->middleware('throttle:10,1')->name('auto.chatgpt.add');
         Route::get('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'chatGptStatus'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.status');

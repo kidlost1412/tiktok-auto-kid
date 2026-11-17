@@ -37,6 +37,7 @@ import {
     type RiengVideo,
     xsrf,
 } from '@/components/fork/kho/rieng';
+import RiengAiStatus from '@/components/fork/kho/RiengAiStatus.vue';
 import RiengAutoDialog from '@/components/fork/kho/RiengAutoDialog.vue';
 import RiengAutoEdit from '@/components/fork/kho/RiengAutoEdit.vue';
 import RiengCard from '@/components/fork/kho/RiengCard.vue';
@@ -1003,6 +1004,12 @@ const onAutoSaved = (id: number, a: RiengAuto) => {
     reloadVideos();
 };
 
+// Thẻ "Mất file" (ổ rời chưa cắm...): anh bỏ hẳn video khỏi danh sách. File không bị đụng tới.
+const forgetVideo = (v: RiengVideo) => {
+    busy.value = 'quet';
+    router.delete(`/auto/kho/rieng/video/${v.id}`, mk('quet'));
+};
+
 const retry = (v: RiengVideo) =>
     router.post(`/auto/videos/${v.id}/thu-lai`, {}, mk('xem'));
 
@@ -1290,6 +1297,12 @@ defineExpose({ scan, busy });
             >
         </section>
 
+        <RiengAiStatus
+            v-if="folders.length"
+            @changed="reloadVideos"
+            @settings="autoOpen = true"
+        />
+
         <RiengUploadDialog
             v-model:open="uploadOpen"
             :folders="folders"
@@ -1486,6 +1499,7 @@ defineExpose({ scan, busy });
                 @queue="toggleQueue(v.id)"
                 @retry="retry(v)"
                 @auto="openAutoEdit(v)"
+                @forget="forgetVideo(v)"
             />
         </section>
 

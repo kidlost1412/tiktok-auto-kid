@@ -112,8 +112,13 @@ class RiengAutoPoster
         }
 
         if (! filled($v->product_code)) {
+            $retryAt = (string) ($ai['next_try_at'] ?? '');
+
             return match ($ai['state'] ?? null) {
-                null, 'error' => 'Chờ AI xem video',
+                null => 'Chờ AI xem video',
+                'error' => (int) ($ai['tries'] ?? 0) > 0 && $retryAt > $now->utc()->toIso8601String()
+                    ? 'AI chưa xem được, thử lại lúc '.RiengAiStatus::clock($retryAt, $now)
+                    : 'Chờ AI xem lại video',
                 'gave_up' => 'AI không xem được, anh chọn sản phẩm',
                 default => 'Anh chọn sản phẩm',
             };

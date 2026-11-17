@@ -75,6 +75,8 @@ export interface RiengVideo {
     duration: number | null;
     status: string;
     gone: boolean;
+    /** "thư mục / đường dẫn cũ" khi app vừa thấy anh dời file sang chỗ khác (3 ngày). */
+    moved_from?: string | null;
     channel: string | null;
     scheduled_for: string | null;
     posted_at: string | null;
@@ -226,6 +228,34 @@ export const xsrf = (): string =>
 /**
  * Gọi JSON tới máy chủ với method bất kỳ; trả { ok, data } (data là JSON trả về kể cả khi máy chủ báo lỗi 422).
  */
+/** Dòng trạng thái "AI xem video" (GET /auto/kho/rieng/tu-dong/ai-trang-thai). */
+export interface AiStatus {
+    tone: 'info' | 'warn' | 'success';
+    title: string;
+    detail: string | null;
+    fix?: 'settings';
+    can_run: boolean;
+    running: {
+        id: number;
+        file_name: string;
+        buoc: number;
+        tong: number;
+        viec: string;
+    } | null;
+    queued: number;
+    waiting: number;
+    next_try_at: string | null;
+    last_error: string | null;
+    gave_up: number;
+    unsure: number;
+    last_run: {
+        luc: string;
+        dang?: boolean;
+        note?: string;
+        video?: number;
+    } | null;
+}
+
 export async function callJson<T = Record<string, unknown>>(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     url: string,
