@@ -18,6 +18,7 @@ use App\Fork\AutoPost\Rieng\RiengCoverMemory;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengInfo;
+use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Rieng\RiengQueueItem;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
@@ -112,6 +113,7 @@ final class RiengController extends Controller
                     'path' => str_replace('/', '\\', (string) $f->path),
                     'exists' => is_dir((string) $f->path),
                     'count' => (int) ($folderCounts[(string) $f->id] ?? 0),
+                    'music' => RiengMusic::settings($f),
                 ])->values()->all();
             },
             'filters' => ['folder' => $folderId, 'status' => $status, 'day' => $day],
@@ -299,6 +301,11 @@ final class RiengController extends Controller
         $start = is_string($last) && $last !== '' ? dirname(str_replace('/', '\\', $last)) : '';
         $body = ['tieu_de' => 'Chọn thư mục chứa video của bạn'];
 
+        if ($request->input('muc_dich') === 'nhac') {
+            $body['tieu_de'] = 'Chọn thư mục chứa nhạc để ghép vào video';
+            $start = '';
+        }
+
         if ($start !== '' && is_dir($start)) {
             $body['bat_dau'] = $start;
         }
@@ -414,6 +421,42 @@ final class RiengController extends Controller
         $folder->forceFill(['name' => $name !== '' ? $name : null])->save();
 
         return response()->json(['ok' => true, 'name' => $folder->displayName()]);
+    }
+
+    /** Lưu cài đặt "Ghép nhạc" của thư mục video: bật/tắt, thư mục nhạc, thay hẳn hay trộn, mức giảm dB của nhạc. */
+    public function saveMusic(Request $request, RiengFolder $folder, RiengMusic $music): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'dir' => ['nullable', 'string', 'max:500'],
+            'mode' => ['required', 'in:'.RiengMusic::MODE_REPLACE.','.RiengMusic::MODE_MIX],
+            'gain_db' => ['required', 'integer', 'between:-40,0'],
+        ]);
+        $dir = trim((string) ($data['dir'] ?? ''));
+        $tracks = $dir !== '' ? count($music->tracks($dir)) : 0;
+
+        if ($data['enabled'] && $tracks === 0) {
+            return response()->json(['ok' => false, 'error' => $dir === '' ? 'Chưa chọn thư mục nhạc.' : 'Thư mục nhạc này không có bài nào (mp3, m4a, wav...).'], 422);
+        }
+
+        $folder->forceFill(['music' => [
+            'enabled' => (bool) $data['enabled'],
+            'dir' => $dir !== '' ? $dir : null,
+            'mode' => $data['mode'],
+            'gain_db' => (int) $data['gain_db'],
+        ]])->save();
+
+        return response()->json(['ok' => true, 'music' => RiengMusic::settings($folder), 'tracks' => $tracks]);
+    }
+
+    /** Đếm số bài nhạc trong một thư mục (hộp Ghép nhạc hiện "có N bài"). */
+    public function countMusic(Request $request, RiengMusic $music): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $data = $request->validate(['dir' => ['required', 'string', 'max:500']]);
+
+        return response()->json(['ok' => true, 'tracks' => count($music->tracks(trim($data['dir'])))]);
     }
 
     /** Mở thư mục trong File Explorer của máy. */

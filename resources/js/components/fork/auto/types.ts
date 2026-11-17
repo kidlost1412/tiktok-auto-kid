@@ -34,6 +34,8 @@ export interface AccountRow {
     daily_cap: number;
     /** Hẹn trước bao nhiêu ngày (1-9). Bản server cũ chưa gửi thì coi là 3. */
     schedule_ahead_days?: number;
+    /** Nguồn video: Xưởng + Kho riêng / chỉ Kho riêng / chỉ Xưởng. */
+    video_source?: 'both' | 'rieng' | 'hub';
     window_start: number;
     window_end: number;
     mode: 'explore' | 'optimized';

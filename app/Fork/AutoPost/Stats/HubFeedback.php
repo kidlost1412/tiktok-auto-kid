@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Fork\AutoPost\Stats;
 
 use App\Fork\AutoPost\Models\AutoVideo;
-use App\Models\SocialAccount;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Sidecar;
+use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 
 /**
@@ -91,7 +92,7 @@ final class HubFeedback
         foreach ($videos as $v) {
             $s = (array) ($v->stats ?? []);
             $account = $accounts[$v->social_account_id] ?? null;
-            $tz = $account?->timezone ?: 'Asia/Ho_Chi_Minh';
+            $tz = Planner::zone()->getName();
             $rows[] = [
                 $v->file_name,
                 (string) ($account?->username ?? ''),

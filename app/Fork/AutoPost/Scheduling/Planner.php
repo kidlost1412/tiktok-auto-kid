@@ -312,14 +312,21 @@ final class Planner
 
         foreach ($slots as $slot) {
             // Kho riêng tự đăng theo khung: video riêng sẵn sàng được ưu tiên trước video Xưởng.
-            try {
-                if ($rieng->postNext($social, $cart['allowed'], $slot, $now)) {
-                    $created++;
+            if ($auto->usesRieng()) {
+                try {
+                    if ($rieng->postNext($social, $cart['allowed'], $slot, $now)) {
+                        $created++;
 
-                    continue;
+                        continue;
+                    }
+                } catch (Throwable $e) {
+                    report($e);
                 }
-            } catch (Throwable $e) {
-                report($e);
+            }
+
+            // Kênh "Chỉ Kho riêng": không lấy video Xưởng, trọn số bài/ngày dành cho video riêng.
+            if (! $auto->usesHub()) {
+                return ['created' => $created, 'failed' => $failed, 'skipped' => $created === 0 ? 'kênh chỉ đăng Kho riêng, chưa có video riêng sẵn sàng' : null];
             }
 
             $video = $this->library->reserveClaimed($social, $cart['allowed'], $slot);
@@ -480,12 +487,19 @@ final class Planner
 
     // ---------------------------------------------------------------- Dữ liệu đã có
 
-    public function timezoneFor(AutoAccount $a): DateTimeZone
+    /**
+     * Múi giờ tính khung giờ đăng: luôn giờ Việt Nam (chỉnh được bằng fork.auto.timezone).
+     * KHÔNG lấy múi giờ lưu trên kênh: máy cài mới có kênh lưu "UTC", làm khung 05–23 thành 12h trưa–6h sáng giờ Việt Nam.
+     */
+    public function timezoneFor(?AutoAccount $a = null): DateTimeZone
     {
-        $name = SocialAccount::query()->whereKey($a->social_account_id)->value('timezone');
+        return self::zone();
+    }
 
+    public static function zone(): DateTimeZone
+    {
         try {
-            return new DateTimeZone(filled($name) ? (string) $name : self::DEFAULT_TIMEZONE);
+            return new DateTimeZone((string) (config('fork.auto.timezone') ?: self::DEFAULT_TIMEZONE));
         } catch (Throwable) {
             return new DateTimeZone(self::DEFAULT_TIMEZONE);
         }

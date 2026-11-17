@@ -47,8 +47,6 @@ final class AutoController extends Controller
 {
     use ScopesToOwner;
 
-    private const string DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
-
     public function index(Request $request): Response
     {
         $accountId = $this->authorizeOwner($request);
@@ -96,7 +94,7 @@ final class AutoController extends Controller
                     'id' => $a->id,
                     'username' => $a->username,
                     'display_name' => $a->display_name,
-                    'timezone' => $a->timezone ?: self::DEFAULT_TZ,
+                    'timezone' => Planner::zone()->getName(),
                     'avatar_url' => $a->avatar_url,
                     'chrome_enabled' => (bool) ($chrome[$a->id] ?? false),
                     'enabled' => (bool) ($auto?->enabled ?? false),
@@ -105,6 +103,7 @@ final class AutoController extends Controller
                     'window_start' => (int) ($auto?->window_start ?? 6),
                     'window_end' => (int) ($auto?->window_end ?? 23),
                     'mode' => (string) ($auto?->mode ?? AutoAccount::EXPLORE),
+                    'video_source' => $auto?->videoSource() ?? AutoAccount::SOURCE_BOTH,
                     'preferred_hours' => array_values((array) ($auto?->preferred_hours ?? [])),
                     'explore_ratio' => (float) ($auto?->explore_ratio ?? 0.2),
                     'paused_reason' => $auto?->paused_reason,
@@ -174,6 +173,7 @@ final class AutoController extends Controller
             'window_end' => ['sometimes', 'integer', 'min:1', 'max:24'],
             'mode' => ['sometimes', 'in:explore,optimized'],
             'explore_ratio' => ['sometimes', 'numeric', 'min:0', 'max:1'],
+            'video_source' => ['sometimes', 'in:'.implode(',', AutoAccount::SOURCES)],
         ]);
 
         $auto = AutoAccount::query()->find($account->id);
@@ -384,7 +384,7 @@ final class AutoController extends Controller
     {
         $failures = collect($failedPosts)->keyBy('id');
         $now = CarbonImmutable::now();
-        $firstTz = $accounts->first()?->timezone ?: self::DEFAULT_TZ;
+        $firstTz = Planner::zone()->getName();
         $labels = ['Hôm nay', 'Ngày mai', 'Ngày kia'];
         $days = [];
 
@@ -398,7 +398,7 @@ final class AutoController extends Controller
         $channels = [];
 
         foreach ($accounts as $a) {
-            $tz = $a->timezone ?: self::DEFAULT_TZ;
+            $tz = Planner::zone()->getName();
             $start = $now->setTimezone($tz)->startOfDay();
             $end = $start->addDays(count($labels));
             $auto = $autoAccounts[$a->id] ?? null;
@@ -637,7 +637,7 @@ final class AutoController extends Controller
      */
     private function trend($accounts): array
     {
-        $tz = $accounts->first()?->timezone ?: self::DEFAULT_TZ;
+        $tz = Planner::zone()->getName();
         $start = CarbonImmutable::now($tz)->startOfDay()->subDays(6);
 
         $byDay = AutoVideo::query()

@@ -8,7 +8,14 @@ import { computed, reactive, ref, watch } from 'vue';
 import type { AccountRow } from '@/components/fork/auto/types';
 import { fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
@@ -24,6 +31,7 @@ interface Draft {
     window_end: number;
     schedule_ahead_days: number;
     mode: 'explore' | 'optimized';
+    video_source: 'both' | 'rieng' | 'hub';
 }
 
 const fromAccount = (): Draft => ({
@@ -32,6 +40,7 @@ const fromAccount = (): Draft => ({
     window_end: props.account.window_end,
     schedule_ahead_days: props.account.schedule_ahead_days ?? 3,
     mode: props.account.mode,
+    video_source: props.account.video_source ?? 'both',
 });
 
 const draft = reactive<Draft>(fromAccount());
@@ -50,7 +59,12 @@ const dirty = computed(() => {
 });
 
 const windowBad = computed(() => draft.window_end <= draft.window_start);
-const capBad = computed(() => !Number.isFinite(draft.daily_cap) || draft.daily_cap < 1 || draft.daily_cap > 100);
+const capBad = computed(
+    () =>
+        !Number.isFinite(draft.daily_cap) ||
+        draft.daily_cap < 1 ||
+        draft.daily_cap > 100,
+);
 
 const hours = Array.from({ length: 24 }, (_, i) => i);
 const ends = hours.slice(1).concat(24);
@@ -64,7 +78,11 @@ const save = () => {
     }
 
     const a = fromAccount();
-    const changed = Object.fromEntries((Object.keys(a) as (keyof Draft)[]).filter((k) => a[k] !== draft[k]).map((k) => [k, draft[k]]));
+    const changed = Object.fromEntries(
+        (Object.keys(a) as (keyof Draft)[])
+            .filter((k) => a[k] !== draft[k])
+            .map((k) => [k, draft[k]]),
+    );
     busy.value = true;
     router.patch(`/auto/accounts/${props.account.id}`, changed, {
         preserveScroll: true,
@@ -84,19 +102,31 @@ const save = () => {
 
 const applyHours = () => {
     busy.value = true;
-    router.post(`/auto/accounts/${props.account.id}/apply-hours`, {}, {
-        preserveScroll: true,
-        ...(props.inPlace ? { preserveState: true } : {}),
-        onSuccess: () => {
-            if (props.inPlace) {
-                emit('changed');
-            }
+    router.post(
+        `/auto/accounts/${props.account.id}/apply-hours`,
+        {},
+        {
+            preserveScroll: true,
+            ...(props.inPlace ? { preserveState: true } : {}),
+            onSuccess: () => {
+                if (props.inPlace) {
+                    emit('changed');
+                }
+            },
+            onFinish: () => {
+                busy.value = false;
+            },
         },
-        onFinish: () => {
-            busy.value = false;
-        },
-    });
+    );
 };
+
+const sourceHint = computed(() =>
+    draft.video_source === 'rieng'
+        ? `Cả ${draft.daily_cap || 0} bài/ngày dành cho video Kho riêng; app không lấy video Xưởng cho kênh này. Bài Xưởng đã hẹn trước đó vẫn giữ.`
+        : draft.video_source === 'hub'
+          ? 'Chỉ đăng video Xưởng tự tạo; Kho riêng tự đăng bỏ qua kênh này (vẫn tự rải lịch Kho riêng bằng tay được).'
+          : 'Video Kho riêng sẵn sàng được đăng trước, chỗ còn lại lấy video Xưởng.',
+);
 
 const rec = computed(() => props.account.recommendation);
 const fieldCls = 'flex flex-col gap-1.5 text-sm';
@@ -105,10 +135,20 @@ const labelCls = 'font-medium text-foreground';
 
 <template>
     <Dialog v-model:open="open">
-        <DialogContent class="sm:max-w-[560px]" :data-testid="`fork-auto-settings-${account.id}`">
+        <DialogContent
+            class="sm:max-w-[560px]"
+            :data-testid="`fork-auto-settings-${account.id}`"
+        >
             <DialogHeader>
-                <DialogTitle>Chỉnh kênh @{{ account.username ?? account.display_name ?? '—' }}</DialogTitle>
-                <DialogDescription>Thay đổi áp dụng cho các lần xếp lịch tiếp theo; bài đã hẹn giữ nguyên giờ.</DialogDescription>
+                <DialogTitle
+                    >Chỉnh kênh @{{
+                        account.username ?? account.display_name ?? '—'
+                    }}</DialogTitle
+                >
+                <DialogDescription
+                    >Thay đổi áp dụng cho các lần xếp lịch tiếp theo; bài đã hẹn
+                    giữ nguyên giờ.</DialogDescription
+                >
             </DialogHeader>
 
             <div class="grid gap-5">
@@ -123,43 +163,124 @@ const labelCls = 'font-medium text-foreground';
                             inputmode="numeric"
                             :aria-invalid="capBad || undefined"
                         />
-                        <span v-if="capBad" :class="cn('text-xs', toneClasses.danger.text)">Từ 1 đến 100 bài.</span>
+                        <span
+                            v-if="capBad"
+                            :class="cn('text-xs', toneClasses.danger.text)"
+                            >Từ 1 đến 100 bài.</span
+                        >
                     </label>
                     <label :class="fieldCls">
-                        <span :class="cn(labelCls, 'flex items-center gap-1.5')"><IconCalendarClock class="size-4 text-muted-foreground" />Hẹn trước</span>
-                        <NativeSelect v-model.number="draft.schedule_ahead_days" class="w-full" :data-testid="`fork-auto-ahead-${account.id}`">
-                            <option v-for="d in aheads" :key="d" :value="d">{{ d }} ngày</option>
+                        <span :class="cn(labelCls, 'flex items-center gap-1.5')"
+                            ><IconCalendarClock
+                                class="size-4 text-muted-foreground"
+                            />Hẹn trước</span
+                        >
+                        <NativeSelect
+                            v-model.number="draft.schedule_ahead_days"
+                            class="w-full"
+                            :data-testid="`fork-auto-ahead-${account.id}`"
+                        >
+                            <option v-for="d in aheads" :key="d" :value="d">
+                                {{ d }} ngày
+                            </option>
                         </NativeSelect>
                     </label>
                     <label :class="fieldCls">
                         <span :class="labelCls">Đăng từ</span>
-                        <NativeSelect v-model.number="draft.window_start" class="w-full">
-                            <option v-for="h in hours" :key="h" :value="h">{{ String(h).padStart(2, '0') }}:00</option>
+                        <NativeSelect
+                            v-model.number="draft.window_start"
+                            class="w-full"
+                        >
+                            <option v-for="h in hours" :key="h" :value="h">
+                                {{ String(h).padStart(2, '0') }}:00
+                            </option>
                         </NativeSelect>
                     </label>
                     <label :class="fieldCls">
                         <span :class="labelCls">Đến</span>
-                        <NativeSelect v-model.number="draft.window_end" class="w-full" :aria-invalid="windowBad || undefined">
-                            <option v-for="h in ends" :key="h" :value="h">{{ h === 24 ? '24:00' : `${String(h).padStart(2, '0')}:00` }}</option>
+                        <NativeSelect
+                            v-model.number="draft.window_end"
+                            class="w-full"
+                            :aria-invalid="windowBad || undefined"
+                        >
+                            <option v-for="h in ends" :key="h" :value="h">
+                                {{
+                                    h === 24
+                                        ? '24:00'
+                                        : `${String(h).padStart(2, '0')}:00`
+                                }}
+                            </option>
                         </NativeSelect>
                     </label>
-                    <p v-if="windowBad" :class="cn('col-span-2 -mt-2 text-xs', toneClasses.danger.text)">Giờ kết thúc phải sau giờ bắt đầu.</p>
+                    <p
+                        v-if="windowBad"
+                        :class="
+                            cn(
+                                'col-span-2 -mt-2 text-xs',
+                                toneClasses.danger.text,
+                            )
+                        "
+                    >
+                        Giờ kết thúc phải sau giờ bắt đầu.
+                    </p>
                 </div>
 
-                <p :class="cn('rounded-xl border px-4 py-3 text-[0.8125rem] leading-relaxed', toneClasses.info.box)" data-testid="fork-auto-ahead-hint">
-                    Có video là app hẹn sẵn lên TikTok cho <b>{{ draft.schedule_ahead_days }} ngày tới</b> — tắt máy vẫn đăng đúng giờ.
+                <label :class="fieldCls">
+                    <span :class="labelCls">Nguồn video</span>
+                    <NativeSelect
+                        v-model="draft.video_source"
+                        class="w-full"
+                        :data-testid="`fork-auto-source-${account.id}`"
+                    >
+                        <option value="both">
+                            Xưởng + Kho riêng (Kho riêng ưu tiên trước)
+                        </option>
+                        <option value="rieng">Chỉ Kho riêng</option>
+                        <option value="hub">Chỉ Xưởng (video tự tạo)</option>
+                    </NativeSelect>
+                    <span class="text-xs text-muted-foreground">{{
+                        sourceHint
+                    }}</span>
+                </label>
+
+                <p
+                    :class="
+                        cn(
+                            'rounded-xl border px-4 py-3 text-[0.8125rem] leading-relaxed',
+                            toneClasses.info.box,
+                        )
+                    "
+                    data-testid="fork-auto-ahead-hint"
+                >
+                    Có video là app hẹn sẵn lên TikTok cho
+                    <b>{{ draft.schedule_ahead_days }} ngày tới</b> — tắt máy
+                    vẫn đăng đúng giờ.
                 </p>
 
-                <div class="grid gap-3 rounded-xl border bg-muted/40 p-4" data-testid="fork-auto-recommend">
+                <div
+                    class="grid gap-3 rounded-xl border bg-muted/40 p-4"
+                    data-testid="fork-auto-recommend"
+                >
                     <label :class="fieldCls">
-                        <span :class="cn(labelCls, 'flex items-center gap-1.5')"><IconSparkles class="size-4 text-muted-foreground" />Chọn giờ đăng</span>
+                        <span :class="cn(labelCls, 'flex items-center gap-1.5')"
+                            ><IconSparkles
+                                class="size-4 text-muted-foreground"
+                            />Chọn giờ đăng</span
+                        >
                         <NativeSelect v-model="draft.mode" class="w-full">
-                            <option value="explore">Thăm dò — rải đều, thử nhiều giờ khác nhau</option>
-                            <option value="optimized">Tối ưu — ưu tiên giờ có nhiều lượt xem</option>
+                            <option value="explore">
+                                Thăm dò — rải đều, thử nhiều giờ khác nhau
+                            </option>
+                            <option value="optimized">
+                                Tối ưu — ưu tiên giờ có nhiều lượt xem
+                            </option>
                         </NativeSelect>
                     </label>
                     <template v-if="rec?.hours?.length">
-                        <div class="text-[0.8125rem] text-muted-foreground">Giờ có lượt xem cao ({{ rec.videos }} bài, {{ rec.days }} ngày):</div>
+                        <div class="text-[0.8125rem] text-muted-foreground">
+                            Giờ có lượt xem cao ({{ rec.videos }} bài,
+                            {{ rec.days }} ngày):
+                        </div>
                         <ul class="flex flex-wrap gap-1.5">
                             <li
                                 v-for="h in rec.hours"
@@ -168,25 +289,59 @@ const labelCls = 'font-medium text-foreground';
                                 :title="`${fmtNum(h.avg_views)} lượt xem trung bình, ${h.samples} bài`"
                             >
                                 <b>{{ h.hour }}h</b>
-                                <span :class="h.delta_pct >= 0 ? toneClasses.success.text : toneClasses.danger.text">
-                                    {{ h.delta_pct > 0 ? '+' : '' }}{{ h.delta_pct }}%</span
+                                <span
+                                    :class="
+                                        h.delta_pct >= 0
+                                            ? toneClasses.success.text
+                                            : toneClasses.danger.text
+                                    "
+                                >
+                                    {{ h.delta_pct > 0 ? '+' : ''
+                                    }}{{ h.delta_pct }}%</span
                                 >
                             </li>
                         </ul>
                         <div>
-                            <Button size="sm" variant="outline" :disabled="busy" @click="applyHours">Dùng các giờ này</Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                :disabled="busy"
+                                @click="applyHours"
+                                >Dùng các giờ này</Button
+                            >
                         </div>
                     </template>
-                    <p v-else class="text-[0.8125rem] text-muted-foreground">{{ rec?.reason ?? 'Chưa đủ số liệu — app sẽ đề xuất giờ sau vài ngày đăng.' }}</p>
-                    <p v-if="account.mode === 'optimized' && account.preferred_hours.length" class="text-[0.8125rem] text-muted-foreground">
-                        Đang ưu tiên: {{ account.preferred_hours.map((h) => `${h}h`).join(', ') }}
+                    <p v-else class="text-[0.8125rem] text-muted-foreground">
+                        {{
+                            rec?.reason ??
+                            'Chưa đủ số liệu — app sẽ đề xuất giờ sau vài ngày đăng.'
+                        }}
+                    </p>
+                    <p
+                        v-if="
+                            account.mode === 'optimized' &&
+                            account.preferred_hours.length
+                        "
+                        class="text-[0.8125rem] text-muted-foreground"
+                    >
+                        Đang ưu tiên:
+                        {{
+                            account.preferred_hours
+                                .map((h) => `${h}h`)
+                                .join(', ')
+                        }}
                     </p>
                 </div>
             </div>
 
             <DialogFooter class="gap-2">
-                <Button variant="ghost" :disabled="busy" @click="open = false">Huỷ</Button>
-                <Button :disabled="busy || !dirty || windowBad || capBad" @click="save">
+                <Button variant="ghost" :disabled="busy" @click="open = false"
+                    >Huỷ</Button
+                >
+                <Button
+                    :disabled="busy || !dirty || windowBad || capBad"
+                    @click="save"
+                >
                     <Spinner v-if="busy" class="size-4" />
                     Lưu
                 </Button>

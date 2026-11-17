@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Hub\HubApi;
 use App\Fork\AutoPost\Hub\HubReporter;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\Notify\Telegram;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
@@ -819,7 +820,7 @@ final class VideoLibrary
     /** Số bài (đã giữ, xếp lịch, đăng) từ đầu ngày địa phương của tài khoản, theo sản phẩm. */
     private function postedTodayByProduct(SocialAccount $a): array
     {
-        $tz = $a->timezone ?: 'Asia/Ho_Chi_Minh';
+        $tz = Planner::zone()->getName();
         $start = CarbonImmutable::now($tz)->startOfDay()->utc();
 
         return AutoVideo::query()

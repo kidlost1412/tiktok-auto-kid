@@ -125,6 +125,28 @@ test('the planner posts a ready private video before hub videos, but only when a
         ->and($v->scheduled_for->lessThan($hub->scheduled_for))->toBeTrue();
 });
 
+test('a channel set to "only kho riêng" never takes hub videos, and "only Xưởng" never takes private videos', function () {
+    $account = ($this->account)(['video_source' => 'rieng']);
+    $v = ($this->ready)('a.mp4');
+    $hub = AutoVideo::create(['hash' => 'h1', 'path' => $this->own.'/h.mp4', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'NanoĐồng_x_MIXKIT_1.mp4', 'status' => 'new', 'product_code' => 'nano-dong', 'caption' => 'hub cap', 'hashtags' => []]);
+    file_put_contents($this->own.'/h.mp4', 'h');
+    RiengAutoSettings::update(['enabled' => true]);
+
+    app(Planner::class)->planAll($this->now);
+    expect($v->refresh()->status)->toBe('scheduled')->and($hub->refresh()->status)->toBe('new');
+
+    // Chỉ Xưởng: video riêng mới không bị lấy, video hub được xếp.
+    AutoAccount::query()->whereKey($account->id)->update(['video_source' => 'hub']);
+    $v2 = ($this->ready)('b.mp4');
+    app(Planner::class)->planAll($this->now);
+    expect($v2->refresh()->status)->toBe('new')->and($hub->refresh()->status)->toBe('scheduled');
+
+    // Lưu được từ hộp Chỉnh kênh, giá trị lạ bị từ chối.
+    $this->actingAs($this->owner)->patch("/auto/accounts/{$account->id}", ['video_source' => 'rieng'])->assertSessionHasNoErrors();
+    expect(AutoAccount::query()->find($account->id)->video_source)->toBe('rieng');
+    $this->actingAs($this->owner)->patch("/auto/accounts/{$account->id}", ['video_source' => 'xyz'])->assertSessionHasErrors('video_source');
+});
+
 test('a video without a sure product, an unapproved caption or an unconfirmed duplicate waits', function () {
     ($this->account)();
     RiengAutoSettings::update(['enabled' => true, 'approve_first' => true]);

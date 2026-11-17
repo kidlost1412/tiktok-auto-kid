@@ -9,6 +9,7 @@ use App\Fork\AutoPost\Models\AccountStat;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\VideoSnapshot;
 use App\Fork\AutoPost\Models\VideoStat;
+use App\Fork\AutoPost\Scheduling\Planner;
 use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 
@@ -210,7 +211,7 @@ final class StatsIngest
             return null;
         }
 
-        $tz = $account->timezone ?: 'Asia/Ho_Chi_Minh';
+        $tz = Planner::zone()->getName();
         $history = is_array($data['follower_history'] ?? null)
             ? array_slice(array_values(array_filter($data['follower_history'], 'is_numeric')), 0, 60)
             : [];
