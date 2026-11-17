@@ -97,7 +97,14 @@ const today = computed(() => {
     return { planned, posted, cap };
 });
 
-const NEXT_STATES = ['scheduled', 'tiktok_scheduled', 'reserved', 'publishing'];
+const NEXT_STATES = [
+    'scheduled',
+    'tiktok_scheduled',
+    'direct',
+    'uploading',
+    'reserved',
+    'publishing',
+];
 
 const next = computed<(LichItem & { username: string | null }) | null>(() => {
     let best: (LichItem & { username: string | null }) | null = null;
