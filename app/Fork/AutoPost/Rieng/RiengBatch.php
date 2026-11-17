@@ -22,6 +22,7 @@ use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -45,6 +46,9 @@ final class RiengBatch
     public const COVER_UPLOAD = 'upload';
 
     public const COVER_FRAME = 'frame';
+
+    /** product_code của lượt = "theo sản phẩm của từng video" (AI đã nhận ra / chủ app đã chọn cho video). */
+    public const string PER_VIDEO = 'theo-video';
 
     /** Hai bài cùng kênh cách nhau dưới ngần này giây coi là trùng giờ y hệt (không cho đăng dù đã xác nhận). */
     public const int EXACT_SECONDS = 60;
@@ -139,11 +143,12 @@ final class RiengBatch
         }
 
         $left = $this->schedule($rows, $auto, $now, $fmt);
+        $products = $this->videoProducts(array_column($rows, 'id'), (string) $auto->social_account_id);
 
         return [
             'ok' => true,
             'error' => null,
-            'rows' => array_map(fn (array $r): array => ['id' => $r['id'], 'at' => $r['at'], 'status' => $r['status'], 'messages' => $r['messages'], 'edited' => (bool) $r['edited']], $rows),
+            'rows' => array_map(fn (array $r): array => ['id' => $r['id'], 'at' => $r['at'], 'status' => $r['status'], 'messages' => $r['messages'], 'edited' => (bool) $r['edited'], 'product' => $products[$r['id']] ?? null], $rows),
             'left' => $left,
             'window' => app(RiengSchedule::class)->windowLabel($auto),
             'gap_minutes' => $gapMinutes,
@@ -213,17 +218,20 @@ final class RiengBatch
 
         $code = (string) ($in['product_code'] ?? '');
         $qc = filled($in['quy_cach'] ?? null) ? (string) $in['quy_cach'] : null;
-        $option = collect($this->productOptions((string) $auto->social_account_id))->first(fn (array $o): bool => $o['code'] === $code && $o['quy_cach'] === $qc);
+        $perVideo = $code === self::PER_VIDEO;
+        $options = collect($this->productOptions((string) $auto->social_account_id))->keyBy(fn (array $o): string => $o['code'].'|'.($o['quy_cach'] ?? ''));
+        $allowed = $this->cart->evaluate((string) $auto->social_account_id)['allowed'];
 
         if ($code === '') {
             return $fail('Hãy chọn sản phẩm gắn giỏ hàng (bắt buộc).');
         }
 
-        if ($option === null) {
+        if (! $perVideo && ! $options->has($code.'|'.($qc ?? ''))) {
             return $fail('Sản phẩm này chưa có giỏ hàng hợp lệ trên kênh đã chọn.');
         }
 
-        $product = AutoProduct::query()->find($code);
+        $productsByCode = AutoProduct::query()->get()->keyBy('code');
+        $coverInfo = [];
         // Không còn chia "tự động / thủ công": giờ luôn được tự đề xuất, giờ nào chủ app sửa (items.*.at) thì giữ và kiểm.
         $mode = self::MODE_AUTO;
         $sharedCaption = trim((string) ($in['caption'] ?? ''));
@@ -231,7 +239,6 @@ final class RiengBatch
         $items = array_values(array_filter((array) ($in['items'] ?? []), 'is_array'));
         $coverMode = in_array($in['cover_mode'] ?? null, [self::COVER_UPLOAD, self::COVER_FRAME], true) ? (string) $in['cover_mode'] : self::COVER_PRODUCT;
         $batchToken = filled($in['cover_token'] ?? null) ? (string) $in['cover_token'] : null;
-        $productCover = $this->productCoverInfo($product);
 
         if ($items === []) {
             return $fail('Chưa chọn video nào.');
@@ -274,9 +281,26 @@ final class RiengBatch
                 $row['messages'][] = 'Không còn thấy file video trong thư mục.';
             }
 
+            // Sản phẩm gắn giỏ của dòng: chọn riêng trong hộp > theo video (AI / chủ app) > sản phẩm chung của lượt.
+            $pick = $this->rowProduct($item, $video, $perVideo, $code, $qc, $options, $allowed, $productsByCode, $row);
+            $product = $pick === null ? null : ($productsByCode[$pick['code']] ?? null);
+            $row['_code'] = $pick['code'] ?? null;
+            $row['_qc'] = $pick['quy_cach'] ?? null;
+
+            $ownTags = array_key_exists('hashtags', $item) && $item['hashtags'] !== null && $item['hashtags'] !== '' && $item['hashtags'] !== [];
             $caption = filled($item['caption'] ?? null) ? trim((string) $item['caption']) : $sharedCaption;
-            $tags = array_key_exists('hashtags', $item) && $item['hashtags'] !== null && $item['hashtags'] !== '' && $item['hashtags'] !== []
-                ? Hashtags::normalize($item['hashtags']) : $sharedTags;
+            $tags = $ownTags ? Hashtags::normalize($item['hashtags']) : $sharedTags;
+
+            // Không viết caption chung / riêng: dùng caption của chính video (anh đã viết, hoặc AI viết) nếu có.
+            if ($caption === '' && ($videoCaption = $this->videoCaption($video)) !== null) {
+                $caption = $videoCaption['caption'];
+                $row['caption_from'] = $videoCaption['from'];
+
+                if (! $ownTags && $sharedTags === []) {
+                    $tags = $videoCaption['hashtags'];
+                }
+            }
+
             $row['caption'] = $caption;
             $row['hashtags'] = $tags;
 
@@ -289,7 +313,8 @@ final class RiengBatch
             }
 
             $ownToken = filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : null;
-            $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, $productCover, $row);
+            $coverInfo[$pick['code'] ?? ''] ??= $this->productCoverInfo($product);
+            $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, $coverInfo[$pick['code'] ?? ''], $row);
             $row['_at'] = $this->parseAt($item['at'] ?? null);
             $rows[] = $row;
         }
@@ -386,6 +411,158 @@ final class RiengBatch
         }
 
         return ['kind' => $mode, 'url' => '/auto/kho/rieng/video/'.$video->id.'/thumb', 'token' => null, 'note' => 'Khung mặc định của video'];
+    }
+
+    /**
+     * Sản phẩm riêng của video: chủ app đã chọn (kid), AI nhận ra chắc chắn (ai), hoặc AI chỉ đoán chưa chắc (guess, chưa gắn).
+     *
+     * @return array{code: ?string, by: ?string, guess: ?string}
+     */
+    public static function ownProduct(AutoVideo $v): array
+    {
+        $code = filled($v->product_code) ? (string) $v->product_code : null;
+        $guess = data_get($v->meta, 'ai.product_code');
+
+        return [
+            'code' => $code,
+            'by' => $code === null ? null : (data_get($v->meta, 'product_by') === 'kid' ? 'kid' : 'ai'),
+            'guess' => $code === null && is_string($guess) && $guess !== '' ? $guess : null,
+        ];
+    }
+
+    /**
+     * Sản phẩm của từng video trên một kênh, cho hộp đăng hàng loạt (để chọn sẵn "theo từng video" và hiện tên).
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array{code: ?string, quy_cach: ?string, label: ?string, by: ?string, guess: ?string, guess_label: ?string, cart: bool}>
+     */
+    public function videoProducts(array $ids, string $socialAccountId): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $allowed = $this->cart->evaluate($socialAccountId)['allowed'];
+        $products = AutoProduct::query()->get()->keyBy('code');
+        $poster = app(Ai\RiengAutoPoster::class);
+        $out = [];
+
+        foreach (AutoVideo::query()->whereIn('id', $ids)->where('source', AutoVideo::SOURCE_RIENG)->get() as $v) {
+            $own = self::ownProduct($v);
+            $qc = $own['code'] !== null ? $poster->quyCachFor($v, $allowed) : false;
+            $out[(int) $v->id] = [
+                'code' => $own['code'],
+                'quy_cach' => $qc === false ? null : $qc,
+                'label' => $own['code'] !== null ? CartRules::label($products[$own['code']] ?? null, $own['code'], $qc === false ? null : $qc) : null,
+                'by' => $own['by'],
+                'guess' => $own['guess'],
+                'guess_label' => $own['guess'] !== null ? CartRules::label($products[$own['guess']] ?? null, $own['guess'], null) : null,
+                'cart' => $own['code'] !== null && $qc !== false,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Chọn sản phẩm gắn giỏ cho một dòng và ghi lỗi / cảnh báo vào dòng. null = không gắn được (dòng thành lỗi).
+     *
+     * Chủ app chọn một sản phẩm chung mà video đã có sản phẩm khác (AI nhận ra hoặc chính anh chọn) thì dòng thành
+     * "cần xem lại" (warn): phải thấy và bấm "Vẫn hẹn" mới gắn — tránh gắn nhầm giỏ hàng loạt.
+     *
+     * @param  array<string, mixed>  $item
+     * @param  Collection<string, array<string, mixed>>  $options  khoá "mã|quy cách"
+     * @param  array<string, list<string|null>>  $allowed
+     * @param  Collection<string, AutoProduct>  $products
+     * @param  array<string, mixed>  $row
+     * @return array{code: string, quy_cach: ?string}|null
+     */
+    private function rowProduct(array $item, AutoVideo $video, bool $perVideo, string $code, ?string $qc, $options, array $allowed, $products, array &$row): ?array
+    {
+        $name = fn (?string $c): string => (string) ($c === null ? '?' : ($products[$c]?->short_name ?: $c));
+        $own = self::ownProduct($video);
+        $fail = function (string $message) use (&$row): null {
+            $row['status'] = 'error';
+            $row['messages'][] = $message;
+            $row['product'] = null;
+
+            return null;
+        };
+        $use = function (string $c, ?string $q, string $from) use (&$row, $options, $products): array {
+            $row['product'] = ['code' => $c, 'quy_cach' => $q, 'label' => $options[$c.'|'.($q ?? '')]['label'] ?? CartRules::label($products[$c] ?? null, $c, $q), 'from' => $from];
+
+            return ['code' => $c, 'quy_cach' => $q];
+        };
+
+        // 1) Chủ app chọn riêng cho video này ngay trong hộp ("mã|quy cách").
+        if (is_string($item['product'] ?? null) && $item['product'] !== '') {
+            if (! $options->has($item['product'])) {
+                return $fail('Sản phẩm chọn cho video này chưa có giỏ hàng hợp lệ trên kênh.');
+            }
+
+            [$c, $q] = explode('|', $item['product'], 2);
+
+            return $use($c, $q === '' ? null : $q, 'chosen');
+        }
+
+        // 2) Theo sản phẩm của từng video.
+        if ($perVideo) {
+            if ($own['code'] === null) {
+                return $fail($own['guess'] !== null
+                    ? 'AI đoán là '.$name($own['guess']).' nhưng chưa chắc: hãy chọn sản phẩm cho video này.'
+                    : 'Video chưa có sản phẩm: hãy chọn sản phẩm cho video này.');
+            }
+
+            $q = app(Ai\RiengAutoPoster::class)->quyCachFor($video, $allowed);
+
+            if ($q === false) {
+                return $fail(isset($allowed[$own['code']])
+                    ? 'Hãy chọn quy cách của '.$name($own['code']).' cho video này.'
+                    : $name($own['code']).' chưa được chọn giỏ hàng trên kênh này (vào Giỏ hàng để chọn), hoặc chọn sản phẩm khác cho video.');
+            }
+
+            return $use($own['code'], $q, 'video');
+        }
+
+        // 3) Sản phẩm chung của lượt: khác với sản phẩm của video thì phải xem lại.
+        if ($own['code'] !== null && $own['code'] !== $code) {
+            $row['status'] = $row['status'] === 'error' ? 'error' : 'warn';
+            $row['messages'][] = ($own['by'] === 'kid' ? 'Anh đã chọn video này là ' : 'AI nhận ra video này là ').$name($own['code'])
+                .', nhưng lượt này sẽ gắn giỏ '.$name($code).'. Kiểm tra kỹ, hoặc chọn "Theo sản phẩm của từng video".';
+            $row['product_mismatch'] = true;
+        } elseif ($own['guess'] !== null && $own['guess'] !== $code) {
+            $row['status'] = $row['status'] === 'error' ? 'error' : 'warn';
+            $row['messages'][] = 'AI đoán video này là '.$name($own['guess']).' (chưa chắc), lượt này sẽ gắn giỏ '.$name($code).'. Kiểm tra kỹ trước khi hẹn.';
+            $row['product_mismatch'] = true;
+        }
+
+        return $use($code, $qc, 'shared');
+    }
+
+    /**
+     * Caption sẵn có của video: anh đã tự viết, hoặc AI đã viết. null = chưa có.
+     *
+     * @return array{caption: string, hashtags: list<string>, from: string}|null
+     */
+    private function videoCaption(AutoVideo $video): ?array
+    {
+        $poster = app(Ai\RiengAutoPoster::class);
+
+        if ($video->caption_source === 'kid' && filled($video->caption)) {
+            $c = trim((string) $video->caption);
+
+            return ['caption' => $c, 'hashtags' => $poster->hashtagsFor($video, $c), 'from' => 'kid'];
+        }
+
+        $ai = (array) data_get($video->meta, 'ai', []);
+
+        if (in_array($ai['state'] ?? null, ['ok', 'unsure'], true) && filled($ai['caption'] ?? null)) {
+            $c = trim((string) $ai['caption']);
+
+            return ['caption' => $c, 'hashtags' => $poster->hashtagsFor($video, $c), 'from' => 'ai'];
+        }
+
+        return null;
     }
 
     private function parseAt(mixed $raw): ?CarbonImmutable
@@ -551,20 +728,18 @@ final class RiengBatch
     private function apply(array $plan, array $in, CarbonImmutable $now): array
     {
         $social = SocialAccount::query()->with('workspace')->findOrFail((string) $in['social_account_id']);
-        $code = (string) $in['product_code'];
-        $qc = filled($in['quy_cach'] ?? null) ? (string) $in['quy_cach'] : null;
         $done = 0;
         $failed = 0;
         $rows = [];
 
         foreach ($plan['rows'] as $row) {
-            if (! in_array($row['status'], ['ok', 'warn'], true) || $row['at'] === null) {
+            if (! in_array($row['status'], ['ok', 'warn'], true) || $row['at'] === null || ! filled($row['_code'] ?? null)) {
                 $rows[] = $row + ['result' => $row['status'] === 'skip' ? 'skip' : 'error'];
 
                 continue;
             }
 
-            $error = $this->postOne($social, (int) $row['id'], $code, $qc, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
+            $error = $this->postOne($social, (int) $row['id'], (string) $row['_code'], $row['_qc'] ?? null, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
 
             if ($error === null) {
                 $done++;
@@ -579,7 +754,11 @@ final class RiengBatch
         if ($done > 0) {
             try {
                 $memory = app(RiengCoverMemory::class);
-                $memory->rememberChoice((string) $social->id, $code, $qc, (string) $plan['cover_mode'], filled($in['cover_token'] ?? null) ? (string) $in['cover_token'] : null);
+                $pairs = collect($rows)->where('result', 'done')->map(fn (array $r): array => [(string) $r['_code'], $r['_qc'] ?? null])->unique(fn (array $p): string => $p[0].'|'.($p[1] ?? ''));
+
+                foreach ($pairs as [$doneCode, $doneQc]) {
+                    $memory->rememberChoice((string) $social->id, $doneCode, $doneQc, (string) $plan['cover_mode'], filled($in['cover_token'] ?? null) ? (string) $in['cover_token'] : null);
+                }
 
                 foreach ($rows as $r) {
                     if (($r['result'] ?? null) === 'done' && ($r['cover']['kind'] ?? null) === 'own' && filled($r['cover']['token'] ?? null)) {

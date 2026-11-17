@@ -783,6 +783,8 @@ final class RiengController extends Controller
             'cover_mode' => ['sometimes', 'in:product,upload,frame'],
             'cover_token' => ['nullable', 'string', 'max:60'],
             'items.*.cover_token' => ['nullable', 'string', 'max:60'],
+            // sản phẩm chọn riêng cho một video: "mã|quy cách"
+            'items.*.product' => ['nullable', 'string', 'max:220'],
         ]);
 
         $this->findAccount($accountId, (string) $in['social_account_id']);

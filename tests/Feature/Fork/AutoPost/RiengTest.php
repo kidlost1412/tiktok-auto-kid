@@ -1050,3 +1050,64 @@ test('a folder with music on but an empty music folder never posts the video wit
 
     expect($done['done'])->toBe(0)->and(Post::query()->count())->toBe(0)->and($v->fresh()->status)->toBe('new');
 });
+
+// ---------------------------------------------------------------- Sản phẩm theo từng video khi đăng hàng loạt
+
+test('batch "per video" attaches each video its own AI or owner product and never a shared one', function () {
+    $account = ($this->account)();
+    AutoProduct::create(['code' => 'tc01', 'name' => 'Kích rễ TC01', 'short_name' => 'TC01', 'facts' => [], 'enabled' => true]);
+    $pid = '17293847561'.random_int(10000000, 99999999);
+    ShopProduct::create(['social_account_id' => $account->id, 'product_id' => $pid, 'source' => 'my_shop', 'title' => 'TC01', 'stock_num' => 5, 'synced_at' => now()]);
+    ProductLink::create(['social_account_id' => $account->id, 'auto_product_id' => 'tc01', 'shop_product_id' => $pid, 'display_name' => 'Kích rễ TC01']);
+
+    $byAi = ($this->rieng)('ai.mp4', null, ['product_code' => 'tc01', 'meta' => ['folder_id' => 1, 'ai' => ['state' => 'ok', 'product_code' => 'tc01', 'caption' => 'Cap AI viết', 'hashtags' => ['#kichre']]]]);
+    $byKid = ($this->rieng)('kid.mp4', null, ['product_code' => 'nano-dong', 'meta' => ['folder_id' => 1, 'product_by' => 'kid']]);
+    $unsure = ($this->rieng)('doan.mp4', null, ['meta' => ['folder_id' => 1, 'ai' => ['state' => 'unsure', 'product_code' => 'tc01']]]);
+
+    // gợi ý giờ trả kèm sản phẩm từng video để hộp chọn sẵn "theo từng video"
+    $p = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => [['id' => $byAi->id], ['id' => $byKid->id], ['id' => $unsure->id]]], $this->now);
+    $byId = collect($p['rows'])->keyBy('id');
+    expect($byId[$byAi->id]['product'])->toMatchArray(['code' => 'tc01', 'by' => 'ai', 'cart' => true])
+        ->and($byId[$byKid->id]['product'])->toMatchArray(['code' => 'nano-dong', 'by' => 'kid'])
+        ->and($byId[$unsure->id]['product'])->toMatchArray(['code' => null, 'guess' => 'tc01']);
+
+    $in = ($this->input)($account, [$byAi, $byKid, $unsure], ['product_code' => RiengBatch::PER_VIDEO, 'caption' => '', 'hashtags' => '']);
+    $done = ($this->batch)()->commit($in, false, $this->now);
+    $rows = collect($done['rows'])->keyBy('id');
+
+    expect($done['done'])->toBe(2)
+        ->and($rows[$unsure->id]['status'])->toBe('error')
+        ->and($rows[$unsure->id]['messages'][0])->toContain('chưa chắc')
+        ->and($byAi->fresh()->product_code)->toBe('tc01')
+        ->and($byKid->fresh()->product_code)->toBe('nano-dong')
+        ->and($unsure->fresh()->status)->toBe('new');
+
+    $post = Post::query()->get()->first(fn (Post $p) => $p->meta['fork_auto_video_id'] === $byAi->id);
+    expect($post->meta['fork_shop_product_id'])->toBe($pid)
+        // không viết caption chung: dùng caption AI của chính video
+        ->and($post->content)->toContain('Cap AI viết')->toContain('#kichre');
+
+    // chọn riêng sản phẩm cho video AI chưa chắc
+    $again = ($this->batch)()->commit(($this->input)($account, [['id' => $unsure->id, 'product' => 'tc01|']], ['product_code' => RiengBatch::PER_VIDEO]), false, $this->now);
+    expect($again['done'])->toBe(1)->and($unsure->fresh()->product_code)->toBe('tc01');
+});
+
+test('a shared product that differs from what the AI found must be confirmed, row by row', function () {
+    $account = ($this->account)();
+    AutoProduct::create(['code' => 'tc01', 'name' => 'Kích rễ TC01', 'short_name' => 'TC01', 'facts' => [], 'enabled' => true]);
+    $v = ($this->rieng)('ai.mp4', null, ['product_code' => 'tc01', 'meta' => ['folder_id' => 1, 'ai' => ['state' => 'ok', 'product_code' => 'tc01']]]);
+    $same = ($this->rieng)('dung.mp4', null, ['product_code' => 'nano-dong', 'meta' => ['folder_id' => 1]]);
+
+    $first = ($this->batch)()->commit(($this->input)($account, [$v, $same]), false, $this->now);
+    $rows = collect($first['rows'])->keyBy('id');
+
+    expect($first['committed'] ?? false)->toBeFalse()->and($first['needs_confirm'])->toBeTrue()
+        ->and($rows[$v->id]['status'])->toBe('warn')
+        ->and(implode(' ', $rows[$v->id]['messages']))->toContain('AI nhận ra video này là TC01')
+        ->and($rows[$same->id]['status'])->toBe('ok')
+        ->and(Post::query()->count())->toBe(0);
+
+    // chủ app thấy cảnh báo và vẫn hẹn: gắn đúng sản phẩm chung đã chọn
+    $ok = ($this->batch)()->commit(($this->input)($account, [$v, $same]), true, $this->now);
+    expect($ok['done'])->toBe(2)->and($v->fresh()->product_code)->toBe('nano-dong');
+});

@@ -649,7 +649,17 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                             :model-value="syncPercent"
                         />
                     </template>
-                    <p v-else class="text-[0.8125rem] text-muted-foreground">
+                    <p
+                        v-if="sync?.chrome"
+                        class="mb-1.5 text-[0.8125rem] font-medium text-amber-800 dark:text-amber-300"
+                        data-testid="fork-gio-hang-sync-chrome"
+                    >
+                        {{ sync.chrome }}
+                    </p>
+                    <p
+                        v-if="!syncProgress"
+                        class="text-[0.8125rem] text-muted-foreground"
+                    >
                         Đang chờ tiện ích Chrome lấy sản phẩm từ shop — Chrome
                         cần đang mở và đã đăng nhập TikTok, thường mất vài giây.
                         Trang tự cập nhật; quá {{ sync_ttl_minutes }} phút thì
@@ -682,6 +692,13 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                         tiện ích chưa lấy được. Kiểm tra Chrome đang mở rồi bấm
                         lại.
                     </template>
+                    <p
+                        v-if="sync?.chrome"
+                        class="mt-1 font-medium"
+                        data-testid="fork-gio-hang-sync-chrome"
+                    >
+                        {{ sync.chrome }}
+                    </p>
                 </div>
             </section>
 
