@@ -263,13 +263,15 @@ final class AutoController extends Controller
 
         abort_if($video->social_account_id === null || ! $accounts->contains('id', $video->social_account_id), 404);
 
-        $refusal = app(FailedPosts::class)->retryJob($video);
+        $r = app(FailedPosts::class)->retryOrQueue($video);
 
-        if ($refusal !== null) {
-            return back()->with('flash.error', $refusal);
+        if ($r['error'] !== null) {
+            return back()->with('flash.error', $r['error']);
         }
 
-        return back()->with('flash.success', 'Đã giao lại cho Chrome. Nếu vẫn lỗi, app sẽ báo lại lý do.');
+        return back()->with('flash.success', $r['queued']
+            ? 'Đã xếp hàng đăng lại. Kênh đang bận bài khác, app tự giao bài này cho Chrome ngay khi kênh rảnh.'
+            : 'Đã giao lại cho Chrome. Nếu vẫn lỗi, app sẽ báo lại lý do.');
     }
 
     public function pause(Request $request, string $socialAccount): RedirectResponse

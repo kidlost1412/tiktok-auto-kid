@@ -710,7 +710,12 @@ test('when the speech tool is installed the AI hears the speech from the first s
 });
 
 test('the AI status line tells what the AI is doing, what is missing and when it retries', function () {
-    $status = fn () => $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/ai-trang-thai')->assertOk()->json();
+    // Trang hỏi lại sau vài giây; ở đây bỏ bộ nhớ đệm 3 giây để mỗi lần hỏi thấy ngay trạng thái mới.
+    $status = function (): array {
+        Cache::forget('fork-rieng:ai-status');
+
+        return $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/ai-trang-thai')->assertOk()->json();
+    };
     $a = ($this->rieng)('a.mp4');
 
     // Chưa cài ChatGPT CLI.
@@ -778,4 +783,10 @@ test('a busy page polling one route does not use up the limit of another button'
 
     // "Chọn thư mục" giới hạn 20/phút riêng của nó: không bị chặn vì các lần gọi ở trên.
     expect($this->actingAs($this->owner)->postJson('/auto/kho/rieng/chon-thu-muc')->status())->not->toBe(429);
+});
+
+test('the CLI install progress has its own GET route that a 3-second poll never gets blocked on', function () {
+    foreach (range(1, 12) as $i) {
+        $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/codex-cli')->assertOk()->assertJsonStructure(['cli' => ['installed', 'installing']]);
+    }
 });

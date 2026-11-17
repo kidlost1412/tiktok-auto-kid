@@ -227,10 +227,10 @@ const watchInstall = () => {
     let ticks = 0;
     cliPoll = setInterval(async () => {
         ticks++;
+        // GET riêng để hỏi tiến độ (POST cài đặt giới hạn 6 lần/phút, hỏi 3 giây một lần sẽ bị chặn).
         const r = await callJson<{ cli: CliStatus }>(
-            'POST',
+            'GET',
             '/auto/kho/rieng/tu-dong/codex-cli',
-            { check: true },
         );
         const cli = r.data?.cli;
 

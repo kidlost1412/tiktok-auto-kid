@@ -2,7 +2,7 @@
 // Trang riêng của bản Việt hoá: ghép nối tiện ích Chrome (TikTok Auto Kid) để đăng TikTok.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en) để không
 // làm lệch bộ khoá dịch của các ngôn ngữ khác.
-import { Link, router, usePoll } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import {
     IconBrandChrome,
     IconBrandTelegram,
@@ -126,7 +126,6 @@ const base = (done: () => void, onSuccess?: () => void) => ({
     onFinish: done,
 });
 
-
 /** So sánh phiên bản dạng số (1.4.10 > 1.4.9): âm nếu a < b. */
 function compareVersions(a: string, b: string): number {
     const pa = a.split('.').map((x) => parseInt(x, 10) || 0);
@@ -162,7 +161,8 @@ const only = [
     'backgroundMode',
 ];
 // Trang thật: tự làm mới bằng Inertia. Popup: bàn tải lại dữ liệu (emit `refresh`) vì trang đang mở là /nha.
-usePoll(5000, { only }, { autoStart: !props.embedded });
+// Đang ghép nối (có mã) thì 5 giây một lần; bình thường 20 giây là đủ. Tab ẩn thì không hỏi.
+let lastRefresh = Date.now();
 
 const refresh = (): void => {
     if (props.embedded) {
@@ -173,7 +173,6 @@ const refresh = (): void => {
 };
 
 let embeddedPoll: ReturnType<typeof setInterval> | null = null;
-
 
 const busy = ref<string | null>(null);
 
@@ -208,13 +207,15 @@ watch(
 onMounted(() => {
     timer = setInterval(tick, 1000);
 
-    if (props.embedded) {
-        embeddedPoll = setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                refresh();
-            }
-        }, 5000);
-    }
+    embeddedPoll = setInterval(() => {
+        if (
+            document.visibilityState === 'visible' &&
+            (props.pair || Date.now() - lastRefresh >= 20000)
+        ) {
+            lastRefresh = Date.now();
+            refresh();
+        }
+    }, 5000);
 });
 onBeforeUnmount(() => {
     if (timer) clearInterval(timer);
@@ -293,11 +294,7 @@ const saveFromSelect = (client: ChromeClient, value: string): void => {
 
 const telegramTest = (): void =>
     run('telegram', (done) =>
-        router.post(
-            '/settings/chrome/telegram-test',
-            {},
-            base(done),
-        ),
+        router.post('/settings/chrome/telegram-test', {}, base(done)),
     );
 
 const revoke = async (client: ChromeClient): Promise<void> => {
@@ -1153,11 +1150,7 @@ const chromeOnlyCandidates = computed(() => {
             tone="amber"
         >
             <template #actions>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="refresh()"
-                >
+                <Button variant="outline" size="sm" @click="refresh()">
                     <IconRefresh class="size-4" />
                     Làm mới
                 </Button>

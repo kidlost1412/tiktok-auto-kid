@@ -212,6 +212,10 @@ const watchAi = () => {
     }
 
     poll = setInterval(async () => {
+        if (document.visibilityState !== 'visible') {
+            return;
+        }
+
         const r = await callJson<{ auto: RiengAuto }>(
             'GET',
             `/auto/kho/rieng/video/${id}/trang-thai`,

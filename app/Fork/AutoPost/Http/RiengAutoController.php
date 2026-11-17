@@ -22,6 +22,7 @@ use App\Models\SocialAccount;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /** "Kho riêng tự đăng theo khung": cài đặt, tài khoản ChatGPT, và chỉnh sản phẩm/caption/kênh của từng video. */
@@ -90,7 +91,8 @@ final class RiengAutoController extends Controller
     {
         $this->authorizeOwner($request);
 
-        return response()->json(RiengAiStatus::get($accounts));
+        // Nhiều tab / nhiều bàn cùng hỏi: dùng chung kết quả 3 giây (hàm này đọc mọi video chưa đăng).
+        return response()->json(Cache::remember('fork-rieng:ai-status', 3, fn (): array => RiengAiStatus::get($accounts)));
     }
 
     /** Nút "Cho AI xem ngay": video lỗi được thử lại từ đầu và AI chạy ở nền liền, không đợi lịch 2 phút. */
@@ -100,6 +102,7 @@ final class RiengAutoController extends Controller
         $analyzer->retryNow();
         RiengAiStatus::beat(['dang' => true, 'note' => 'anh vừa bấm cho AI xem ngay']);
         RiengAiCommand::launch();
+        Cache::forget('fork-rieng:ai-status');
 
         return response()->json(RiengAiStatus::get($accounts));
     }
@@ -116,6 +119,14 @@ final class RiengAutoController extends Controller
         $error = $accounts->installCli();
 
         return response()->json(['cli' => $accounts->cliStatus(), 'error' => $error], $error === null ? 200 : 422);
+    }
+
+    /** Tiến độ cài ChatGPT CLI (trang hỏi vài giây một lần trong lúc cài). */
+    public function cliStatus(Request $request, ChatGptAccounts $accounts): JsonResponse
+    {
+        $this->authorizeOwner($request);
+
+        return response()->json(['cli' => $accounts->cliStatus()]);
     }
 
     public function addChatGpt(Request $request, ChatGptAccounts $accounts): JsonResponse

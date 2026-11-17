@@ -187,9 +187,12 @@ watch(
         }
 
         if (state === 'waiting') {
+            // 4 giây, tab ẩn thì thôi; máy chủ tự hết hạn lượt đồng bộ sau 10 phút nên vòng hỏi cũng dừng theo.
             timer = setInterval(() => {
-                refresh(['sync']);
-            }, 2000);
+                if (document.visibilityState === 'visible') {
+                    refresh(['sync']);
+                }
+            }, 4000);
         } else if (before === 'waiting') {
             refresh(['sync', 'products', 'rows', 'sample_hidden']);
         }
@@ -801,7 +804,7 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                             'hidden border-b bg-muted/40 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid',
                             embedded
                                 ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
-                                : 'px-5 lg:gap-x-3 xl:gap-x-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
+                                : 'px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] lg:gap-x-3 xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] xl:gap-x-5',
                         )
                     "
                     aria-hidden="true"

@@ -102,6 +102,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         // Kho riêng tự đăng theo khung: cài đặt, tài khoản ChatGPT, chỉnh sản phẩm/caption/kênh từng video.
         Route::get('tu-dong', [RiengAutoController::class, 'show'])->name('auto.show');
         Route::patch('tu-dong', [RiengAutoController::class, 'update'])->middleware('throttle:60,1')->name('auto.update');
+        Route::get('tu-dong/codex-cli', [RiengAutoController::class, 'cliStatus'])->middleware('throttle:120,1')->name('auto.codex.status');
         Route::post('tu-dong/codex-cli', [RiengAutoController::class, 'installCli'])->middleware('throttle:6,1')->name('auto.codex.install');
         Route::get('tu-dong/ai-trang-thai', [RiengAutoController::class, 'aiStatus'])->name('auto.rieng.ai.status');
         Route::post('tu-dong/ai-chay-ngay', [RiengAutoController::class, 'aiRunNow'])->middleware('throttle:10,1')->name('auto.rieng.ai.run');

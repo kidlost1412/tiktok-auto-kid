@@ -11,10 +11,12 @@ use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\FailureReasons;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeJob;
+use App\Fork\Chrome\ScheduledDispatcher;
 use App\Models\Account;
 use App\Models\Post;
 use App\Models\SocialAccount;
@@ -264,4 +266,26 @@ test('several failures in one run become ONE message, then are not repeated', fu
 
     $texts = faTexts();
     expect($texts)->toHaveCount(2)->and($texts[1])->toContain('Chú thích số 5')->not->toContain('Chú thích số 1');
+});
+
+test('pressing retry on several posts of a busy channel queues them and the app hands each one to Chrome when the channel is free', function () {
+    $a = faMake($this, 1);
+    $b = faMake($this, 2);
+
+    $this->actingAs($this->owner)->post("/auto/videos/{$a->id}/dang-lai")->assertSessionHas('flash.success');
+    // Kênh đang bận lượt mới của bài a: bài b không báo lỗi, được xếp hàng.
+    $this->actingAs($this->owner)->post("/auto/videos/{$b->id}/dang-lai")->assertSessionHas('flash.success', fn (string $m) => str_contains($m, 'xếp hàng'));
+    expect(ChromeJob::query()->where('post_id', $b->post_id)->count())->toBe(1)
+        ->and(data_get(Post::query()->find($b->post_id)->meta, FailedPosts::RETRY_WANTED))->not->toBeNull();
+
+    // Thẻ của bài b ghi đã xếp hàng, không còn nút Đăng lại.
+    $row = app(FailedPosts::class)->forVideo($b);
+    expect($row['can_retry'])->toBeFalse()->and($row['retry_note'])->toContain('xếp hàng');
+
+    // Bài a xong: kênh rảnh, app tự giao bài b.
+    ChromeJob::query()->where('post_id', $a->post_id)->where('attempt', 2)->update(['state' => 'posted']);
+    expect(app(ScheduledDispatcher::class)->dispatchForAccount($this->social))->toBe(1);
+    $jobs = ChromeJob::query()->where('post_id', $b->post_id)->orderBy('attempt')->get();
+    expect($jobs)->toHaveCount(2)->and($jobs[1]->state)->toBe('queued')
+        ->and(data_get(Post::query()->find($b->post_id)->meta, FailedPosts::RETRY_WANTED))->toBeNull();
 });
