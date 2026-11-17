@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 
 import { lineFor, noi } from '../nha/loi-thoai';
+import { tatCaTuThoai, type TuThoai } from '../nha/tu-thoai';
 import type { NhaData, NhaEvent } from '../nha/types';
 import type { Actor, Step, Talker } from './actor';
 import type { Owl } from './cast';
@@ -96,6 +97,9 @@ export class Director {
     private rel = new Map<string, number>();
     private avoidCool = new Map<Actor, number>();
     readonly board: Talker;
+    /** Tự thoại (việc thật đang làm) đã nói / đang chờ nói: nhân vật vừa nói câu khác thì đợi lượt, quá 25 giây thì thôi. */
+    private talkSeen = new Set<string>();
+    private talkQ: { t: TuThoai; until: number }[] = [];
     data: NhaData | null = null;
     log: string[] = [];
 
@@ -140,6 +144,9 @@ export class Director {
             this.lo = data.lo;
             this.reels = data.reels ?? [];
             this.syncShelf();
+            for (const t of tatCaTuThoai(data)) {
+                this.talkSeen.add(t.id); // lần đầu mở trang: không nói lại chuyện cũ
+            }
         } else {
             if (data.lo !== this.lo) {
                 this.lo = data.lo;
@@ -158,6 +165,7 @@ export class Director {
                 this.enqueue(this.postScene());
             }
             this.postSum = sum;
+            this.queueTalk(data);
         }
         this.applyStates(data);
         const bk = JSON.stringify([data.bang, data.mode]);
@@ -165,6 +173,59 @@ export class Director {
             this.boardKey = bk;
             this.house.drawBoard(data.bang, data.mode);
         }
+    }
+
+    private queueTalk(data: NhaData) {
+        const now = this.now();
+        for (const t of tatCaTuThoai(data)) {
+            if (this.talkSeen.has(t.id)) {
+                continue;
+            }
+            this.talkSeen.add(t.id);
+            this.talkQ.push({ t, until: now + 25 });
+            // mỗi người giữ tối đa 2 câu chờ (dồn nhiều việc một lúc thì nói câu mới nhất)
+            const mine = this.talkQ.filter((q) => q.t.who === t.who);
+            if (mine.length > 2) {
+                this.talkQ.splice(this.talkQ.indexOf(mine[0]), 1);
+            }
+        }
+        if (this.talkSeen.size > 3000) {
+            this.talkSeen = new Set([...this.talkSeen].slice(-1500));
+        }
+    }
+
+    /** Ai nói câu tự thoại này: đạo diễn chia cho A/B theo video, Cú và Mèo nói bằng bong bóng riêng. */
+    private sayTalk(t: TuThoai): boolean {
+        const d = Math.min(7, 3 + t.text.length * 0.045);
+        if (t.who === 'cu') {
+            if (this.owl.sleeping) {
+                return false;
+            }
+            this.owl.say(t.text, d);
+
+            return true;
+        }
+        if (t.who === 'meo') {
+            this.cat.say(t.text, d, 'work');
+
+            return true;
+        }
+        const key =
+            t.who === 'daodien'
+                ? [...t.id].reduce((h, c) => h + c.charCodeAt(0), 0) % 2
+                    ? 'daodienB'
+                    : 'daodienA'
+                : t.who;
+        const a = this.A[key];
+        if (!a) {
+            return true;
+        }
+        const left = a.bubbleLeft();
+        if (left !== 99 && left > 0.6) {
+            return false; // câu trước chưa đọc xong: đợi
+        }
+
+        return a.say(t.text, d, 'work');
     }
 
     private syncShelf() {
@@ -292,6 +353,13 @@ export class Director {
         }
         // hẹn giờ nhỏ (câu đáp khi va nhau…)
         const now = this.now();
+        for (let i = 0; i < this.talkQ.length; i++) {
+            const q = this.talkQ[i];
+            if (now > q.until || this.sayTalk(q.t)) {
+                this.talkQ.splice(i, 1);
+                i--;
+            }
+        }
         for (let i = this.timers.length - 1; i >= 0; i--) {
             if (now >= this.timers[i].at) {
                 const fn = this.timers[i].fn;

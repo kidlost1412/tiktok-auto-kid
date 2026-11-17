@@ -1,3 +1,4 @@
+import type { HoatDong } from './tu-thoai';
 // Kiểu dùng chung của "Khu Tự Trị".
 export type VaiState = 'working' | 'idle' | 'sleep';
 
@@ -34,6 +35,19 @@ export interface NhaEvent {
     so_video?: number;
     lan?: number;
     buoc?: string;
+    // tự thoại: chi tiết thật của việc đang làm (xem tu-thoai.ts)
+    hook?: string;
+    kieu?: string;
+    so_loi?: number;
+    dur?: number;
+    goc?: string;
+    gu?: string;
+    may?: boolean;
+    cong_thuc?: string;
+    so_canh?: number;
+    y?: string;
+    co_nhac?: boolean;
+    sua?: string;
 }
 
 export interface NhaData {
@@ -57,6 +71,9 @@ export interface NhaData {
     events?: NhaEvent[];
     bay_gio?: number;
     viec?: Record<string, { so: number; tom_tat: string }>;
+    /** Việc thật của các vai lo app (đăng bài, giỏ, AI Kho riêng, bình luận, Chrome), cho tự thoại. */
+    hoat_dong?: HoatDong[];
+    bay_gio_app?: number;
     app: {
         posts_today?: number;
         next?: { at: string; minutes: number; channel: string } | null;

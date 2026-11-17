@@ -342,7 +342,9 @@ export class Actor implements Talker {
         }
         this.sayText = text;
         this.sayStart = this.ctx.now();
-        this.sayUntil = this.sayStart + clamp(d ?? Speech.dur(text), 3, 5);
+        this.sayUntil =
+            this.sayStart +
+            clamp(d ?? Speech.dur(text), 3, p === 'work' ? 7 : 5); // câu việc thật dài hơn: cho đọc kịp
 
         return true;
     }

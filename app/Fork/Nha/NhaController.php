@@ -69,6 +69,9 @@ final class NhaController extends Controller
         $state['viec'] = NhaState::viec($app, $dem);
         // Địa chỉ hub để bấm cuộn phim mở video (trình duyệt gọi thẳng hub như khung Xưởng Video).
         $state['hub']['url'] = rtrim((string) config('fork.xuong.url'), '/');
+        // Việc thật của các vai lo app (đăng bài, giỏ, AI Kho riêng, bình luận, Chrome) cho lời tự thoại.
+        $state['hoat_dong'] = NhaHoatDong::build($now);
+        $state['bay_gio_app'] = (float) $now->getTimestamp();
 
         return $state;
     }

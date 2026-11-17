@@ -103,6 +103,9 @@ final class NhaState
         $scored = 0;
         $lastScore = null;
         foreach ($cur as $e) {
+            if (($e['loai'] ?? '') === 'nghi') {
+                continue; // dòng tự thoại (chi tiết việc đang làm) không đổi trạng thái làm/nghỉ của vai
+            }
             $last[($e['vai'] ?? '').'|'.($e['video'] ?? '')] = $e;
             if (($e['loai'] ?? '') === 'diem') {
                 $scored++;
@@ -232,7 +235,9 @@ final class NhaState
     }
 
     /** Trường sự kiện gửi cho trình duyệt (đủ để diễn hoạt cảnh và dòng "hoạt động gần đây"; không gửi gì khác). */
-    private const array EVENT_KEYS = ['n', 't', 'vai', 'loai', 'video', 'msg', 'so', 'tong', 'diem', 'dat', 'file', 'ngay', 'loi', 'phut', 'ten', 'so_video', 'lan', 'buoc'];
+    private const array EVENT_KEYS = ['n', 't', 'vai', 'loai', 'video', 'msg', 'so', 'tong', 'diem', 'dat', 'file', 'ngay', 'loi', 'phut', 'ten', 'so_video', 'lan', 'buoc',
+        // tự thoại: chi tiết thật của việc đang làm (hook vừa chốt, lý do loại bài, giọng dài bao nhiêu, công thức dựng…)
+        'hook', 'kieu', 'so_loi', 'dur', 'goc', 'gu', 'may', 'cong_thuc', 'so_canh', 'y', 'co_nhac', 'sua'];
 
     /**
      * @param  list<array<string, mixed>>  $events
@@ -241,7 +246,7 @@ final class NhaState
     private static function compact(array $events): array
     {
         $out = [];
-        foreach (array_slice($events, -60) as $e) {
+        foreach (array_slice($events, -120) as $e) {
             $out[] = array_intersect_key($e, array_flip(self::EVENT_KEYS));
         }
 

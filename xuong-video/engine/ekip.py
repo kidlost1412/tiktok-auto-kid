@@ -203,9 +203,12 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         if het_han["v"]:
             return vname, None                       # đã hết hạn mức → không mua thêm giọng
         try:
-            return vname, tao_giong(sc["text"], CFG["giong"]["danh_sach"][sc["giong"]], out_dir / "_giong", vname, doc=sp.get("doc_la"))
+            v = tao_giong(sc["text"], CFG["giong"]["danh_sach"][sc["giong"]], out_dir / "_giong", vname, doc=sp.get("doc_la"))
+            SK.ghi("giong", "nghi", "Thu xong 1 giọng", buoc="xong1", dur=round(float(v.get("dur") or 0), 1), goc=sc.get("goc"), giong=sc.get("giong"))
+            return vname, v
         except Exception as e:
             log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__} {str(e)[:120]}")
+            SK.ghi("giong", "nghi", "Thu hỏng 1 giọng", buoc="hong", goc=sc.get("goc"), loi=f"{type(e).__name__} {str(e)[:60]}")
             return vname, None
 
     def viec_tu_loi(i0, ds_sc):
@@ -221,7 +224,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             if voice is None:
                 continue
             if voice["dur"] > khung_giay(sp, CFG)[1] - 0.7:
-                log(f"  bỏ {sc['goc']}: giọng {voice['dur']} s quá dài"); continue
+                log(f"  bỏ {sc['goc']}: giọng {voice['dur']} s quá dài")
+                SK.ghi("giong", "nghi", "Bỏ giọng quá dài", buoc="dai", dur=voice["dur"], goc=sc.get("goc")); continue
             for j in range(per):
                 if len(tasks) >= so_video:
                     break
@@ -310,7 +314,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         t["plan"] = {"seed": t["rng"].randint(1, 10**9), "phong_cach": st, "canh": t["sc"].get("canh", []), "dong": t["sc"].get("dong"),
                      "ten_thuong_hieu": (sp.get("ten_ngan") or sp["ten_goi"]).upper(), "edl_segs": segs,
                      "vmin": khung_giay(sp, CFG)[0]}
-        SK.ghi("dao-dien", "xong", "Đã có bảng dựng", video=f'{t["vname"]}-{t["j"]}', gu=t["gu"])
+        SK.ghi("dao-dien", "xong", "Đã có bảng dựng", video=f'{t["vname"]}-{t["j"]}', gu=t["gu"], may=may_dung or None,
+               cong_thuc=str(st.get("cong_thuc") or edl.get("cong_thuc") or "")[:40] or None, so_canh=len(segs or []),
+               y=str(edl.get("ly_do") or "")[:90] or None)
         return t
 
     def dung_nen(t):
@@ -329,7 +335,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                     return t if t.get("job") else None   # dựng lại hỏng → giữ bản cũ
                 time.sleep(20)
         t["fname"] = fname; job["out"] = str(out_dir / fname); t["job"] = job; t["info"] = info
-        SK.ghi("dung", "xong", "Dựng nền xong", video=f'{t["vname"]}-{t["j"]}')
+        SK.ghi("dung", "xong", "Dựng nền xong", video=f'{t["vname"]}-{t["j"]}', co_nhac=bool(music), gu=t["gu"])
         return t
 
     def mot_vong(ds, gop=None):
@@ -402,7 +408,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 t["gk"] = r; t["lan"] = 1
                 log(f"  giám khảo {t['fname']}: {r.get('diem')}/10 {'ĐẠT' if r.get('dat') else 'CHƯA ĐẠT'} {'; '.join((r.get('loi') or [])[:2])}")
                 SK.ghi("giam-khao", "diem", "Chấm xong", video=f'{t["vname"]}-{t["j"]}', diem=r.get("diem"), dat=r.get("dat"),
-                       file=t.get("fname"), loi=(r["loi"][0][:90] if r.get("loi") else None), lan=t.get("lan"))
+                       file=t.get("fname"), loi=(r["loi"][0][:90] if r.get("loi") else None), lan=t.get("lan"), so_loi=len(r.get("loi") or []),
+                       sua=(str(r.get("sua") or "")[:90] or None))
             # Kid 10/11: KHÔNG dựng lại hàng loạt (50 video thành 100). Giám khảo chỉ chấm + ghi bài học cho lô sau.
             # Bật lại bằng config "dung_lai": true nếu cần.
             sua = [t for t, r in kq if not r.get("dat") and r.get("sua")] if CFG.get("dung_lai") else []

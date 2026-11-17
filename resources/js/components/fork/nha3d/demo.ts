@@ -15,7 +15,7 @@ interface Beat {
 }
 
 const SP = 'Bình giữ nhiệt mini';
-const V = (j: number) => `binh-giu-nhiet-${j}`;
+const V = (j: number) => `binh-giu-nhiet-20261117-0${j}-0`;
 
 const BEATS: Beat[] = [
     {
@@ -51,7 +51,18 @@ const BEATS: Beat[] = [
             daodien: ['working', '2 đạo diễn đang lên bảng dựng…'],
         },
     },
-    { at: 40, ev: { vai: 'dao-dien', loai: 'xong', video: V(0) } },
+    {
+        at: 40,
+        ev: {
+            vai: 'dao-dien',
+            loai: 'xong',
+            video: V(0),
+            gu: 'nhanh',
+            so_canh: 7,
+            cong_thuc: 'cuon-nhanh',
+            y: 'mở bằng cảnh đổ nước đá, cắt nhanh theo nhịp hook',
+        },
+    },
     {
         at: 46,
         ev: { vai: 'dao-dien', loai: 'xong', video: V(1) },
@@ -63,7 +74,7 @@ const BEATS: Beat[] = [
     },
     {
         at: 58,
-        ev: { vai: 'dung', loai: 'xong', video: V(0) },
+        ev: { vai: 'dung', loai: 'xong', video: V(0), co_nhac: true },
         dong: 'Giám khảo đang chấm',
         state: { giamkhao: ['working', 'Đang chấm bản đầu…'] },
     },
@@ -188,6 +199,132 @@ const BEATS: Beat[] = [
         state: { thukho: ['idle', null] },
     },
     { at: 236, post: 'posted' },
+    // ---- tự thoại: chi tiết việc thật (giống sự kiện "nghi" hub ghi)
+    {
+        at: 6,
+        ev: { vai: 'bien-kich', loai: 'nghi', buoc: 'goi', so: 3, lan: 1 },
+    },
+    {
+        at: 8,
+        ev: {
+            vai: 'bien-kich',
+            loai: 'nghi',
+            buoc: 'loai',
+            kieu: 'con_so',
+            loi: 'câu mở dài (26 âm tiết, tối đa 22)',
+        },
+    },
+    {
+        at: 10,
+        ev: {
+            vai: 'bien-kich',
+            loai: 'nghi',
+            buoc: 'dat',
+            so: 1,
+            tong: 3,
+            kieu: 'phan_quyet',
+            hook: 'Bình giữ nhiệt mà sáu tiếng nước đá tan hết thì vứt.',
+            diem: 8,
+        },
+    },
+    {
+        at: 11,
+        ev: {
+            vai: 'bien-kich',
+            loai: 'nghi',
+            buoc: 'dat',
+            so: 2,
+            tong: 3,
+            kieu: 'mat_tien',
+            hook: 'Ba chục nghìn một ly trà sữa, mỗi ngày, cộng lại bằng ba cái bình.',
+            diem: 9,
+        },
+    },
+    {
+        at: 19,
+        ev: {
+            vai: 'giong',
+            loai: 'nghi',
+            buoc: 'xong1',
+            dur: 21.4,
+            goc: 'cong-dung',
+        },
+    },
+    {
+        at: 22,
+        ev: {
+            vai: 'giong',
+            loai: 'nghi',
+            buoc: 'dai',
+            dur: 27.8,
+            goc: 'qua-tang',
+        },
+    },
+    {
+        at: 30,
+        ev: { vai: 'dao-dien', loai: 'bat-dau', video: V(0), gu: 'nhanh' },
+    },
+    { at: 52, ev: { vai: 'dung', loai: 'bat-dau', video: V(0) } },
+    { at: 66, ev: { vai: 'giam-khao', loai: 'bat-dau', video: V(1) } },
+];
+BEATS.sort((a, b) => a.at - b.at);
+/** Việc giả của các vai lo app (giống NhaHoatDong.php). */
+const APP_BEATS: {
+    at: number;
+    vai: string;
+    loai: string;
+    [k: string]: unknown;
+}[] = [
+    {
+        at: 14,
+        vai: 'buuta',
+        loai: 'dang-dang',
+        buoc: 'claimed',
+        video: 'demo-binh-1.mp4',
+        kenh: '@vuonxanh',
+    },
+    {
+        at: 18,
+        vai: 'buuta',
+        loai: 'dang-dang',
+        buoc: 'uploading',
+        video: 'demo-binh-1.mp4',
+        kenh: '@vuonxanh',
+    },
+    {
+        at: 34,
+        vai: 'buuta',
+        loai: 'da-dang',
+        video: 'demo-binh-1.mp4',
+        kenh: '@vuonxanh',
+    },
+    { at: 48, vai: 'chuquay', loai: 'lay-gio', kenh: '@vuonxanh' },
+    { at: 56, vai: 'chuquay', loai: 'lay-gio-xong', kenh: '@vuonxanh', so: 50 },
+    {
+        at: 74,
+        vai: 'thukho',
+        loai: 'ai-xem',
+        state: 'ok',
+        chac: 'cao',
+        video: 'vuon-tieu-dak-nong.mp4',
+        san_pham: 'Nano Đồng',
+    },
+    {
+        at: 88,
+        vai: 'cu',
+        loai: 'hoi-mua',
+        y: 'giá sao shop, ship Đắk Lắk được không',
+        ai: '@chutu',
+    },
+    {
+        at: 112,
+        vai: 'buuta',
+        loai: 'dang-loi',
+        video: 'demo-binh-2.mp4',
+        kenh: '@vuonxanh',
+        loi: 'TikTok báo video trùng nội dung',
+    },
+    { at: 140, vai: 'meo', loai: 'chrome-tat', so: 3 },
 ];
 const LOOP = 270;
 const KEYS = [
@@ -309,8 +446,24 @@ export const createDemo = (startAt = 0) => {
                 hub: { up: true, dang_chay: working, url: '' },
                 lo,
                 reels,
-                events: events.slice(-60),
+                events: events.slice(-120),
                 bay_gio: Date.now() / 1000,
+                bay_gio_app: Date.now() / 1000,
+                hoat_dong: APP_BEATS.flatMap((b, i) => {
+                    const out = [];
+                    for (let L = 0; L <= loop; L++) {
+                        const at = L * LOOP + b.at;
+                        if (at <= el) {
+                            out.push({
+                                ...b,
+                                id: `demo:${L}:${i}`,
+                                n: base + at * 1_000_000,
+                            });
+                        }
+                    }
+
+                    return out;
+                }).sort((a, b) => a.n - b.n),
                 app: {
                     posts_today: 2,
                     next: null,

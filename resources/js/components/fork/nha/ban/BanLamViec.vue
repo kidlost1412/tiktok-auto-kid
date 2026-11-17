@@ -20,6 +20,7 @@ import { computed, watch } from 'vue';
 
 import { banBao } from '@/components/fork/nha/ban/bus';
 import { BAN, BAN_THU_TU } from '@/components/fork/nha/ban/registry';
+import SoTuThoai from '@/components/fork/nha/ban/SoTuThoai.vue';
 import type { NhaData } from '@/components/fork/nha/types';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,19 @@ const vai = defineModel<string | null>('vai', { required: true });
 const props = defineProps<{ data: NhaData | null }>();
 
 const def = computed(() => (vai.value ? (BAN[vai.value] ?? null) : null));
+/** Vai có sổ tự thoại (việc thật có lời lẩm bẩm). */
+const TU_THOAI = new Set([
+    'bienkich',
+    'thuam',
+    'daodien',
+    'thodung',
+    'giamkhao',
+    'thukho',
+    'chuquay',
+    'buuta',
+    'cu',
+    'meo',
+]);
 const open = computed({
     get: () => def.value !== null,
     set: (v: boolean) => {
@@ -173,6 +187,11 @@ watch(vai, (now, before) => {
                 <div
                     class="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5"
                 >
+                    <SoTuThoai
+                        v-if="TU_THOAI.has(vai ?? '')"
+                        :data="data"
+                        :who="def.vai ?? vai ?? ''"
+                    />
                     <component :is="def.component" :key="vai" :data="data" />
                 </div>
             </DialogContent>
