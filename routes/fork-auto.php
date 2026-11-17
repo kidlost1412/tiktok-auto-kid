@@ -82,6 +82,8 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::delete('video/{video}', [RiengController::class, 'forgetVideo'])->whereNumber('video')->middleware('throttle:60,1')->name('video.forget');
         Route::delete('thu-muc/{folder}', [RiengController::class, 'removeFolder'])->whereNumber('folder')->name('folders.remove');
         Route::patch('thu-muc/{folder}', [RiengController::class, 'renameFolder'])->whereNumber('folder')->name('folders.rename');
+        Route::patch('thu-muc/{folder}/nhac', [RiengController::class, 'saveMusic'])->whereNumber('folder')->middleware('throttle:60,1')->name('folders.music');
+        Route::post('nhac/dem', [RiengController::class, 'countMusic'])->middleware('throttle:60,1')->name('folders.music.count');
         Route::post('thu-muc/{folder}/mo', [RiengController::class, 'openFolder'])->whereNumber('folder')->middleware('throttle:30,1')->name('folders.open');
         Route::post('thu-muc/{folder}/video', [RiengController::class, 'uploadToFolder'])->whereNumber('folder')->middleware('throttle:120,1')->name('folders.upload');
         Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');

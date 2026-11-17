@@ -9,6 +9,15 @@ export interface Folder {
     path: string;
     exists: boolean;
     count: number;
+    music?: FolderMusic;
+}
+
+/** Ghép nhạc hàng loạt của thư mục: replace = tắt hẳn tiếng video; mix = trộn, nhạc nhỏ đi gain_db. */
+export interface FolderMusic {
+    enabled: boolean;
+    dir: string | null;
+    mode: 'replace' | 'mix';
+    gain_db: number;
 }
 
 export interface Selectable {

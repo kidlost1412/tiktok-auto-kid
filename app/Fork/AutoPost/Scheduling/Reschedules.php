@@ -72,7 +72,7 @@ final class Reschedules
         'identity' => 'Chrome đang đăng nhập một tài khoản TikTok khác — không xoá gì, giữ nguyên lịch cũ.',
         'list_failed' => 'Chrome không đọc được danh sách bài của TikTok Studio — chưa xoá gì, giữ nguyên lịch cũ.',
         'ui_failed' => 'TikTok không nhận lệnh xoá bài hẹn cũ (và Chrome cũng không bấm được nút Xoá trong TikTok Studio) — chưa xoá gì, giữ nguyên lịch cũ.',
-        'delete_failed' =>'TikTok từ chối lệnh xoá bài hẹn cũ — giữ nguyên lịch cũ, chưa đổi giờ.',
+        'delete_failed' => 'TikTok từ chối lệnh xoá bài hẹn cũ — giữ nguyên lịch cũ, chưa đổi giờ.',
         'unknown' => 'Đã gửi lệnh xoá nhưng không kiểm lại được danh sách bài — CHƯA đổi giờ. Hãy mở TikTok Studio xem bài hẹn cũ còn hay không trước khi làm gì thêm.',
     ];
 
@@ -633,13 +633,8 @@ final class Reschedules
 
     private function tz(string $accountId): DateTimeZone
     {
-        $name = SocialAccount::query()->whereKey($accountId)->value('timezone');
-
-        try {
-            return new DateTimeZone(filled($name) ? (string) $name : Planner::DEFAULT_TIMEZONE);
-        } catch (Throwable) {
-            return new DateTimeZone(Planner::DEFAULT_TIMEZONE);
-        }
+        // Luôn giờ Việt Nam như Planner (múi giờ lưu trên kênh có thể là UTC).
+        return Planner::zone();
     }
 
     /**

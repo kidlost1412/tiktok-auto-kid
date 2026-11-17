@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Fork\AutoPost\Http;
 
 use App\Fork\AutoPost\Media\ProductImages;
+use App\Fork\AutoPost\Models\AccountStat;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
-use App\Fork\AutoPost\Models\AccountStat;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\VideoComment;
 use App\Fork\AutoPost\Models\VideoStat;
+use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Http\Controllers\Controller;
 use App\Models\AnalyticsPublication;
@@ -30,8 +31,6 @@ final class StatsController extends Controller
 {
     use ScopesToOwner;
 
-    private const string DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
-
     private const int MAX_DAYS = 120;
 
     private const int LIST_LIMIT = 60;
@@ -49,7 +48,7 @@ final class StatsController extends Controller
     {
         $accounts = $this->tiktokAccounts($this->authorizeOwner($request));
         $accountIds = $accounts->pluck('id')->map(fn ($id): string => (string) $id)->all();
-        $tz = $accounts->first()?->timezone ?: self::DEFAULT_TZ;
+        $tz = Planner::zone()->getName();
 
         $range = $request->query('range');
         $range = is_string($range) && in_array($range, self::RANGES, true) ? $range : '7d';
@@ -299,7 +298,7 @@ final class StatsController extends Controller
      */
     private function row(AutoVideo $v, array $m, string $tz): array
     {
-        $local = CarbonImmutable::instance($v->posted_at)->setTimezone($v->socialAccount?->timezone ?: $tz);
+        $local = CarbonImmutable::instance($v->posted_at)->setTimezone($tz);
         $l = $m['latest'];
         $views = (int) ($l['views'] ?? 0);
         $likes = (int) ($l['likes'] ?? 0);

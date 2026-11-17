@@ -9,6 +9,7 @@ import {
     IconFolder,
     IconFolderOpen,
     IconFolderPlus,
+    IconMusic,
     IconPencil,
     IconPlus,
     IconPlaylistAdd,
@@ -41,6 +42,7 @@ import RiengAiStatus from '@/components/fork/kho/RiengAiStatus.vue';
 import RiengAutoDialog from '@/components/fork/kho/RiengAutoDialog.vue';
 import RiengAutoEdit from '@/components/fork/kho/RiengAutoEdit.vue';
 import RiengCard from '@/components/fork/kho/RiengCard.vue';
+import RiengMusicDialog from '@/components/fork/kho/RiengMusicDialog.vue';
 import RiengQueueDialog from '@/components/fork/kho/RiengQueueDialog.vue';
 import RiengSteps from '@/components/fork/kho/RiengSteps.vue';
 import RiengUploadDialog from '@/components/fork/kho/RiengUploadDialog.vue';
@@ -103,6 +105,14 @@ const openMenu = ref<number | null>(null);
 const renameVal = ref('');
 const uploadOpen = ref(false);
 const uploadFolder = ref<number | null>(null);
+const musicOpen = ref(false);
+const musicFolder = ref<Folder | null>(null);
+
+const openMusic = (f: Folder) => {
+    openMenu.value = null;
+    musicFolder.value = f;
+    musicOpen.value = true;
+};
 
 watch(openMenu, (id) => {
     const f = props.folders.find((x) => x.id === id);
@@ -1204,6 +1214,11 @@ defineExpose({ scan, busy });
                             title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
                         />
                         <span class="truncate font-medium">{{ f.name }}</span>
+                        <IconMusic
+                            v-if="f.music?.enabled"
+                            class="size-3.5 shrink-0 text-violet-600 dark:text-primary"
+                            aria-label="Đang ghép nhạc"
+                        />
                         <span
                             class="shrink-0 text-xs text-muted-foreground tabular-nums"
                             >{{ f.count }} video</span
@@ -1264,6 +1279,24 @@ defineExpose({ scan, busy });
                         size="sm"
                         variant="ghost"
                         class="w-full justify-start"
+                        :data-testid="`fork-rieng-folder-music-${f.id}`"
+                        @click="openMusic(f)"
+                    >
+                        <IconMusic class="size-4" /> Ghép nhạc
+                        <span
+                            v-if="f.music?.enabled"
+                            class="ml-auto text-xs text-emerald-600 dark:text-emerald-400"
+                            >{{
+                                f.music.mode === 'replace'
+                                    ? 'Thay hẳn'
+                                    : `Trộn ${f.music.gain_db} dB`
+                            }}</span
+                        >
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        class="w-full justify-start"
                         @click="removeFolder(f)"
                     >
                         <IconTrash class="size-4" /> Bỏ khỏi danh sách
@@ -1313,6 +1346,12 @@ defineExpose({ scan, busy });
             :folders="folders"
             :folder-id="uploadFolder"
             @done="reloadVideos"
+        />
+
+        <RiengMusicDialog
+            v-model:open="musicOpen"
+            :folder="musicFolder"
+            @saved="reloadVideos"
         />
 
         <Dialog v-model:open="folderDialog">

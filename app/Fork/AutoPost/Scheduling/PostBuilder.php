@@ -19,6 +19,7 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Rieng\RiengCovers;
+use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Models\Media;
@@ -89,9 +90,15 @@ final class PostBuilder
         $cartName = $videoName ?? CartRules::limitName((string) $link->display_name);
 
         $storedPath = null;
+        // Kho riêng: thư mục bật "Ghép nhạc" thì đăng bản đã ghép (file tạm, xoá sau khi chép). Lỗi ghép = không đăng.
+        $music = app(RiengMusic::class)->apply($video, $path);
+
+        if ($music !== null) {
+            $path = $music['path'];
+        }
 
         try {
-            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, $optional, &$storedPath): Post {
+            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, $optional, $music, &$storedPath): Post {
                 $post = $workspace->posts()->forceCreate([
                     'post_group_id' => (string) Str::uuid7(),
                     'user_id' => $owner->id,
@@ -120,6 +127,7 @@ final class PostBuilder
                         'fork_shop_name_src' => $videoName !== null ? 'video' : 'link',
                         ...($coverFile !== null ? ['fork_cover' => $coverFile] : []),
                         ...($coverFile !== null && $coverFile === $ownCover ? ['fork_cover_src' => RiengCovers::SOURCE] : []),
+                        ...($music !== null ? ['fork_music' => $music['track'], 'fork_music_mode' => $music['mode']] : []),
                     ],
                 ]);
 
@@ -131,7 +139,7 @@ final class PostBuilder
                 $mime = ['mp4' => 'video/mp4', 'mov' => 'video/quicktime', 'webm' => 'video/webm'][$ext];
                 $displayName = (string) $video->file_name;
 
-                if ($sourceExt === 'm4v') {
+                if ($sourceExt === 'm4v' || ($music !== null && strtolower(pathinfo($displayName, PATHINFO_EXTENSION)) !== 'mp4')) {
                     $displayName = pathinfo($displayName, PATHINFO_FILENAME).'.mp4';
                 }
 
@@ -189,6 +197,10 @@ final class PostBuilder
             }
 
             throw $e;
+        } finally {
+            if ($music !== null) {
+                @unlink($music['path']);
+            }
         }
     }
 }

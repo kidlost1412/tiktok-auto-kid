@@ -6,7 +6,7 @@ namespace App\Fork\AutoPost\Stats;
 
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
-use App\Models\SocialAccount;
+use App\Fork\AutoPost\Scheduling\Planner;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -22,8 +22,6 @@ final class Insights
 
     /** Một giờ cần ít nhất ngần này bài mới được xét. */
     public const int MIN_PER_HOUR = 2;
-
-    private const string DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
 
     /** @var list<string> */
     private const array DIMENSIONS = ['product_code', 'goc', 'giong', 'nhac', 'font', 'chuyen_canh', 'mau'];
@@ -114,13 +112,11 @@ final class Insights
             ->when($account, fn ($q) => $q->where('social_account_id', $account->social_account_id))
             ->get();
 
-        $timezones = SocialAccount::query()
-            ->whereIn('id', $videos->pluck('social_account_id')->filter()->unique()->all())
-            ->pluck('timezone', 'id');
+        // Giờ Việt Nam như lúc xếp lịch (múi giờ lưu trên kênh có thể là UTC).
+        $zone = Planner::zone();
 
-        return $videos->map(function (AutoVideo $v) use ($timezones): array {
-            $local = CarbonImmutable::instance($v->posted_at)
-                ->setTimezone(($timezones[$v->social_account_id] ?? null) ?: self::DEFAULT_TZ);
+        return $videos->map(function (AutoVideo $v) use ($zone): array {
+            $local = CarbonImmutable::instance($v->posted_at)->setTimezone($zone);
 
             return [
                 'hour' => (int) $local->format('G'),

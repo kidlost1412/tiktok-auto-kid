@@ -14,6 +14,11 @@ class RiengFolder extends Model
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return ['music' => 'array'];
+    }
+
     public function displayName(): string
     {
         if (filled($this->name)) {

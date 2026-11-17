@@ -15,9 +15,11 @@ use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengInfo;
+use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Rieng\RiengQueueItem;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
+use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PostBuilder;
 use App\Fork\AutoPost\Scheduling\Readiness;
@@ -38,6 +40,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
+use Symfony\Component\Process\Process;
 
 beforeEach(function (): void {
     Storage::fake();
@@ -547,6 +550,27 @@ test('auto times always stay inside the posting window and spill to the next day
         ->and($local)->toBe(['2026-11-21 06:00', '2026-11-21 06:50', '2026-11-21 07:10']);
 });
 
+test('posting times always use Vietnam time even when the channel was saved with UTC (fresh install)', function () {
+    $account = ($this->account)(['window_start' => 5, 'window_end' => 23]);
+    SocialAccount::query()->whereKey($account->id)->update(['timezone' => 'UTC']);
+    // 9:00 sáng giờ VN: giờ đầu tiên phải ngay sau 9:00 (không phải 12:00 trưa = 05:00 UTC), không bao giờ 0h–5h sáng.
+    $now = CarbonImmutable::parse('2026-11-20 09:00', 'Asia/Ho_Chi_Minh')->utc();
+    $v = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4')];
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => array_map(fn ($x) => ['id' => $x->id], $v)], $now);
+    $local = array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh'), $r['rows']);
+
+    expect($r['window'])->toBe('05:00–23:00')
+        ->and($local[0]->format('Y-m-d'))->toBe('2026-11-20')->and($local[0]->hour)->toBe(9)
+        ->and($local[1]->hour)->toBeIn([9, 10]);
+
+    // Xưởng cũng vậy: mọi giờ trong ngày nằm trong 05:00–23:00 giờ VN.
+    $slots = app(Planner::class)->slotsFor(AutoAccount::query()->findOrFail($account->id), $now, $now->addDay());
+    foreach ($slots as $s) {
+        $h = $s->setTimezone('Asia/Ho_Chi_Minh');
+        expect($h->hour * 60 + $h->minute)->toBeGreaterThanOrEqual(5 * 60)->toBeLessThanOrEqual(23 * 60);
+    }
+});
+
 test('an edited time is kept and checked; outside the window it is refused, the others are proposed around it', function () {
     $account = ($this->account)(['window_start' => 6, 'window_end' => 23]);
     $now = CarbonImmutable::parse('2026-11-20 09:00', 'Asia/Ho_Chi_Minh')->utc();
@@ -923,4 +947,106 @@ test('pick folder falls back to the blocking call when the launcher is older', f
 test('pick folder is owner only', function () {
     $this->postJson('/auto/kho/rieng/chon-thu-muc')->assertStatus(401);
     $this->postJson('/auto/kho/rieng/chon-thu-muc/ket-qua', ['id' => 'abc-1'])->assertStatus(401);
+});
+
+// ---------------------------------------------------------------- Ghép nhạc hàng loạt
+
+test('music settings are saved per folder; turning it on needs a music folder with tracks', function () {
+    $owner = ownerUser();
+    $folder = RiengFolder::create(['path' => $this->own]);
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music.'/them');
+    file_put_contents($music.'/a.mp3', 'x');
+    file_put_contents($music.'/them/b.M4A', 'x');
+    file_put_contents($music.'/ghi-chu.txt', 'x');
+    $url = '/auto/kho/rieng/thu-muc/'.$folder->id.'/nhac';
+
+    $this->actingAs($owner)->patchJson($url, ['enabled' => true, 'dir' => $this->own.'/rong', 'mode' => 'mix', 'gain_db' => -12])->assertStatus(422);
+    $this->actingAs($owner)->patchJson($url, ['enabled' => true, 'dir' => $music, 'mode' => 'mix', 'gain_db' => -50])->assertStatus(422);
+    $this->actingAs($owner)->patchJson($url, ['enabled' => true, 'dir' => $music, 'mode' => 'replace', 'gain_db' => -18])
+        ->assertOk()->assertJson(['ok' => true, 'tracks' => 2, 'music' => ['enabled' => true, 'mode' => 'replace', 'gain_db' => -18]]);
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/nhac/dem', ['dir' => $music])->assertOk()->assertJson(['tracks' => 2]);
+
+    expect(RiengMusic::settings($folder->fresh()))->toBe(['enabled' => true, 'dir' => $music, 'mode' => 'replace', 'gain_db' => -18])
+        ->and(RiengMusic::settings(RiengFolder::create(['path' => $this->own.'/khac']))['enabled'])->toBeFalse();
+
+    // tắt thì không cần thư mục nhạc
+    $this->actingAs($owner)->patchJson($url, ['enabled' => false, 'dir' => null, 'mode' => 'mix', 'gain_db' => -12])->assertOk();
+    expect(RiengMusic::settings($folder->fresh())['enabled'])->toBeFalse();
+});
+
+test('random track pick avoids the tracks used just before', function () {
+    $m = app(RiengMusic::class);
+    $tracks = ['a.mp3', 'b.mp3', 'c.mp3', 'd.mp3', 'e.mp3', 'f.mp3', 'g.mp3'];
+    $seen = [];
+
+    for ($i = 0; $i < 40; $i++) {
+        $t = $m->pick(9, $tracks);
+        expect(array_slice($seen, -5))->not->toContain($t);
+        $seen[] = $t;
+    }
+
+    expect($m->pick(9, ['only.mp3']))->toBe('only.mp3')->and($m->pick(9, []))->toBeNull();
+});
+
+test('posting a private video from a music folder uploads a new file with the music, never touching the original', function () {
+    $ffmpeg = app(RiengThumbs::class)->ffmpegPath();
+
+    if ($ffmpeg === null) {
+        $this->markTestSkipped('ffmpeg not installed');
+    }
+
+    $run = function (array $args) use ($ffmpeg): string {
+        $p = new Process([$ffmpeg, '-hide_banner', ...$args]);
+        $p->setTimeout(60);
+        $p->run();
+
+        return $p->getErrorOutput();
+    };
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music);
+    $run(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=20', $music.'/nhac-1.mp3']);
+    $folder = RiengFolder::create(['path' => $this->own, 'music' => ['enabled' => true, 'dir' => $music, 'mode' => 'mix', 'gain_db' => -12]]);
+    $quiet = RiengFolder::create(['path' => $this->own.'/q', 'music' => ['enabled' => true, 'dir' => $music, 'mode' => 'replace', 'gain_db' => 0]]);
+
+    $make = function (string $name, int $folderId, bool $withAudio) use ($run): AutoVideo {
+        $v = ($this->rieng)($name, null, ['meta' => ['folder_id' => $folderId, 'rel_path' => $name]]);
+        $run(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=25:duration=4',
+            ...($withAudio ? ['-f', 'lavfi', '-i', 'sine=frequency=440:duration=4'] : []),
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', ...($withAudio ? ['-c:a', 'aac'] : []), '-shortest', $v->path]);
+
+        return $v;
+    };
+    $mixed = $make('co-tieng.mp4', $folder->id, true);
+    $silent = $make('khong-tieng.MOV', $folder->id, false);
+    $replaced = $make('thay.mp4', $quiet->id, true);
+    $before = md5_file($mixed->path);
+
+    $done = ($this->batch)()->commit(($this->input)(($this->account)(), [$mixed, $silent, $replaced]), false, $this->now);
+    expect($done['done'])->toBe(3);
+
+    $postOf = fn (AutoVideo $v): Post => Post::query()->get()->first(fn (Post $p) => $p->meta['fork_auto_video_id'] === $v->id);
+
+    foreach ([$mixed, $silent, $replaced] as $v) {
+        $media = Media::query()->where('post_id', $postOf($v)->id)->firstOrFail();
+        $info = $run(['-i', Storage::path($media->path)]);
+
+        expect($postOf($v)->meta['fork_music'])->toBe('nhac-1.mp3')
+            ->and($info)->toMatch('/Audio: aac/')->toMatch('/Video: h264/')->toMatch('/Duration: 00:00:0[34]/')
+            ->and($media->path)->toEndWith('.mp4')->and($media->mime_type)->toBe('video/mp4');
+    }
+
+    expect(md5_file($mixed->path))->toBe($before)
+        ->and($postOf($replaced)->meta['fork_music_mode'])->toBe('replace')
+        ->and(Media::query()->where('post_id', $postOf($silent)->id)->value('original_filename'))->toBe('khong-tieng.mp4')
+        ->and(glob(storage_path('app/rieng-music/*')) ?: [])->toBe([]);
+});
+
+test('a folder with music on but an empty music folder never posts the video without music', function () {
+    $folder = RiengFolder::create(['path' => $this->own, 'music' => ['enabled' => true, 'dir' => $this->own.'/khong-co', 'mode' => 'mix', 'gain_db' => -12]]);
+    $v = ($this->rieng)('a.mp4', null, ['meta' => ['folder_id' => $folder->id, 'rel_path' => 'a.mp4']]);
+
+    $done = ($this->batch)()->commit(($this->input)(($this->account)(), [$v]), false, $this->now);
+
+    expect($done['done'])->toBe(0)->and(Post::query()->count())->toBe(0)->and($v->fresh()->status)->toBe('new');
 });
