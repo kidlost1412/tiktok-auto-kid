@@ -45,14 +45,14 @@ final class RemoteImage
     /**
      * @return array{body: string, ext: string}|null
      */
-    public static function fetch(string $url): ?array
+    public static function fetch(string $url, int $timeout = 8): ?array
     {
         if (! self::allowed($url)) {
             return null;
         }
 
         try {
-            $res = Http::timeout(8)->connectTimeout(4)->withoutRedirecting()
+            $res = Http::timeout($timeout)->connectTimeout(min(10, $timeout))->withoutRedirecting()
                 ->withHeaders(['User-Agent' => self::USER_AGENT, 'Referer' => 'https://www.tiktok.com/'])
                 ->get($url);
         } catch (Throwable) {
@@ -82,7 +82,16 @@ final class RemoteImage
         $info = @getimagesizefromstring($body);
         $mime = is_array($info) ? (string) ($info['mime'] ?? '') : '';
 
-        return isset(self::TYPES[$mime]) ? ['body' => $body, 'ext' => self::TYPES[$mime]] : null;
+        if (! isset(self::TYPES[$mime])) {
+            return null;
+        }
+
+        // Đầu file đúng là ảnh nhưng phần sau hỏng (tải dở / ảnh shop lỗi): trình duyệt cũng không hiện được, coi như không có.
+        if (in_array($mime, ['image/jpeg', 'image/png'], true) && function_exists('imagecreatefromstring') && @imagecreatefromstring($body) === false) {
+            return null;
+        }
+
+        return ['body' => $body, 'ext' => self::TYPES[$mime]];
     }
 
     public static function mime(string $ext): string

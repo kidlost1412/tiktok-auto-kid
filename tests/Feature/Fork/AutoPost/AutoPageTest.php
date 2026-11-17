@@ -175,7 +175,9 @@ test('owner can hide and unhide a shop product and request a sync', function ():
     expect(ShopProduct::query()->first()->hidden)->toBeFalse();
     $this->actingAs($this->owner)->patch("/auto/accounts/{$this->sa->id}/shop-products/1729384756000000042", ['hidden' => true])->assertNotFound();
 
-    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")->assertSessionHas('flash.success');
+    // Chrome của kênh chưa từng kết nối: vẫn gửi yêu cầu nhưng nói rõ lý do chưa lấy được.
+    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")
+        ->assertSessionHas('flash.error', fn (string $m) => str_contains($m, 'Đã gửi yêu cầu') && str_contains($m, 'không mở'));
     expect(AutoAccount::query()->find($this->sa->id)->products_sync_request)->not->toBeNull();
 });
 

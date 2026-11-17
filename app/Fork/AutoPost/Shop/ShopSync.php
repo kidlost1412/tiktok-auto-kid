@@ -8,6 +8,10 @@ use App\Fork\AutoPost\Jobs\PrefetchProductCovers;
 use App\Fork\AutoPost\Models\AnchorTemplate;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Scheduling\Planner;
+use App\Fork\Chrome\ChromeJobs;
+use App\Fork\Chrome\Models\ChromeAccount;
+use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Models\Post;
 use Carbon\CarbonImmutable;
@@ -128,7 +132,7 @@ final class ShopSync
                 $state = 'expired';
             } elseif (filled($auto->products_sync_error)) {
                 $state = 'error';
-                $reason = (string) $auto->products_sync_error;
+                $reason = self::humanReason((string) $auto->products_sync_error);
             } else {
                 $state = 'waiting';
             }
@@ -153,6 +157,63 @@ final class ShopSync
             'requested_at' => $auto?->products_sync_requested_at?->toIso8601String(),
             'synced_at' => $auto?->products_synced_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Vì sao Chrome của kênh này chưa nhận được lệnh lấy giỏ (null = Chrome sẵn sàng). Lệnh lấy giỏ chỉ giao cho đúng
+     * Chrome đang đăng nhập tài khoản TikTok của kênh, nên kênh nào Chrome tắt / chưa đăng nhập thì yêu cầu nằm chờ.
+     */
+    public function chromeProblem(string $socialAccountId): ?string
+    {
+        $jobs = app(ChromeJobs::class);
+        $chrome = ChromeAccount::query()->where('social_account_id', $socialAccountId)->where('enabled', true)->first();
+
+        if ($chrome === null) {
+            return 'Kênh chưa bật đăng qua Chrome (Cài đặt → Kết nối Chrome).';
+        }
+
+        if (blank($chrome->tiktok_user_id)) {
+            return 'App chưa biết Chrome nào đăng nhập tài khoản này: mở Chrome của kênh, vào TikTok Studio và đăng nhập đúng tài khoản.';
+        }
+
+        $clients = ChromeClient::query()->where('tiktok_user_id', $chrome->tiktok_user_id)->whereNull('revoked_at')->get();
+        $online = $clients->filter(fn (ChromeClient $c): bool => $jobs->isOnline($c));
+
+        if ($online->isEmpty()) {
+            $last = $clients->max('last_seen_at');
+
+            return 'Chrome đang đăng nhập tài khoản này không mở (hoặc mất kết nối)'
+                .($last !== null ? ', lần cuối thấy lúc '.CarbonImmutable::parse($last)->setTimezone(Planner::zone())->format('H:i d/m') : '')
+                .'. Mở Chrome (đúng hồ sơ có tài khoản này) rồi bấm lấy lại.';
+        }
+
+        if ($online->count() > 1) {
+            return 'Có '.$online->count().' Chrome cùng đăng nhập tài khoản này: tắt bớt, chỉ để một Chrome.';
+        }
+
+        if (! $jobs->protocolOk((int) $online->first()->protocol)) {
+            return 'Tiện ích Chrome của tài khoản này là bản cũ: vào chrome://extensions bấm tải lại tiện ích.';
+        }
+
+        return null;
+    }
+
+    /** Lý do lỗi tiện ích gửi lên (mã kỹ thuật) -> câu dễ hiểu, giữ mã gốc trong ngoặc để tra. */
+    public static function humanReason(string $raw): string
+    {
+        $r = mb_strtolower($raw);
+        $text = match (true) {
+            str_contains($r, 'identity_mismatch') || str_contains($r, 'không khớp') || str_contains($r, '409') => 'Chrome đang đăng nhập một tài khoản TikTok khác với kênh này',
+            str_contains($r, 'sync-timeout') => 'Chrome lấy quá lâu mà chưa xong',
+            str_contains($r, 'tab-closed') => 'cửa sổ TikTok Studio bị đóng giữa chừng',
+            str_contains($r, 'open-window-failed') => 'Chrome không mở được cửa sổ TikTok Studio',
+            str_contains($r, 'gave-up') => 'Chrome đã thử nhiều lần không được',
+            str_contains($r, 'http 401') || str_contains($r, 'http 403') || str_contains($r, 'code-') => 'TikTok Shop từ chối: phiên đăng nhập hết hạn, hoặc tài khoản này chưa có TikTok Shop / chưa được gắn giỏ hàng. Mở TikTok Studio của tài khoản này, đăng nhập lại và thử gắn giỏ tay một lần',
+            str_contains($r, 'failed to fetch') || str_contains($r, 'network') || str_contains($r, 'non-json') => 'mạng tới TikTok Shop bị lỗi',
+            default => null,
+        };
+
+        return $text === null ? $raw : $text.' ('.$raw.')';
     }
 
     // ---------------------------------------------------------------- Sản phẩm shop

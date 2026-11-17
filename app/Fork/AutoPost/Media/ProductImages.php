@@ -22,9 +22,19 @@ final class ProductImages
         return storage_path('app/product-covers');
     }
 
+    /**
+     * Mã phiên bản ảnh: theo ẢNH (host + đường dẫn tới mã ảnh, trước dấu "~"), không theo cả link. Mỗi lần lấy giỏ TikTok
+     * trả link mới cho cùng một ảnh (tham số ký thay đổi); tính theo cả link thì ảnh đang có bị bỏ và phải tải lại, tải
+     * không kịp là mất ảnh.
+     */
     public static function version(ShopProduct $p): string
     {
-        return substr(md5((string) $p->cover_url), 0, 8);
+        $url = (string) $p->cover_url;
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $key = $host !== '' && $path !== '' ? $host.explode('~', $path, 2)[0] : $url;
+
+        return substr(md5($key), 0, 8);
     }
 
     /** Đường dẫn tương đối trả cho giao diện, hoặc null nếu sản phẩm chưa có ảnh. */
@@ -54,6 +64,14 @@ final class ProductImages
         return null;
     }
 
+    /** Ảnh cũ của sản phẩm (phiên bản trước) còn trên máy: dùng tạm khi bản mới chưa tải được. */
+    private function stale(ShopProduct $p): ?string
+    {
+        $files = glob(self::dir().DIRECTORY_SEPARATOR.$p->id.'-*') ?: [];
+
+        return $files === [] ? null : $files[0];
+    }
+
     /** Đường dẫn file ảnh trên máy (tải nếu chưa có); null khi chưa lấy được. */
     public function file(ShopProduct $p): ?string
     {
@@ -68,13 +86,13 @@ final class ProductImages
         $failKey = self::failKey($p);
 
         if (Cache::has($failKey)) {
-            return null;
+            return $this->stale($p);
         }
 
-        $img = RemoteImage::fetch(self::largeUrl($p));
-        $img ??= self::largeUrl($p) !== (string) $p->cover_url ? RemoteImage::fetch((string) $p->cover_url) : null;
+        $img = RemoteImage::fetch(self::largeUrl($p), 30);
+        $img ??= self::largeUrl($p) !== (string) $p->cover_url ? RemoteImage::fetch((string) $p->cover_url, 30) : null;
 
-        return $this->store($p, $img);
+        return $this->store($p, $img) ?? $this->stale($p);
     }
 
     /**
@@ -99,7 +117,8 @@ final class ProductImages
         foreach (array_chunk($todo, max(1, $concurrency)) as $batch) {
             try {
                 $responses = Http::pool(fn (Pool $pool): array => array_map(
-                    fn (ShopProduct $p) => $pool->as((string) $p->id)->timeout(15)->connectTimeout(5)->withoutRedirecting()
+                    // Máy chủ ảnh TikTok lần đầu có khi chờ rất lâu (đo được hơn 1 phút): chờ đủ lâu, đây là việc chạy nền.
+                    fn (ShopProduct $p) => $pool->as((string) $p->id)->timeout(90)->connectTimeout(10)->withoutRedirecting()
                         ->withHeaders(['User-Agent' => RemoteImage::USER_AGENT, 'Referer' => 'https://www.tiktok.com/'])
                         ->get(self::largeUrl($p)),
                     $batch,
@@ -113,7 +132,7 @@ final class ProductImages
 
                 // Bản lớn không được thì thử đúng link gốc (từng cái một, hiếm khi xảy ra).
                 if ($img === null && self::largeUrl($p) !== (string) $p->cover_url) {
-                    $img = RemoteImage::fetch((string) $p->cover_url);
+                    $img = RemoteImage::fetch((string) $p->cover_url, 60);
                 }
 
                 if ($this->store($p, $img) !== null) {
@@ -125,11 +144,14 @@ final class ProductImages
         return $saved;
     }
 
-    /** Shop thường gửi bản thu nhỏ 48x48: xin bản lớn của cùng ảnh trước. */
+    /**
+     * Xin bản JPEG 400px của cùng ảnh: shop hay gửi bản thu nhỏ 48x48 (resize-image) hoặc ảnh gốc (origin-image, có khi là
+     * PNG vài MB, có cái hỏng không mở được). Máy chủ ảnh TikTok tự đổi cỡ/định dạng theo mẫu "tplv-…-resize-jpeg:400:400.jpeg".
+     */
     private static function largeUrl(ShopProduct $p): string
     {
         $url = (string) $p->cover_url;
-        $big = preg_replace('/(resize-image:)\d+:\d+(\.image)/', '${1}400:400${2}', $url);
+        $big = preg_replace('/(~tplv-[a-z0-9]+-)(?:origin-image|resize-image:\d+:\d+)\.image/i', '${1}resize-jpeg:400:400.jpeg', $url);
 
         return is_string($big) ? $big : $url;
     }

@@ -79,7 +79,13 @@ final class GioHangController extends Controller
             return back()->with('flash.error', 'Kênh chưa bật đăng qua Chrome nên không lấy được sản phẩm từ shop.');
         }
 
-        app(ShopSync::class)->requestSync($account->id);
+        $sync = app(ShopSync::class);
+        $sync->requestSync($account->id);
+
+        // Chrome của kênh chưa sẵn sàng: nói ngay lý do (yêu cầu vẫn chờ, Chrome mở lên là tự lấy).
+        if (($problem = $sync->chromeProblem((string) $account->id)) !== null) {
+            return back()->with('flash.error', 'Đã gửi yêu cầu, nhưng chưa lấy được ngay: '.$problem);
+        }
 
         return back()->with('flash.success', 'Đã gửi yêu cầu. Tiện ích Chrome sẽ lấy sản phẩm từ shop @'.$account->username.' trong ít phút.');
     }
@@ -289,6 +295,8 @@ final class GioHangController extends Controller
     {
         $auto = AutoAccount::query()->find($account->id);
         $sync = app(ShopSync::class)->status($auto);
+        // Đang chờ / lỗi / hết hạn: kèm lý do phía Chrome (tắt, chưa đăng nhập, 2 Chrome...) để chủ app biết sửa gì.
+        $sync['chrome'] = in_array($sync['state'], ['waiting', 'error', 'expired'], true) ? app(ShopSync::class)->chromeProblem((string) $account->id) : null;
         $rules = app(CartRules::class);
 
         $shop = ShopProduct::query()->where('social_account_id', $account->id)->orderBy('title')->get();

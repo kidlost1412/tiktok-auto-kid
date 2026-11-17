@@ -243,11 +243,12 @@ test('delete the sample: the hub is asked and the hub refusing leaves everything
 });
 
 test('sync progress: only the pending request can report it, the page shows got/total, and finishing clears it', function (): void {
-    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")->assertSessionHas('flash.success');
-    $id = AutoAccount::query()->find($this->sa->id)->products_sync_request;
-
     $paired = app(ChromeJobs::class)->createClient((string) $this->account->id, 'Chrome', '1.1.0', 1);
     $paired['client']->forceFill(['tiktok_user_id' => '777', 'tiktok_username' => 'kenh_a'])->save();
+
+    // Chrome của kênh đang mở: không có gì phải báo.
+    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")->assertSessionHas('flash.success');
+    $id = AutoAccount::query()->find($this->sa->id)->products_sync_request;
     $headers = ['Authorization' => 'Bearer '.$paired['token'], 'X-Autotok-Protocol' => '1'];
 
     $this->postJson('/api/ext/sync_status', ['request_id' => 'sai', 'ok' => true, 'progress' => ['got' => 5, 'total' => 58]], $headers)->assertOk()->assertJson(['recorded' => false]);
@@ -288,7 +289,7 @@ test('covers: prefetch downloads all missing images at once, shrinks them, and t
     expect($saved)->toBe(2);
     // Bản lớn 400:400 được xin trước; chỉ 2 lần tải (host lạ bị bỏ qua).
     Http::assertSentCount(2);
-    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'resize-image:400:400.image'));
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'resize-jpeg:400:400.jpeg'));
 
     foreach ([$one, $two] as $p) {
         $file = $images->cached($p);
@@ -323,4 +324,40 @@ test('covers: a failed download is remembered so the page does not hammer the CD
 
     // Lần 1: bản lớn + link gốc (2 lần thử); lần 2 đọc từ bộ nhớ đệm lỗi nên không gọi thêm.
     Http::assertSentCount(2);
+});
+
+test('covers: a re-sync that only changes the signed link keeps the image; a broken image or failed new download never blanks it', function (): void {
+    $p = ($this->shop)('1729384756000000107', ['cover_url' => 'https://p16.ibyteimg.com/obj/abc123~tplv-x-origin-image.image?t=1&sig=aaa']);
+    $im = imagecreatetruecolor(500, 500);
+    imagefill($im, 0, 0, (int) imagecolorallocate($im, 30, 200, 30));
+    ob_start();
+    imagejpeg($im);
+    $jpg = (string) ob_get_clean();
+    $broken = false;
+    Http::fake(['p16.ibyteimg.com/*' => function () use (&$broken, $jpg) {
+        return $broken ? Http::response('PNG
+
+
+'.str_repeat(' ', 64), 200) : Http::response($jpg, 200, ['Content-Type' => 'image/jpeg']);
+    }]);
+    $images = app(ProductImages::class);
+
+    expect($images->prefetch([$p]))->toBe(1);
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'abc123~tplv-x-resize-jpeg:400:400.jpeg?t=1'));
+    $first = $images->cached($p);
+
+    // Lấy giỏ lần sau: cùng ảnh, chỉ khác tham số ký -> không tải lại, vẫn đúng file.
+    $p->forceFill(['cover_url' => 'https://p16.ibyteimg.com/obj/abc123~tplv-x-origin-image.image?t=2&sig=bbb'])->save();
+    expect($images->cached($p))->toBe($first)->and($images->prefetch([$p]))->toBe(0);
+
+    // Shop đổi sang ảnh khác mà máy chủ ảnh trả về ảnh hỏng: vẫn hiện ảnh cũ thay vì icon trống.
+    $broken = true;
+    $p->forceFill(['cover_url' => 'https://p16.ibyteimg.com/obj/khac999~tplv-x-origin-image.image?t=3'])->save();
+    Cache::flush();
+    expect($images->cached($p))->toBeNull()->and($images->file($p))->toBe($first);
+    $this->actingAs($this->owner)->get(ProductImages::url($p))->assertOk();
+
+    foreach (glob(ProductImages::dir().'/'.$p->id.'-*') ?: [] as $f) {
+        @unlink($f);
+    }
 });

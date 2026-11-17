@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Post\Status;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
@@ -11,7 +12,9 @@ use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeAccount;
+use App\Fork\Chrome\Models\ChromeJob;
 use App\Models\Account;
+use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\Workspace;
@@ -193,7 +196,7 @@ test('sync status: waiting, error, expired after 10 minutes (tasks stop offering
     expect($sync->reportFailure($this->sa->id, 'khac', 'x'))->toBeFalse()   // yêu cầu cũ/khác không ghi đè
         ->and($sync->reportFailure($this->sa->id, $id, 'tab-closed'))->toBeTrue();
     $st = $sync->status(AutoAccount::query()->find($this->sa->id));
-    expect($st['state'])->toBe('error')->and($st['reason'])->toBe('tab-closed');
+    expect($st['state'])->toBe('error')->and($st['reason'])->toBe('cửa sổ TikTok Studio bị đóng giữa chừng (tab-closed)');
 
     AutoAccount::query()->find($this->sa->id)->update(['products_sync_requested_at' => CarbonImmutable::now()->subMinutes(11)]);
     expect($sync->status(AutoAccount::query()->find($this->sa->id))['state'])->toBe('expired')
@@ -206,8 +209,11 @@ test('sync status: waiting, error, expired after 10 minutes (tasks stop offering
 });
 
 test('the page shows the sync state and the extension can report a failure', function (): void {
-    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")->assertSessionHas('flash.success');
-    $this->actingAs($this->owner)->get('/auto/gio-hang')->assertInertia(fn (AssertableInertia $p) => $p->where('sync.state', 'waiting'));
+    // Chưa có Chrome nào của kênh đang mở: yêu cầu vẫn được gửi, nhưng báo ngay lý do.
+    $this->actingAs($this->owner)->post("/auto/accounts/{$this->sa->id}/shop/sync")
+        ->assertSessionHas('flash.error', fn (string $m) => str_contains($m, 'không mở'));
+    $this->actingAs($this->owner)->get('/auto/gio-hang')->assertInertia(fn (AssertableInertia $p) => $p->where('sync.state', 'waiting')
+        ->where('sync.chrome', fn (?string $c) => str_contains((string) $c, 'không mở')));
 
     $chrome = app(ChromeJobs::class);
     $paired = $chrome->createClient((string) $this->account->id, 'Chrome', '1.1.0', 1);
@@ -230,8 +236,8 @@ test('changing the cart also moves already scheduled posts that Chrome has not s
     $url = "/auto/accounts/{$this->sa->id}/links/dam-ca";
     $this->actingAs($this->owner)->put($url, ['quy_cach' => '1l', 'shop_product_id' => GH_1L, 'display_name' => 'ĐẠM CÁ CŨ'])->assertSessionHas('flash.success');
 
-    $post = function (array $meta, string $hash): App\Models\Post {
-        $p = App\Models\Post::factory()->forAccount($this->sa)->scheduled()->create(['user_id' => $this->owner->id, 'meta' => [
+    $post = function (array $meta, string $hash): Post {
+        $p = Post::factory()->forAccount($this->sa)->scheduled()->create(['user_id' => $this->owner->id, 'meta' => [
             'fork_shop_product_id' => GH_1L, ...$meta,
         ]]);
         AutoVideo::query()->create(['hash' => $hash, 'path' => "/{$hash}.mp4", 'batch_date' => '2026-01-05', 'file_name' => "{$hash}.mp4",
@@ -242,7 +248,7 @@ test('changing the cart also moves already scheduled posts that Chrome has not s
     $legacy = $post(['fork_shop_product_name' => 'ĐẠM CÁ CŨ'], 'a');            // bài cũ: tên lấy từ liên kết
     $own = $post(['fork_shop_product_name' => 'TÊN RIÊNG VIDEO', 'fork_shop_name_src' => 'video'], 'b');
     $running = $post(['fork_shop_product_name' => 'ĐẠM CÁ CŨ'], 'c');
-    App\Fork\Chrome\Models\ChromeJob::create([
+    ChromeJob::create([
         'id' => 'ej_'.bin2hex(random_bytes(8)), 'post_id' => $running->id, 'social_account_id' => $this->sa->id, 'attempt' => 1, 'mode' => 'scheduled',
         'expect_user_id' => '777', 'media_path' => 'x.mp4', 'video_name' => 'x.mp4', 'video_size' => 1, 'state' => 'uploading', 'options' => [],
         'nonce' => 'n', 'deliver_by' => now(),
@@ -259,5 +265,5 @@ test('changing the cart also moves already scheduled posts that Chrome has not s
 
     // Bỏ chọn: bài đã xếp lịch không bị huỷ, chỉ báo cho chủ app.
     $this->actingAs($this->owner)->delete($url, ['quy_cach' => '1l'])->assertSessionHas('flash.warning');
-    expect($legacy->fresh()->status)->toBe(App\Enums\Post\Status::Scheduled);
+    expect($legacy->fresh()->status)->toBe(Status::Scheduled);
 });

@@ -45,6 +45,8 @@ export interface Sync {
     synced_at: string | null;
     /** Đang lấy dở: đã có got trên tổng total (null nếu shop chưa cho biết tổng). */
     progress?: { got: number; total: number | null } | null;
+    /** Chrome của kênh chưa sẵn sàng nhận lệnh lấy giỏ (tắt, chưa đăng nhập, 2 Chrome...). */
+    chrome?: string | null;
 }
 
 /** Cá nhân hoá theo sản phẩm hub (ảnh bìa, hashtag). */
