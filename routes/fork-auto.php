@@ -108,6 +108,7 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::get('tu-dong/chatgpt/{id}/han-muc', [RiengAutoController::class, 'chatGptLimits'])->where('id', 'tk-[a-z0-9]{8}')->middleware('throttle:30,1')->name('auto.chatgpt.limits');
         Route::delete('tu-dong/chatgpt/{id}', [RiengAutoController::class, 'removeChatGpt'])->where('id', 'tk-[a-z0-9]{8}')->name('auto.chatgpt.remove');
         Route::post('video/{video}/tu-dong', [RiengAutoController::class, 'updateVideo'])->whereNumber('video')->middleware('throttle:120,1')->name('auto.video');
+        Route::get('video/{video}/trang-thai', [RiengAutoController::class, 'videoState'])->whereNumber('video')->name('auto.rieng.video.state');
         Route::post('video/{video}/ai-xem-lai', [RiengAutoController::class, 'reanalyze'])->whereNumber('video')->middleware('throttle:20,1')->name('auto.reanalyze');
     });
 });

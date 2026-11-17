@@ -4,25 +4,69 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Console;
 
+use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
 use App\Fork\AutoPost\Rieng\RiengScanner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Symfony\Component\Process\Process;
 use Throwable;
 
 /** Cho AI (ChatGPT) xem các video Kho riêng mới: đoán sản phẩm + viết caption. Chạy khi đã bật "Kho riêng tự đăng theo khung". */
 class RiengAiCommand extends Command
 {
-    protected $signature = 'fork:rieng-ai {--limit=4 : số video tối đa mỗi lượt} {--force : chạy cả khi chưa bật tự đăng}';
+    protected $signature = 'fork:rieng-ai
+        {--limit=4 : số video tối đa mỗi lượt}
+        {--video= : chỉ xem một video (nút "AI xem lại")}
+        {--minutes=20 : dừng nhận video mới sau ngần này phút}
+        {--force : chạy cả khi chưa bật tự đăng}';
 
     protected $description = 'AI xem video Kho riêng mới: đoán sản phẩm và viết caption';
+
+    /** Chạy lệnh này ở nền ngay (không đợi lịch 2 phút), vd. khi chủ app bấm "AI xem lại". */
+    public static function launch(?int $videoId = null): void
+    {
+        // Không bao giờ tự sinh tiến trình con khi chạy test (từng làm treo máy).
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        $php = dirname(PHP_BINARY).DIRECTORY_SEPARATOR.(PHP_OS_FAMILY === 'Windows' ? 'php.exe' : 'php');
+        $php = is_file($php) ? $php : PHP_BINARY;
+        $args = ['fork:rieng-ai', '--force'];
+
+        if ($videoId !== null) {
+            $args[] = '--video='.$videoId;
+        }
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            // start /b: tách khỏi request web (nếu chỉ start() thì hết request là bị tắt theo).
+            $cmd = '"'.$php.'" "'.base_path('artisan').'" '.implode(' ', $args);
+            (new Process(['cmd.exe', '/c', 'start', '""', '/b', 'cmd.exe', '/c', $cmd.' > nul 2>&1'], base_path()))->setTimeout(15)->run();
+
+            return;
+        }
+
+        (new Process(['sh', '-c', 'nohup '.escapeshellarg($php).' '.escapeshellarg(base_path('artisan')).' '.implode(' ', $args).' > /dev/null 2>&1 &'], base_path()))->setTimeout(15)->run();
+    }
 
     public function handle(RiengAnalyzer $analyzer, ChatGptAccounts $accounts): int
     {
         if (! RiengAutoSettings::get()['enabled'] && ! $this->option('force')) {
             $this->line('Chưa bật Kho riêng tự đăng theo khung.');
+
+            return self::SUCCESS;
+        }
+
+        if (filled($this->option('video'))) {
+            $video = AutoVideo::query()->find((int) $this->option('video'));
+
+            if ($video !== null && $video->isRieng() && $video->status === AutoVideo::NEW) {
+                $ai = $analyzer->analyze($video);
+                $this->line("#{$video->id}: ".($ai['state'] ?? '-').' '.($ai['product_code'] ?? '-'));
+            }
 
             return self::SUCCESS;
         }
@@ -44,14 +88,20 @@ class RiengAiCommand extends Command
             $analyzer->retryNow();
         }
 
+        $until = microtime(true) + 60 * max(1, (int) $this->option('minutes'));
+
         foreach ($analyzer->pending(max(1, (int) $this->option('limit'))) as $video) {
+            if (microtime(true) > $until) {
+                break;
+            }
+
             if ($accounts->pick() === null) {
                 $this->line('Chưa có tài khoản ChatGPT nào sẵn sàng.');
 
                 break;
             }
 
-            $ai = $analyzer->analyze($video);
+            $ai = $analyzer->analyze($video, null, (int) max(120, $until - microtime(true)));
             $this->line("#{$video->id} {$video->file_name}: {$ai['state']} ".($ai['product_code'] ?? '-').' '.($ai['error'] ?? ($ai['caption'] ?? '')));
         }
 

@@ -270,11 +270,13 @@ const onClick = (e: MouseEvent) => {
                 >
                 <span
                     v-if="
-                        auto()!.ai_hashtags?.length &&
+                        (auto()!.kid_hashtags ?? auto()!.ai_hashtags)?.length &&
                         auto()!.final_caption !== ''
                     "
                     class="truncate text-sky-700 dark:text-sky-300"
-                    >{{ auto()!.ai_hashtags.join(' ') }}</span
+                    >{{
+                        (auto()!.kid_hashtags ?? auto()!.ai_hashtags).join(' ')
+                    }}</span
                 >
             </button>
 

@@ -100,6 +100,20 @@ export interface RiengAuto {
     ai_error: string | null;
     ai_tries: number;
     ai_next_try_at: string | null;
+    /** Hashtag chủ app tự sửa (null = dùng hashtag AI). */
+    kid_hashtags: string[] | null;
+    /** AI đang xem: bậc mấy / tổng, việc gì. */
+    ai_progress: {
+        buoc: number;
+        tong: number;
+        viec: string;
+        tu: string;
+        luc: string;
+    } | null;
+    /** Các bậc AI đã thử lần gần nhất. */
+    ai_steps: { buoc: string; ket_qua: string }[];
+    /** Lời nói app nghe được trong video. */
+    ai_heard: string | null;
     ai_at: string | null;
     approved: boolean;
     product_by: 'kid' | 'ai' | null;
@@ -166,6 +180,13 @@ export interface AutoPayload {
     efforts: Record<string, string>;
     codex_installed: boolean;
     cli: CliStatus;
+    /** Bộ nghe lời nói (Whisper trên máy). */
+    speech: {
+        python: boolean;
+        installed: boolean;
+        installing: boolean;
+        error: string | null;
+    };
     chatgpt: ChatGptAccount[];
     channels: {
         id: string;

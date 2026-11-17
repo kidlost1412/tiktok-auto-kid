@@ -10,6 +10,7 @@ import {
     IconExternalLink,
     IconFolder,
     IconLoader2,
+    IconMicrophone,
     IconPlus,
     IconRefresh,
     IconTrash,
@@ -984,6 +985,48 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             "
                         />
                     </label>
+
+                    <div
+                        class="flex items-start gap-2 rounded-xl border-2 px-3 py-2.5"
+                        data-testid="fork-rieng-speech"
+                    >
+                        <IconMicrophone
+                            class="mt-0.5 size-5 shrink-0 text-foreground/70"
+                        />
+                        <span class="min-w-0">
+                            <span class="block font-semibold"
+                                >Nghe lời nói trong video
+                                <span class="font-normal text-foreground/70"
+                                    >(miễn phí, chạy trên máy)</span
+                                ></span
+                            >
+                            <span
+                                :class="
+                                    cn(
+                                        'block text-[13px]',
+                                        data.speech.installed
+                                            ? 'text-emerald-700 dark:text-emerald-400'
+                                            : data.speech.error ||
+                                                !data.speech.python
+                                              ? 'text-amber-700 dark:text-amber-400'
+                                              : 'text-foreground/70',
+                                    )
+                                "
+                                >{{
+                                    data.speech.installed
+                                        ? 'Sẵn sàng. App nghe lời nói trong video để AI nhận sản phẩm chắc hơn.'
+                                        : data.speech.installing
+                                          ? 'Đang cài lần đầu (vài phút)…'
+                                          : !data.speech.python
+                                            ? 'Máy chưa có Python của Xưởng Video nên chưa nghe được.'
+                                            : data.speech.error
+                                              ? data.speech.error +
+                                                ' (app sẽ thử cài lại)'
+                                              : 'App tự cài lần đầu khi cần (khoảng 2 GB).'
+                                }}</span
+                            >
+                        </span>
+                    </div>
 
                     <div class="flex flex-col gap-1.5">
                         <span class="font-medium">Tài khoản ChatGPT</span>
