@@ -106,6 +106,11 @@ class RiengAutoPoster
         $meta = (array) $v->meta;
         $ai = (array) ($meta['ai'] ?? []);
 
+        // AI đang xem (kết quả có thể đổi sản phẩm / caption): chờ AI xong rồi mới đăng.
+        if (is_array($dang = $ai['dang'] ?? null) && CarbonImmutable::parse((string) ($dang['luc'] ?? 'now'))->diffInMinutes($now, true) < 40) {
+            return empty($dang['tong']) ? 'AI sắp xem video' : "AI đang xem (bước {$dang['buoc']}/{$dang['tong']})";
+        }
+
         if (! filled($v->product_code)) {
             return match ($ai['state'] ?? null) {
                 null, 'error' => 'Chờ AI xem video',
@@ -191,7 +196,14 @@ class RiengAutoPoster
      */
     public function hashtagsFor(AutoVideo $v, string $caption): array
     {
-        return $caption === '' ? [] : array_values(array_filter((array) data_get($v->meta, 'ai.hashtags', []), 'is_string'));
+        if ($caption === '') {
+            return [];
+        }
+
+        // Chủ app đã sửa hashtag thì dùng đúng hashtag đó (kể cả để trống), không thì hashtag AI đề xuất.
+        $kid = data_get($v->meta, 'kid_hashtags');
+
+        return array_values(array_filter(is_array($kid) ? $kid : (array) data_get($v->meta, 'ai.hashtags', []), 'is_string'));
     }
 
     /**

@@ -6,7 +6,7 @@ import {
     IconRefresh,
     IconSparkles,
 } from '@tabler/icons-vue';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
 import {
@@ -39,7 +39,9 @@ const auto = ref<RiengAuto | null>(null);
 const product = ref('');
 const quyCach = ref('');
 const caption = ref('');
+const tags = ref('');
 const channels = ref<string[]>([]);
+let poll: ReturnType<typeof setInterval> | null = null;
 const busy = ref<'save' | 'ai' | null>(null);
 
 watch(
@@ -51,15 +53,31 @@ watch(
 
         auto.value = props.video.auto ?? null;
         reset();
+
+        if (auto.value?.ai_progress) {
+            watchAi();
+        }
     },
     { immediate: true },
 );
+
+watch(open, (o) => {
+    if (!o) {
+        stopPoll();
+    }
+});
+
+onBeforeUnmount(() => stopPoll());
+
+const tagsOf = (a: RiengAuto | null) =>
+    (a?.kid_hashtags ?? a?.ai_hashtags ?? []).join(' ');
 
 function reset() {
     const a = auto.value;
     product.value = a?.product_by === 'kid' ? (a.product_code ?? '') : '';
     quyCach.value = a?.quy_cach ?? '';
     caption.value = a?.kid_caption ?? a?.ai_caption ?? '';
+    tags.value = tagsOf(a);
     channels.value = [...(a?.channels ?? [])];
 }
 
@@ -75,6 +93,14 @@ const quyOptions = computed(
 
 const sureText = computed(() => {
     const a = auto.value;
+
+    if (a?.ai_progress) {
+        const p = a.ai_progress;
+
+        return p.tong
+            ? `AI đang xem (bước ${p.buoc}/${p.tong}): ${p.viec}…`
+            : 'AI sắp xem video này…';
+    }
 
     if (!a?.ai_state) {
         return 'AI chưa xem video này.';
@@ -147,10 +173,17 @@ const save = async () => {
     // Caption: giống hệt caption AI thì coi như chưa tự viết (để AI viết lại còn được dùng).
     const cap = caption.value.trim();
     const own = cap !== '' && cap !== (a?.ai_caption ?? '').trim() ? cap : '';
+    // Hashtag: giống hệt hashtag AI thì giữ "theo AI" (AI xem lại còn cập nhật được).
+    const list = tags.value
+        .split(/[\s,]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.replace(/^#+/, '') !== '');
+    const sameAsAi = list.join(' ') === (a?.ai_hashtags ?? []).join(' ');
     const ok = await send({
         product_code: product.value || null,
         quy_cach: quyCach.value || null,
         caption: own,
+        hashtags: sameAsAi ? null : list,
         channels: channels.value,
         ...(settings.value?.approve_first && cap !== ''
             ? { approved: true }
@@ -162,6 +195,60 @@ const save = async () => {
     }
 };
 
+// ---- AI xem lại: chạy ngay ở nền, trang hỏi tiến độ mỗi 3 giây tới khi xong.
+const stopPoll = () => {
+    if (poll) {
+        clearInterval(poll);
+        poll = null;
+    }
+};
+
+const watchAi = () => {
+    stopPoll();
+    const id = props.video?.id;
+
+    if (!id) {
+        return;
+    }
+
+    poll = setInterval(async () => {
+        const r = await callJson<{ auto: RiengAuto }>(
+            'GET',
+            `/auto/kho/rieng/video/${id}/trang-thai`,
+        );
+
+        if (!r.data?.auto || props.video?.id !== id) {
+            return;
+        }
+
+        const was = auto.value;
+        auto.value = r.data.auto;
+
+        if (!r.data.auto.ai_progress) {
+            stopPoll();
+            emit('saved', id, r.data.auto);
+
+            // Anh chưa sửa gì thì cập nhật caption / hashtag theo kết quả mới.
+            if (caption.value === (was?.kid_caption ?? was?.ai_caption ?? '')) {
+                caption.value =
+                    r.data.auto.kid_caption ?? r.data.auto.ai_caption ?? '';
+            }
+
+            if (tags.value === tagsOf(was)) {
+                tags.value = tagsOf(r.data.auto);
+            }
+
+            if (r.data.auto.ai_state === 'ok') {
+                toast.success('AI đã nhận ra sản phẩm.');
+            } else if (r.data.auto.ai_state === 'unsure') {
+                toast('AI xem xong nhưng chưa chắc sản phẩm, anh chọn giúp.');
+            } else {
+                toast.error('AI chưa xem được video này.');
+            }
+        }
+    }, 3000);
+};
+
 const reanalyze = async () => {
     if (!props.video) {
         return;
@@ -170,23 +257,22 @@ const reanalyze = async () => {
     busy.value = 'ai';
     const r = await callJson<{
         ok: boolean;
-        error: string | null;
+        error?: string | null;
         auto: RiengAuto;
     }>('POST', `/auto/kho/rieng/video/${props.video.id}/ai-xem-lai`);
     busy.value = null;
 
-    if (r.data?.auto) {
+    if (r.ok && r.data?.auto) {
         auto.value = r.data.auto;
         emit('saved', props.video.id, r.data.auto);
-        reset();
-    }
-
-    if (r.ok && r.data?.ok) {
-        toast.success('AI đã xem lại video.');
+        watchAi();
     } else {
-        toast.error(r.data?.error ?? 'AI chưa xem được, anh thử lại sau.');
+        toast.error(r.data?.error ?? 'Chưa cho AI xem lại được, anh thử lại.');
     }
 };
+
+const aiBusy = computed(() => busy.value === 'ai' || !!auto.value?.ai_progress);
+const showSteps = ref(false);
 
 const chipCls = (on: boolean) =>
     cn(
@@ -227,16 +313,33 @@ const initial = (name: string) =>
                             size="sm"
                             variant="outline"
                             class="h-7 shrink-0"
-                            :disabled="busy !== null"
+                            :disabled="busy !== null || aiBusy"
+                            data-testid="fork-rieng-ai-again"
                             @click="reanalyze"
                         >
                             <IconLoader2
-                                v-if="busy === 'ai'"
+                                v-if="aiBusy"
                                 class="size-3.5 animate-spin"
                             />
                             <IconRefresh v-else class="size-3.5" />
-                            {{ busy === 'ai' ? 'AI đang xem…' : 'AI xem lại' }}
+                            {{ aiBusy ? 'AI đang xem…' : 'AI xem lại' }}
                         </Button>
+                    </div>
+                    <div
+                        v-if="auto?.ai_progress?.tong"
+                        class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+                    >
+                        <div
+                            class="h-full rounded-full bg-violet-600 transition-all dark:bg-primary"
+                            :style="{
+                                width:
+                                    Math.round(
+                                        (auto.ai_progress.buoc /
+                                            auto.ai_progress.tong) *
+                                            100,
+                                    ) + '%',
+                            }"
+                        />
                     </div>
                     <p
                         v-if="auto?.ai_reason"
@@ -247,6 +350,38 @@ const initial = (name: string) =>
                     <p v-if="auto?.ai_summary" class="mt-1 text-[13px]">
                         Video: {{ auto.ai_summary }}
                     </p>
+                    <details
+                        v-if="auto?.ai_heard"
+                        class="mt-1 text-[13px]"
+                        data-testid="fork-rieng-ai-heard"
+                    >
+                        <summary class="cursor-pointer font-medium">
+                            Lời nói app nghe được
+                        </summary>
+                        <p class="mt-1 whitespace-pre-line text-foreground/80">
+                            {{ auto.ai_heard }}
+                        </p>
+                    </details>
+                    <div
+                        v-if="auto?.ai_steps?.length && !auto.ai_progress"
+                        class="mt-1 text-[13px]"
+                    >
+                        <button
+                            type="button"
+                            class="font-medium underline"
+                            @click="showSteps = !showSteps"
+                        >
+                            AI đã thử {{ auto.ai_steps.length }} cách
+                        </button>
+                        <ol
+                            v-if="showSteps"
+                            class="mt-1 list-decimal pl-5 text-foreground/80"
+                        >
+                            <li v-for="(st, i) in auto.ai_steps" :key="i">
+                                {{ st.buoc }} → {{ st.ket_qua }}
+                            </li>
+                        </ol>
+                    </div>
                 </section>
 
                 <!-- Sản phẩm -->
@@ -322,6 +457,38 @@ const initial = (name: string) =>
                         >
                             Dùng lại caption AI
                         </button>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="font-medium">Hashtag</span>
+                        <input
+                            v-model="tags"
+                            type="text"
+                            class="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                            placeholder="#vuoncaphe #ruavuon"
+                            aria-label="Hashtag của video"
+                            data-testid="fork-rieng-hashtags"
+                        />
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-foreground/70"
+                        >
+                            <span
+                                >Cách nhau bằng dấu cách. Để trống = không
+                                hashtag.</span
+                            >
+                            <button
+                                v-if="
+                                    auto?.ai_hashtags?.length &&
+                                    tags !== (auto.ai_hashtags ?? []).join(' ')
+                                "
+                                type="button"
+                                class="underline"
+                                @click="
+                                    tags = (auto?.ai_hashtags ?? []).join(' ')
+                                "
+                            >
+                                Dùng lại hashtag AI
+                            </button>
+                        </div>
                     </div>
                     <label
                         v-if="settings?.approve_first && auto?.ai_caption"

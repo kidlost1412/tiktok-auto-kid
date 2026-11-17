@@ -14,6 +14,7 @@ use App\Fork\AutoPost\Rieng\Ai\CodexRunner;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
+use App\Fork\AutoPost\Rieng\Ai\RiengSpeech;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
@@ -203,10 +204,33 @@ test('a product with no valid cart on the channel is never attached there', func
 
 // ---------------------------------------------------------------- AI xem video
 
-/** Bộ xem video giả: không cần ffmpeg. */
-function fakeAnalyzer(CodexRunner $codex): RiengAnalyzer
+/** Bộ nghe lời nói giả: trả sẵn lời nói (null = bộ nghe chưa sẵn sàng). */
+function fakeSpeech(?string $text, bool $ready = false): RiengSpeech
 {
-    return new class(app(ChatGptAccounts::class), $codex, app(RiengThumbs::class)) extends RiengAnalyzer
+    return new class($text, $ready) extends RiengSpeech
+    {
+        public int $calls = 0;
+
+        public function __construct(private ?string $text, private bool $isReady) {}
+
+        public function ready(): bool
+        {
+            return $this->isReady;
+        }
+
+        public function transcribe(string $video): ?string
+        {
+            $this->calls++;
+
+            return $this->text;
+        }
+    };
+}
+
+/** Bộ xem video giả: không cần ffmpeg. */
+function fakeAnalyzer(CodexRunner $codex, ?RiengSpeech $speech = null): RiengAnalyzer
+{
+    return new class(app(ChatGptAccounts::class), $codex, app(RiengThumbs::class), $speech ?? fakeSpeech(null)) extends RiengAnalyzer
     {
         protected function grids(AutoVideo $video, string $work): array
         {
@@ -247,8 +271,6 @@ test('the AI attaches the product only when sure, writes a short caption without
     ($this->gptAccount)('tk-aaaaaaaa');
     $codex = fakeCodex([
         '{"ma":"nano-dong","chac":"cao","ly_do":"thấy nhãn","tom_tat":"rửa vườn","hashtag":["#nanođồng","vườn cà phê","#ruavuon","#thua"],"caption":"#rua Rửa vườn sau thu hoạch, sạch nấm hồng rong rêu trên thân cành cà phê cho mùa sau ra hoa đều hơn nhiều lắm"}',
-        '{"ma":"nano-dong","chac":"vua","ly_do":"","tom_tat":"","caption":"c2"}',
-        '{"ma":"tc01","chac":"cao","ly_do":"","tom_tat":"","caption":"c3"}',
     ]);
     $an = fakeAnalyzer($codex);
     $sure = ($this->rieng)('a.mp4');
@@ -262,8 +284,11 @@ test('the AI attaches the product only when sure, writes a short caption without
         ->and($codex->calls[0][1])->toBe('gpt-6-luna')
         ->and($ai['hashtags'])->toBe(['#nanodong', '#vuoncaphe', '#ruavuon']);
 
-    expect($an->analyze($vague)['state'])->toBe('unsure')->and($vague->refresh()->product_code)->toBeNull();
-    expect($an->analyze($mine)['product_code'])->toBe('tc01')->and($mine->refresh()->product_code)->toBe('nano-dong');
+    // Mọi bậc đều chỉ "vừa chắc": giữ kết quả, không gắn sản phẩm.
+    $vagueAi = fakeAnalyzer(fakeCodex(array_fill(0, 8, '{"ma":"nano-dong","chac":"vua","ly_do":"","tom_tat":"","caption":"c2"}')))->analyze($vague);
+    expect($vagueAi['state'])->toBe('unsure')->and($vague->refresh()->product_code)->toBeNull();
+    expect(fakeAnalyzer(fakeCodex(['{"ma":"tc01","chac":"cao","ly_do":"","tom_tat":"","caption":"c3"}']))->analyze($mine)['product_code'])->toBe('tc01')
+        ->and($mine->refresh()->product_code)->toBe('nano-dong');
 });
 
 test('an account out of quota rests and the next account takes over; no account left means retry later', function () {
@@ -311,14 +336,14 @@ test('accounts rotate in turn and show the signed-in email', function () {
 test('wrong answers are rejected and the retry wait grows', function () {
     ($this->gptAccount)('tk-aaaaaaaa');
     $v = ($this->rieng)('a.mp4');
-    $an = fakeAnalyzer(fakeCodex(['không phải json', 'cũng không']));
+    $an = fakeAnalyzer(fakeCodex(array_fill(0, 20, 'không phải json')));
 
     $one = $an->analyze($v, CarbonImmutable::parse('2026-11-16 10:00:00'));
     $two = $an->analyze($v->refresh(), CarbonImmutable::parse('2026-11-16 11:00:00'));
 
     expect($one['state'])->toBe('error')->and($one['error'])->toContain('sai định dạng')
-        ->and(CarbonImmutable::parse($one['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 10:00:00'), true))->toEqual(10)
-        ->and(CarbonImmutable::parse($two['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 11:00:00'), true))->toEqual(30)
+        ->and(CarbonImmutable::parse($one['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 10:00:00'), true))->toEqual(2)
+        ->and(CarbonImmutable::parse($two['next_try_at'])->diffInMinutes(CarbonImmutable::parse('2026-11-16 11:00:00'), true))->toEqual(10)
         ->and($two['tries'])->toBe(2);
 });
 
@@ -576,4 +601,109 @@ test('when ChatGPT says the model is not available the app switches to another m
 
     expect($ai['state'])->toBe('ok')->and(array_column($codex->calls, 1))->toBe(['gpt-6.1-terra', 'gpt-6-luna'])
         ->and(app(ChatGptAccounts::class)->knownModels('tk-aaaaaaaa'))->not->toHaveKey('gpt-6.1-terra');
+});
+
+test('when the AI is not sure it listens to the speech, thinks harder, then switches model, and stops as soon as it is sure', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    Cache::put('fork-rieng:chatgpt-models:tk-aaaaaaaa', [
+        'gpt-6-luna' => ['name' => 'GPT-6-Luna', 'note' => '', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max'], 'fast' => false, 'default' => true],
+        'gpt-5.6-terra' => ['name' => 'GPT-5.6-Terra', 'note' => '', 'efforts' => ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], 'fast' => false, 'default' => false],
+        'gpt-5.6-luna' => ['name' => 'GPT-5.6-Luna', 'note' => '', 'efforts' => ['low', 'max'], 'fast' => false, 'default' => false],
+    ], now()->addHour());
+    RiengAutoSettings::update(['model' => 'gpt-6-luna', 'effort' => 'low']);
+    $an = fakeAnalyzer(fakeCodex([]));
+
+    expect(array_map(fn ($s) => [$s['model'], $s['effort'], $s['loi']], $an->plan(RiengAutoSettings::get())))->toBe([
+        ['gpt-6-luna', 'low', false],
+        ['gpt-6-luna', 'low', true],
+        ['gpt-6-luna', 'max', true],
+        ['gpt-5.6-terra', 'ultra', true],
+        ['gpt-5.6-luna', 'max', true],
+    ]);
+
+    $vague = '{"ma":null,"chac":"thap","ly_do":"","tom_tat":"","caption":"c"}';
+    $codex = fakeCodex([$vague, 'không phải json', $vague, '{"ma":"tc01","chac":"cao","ly_do":"nghe tên","tom_tat":"","caption":"c4"}', 'không dùng tới']);
+    $speech = fakeSpeech('Hôm nay em giới thiệu TC01 cho bà con');
+    $v = ($this->rieng)('l.mp4');
+
+    $ai = fakeAnalyzer($codex, $speech)->analyze($v);
+
+    expect($ai['state'])->toBe('ok')->and($ai['product_code'])->toBe('tc01')->and($v->refresh()->product_code)->toBe('tc01')
+        ->and(array_map(fn ($c) => [$c[1], $c[2]], $codex->calls))->toBe([['gpt-6-luna', 'low'], ['gpt-6-luna', 'low'], ['gpt-6-luna', 'max'], ['gpt-5.6-terra', 'ultra']])
+        ->and($codex->calls[0][3])->not->toContain('LỜI NÓI trong video')
+        ->and($codex->calls[1][3])->toContain('Hôm nay em giới thiệu TC01')
+        ->and($speech->calls)->toBe(1)
+        ->and($ai['loi'])->toBe('Hôm nay em giới thiệu TC01 cho bà con')
+        ->and($ai['buoc'])->toHaveCount(4)
+        ->and($ai['model'])->toBe('gpt-5.6-terra');
+
+    // Xem lại lần sau dùng lại lời nói đã nghe, không nghe lại.
+    $speech2 = fakeSpeech('khác');
+    fakeAnalyzer(fakeCodex(array_fill(0, 6, $vague)), $speech2)->analyze($v->refresh());
+    expect($speech2->calls)->toBe(0);
+});
+
+test('without speech the listen step is skipped and product photos go with the grids', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    file_put_contents($this->hub.'/san-pham/nano-dong/anh.jpg', 'jpg');
+    $codex = fakeCodex(array_fill(0, 10, '{"ma":null,"chac":"thap","ly_do":"","tom_tat":"","caption":"c"}'));
+    $v = ($this->rieng)('n.mp4');
+    $an = new class(app(ChatGptAccounts::class), $codex, app(RiengThumbs::class), fakeSpeech(null)) extends RiengAnalyzer
+    {
+        public array $images = [];
+
+        protected function grids(AutoVideo $video, string $work): array
+        {
+            file_put_contents($work.'/luoi-1.jpg', 'jpg');
+
+            return [$work.'/luoi-1.jpg'];
+        }
+    };
+
+    $ai = $an->analyze($v);
+    $plan = $an->plan(RiengAutoSettings::get());
+
+    // Bậc "nghe thêm" bỏ qua (không tốn lượt), các bậc khác vẫn chạy.
+    expect($ai['state'])->toBe('unsure')->and($codex->calls)->toHaveCount(count($plan) - 1)
+        ->and($codex->calls[0][3])->toContain('ẢNH MẪU')->toContain('Ảnh 2: sản phẩm `nano-dong`');
+});
+
+test('the owner can edit the AI hashtags of a video, and reset them to the AI ones', function () {
+    $v = ($this->ready)('h.mp4', ['hashtags' => ['#ai1', '#ai2']]);
+    $poster = app(RiengAutoPoster::class);
+
+    $r = $this->actingAs($this->owner)->postJson("/auto/kho/rieng/video/{$v->id}/tu-dong", ['hashtags' => ['vườn cà phê', '#NanoĐồng', '', '#nanodong']])->assertOk()->json();
+    expect($r['auto']['kid_hashtags'])->toBe(['#vuoncaphe', '#NanoDong'])
+        ->and($poster->hashtagsFor($v->refresh(), 'cap'))->toBe(['#vuoncaphe', '#NanoDong']);
+
+    $this->actingAs($this->owner)->postJson("/auto/kho/rieng/video/{$v->id}/tu-dong", ['hashtags' => []])->assertOk();
+    expect($poster->hashtagsFor($v->refresh(), 'cap'))->toBe([]);
+
+    $this->actingAs($this->owner)->postJson("/auto/kho/rieng/video/{$v->id}/tu-dong", ['hashtags' => null])->assertOk()->assertJsonPath('auto.kid_hashtags', null);
+    expect($poster->hashtagsFor($v->refresh(), 'cap'))->toBe(['#ai1', '#ai2']);
+});
+
+test('asking the AI to look again queues the video right away and keeps the heard speech', function () {
+    $v = ($this->rieng)('q.mp4', [], ['ai' => ['state' => 'unsure', 'product_code' => null, 'loi' => 'lời cũ', 'tries' => 1]]);
+
+    $r = $this->actingAs($this->owner)->postJson("/auto/kho/rieng/video/{$v->id}/ai-xem-lai")->assertOk()->json();
+
+    expect($r['auto']['ai_state'])->toBeNull()->and($r['auto']['ai_progress']['viec'])->toBe('Đang chờ AI')
+        ->and(data_get($v->refresh()->meta, 'ai.loi'))->toBe('lời cũ')
+        ->and(collect(app(RiengAnalyzer::class)->pending(10))->pluck('id')->all())->toContain($v->id);
+
+    $this->actingAs($this->owner)->getJson("/auto/kho/rieng/video/{$v->id}/trang-thai")->assertOk()->assertJsonPath('auto.ai_heard', 'lời cũ');
+});
+
+test('when the speech tool is installed the AI hears the speech from the first step', function () {
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $codex = fakeCodex(['{"ma":null,"chac":"thap","ly_do":"","tom_tat":"","caption":"c"}', '{"ma":"tc01","chac":"cao","ly_do":"","tom_tat":"","caption":"c"}']);
+    $speech = fakeSpeech('em giới thiệu TC01', true);
+
+    $ai = fakeAnalyzer($codex, $speech)->analyze(($this->rieng)('s.mp4'));
+
+    // Bậc 1 đã có lời nói; bậc "nghe thêm" bị bỏ; bậc 2 là nghĩ kỹ nhất.
+    expect($ai['state'])->toBe('ok')->and($speech->calls)->toBe(1)
+        ->and($codex->calls[0][3])->toContain('em giới thiệu TC01')
+        ->and($codex->calls[1][2])->not->toBe($codex->calls[0][2]);
 });

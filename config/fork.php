@@ -51,6 +51,9 @@ return [
         'codex_path' => env('FORK_CODEX_PATH', ''),
         'chatgpt_dir' => env('FORK_CHATGPT_DIR', ''),
         'codex_dir' => env('FORK_CODEX_DIR', ''),
+        // Nghe lời nói trong video (Whisper trên máy): thư mục bộ nghe + model, và Python dùng (mặc định Python của Xưởng).
+        'whisper_dir' => env('FORK_WHISPER_DIR', ''),
+        'speech_python' => env('FORK_SPEECH_PYTHON', ''),
         // TikTok chỉ cho mỗi kênh để chờ tối đa 50 bài hẹn giờ (quá thì báo status_code 3013021). Bài vượt mức được giữ trong
         // app và tự hẹn lên khi có chỗ trống (bài sớm nhất trước); tới giờ mà vẫn chưa hẹn được thì Chrome đăng ngay lúc đó.
         'tiktok_schedule_cap' => (int) env('FORK_TIKTOK_SCHEDULE_CAP', 50),

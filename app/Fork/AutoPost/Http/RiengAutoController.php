@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Http;
 
+use App\Fork\AutoPost\Console\RiengAiCommand;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
+use App\Fork\AutoPost\Rieng\Ai\RiengSpeech;
 use App\Fork\AutoPost\Rieng\RiengFolder;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /** "Kho riêng tự đăng theo khung": cài đặt, tài khoản ChatGPT, và chỉnh sản phẩm/caption/kênh của từng video. */
 final class RiengAutoController extends Controller
@@ -137,6 +142,8 @@ final class RiengAutoController extends Controller
             'channels' => ['sometimes', 'array'],
             'approved' => ['sometimes', 'boolean'],
             'dup_ok' => ['sometimes', 'boolean'],
+            'hashtags' => ['sometimes', 'nullable', 'array', 'max:10'],
+            'hashtags.*' => ['nullable', 'string', 'max:60'],
         ]);
 
         if ($video->status !== AutoVideo::NEW) {
@@ -183,6 +190,18 @@ final class RiengAutoController extends Controller
             $meta['dup_ok'] = (bool) $in['dup_ok'];
         }
 
+        // Hashtag chủ app tự sửa (thay hashtag AI đề xuất); null = quay lại dùng hashtag AI.
+        if (array_key_exists('hashtags', $in)) {
+            if ($in['hashtags'] === null) {
+                unset($meta['kid_hashtags']);
+            } else {
+                $meta['kid_hashtags'] = Hashtags::normalize(array_map(
+                    fn (string $t): string => '#'.(preg_replace('/[^A-Za-z0-9]/', '', Str::ascii($t)) ?? ''),
+                    array_filter($in['hashtags'], fn ($t): bool => is_string($t) && preg_match('/[\p{L}\p{N}]/u', $t) === 1),
+                ));
+            }
+        }
+
         // Chủ app vừa sửa: bỏ khoá "lần đăng trước lỗi" để app thử lại ngay lượt tới.
         unset($meta['auto_error'], $meta['auto_error_at']);
         $video->forceFill($changes + ['meta' => $meta])->save();
@@ -190,24 +209,36 @@ final class RiengAutoController extends Controller
         return response()->json(['ok' => true, 'auto' => self::videoAuto($video->refresh(), RiengAutoSettings::get())]);
     }
 
-    /** Cho AI xem lại video ngay (đợi kết quả, khoảng 20 giây). */
-    public function reanalyze(Request $request, AutoVideo $video, RiengAnalyzer $analyzer): JsonResponse
+    /**
+     * Cho AI xem lại video ngay: chạy ở nền liền (không đợi lịch 2 phút), trang hỏi tiến độ qua videoState().
+     * Giữ lời nói đã nghe lần trước (đỡ nghe lại).
+     */
+    public function reanalyze(Request $request, AutoVideo $video): JsonResponse
     {
         $this->authorizeOwner($request);
         abort_unless($video->isRieng(), 404);
-        set_time_limit(300);
 
         if ($video->status !== AutoVideo::NEW) {
             return response()->json(['ok' => false, 'error' => 'Video này đã hẹn giờ hoặc đã đăng.'], 422);
         }
 
         $meta = (array) $video->meta;
-        $meta['ai'] = array_intersect_key((array) ($meta['ai'] ?? []), ['tries' => true]);
-        $meta['ai']['tries'] = 0;
+        $prev = (array) ($meta['ai'] ?? []);
+        $meta['ai'] = ['tries' => 0, 'dang' => ['buoc' => 0, 'tong' => 0, 'viec' => 'Đang chờ AI', 'tu' => now()->toIso8601String(), 'luc' => now()->toIso8601String()]]
+            + (is_string($prev['loi'] ?? null) ? ['loi' => $prev['loi']] : []);
         $video->forceFill(['meta' => $meta])->save();
-        $ai = $analyzer->analyze($video);
+        RiengAiCommand::launch($video->id);
 
-        return response()->json(['ok' => in_array($ai['state'], ['ok', 'unsure'], true), 'error' => $ai['error'] ?? null, 'auto' => self::videoAuto($video->refresh(), RiengAutoSettings::get())]);
+        return response()->json(['ok' => true, 'auto' => self::videoAuto($video->refresh(), RiengAutoSettings::get())]);
+    }
+
+    /** Trạng thái "tự đăng" của một video (trang hỏi lại trong lúc AI đang xem). */
+    public function videoState(Request $request, AutoVideo $video): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        abort_unless($video->isRieng(), 404);
+
+        return response()->json(['auto' => self::videoAuto($video, RiengAutoSettings::get())]);
     }
 
     /**
@@ -234,6 +265,11 @@ final class RiengAutoController extends Controller
             'ai_summary' => $ai['tom_tat'] ?? null,
             'ai_caption' => $ai['caption'] ?? null,
             'ai_hashtags' => array_values(array_filter((array) ($ai['hashtags'] ?? []), 'is_string')),
+            'kid_hashtags' => is_array($kh = data_get($v->meta, 'kid_hashtags')) ? array_values(array_filter($kh, 'is_string')) : null,
+            // AI đang xem (bậc mấy / tổng, việc gì); null khi không xem. Quá 40 phút không cập nhật coi như đã dừng.
+            'ai_progress' => is_array($dang = $ai['dang'] ?? null) && now()->diffInMinutes(CarbonImmutable::parse((string) ($dang['luc'] ?? 'now')), true) < 40 ? $dang : null,
+            'ai_steps' => array_values(array_filter((array) ($ai['buoc'] ?? []), 'is_array')),
+            'ai_heard' => is_string($ai['loi'] ?? null) ? ($ai['loi'] === '' ? 'Video không có lời nói.' : $ai['loi']) : null,
             'ai_error' => $ai['error'] ?? null,
             'ai_tries' => (int) ($ai['tries'] ?? 0),
             'ai_next_try_at' => $ai['next_try_at'] ?? null,
@@ -309,6 +345,7 @@ final class RiengAutoController extends Controller
             'model_effective' => $this->effectiveModel($accounts, $known),
             'efforts' => RiengAutoSettings::EFFORTS,
             'codex_installed' => ($cli = $accounts->cliStatus())['installed'],
+            'speech' => app(RiengSpeech::class)->status(),
             'cli' => $cli,
             'chatgpt' => $accounts->all(),
             'channels' => $this->tiktokAccounts($accountId)
