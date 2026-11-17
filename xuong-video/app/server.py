@@ -455,7 +455,7 @@ def tao_san_pham(b):
             sp.setdefault(k, mac_dinh)
         f.write_text(json.dumps(sp, ensure_ascii=False, indent=1), encoding="utf-8")
         return {"ok": True, "ma": ma}
-    for k, mac_dinh in (("su_that_duoc_noi", []), ("qua_tang", []), ("khong_duoc_noi", ["Giá tiền, giá trị quà.", "'chữa khỏi', cam kết 100%, 'số 1', 'nhất', 'duy nhất'."]),
+    for k, mac_dinh in (("su_that_duoc_noi", []), ("qua_tang", []), ("khong_duoc_noi", ["'chữa khỏi', cam kết 100%, 'số 1', 'nhất', 'duy nhất'."]),
                         ("goc_ban", []), ("loai_tru", {"file": [], "doan": []})):
         sp.setdefault(k, mac_dinh)
     f.write_text(json.dumps(sp, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -821,7 +821,8 @@ def tai_khoan_ds(moi=False):
                 ai._ghi_trang_thai(tk["ma"], dang_nhap=True); st = ai.doc_trang_thai()   # đã đăng nhập lại → dùng được ngay
         x = st.get(tk["ma"], {})
         out.append({"ma": tk["ma"], "ten": tk["ten"], "dang_nhap": a["dang_nhap"], "email": a["email"], "goi": a["goi"],
-                    "five_hour": x.get("five_hour"), "seven_day": x.get("seven_day"), "het_den": x.get("het_den"), "cap_nhat": x.get("cap_nhat")})
+                    "five_hour": x.get("five_hour"), "seven_day": x.get("seven_day"), "het_den": x.get("het_den"), "cap_nhat": x.get("cap_nhat"),
+                    "bi_chan": bool(x.get("bi_chan"))})
     return out
 
 

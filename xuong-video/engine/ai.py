@@ -86,7 +86,7 @@ def chon_tai_khoan(bo_qua=()):
     if co_dinh and co_dinh != "tu_dong":
         tk = next((t for t in ds_tai_khoan() if t["ma"] == co_dinh), None)
         x = st.get(co_dinh, {})
-        if tk and co_dinh not in bo_qua and not (x.get("het_den") and x["het_den"] > now) and x.get("dang_nhap") is not False:
+        if tk and co_dinh not in bo_qua and not (x.get("het_den") and x["het_den"] > now) and x.get("dang_nhap") is not False and not x.get("bi_chan"):
             return tk
         if not c.get("tu_chuyen", True):
             return None                                  # anh chọn cố định + không cho tự chuyển → dừng, báo anh chọn tài khoản khác
@@ -96,7 +96,7 @@ def chon_tai_khoan(bo_qua=()):
         x = st.get(tk["ma"], {})
         if x.get("het_den") and x["het_den"] > now:
             continue
-        if x.get("dang_nhap") is False:
+        if x.get("dang_nhap") is False or x.get("bi_chan"):
             continue
         def pct(w):
             o = x.get(w) or {}
@@ -107,6 +107,9 @@ def chon_tai_khoan(bo_qua=()):
         return None
     ung.sort(key=lambda z: (z[0], z[1]))
     return ung[0][2]
+
+
+_RE_BI_CHAN = re.compile(r"organization has disabled|disabled claude subscription access|ask your admin to enable", re.I)   # gói bị tổ chức tắt quyền dùng Claude Code
 
 
 MAX_BYTE_ANH = 3_500_000      # ảnh > 3.5MB (hoặc cạnh > 7900px) → nén lại JPEG trước khi gửi
@@ -240,6 +243,10 @@ def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
         if re.search(r"login expired|please run /login|not logged in|oauth token revoked|invalid api key", txt, re.I):
             _ghi_trang_thai(tk["ma"], dang_nhap=False)
             da_thu.append(tk["ma"]); continue              # mất đăng nhập → báo app, thử tài khoản khác
+        if _RE_BI_CHAN.search(txt):
+            _ghi_trang_thai(tk["ma"], bi_chan=True)
+            print(f"[ai] tài khoản {tk['ma']} bị tắt quyền dùng Claude Code → thử tài khoản khác", flush=True)
+            da_thu.append(tk["ma"]); continue              # gói bị tổ chức tắt quyền → bỏ qua tới khi kiểm lại thấy dùng được
         if r.returncode != 0 or d.get("is_error"):
             raise RuntimeError(f"Claude lỗi ({vai}, {tk['ma']}): {(res or r.stderr)[:300]}")
         return res, u
@@ -254,6 +261,10 @@ def kiem_han_muc(ma):
     txt = (d.get("result") or "") + " " + (r.stderr or "")
     if re.search(r"login expired|please run /login|not logged in|oauth token revoked", txt, re.I):
         _ghi_trang_thai(ma, dang_nhap=False)
+    elif _RE_BI_CHAN.search(txt):
+        _ghi_trang_thai(ma, bi_chan=True)
+    elif r.returncode == 0 and not d.get("is_error"):
+        _ghi_trang_thai(ma, bi_chan=False)                  # kiểm lại thấy dùng được → bỏ cờ bị chặn
     return doc_trang_thai().get(ma, {})
 
 

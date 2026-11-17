@@ -1610,7 +1610,7 @@ async function taiTk(moi) {
   const ds = await api('/api/tai-khoan-ds' + (moi ? '?moi=1' : ''));
   const the = t => {
     const het = t.het_den && t.het_den * 1000 > Date.now();
-    const tt = !t.dang_nhap ? '<span class="pill r dot">Chưa đăng nhập</span>' : het ? `<span class="pill r dot">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g dot">Sẵn sàng</span>';
+    const tt = !t.dang_nhap ? '<span class="pill r dot">Chưa đăng nhập</span>' : t.bi_chan ? '<span class="pill r dot" title="Gói này bị tổ chức tắt quyền dùng Claude Code; app tự dùng tài khoản khác. Bấm kiểm hạn mức để thử lại.">Gói bị tắt quyền Claude Code</span>' : het ? `<span class="pill r dot">Hết hạn mức tới ${new Date(t.het_den * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>` : '<span class="pill g dot">Sẵn sàng</span>';
     const dangDung = (ST.tai_khoan_dung || 'tu_dong') === t.ma;
     return `<div class="acc">
       <div class="hd"><div class="who"><span class="av">${esc((String(t.ten || '?').trim()[0] || '?').toUpperCase())}</span><div style="min-width:0"><b>${esc(t.ten)}</b>
@@ -1630,7 +1630,7 @@ async function taiTk(moi) {
     const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
     const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
     const het = t.het_den && t.het_den * 1000 > Date.now();
-    return `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : het ? 'HẾT hạn mức' : `5 giờ ${p ?? '?'}% · tuần ${w ?? '?'}%`}</option>`; }).join('');
+    return `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : t.bi_chan ? 'gói bị tắt quyền' : het ? 'HẾT hạn mức' : `5 giờ ${p ?? '?'}% · tuần ${w ?? '?'}%`}</option>`; }).join('');
   if (setH(sel, optH) || !sel._ok || sel.value !== giu) sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
   sel._ok = true; sel.disabled = false;
   if (ST.claude) { $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; $('#tkChuyen')._ok = true; }
@@ -1641,7 +1641,7 @@ async function taiTk(moi) {
     const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
     const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
     const het = t.het_den && t.het_den * 1000 > Date.now();
-    return `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
+    return `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : t.bi_chan ? '<span class="pill r dot">bị tắt quyền</span>' : het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
       ${t.dang_nhap ? mini(p, 'Phiên 5 giờ') + mini(w, 'Cả tuần') : '<div class="note" style="font-size:12px">Vào Cài đặt → Đăng nhập</div>'}</div>`; }).join('') + '</div>');
   document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => { await api('/api/cai-dat', {tai_khoan_dung: b.dataset.dung});
     ST.tai_khoan_dung = b.dataset.dung; toast(b.dataset.dung === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản này'); taiTk(); });

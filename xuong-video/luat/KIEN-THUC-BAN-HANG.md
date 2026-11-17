@@ -1,7 +1,7 @@
 # KIẾN THỨC BÁN HÀNG — cách nghĩ của người bán giỏi
 
 Đây là CÁCH NGHĨ, không phải khuôn. Mỗi bài chọn MỘT đòn chính bên dưới rồi viết theo giọng riêng; đừng nhồi hết, đừng lặp khung câu của ví dụ.
-Giới hạn không đổi: điều nói về sản phẩm chỉ lấy trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG; không giá; không hứa chắc.
+Giới hạn không đổi: điều nói về sản phẩm chỉ lấy trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG; giá được nói (không bịa giá bán khi hồ sơ không ghi); nói tự tin, chỉ tránh chữ cấm.
 
 ## 1. Bán cái vườn sau khi dùng, không bán cái chai
 Người trồng không mua thành phần, họ mua lứa bông giữ được, một lượt phun đỡ phải đi, một đêm ngủ yên. Mỗi chi tiết trên nhãn chỉ đáng nói khi trả lời được câu "vậy thì vườn tôi được gì?".
@@ -17,7 +17,7 @@ Người xem đã có sẵn một cách làm hoặc một món đang xài. Họ 
 - Một lý do để tin: một chi tiết thật (cách nhận đúng hàng, một dòng trên nhãn, một bước dùng) đặt đúng lúc người nghe đang ngờ.
 - Giảm rủi ro: mở đường lui cho người chưa tin (thử một góc vườn, lấy ít trước).
 - Đúng lúc: vì sao là tuần này, đợt đọt này, trước cơn mưa này — không phải "nhanh tay kẻo hết".
-- Người giống mình đã làm: chuyện một người hàng xóm, một ông khách (được hư cấu), miễn điều nói về sản phẩm vẫn đúng hồ sơ.
+- Người giống mình đã làm: nói thẳng nhiều vườn đã đổi sang loại này và vì sao (không dựng chuyện, không dựng nhân vật), điều nói về sản phẩm vẫn đúng hồ sơ.
 - Đỡ công, đỡ rối: một phép tính tiện bằng con số thật.
 
 ## 4. Để người ta NHỚ thương hiệu
@@ -36,7 +36,7 @@ Người làm vườn NGHE chứ ít đọc, vừa lướt vừa làm việc kh�
 
 ## 7. Người quanh mình đang dùng
 Nhà nông tin cái mình thấy người khác làm hơn cái người bán nói. Thấy ông hàng xóm, anh bạn cùng xã, cô chủ vườn bên kia đang xài một món thì lòng ngại đổi đã bớt quá nửa.
-- Bài có thể dựa vào khoảnh khắc "người quanh mình": nghe hàng xóm nhắc, thấy bà con trong xóm cầm chai ra vườn, một ông chủ vườn kể lại. Nhân vật được hư cấu, miễn không gán cho họ điều sản phẩm không có trong hồ sơ.
-- Điều nói về SẢN PHẨM (công dụng, liều, thành phần, quà) vẫn chỉ lấy ở hồ sơ, không hứa kết quả chắc chắn. Lời rao viral về độ tin dùng ("hơn một triệu nhà vườn tin dùng", "sáu mươi ba tỉnh thì sáu mươi hai tỉnh xài rồi") là hook rao hàng, được dùng — khác với bịa công dụng; chỉ tránh chữ cấm trong khong_duoc_noi.
+- Dùng điều này bằng một câu nói thẳng (nhiều vườn quanh đây đã đổi sang loại này, vì sao), KHÔNG dựng chuyện, không dựng nhân vật.
+- Điều nói về SẢN PHẨM (công dụng, liều, thành phần, quà) vẫn chỉ lấy ở hồ sơ, nói chắc nịch nhưng tránh chữ cấm. Lời rao viral về độ tin dùng ("hơn một triệu nhà vườn tin dùng", "sáu mươi ba tỉnh thì sáu mươi hai tỉnh xài rồi") là hook rao hàng, được dùng — khác với bịa công dụng; chỉ tránh chữ cấm trong khong_duoc_noi.
 - Cảnh người thật cầm, xài, kể về sản phẩm (nếu kho có) chính là bằng chứng loại này: để hình làm việc đó, lời đừng nhắc lại điều hình đã thấy.
-- Nói như chuyện kể ngoài vườn, không như lời quảng cáo thuê người khen.
+- Nói như người rành hàng nói, không như lời quảng cáo thuê người khen.

@@ -48,6 +48,34 @@ class TaiKhoanTest(unittest.TestCase):
         self.assertNotIn(moi, ai.doc_trang_thai())
         self.assertNotEqual(moi, a)
 
+    def test_goi_bi_to_chuc_tat_quyen_thi_chuyen_tai_khoan(self):
+        import subprocess
+        import ai
+        s = self.s
+        a = s.tai_khoan_them("Chan")["ma"]
+        b = s.tai_khoan_them("Tot")["ma"]
+        c = s.cfg(); c["tai_khoan"] = [t for t in c["tai_khoan"] if t["ma"] in (a, b)]; c["tai_khoan_dung"] = "tu_dong"; s.luu_cfg(c)
+        da_goi = []
+
+        def gia(tk, *a_, **k):
+            da_goi.append(tk["ma"])
+            if tk["ma"] == a:
+                loi = "Your organization has disabled Claude subscription access for Claude Code · ask your admin to enable access"
+                return subprocess.CompletedProcess([], 1, "", ""), {"result": loi, "is_error": True}, None
+            return subprocess.CompletedProcess([], 0, "", ""), {"result": "OK", "usage": {}}, None
+
+        goc, goc_chon = ai._goi_1, ai.chon_tai_khoan
+        ai._goi_1 = gia
+        ai.chon_tai_khoan = lambda bo_qua=(): next((t for t in ai.ds_tai_khoan() if t["ma"] not in bo_qua
+                                                     and not ai.doc_trang_thai().get(t["ma"], {}).get("bi_chan")), None)
+        try:
+            self.assertEqual(ai.goi("thử", "x")[0], "OK")
+        finally:
+            ai._goi_1, ai.chon_tai_khoan = goc, goc_chon
+        self.assertEqual(da_goi, [a, b])
+        self.assertTrue(ai.doc_trang_thai()[a]["bi_chan"])
+        self.assertEqual(ai.chon_tai_khoan()["ma"], b)          # lần sau bỏ qua tài khoản bị chặn
+
     def test_khong_bo_tai_khoan_cuoi(self):
         s = self.s
         c = s.cfg(); c["tai_khoan"] = c["tai_khoan"][:1]; s.luu_cfg(c)
