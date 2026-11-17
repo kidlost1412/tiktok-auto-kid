@@ -22,6 +22,7 @@ use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PostBuilder;
+use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Readiness;
 use App\Fork\AutoPost\Sidecar;
 use App\Fork\AutoPost\Stats\HubFeedback;
@@ -1110,4 +1111,55 @@ test('a shared product that differs from what the AI found must be confirmed, ro
     // chủ app thấy cảnh báo và vẫn hẹn: gắn đúng sản phẩm chung đã chọn
     $ok = ($this->batch)()->commit(($this->input)($account, [$v, $same]), true, $this->now);
     expect($ok['done'])->toBe(2)->and($v->fresh()->product_code)->toBe('nano-dong');
+});
+
+test('owner can swap the music of a scheduled private video: remixed from the original, old upload file removed', function () {
+    $ffmpeg = app(RiengThumbs::class)->ffmpegPath();
+
+    if ($ffmpeg === null) {
+        $this->markTestSkipped('ffmpeg not installed');
+    }
+
+    $run = function (array $args) use ($ffmpeg): string {
+        $p = new Process([$ffmpeg, '-hide_banner', ...$args]);
+        $p->setTimeout(60);
+        $p->run();
+
+        return $p->getErrorOutput();
+    };
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music);
+    $run(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=20', $music.'/nhac-1.mp3']);
+    $run(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=20', $music.'/nhac-2.mp3']);
+    $folder = RiengFolder::create(['path' => $this->own, 'music' => ['enabled' => true, 'dir' => $music, 'mode' => 'mix', 'gain_db' => -12]]);
+    $v = ($this->rieng)('goc.mp4', null, ['meta' => ['folder_id' => $folder->id, 'rel_path' => 'goc.mp4']]);
+    $run(['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=25:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=4',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', $v->path]);
+    $before = md5_file($v->path);
+
+    expect(($this->batch)()->commit(($this->input)(($this->account)(), [$v]), false, $this->now)['done'])->toBe(1);
+    $v->refresh();
+    $post = Post::query()->findOrFail($v->post_id);
+    $first = (string) $post->meta['fork_music'];
+    $oldFile = (string) Media::query()->where('post_id', $post->id)->value('path');
+    $other = $first === 'nhac-1.mp3' ? 'nhac-2.mp3' : 'nhac-1.mp3';
+
+    $edits = app(PostEdits::class);
+    $info = $edits->describe($v);
+    expect($info['music']['current'])->toBe($first)->and(array_column($info['music']['tracks'], 'rel'))->toContain($other);
+
+    // "*" = bốc bài khác bài đang dùng.
+    expect($edits->edit($v, ['music' => '*'])['state'])->toBe('done');
+    $post->refresh();
+    $newFile = (string) Media::query()->where('post_id', $post->id)->value('path');
+
+    expect($post->meta['fork_music'])->toBe($other)
+        ->and($newFile)->not->toBe($oldFile)->toEndWith('.mp4')
+        ->and(Storage::exists($newFile))->toBeTrue()->and(Storage::exists($oldFile))->toBeFalse()
+        ->and(data_get($post->media, '0.path'))->toBe($newFile)
+        ->and($run(['-i', Storage::path($newFile)]))->toMatch('/Audio: aac/')
+        ->and(md5_file($v->path))->toBe($before);
+
+    // Bài ngoài thư mục nhạc bị từ chối.
+    expect(fn () => $edits->edit($v->refresh(), ['music' => '../goc.mp4']))->toThrow(RuntimeException::class);
 });

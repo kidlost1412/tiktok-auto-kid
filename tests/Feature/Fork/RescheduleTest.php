@@ -15,6 +15,7 @@ use App\Fork\Chrome\Listeners\ChromePostWatcher;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Models\Account;
+use App\Models\Media;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
@@ -414,4 +415,68 @@ test('bỏ xếp lịch bài Kho riêng đã hẹn trên TikTok: chỉ bỏ sau 
 test('tách caption và dòng hashtag cuối của nội dung bài', function (): void {
     expect(PostEdits::splitContent("Một\n\nHai dòng\n\n#a #b"))->toBe(["Một\n\nHai dòng", ['#a', '#b']])
         ->and(PostEdits::splitContent("Chỉ chữ\n\ncó #tag giữa"))->toBe(["Chỉ chữ\n\ncó #tag giữa", []]);
+});
+
+test('xoá hẳn bài chưa lên TikTok: bài bị bỏ, video thành đã bỏ qua và không bao giờ tự xếp lại', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10));
+    $job = rsJob($post, 'queued');
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertOk()->assertJson(['ok' => true, 'state' => 'done']);
+
+    $video->refresh();
+    expect(Post::query()->find($post->id))->toBeNull()
+        ->and(ChromeJob::query()->whereKey($job->id)->whereIn('state', ChromeJob::OPEN)->exists())->toBeFalse()
+        ->and($video->status)->toBe(AutoVideo::SKIPPED)
+        ->and($video->post_id)->toBeNull()->and($video->social_account_id)->toBeNull()->and($video->scheduled_for)->toBeNull()
+        ->and(data_get($video->meta, 'removed_by_owner'))->not->toBeNull();
+});
+
+test('xoá hẳn video còn trong kho (chưa xếp lịch)', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10));
+    $video->forceFill(['status' => AutoVideo::NEW, 'post_id' => null, 'social_account_id' => null, 'scheduled_for' => null])->save();
+    $post->delete();
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertOk()->assertJson(['state' => 'done']);
+    expect($video->refresh()->status)->toBe(AutoVideo::SKIPPED);
+});
+
+test('xoá hẳn bài đã hẹn trên TikTok: chỉ xoá sau khi Chrome đã xoá bài hẹn và kiểm lại', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10), 'rieng');
+    rsJob($post, 'posted');
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertOk()->assertJson(['state' => 'pending', 'kind' => 'tiktok']);
+    expect($video->refresh()->status)->toBe(AutoVideo::SCHEDULED)
+        ->and(Reschedule::query()->value('action'))->toBe('remove');
+
+    // Đang chờ xoá thì không cho xoá / sửa thêm lần nữa.
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertStatus(422);
+
+    rsDeleteVerified($this);
+
+    $video->refresh();
+    expect($video->status)->toBe(AutoVideo::SKIPPED)->and(Post::query()->find($post->id))->toBeNull()
+        ->and(data_get($video->meta, 'removed_by_owner'))->not->toBeNull();
+});
+
+test('xoá hẳn bị từ chối khi bài sắp tới giờ đăng', function (): void {
+    [$post, $video] = rsPost($this, CarbonImmutable::now()->addMinute());
+
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertStatus(422);
+    expect($video->refresh()->status)->toBe(AutoVideo::SCHEDULED)->and(Post::query()->find($post->id))->not->toBeNull();
+});
+
+test('nghe bản sẽ đăng và nghe thử nhạc: chỉ chủ app, chỉ file trong thư mục nhạc', function (): void {
+    [$post, $video] = rsPost($this, rsAt(10), 'rieng');
+    Media::query()->where('post_id', $post->id)->delete();
+
+    // Bài không có file đăng / nhạc không thuộc thư mục nhạc → 404.
+    $this->actingAs($this->owner)->get("/auto/videos/{$video->id}/ban-dang")->assertNotFound();
+    $this->actingAs($this->owner)->get("/auto/videos/{$video->id}/nhac?rel=".urlencode('../../.env'))->assertNotFound();
+
+    // Không có bài nhạc nào → đổi nhạc báo lỗi, không đổi gì.
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/sua", ['music' => '*'])->assertStatus(422);
+
+    // Người lạ không xem được.
+    $stranger = User::factory()->create(['account_id' => Account::factory()->create()->id]);
+    expect($this->actingAs($stranger)->get("/auto/videos/{$video->id}/ban-dang")->status())->toBeIn([302, 403, 404]);
 });

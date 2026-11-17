@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Fork\AutoPost\Http;
 
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Http\Controllers\Controller;
+use App\Models\Media;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Sửa bài đã xếp lịch mà chưa đăng (giờ, kênh, caption, hashtag, ảnh bìa), "Bỏ xếp lịch" và "Cho xếp lịch lại".
@@ -37,6 +41,7 @@ final class PostEditController extends Controller
             'hashtags.*' => ['string', 'max:120'],
             'cover_token' => ['nullable', 'string', 'max:120'],
             'cover_reset' => ['nullable', 'boolean'],
+            'music' => ['nullable', 'string', 'max:500'],
         ]);
 
         return $this->run($video, $edits, fn () => $edits->edit($video, $data));
@@ -47,6 +52,33 @@ final class PostEditController extends Controller
         $this->own($request, $video);
 
         return $this->run($video, $edits, fn () => $edits->unschedule($video));
+    }
+
+    /** Nghe / xem bản sẽ đăng (đã ghép nhạc) của bài đã xếp lịch. */
+    public function postedFile(Request $request, AutoVideo $video): BinaryFileResponse
+    {
+        $this->own($request, $video);
+        $path = $video->post_id ? Media::query()->where('post_id', $video->post_id)->where('collection', Media::COLLECTION_MEDIA)->orderBy('order')->value('path') : null;
+        abort_if($path === null || ! Storage::exists((string) $path), 404);
+
+        return response()->file(Storage::path((string) $path), ['Content-Type' => 'video/mp4', 'Cache-Control' => 'no-store']);
+    }
+
+    /** Nghe thử một bài trong thư mục nhạc của video (chỉ bài nằm trong thư mục nhạc). */
+    public function musicTrack(Request $request, AutoVideo $video, RiengMusic $music): BinaryFileResponse
+    {
+        $this->own($request, $video, true);
+        $file = $music->resolve($video, (string) $request->query('rel', ''));
+        abort_if($file === null || ! is_file($file), 404);
+
+        return response()->file($file, ['Cache-Control' => 'no-store']);
+    }
+
+    public function remove(Request $request, AutoVideo $video, PostEdits $edits): JsonResponse
+    {
+        $this->own($request, $video, true);
+
+        return $this->run($video, $edits, fn () => $edits->remove($video));
     }
 
     public function release(Request $request, AutoVideo $video, PostEdits $edits): JsonResponse

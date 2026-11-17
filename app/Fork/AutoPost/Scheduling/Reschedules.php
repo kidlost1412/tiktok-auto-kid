@@ -506,6 +506,7 @@ final class Reschedules
                 'result' => $keep,
                 'message' => $applied ?? match ((string) ($row->action ?: 'time')) {
                     'unschedule' => 'Đã xoá bài hẹn trên TikTok (đã kiểm lại) và bỏ xếp lịch — video đã về kho.',
+                    'remove' => 'Đã xoá bài hẹn trên TikTok (đã kiểm lại) và xoá video khỏi lịch, khỏi kho.',
                     'edit' => 'Đã xoá bài hẹn cũ trên TikTok (đã kiểm lại) và lưu thay đổi. App sẽ tải lên lại bản mới.',
                     default => 'Đã xoá bài hẹn cũ trên TikTok (đã kiểm lại). App sẽ tải lên lại với giờ mới.',
                 },
@@ -555,8 +556,12 @@ final class Reschedules
 
         $action = (string) ($row->action ?: 'time');
 
-        if ($action === 'unschedule') {
+        if ($action === 'unschedule' || $action === 'remove') {
             app(PostEdits::class)->unscheduleNow($video, $post);
+
+            if ($action === 'remove') {
+                app(PostEdits::class)->discard($video);
+            }
 
             return null;
         }

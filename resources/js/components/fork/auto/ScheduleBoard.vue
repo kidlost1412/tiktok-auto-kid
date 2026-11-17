@@ -6,6 +6,7 @@ import { useMediaQuery } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
 import DirectWindowDialog from '@/components/fork/auto/DirectWindowDialog.vue';
+import { dragging } from '@/components/fork/auto/dragMove';
 import ScheduleDayList from '@/components/fork/auto/ScheduleDayList.vue';
 import type {
     AccountRow,
@@ -406,6 +407,9 @@ const pct = (n: number, d: Day) =>
                         )
                     "
                     @click="picked = d.key"
+                    @dragover="
+                        dragging && ($event.preventDefault(), (picked = d.key))
+                    "
                 >
                     <span
                         v-if="current?.key === d.key"

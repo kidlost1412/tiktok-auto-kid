@@ -9,9 +9,12 @@ import {
     IconExternalLink,
     IconLoader2,
     IconShoppingCart,
+    IconTrash,
 } from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
 
+import { dragging, proposeTime } from '@/components/fork/auto/dragMove';
+import RemoveDialog from '@/components/fork/auto/RemoveDialog.vue';
 import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
 import type { ScheduleEntry } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
@@ -93,9 +96,75 @@ const canMove = (e: ScheduleEntry) =>
 const moving = (e: ScheduleEntry) => !!e.reschedule?.open;
 const moveOpen = ref(false);
 const moveEntry = ref<ScheduleEntry | null>(null);
-const startMove = (e: ScheduleEntry) => {
+const moveAt = ref<string | null>(null);
+const startMove = (e: ScheduleEntry, proposed: string | null = null) => {
     moveEntry.value = e;
+    moveAt.value = proposed;
     moveOpen.value = true;
+};
+
+// Kéo thả: kéo một bài (đổi giờ được) thả vào chỗ mới, ngày nào cũng được; hộp đổi giờ mở với giờ gợi ý để xác nhận.
+const dropKey = ref<string | null>(null);
+const keyOf = (e: ScheduleEntry | null) =>
+    e ? `${e.channelId}-${e.id ?? e.video_id ?? e.at}` : 'end';
+const onDragStart = (ev: DragEvent, e: ScheduleEntry) => {
+    dragging.value = e;
+
+    if (ev.dataTransfer) {
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', String(e.id));
+    }
+};
+const onDragEnd = () => {
+    dragging.value = null;
+    dropKey.value = null;
+};
+const onDragOver = (ev: DragEvent, target: ScheduleEntry | null) => {
+    const d = dragging.value;
+
+    // Chỉ thả vào cùng kênh (đổi kênh làm ở "Sửa bài").
+    if (
+        !d ||
+        (target &&
+            (target.channelId !== d.channelId || keyOf(target) === keyOf(d)))
+    ) {
+        return;
+    }
+
+    ev.preventDefault();
+
+    if (ev.dataTransfer) {
+        ev.dataTransfer.dropEffect = 'move';
+    }
+
+    dropKey.value = keyOf(target);
+};
+const onDrop = (ev: DragEvent, target: ScheduleEntry | null) => {
+    const d = dragging.value;
+    dropKey.value = null;
+
+    if (!d) {
+        return;
+    }
+
+    ev.preventDefault();
+    const sameChannel = props.list.filter((x) => x.channelId === d.channelId);
+    const at = proposeTime(d, props.dayKey, sameChannel, target);
+    dragging.value = null;
+    startMove(d, at);
+};
+
+// Xoá / bỏ xếp lịch ngay trên dòng lịch.
+const removeOpen = ref(false);
+const removeEntry = ref<ScheduleEntry | null>(null);
+const canRemove = (e: ScheduleEntry) =>
+    !!e.id &&
+    ['scheduled', 'direct', 'reserved', 'tiktok_scheduled', 'failed'].includes(
+        e.state,
+    );
+const startRemove = (e: ScheduleEntry) => {
+    removeEntry.value = e;
+    removeOpen.value = true;
 };
 
 // Kiểu gọn: trạng thái thường gặp chỉ là một chấm màu (có chú thích ở đầu bảng); trạng thái cần chú ý mới thành nhãn.
@@ -207,7 +276,18 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                         >Bây giờ</span
                     >
                 </li>
-                <li>
+                <li
+                    :class="
+                        cn(
+                            'relative',
+                            dropKey === keyOf(e) &&
+                                'before:absolute before:inset-x-3 before:-top-px before:z-10 before:h-0.5 before:rounded-full before:bg-primary',
+                        )
+                    "
+                    @dragover="onDragOver($event, e)"
+                    @dragleave="dropKey === keyOf(e) && (dropKey = null)"
+                    @drop="onDrop($event, e)"
+                >
                     <div
                         v-if="isEmptySlot(e)"
                         :class="
@@ -249,7 +329,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                         "
                         :class="
                             cn(
-                                'group grid cursor-pointer items-center rounded-lg px-2 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                                'group grid cursor-pointer items-center rounded-lg px-2 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-[dragging=true]:opacity-40',
                                 compact
                                     ? 'mx-2 grid-cols-[40px_28px_minmax(0,1fr)_auto] gap-2.5 py-1.5'
                                     : 'mx-3 grid-cols-[52px_36px_minmax(0,1fr)_auto] gap-3 py-2',
@@ -260,6 +340,14 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                     'opacity-70 hover:opacity-100',
                             )
                         "
+                        :draggable="canMove(e) && !moving(e)"
+                        :data-dragging="
+                            dragging && keyOf(dragging) === keyOf(e)
+                                ? 'true'
+                                : undefined
+                        "
+                        @dragstart="onDragStart($event, e)"
+                        @dragend="onDragEnd"
                         @click="open(e)"
                         @keydown.enter.self.prevent="open(e)"
                         @keydown.space.self.prevent="open(e)"
@@ -444,6 +532,26 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                     :class="compact ? 'size-3.5' : 'size-4'"
                                 />
                             </button>
+                            <button
+                                v-if="canRemove(e) && !moving(e)"
+                                type="button"
+                                :class="
+                                    cn(
+                                        'flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
+                                        compact ? 'size-6' : 'size-7',
+                                    )
+                                "
+                                title="Xoá hoặc bỏ xếp lịch"
+                                aria-label="Xoá hoặc bỏ xếp lịch"
+                                :data-testid="`fork-auto-remove-${e.id}`"
+                                @click.stop="startRemove(e)"
+                                @keydown.enter.stop
+                                @keydown.space.stop
+                            >
+                                <IconTrash
+                                    :class="compact ? 'size-3.5' : 'size-4'"
+                                />
+                            </button>
                             <template v-if="compact">
                                 <a
                                     v-if="e.link"
@@ -555,7 +663,28 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     >Bây giờ · hết bài trong ngày</span
                 >
             </li>
+            <!-- Thả vào cuối cột (sau bài cuối, hoặc ngày chưa có bài) -->
+            <li
+                v-if="dragging"
+                :class="
+                    cn(
+                        'mx-3 mt-1 rounded-lg border border-dashed px-3 py-3 text-center text-[0.75rem] text-muted-foreground',
+                        dropKey === 'end' &&
+                            'border-primary bg-primary/5 text-primary-text',
+                    )
+                "
+                @dragover="onDragOver($event, null)"
+                @dragleave="dropKey === 'end' && (dropKey = null)"
+                @drop="onDrop($event, null)"
+            >
+                Thả vào đây để đăng ngày này
+            </li>
         </ol>
-        <RescheduleDialog v-model:open="moveOpen" :entry="moveEntry" />
+        <RescheduleDialog
+            v-model:open="moveOpen"
+            :entry="moveEntry"
+            :proposed="moveAt"
+        />
+        <RemoveDialog v-model:open="removeOpen" :entry="removeEntry" />
     </div>
 </template>

@@ -157,6 +157,61 @@ const slotInfo = ref<
 >({});
 const slotsBusy = ref(false);
 const slotProblem = ref('');
+// Thứ tự xếp giờ: theo danh sách (video trước đăng trước) hoặc ngẫu nhiên (xáo cả lượt). Nhớ lựa chọn trên máy này.
+const ORDER_KEY = 'fork-rieng-batch-order';
+const readOrder = (): 'list' | 'random' => {
+    try {
+        return localStorage.getItem(ORDER_KEY) === 'random' ? 'random' : 'list';
+    } catch {
+        return 'list';
+    }
+};
+const order = ref<'list' | 'random'>(readOrder());
+const shuffled = ref<number[]>([]);
+const shuffle = () => {
+    const ids = props.items.map((i) => i.id);
+
+    for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+
+    shuffled.value = ids;
+};
+/** Video theo thứ tự sẽ xếp giờ (giờ sớm nhất cho video đầu). */
+const ordered = computed<BatchItem[]>(() => {
+    if (order.value !== 'random') {
+        return props.items;
+    }
+
+    const byId = new Map(props.items.map((i) => [i.id, i]));
+    const out = shuffled.value
+        .map((id) => byId.get(id))
+        .filter((i): i is BatchItem => !!i);
+
+    // Video mới thêm vào lượt mà chưa có trong thứ tự xáo: để cuối.
+    return [
+        ...out,
+        ...props.items.filter((i) => !shuffled.value.includes(i.id)),
+    ];
+});
+const setOrder = (o: 'list' | 'random', reshuffle = false) => {
+    if (o === 'random' && (reshuffle || order.value !== 'random')) {
+        shuffle();
+    }
+
+    order.value = o;
+
+    try {
+        localStorage.setItem(ORDER_KEY, o);
+    } catch {
+        // trình duyệt chặn lưu: chỉ không nhớ được lựa chọn
+    }
+
+    // Giờ chưa sửa tay được xếp lại theo thứ tự mới.
+    void propose();
+};
+
 const rules = ref<{ window: string | null; gap: number }>({
     window: null,
     gap: 20,
@@ -309,6 +364,11 @@ watch(
 
         step.value = 'form';
         plan.value = null;
+
+        if (order.value === 'random') {
+            shuffle();
+        }
+
         problem.value = '';
         times.value = {};
         edited.value = {};
@@ -375,7 +435,7 @@ async function propose() {
         gap_minutes: number;
     }>('/auto/kho/rieng/dat-lich/goi-y', {
         social_account_id: accountId.value,
-        items: props.items.map((it) => ({
+        items: ordered.value.map((it) => ({
             id: it.id,
             ...(edited.value[it.id] && times.value[it.id]
                 ? { at: dayjs(times.value[it.id]).toISOString() }
@@ -519,7 +579,7 @@ const payload = (acceptWarnings: boolean) => ({
     cover_mode: coverMode.value,
     cover_token:
         coverMode.value === 'upload' ? (batchCover.value?.token ?? null) : null,
-    items: props.items.map((it) => {
+    items: ordered.value.map((it) => {
         const o = overrides.value[it.id];
         const at = times.value[it.id];
         const c = rowCover.value[it.id];
@@ -1161,6 +1221,57 @@ const areaCls =
                                 class="text-xs text-red-600 dark:text-red-400"
                                 >{{ slotProblem }}</span
                             >
+                            <div
+                                class="mt-1.5 flex flex-wrap items-center gap-1.5"
+                                role="radiogroup"
+                                aria-label="Thứ tự xếp giờ"
+                            >
+                                <span class="mr-1 text-xs font-medium"
+                                    >Thứ tự đăng:</span
+                                >
+                                <button
+                                    v-for="o in [
+                                        {
+                                            v: 'list' as const,
+                                            l: 'Theo danh sách',
+                                        },
+                                        {
+                                            v: 'random' as const,
+                                            l: 'Ngẫu nhiên',
+                                        },
+                                    ]"
+                                    :key="o.v"
+                                    type="button"
+                                    role="radio"
+                                    :aria-checked="order === o.v"
+                                    :class="
+                                        cn(
+                                            'h-7 rounded-md border px-2.5 text-xs font-medium transition-colors',
+                                            order === o.v
+                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                : 'bg-background hover:bg-muted',
+                                        )
+                                    "
+                                    :data-testid="`fork-rieng-order-${o.v}`"
+                                    @click="setOrder(o.v)"
+                                >
+                                    {{ o.l }}
+                                </button>
+                                <button
+                                    v-if="order === 'random'"
+                                    type="button"
+                                    class="h-7 rounded-md px-2 text-xs font-medium text-primary-text hover:bg-muted"
+                                    data-testid="fork-rieng-order-reshuffle"
+                                    @click="setOrder('random', true)"
+                                >
+                                    Xáo lại
+                                </button>
+                                <span class="text-xs text-muted-foreground">{{
+                                    order === 'random'
+                                        ? 'Xáo trộn cả lượt, video nào cũng có thể lên trước.'
+                                        : 'Video ở trên đăng trước.'
+                                }}</span>
+                            </div>
                         </div>
 
                         <!-- Danh sách video: mỗi video một thẻ, hình nhỏ bên trái, thông tin + giờ + nút bên phải. -->
@@ -1173,7 +1284,7 @@ const areaCls =
                                 data-testid="fork-rieng-rows"
                             >
                                 <li
-                                    v-for="(it, n) in items"
+                                    v-for="(it, n) in ordered"
                                     :key="it.id"
                                     class="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-sm"
                                     :data-testid="`fork-rieng-row-${it.id}`"

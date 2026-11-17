@@ -13,6 +13,7 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Rieng\RiengCovers;
+use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\ChromeJobs;
@@ -73,6 +74,8 @@ final class PostEdits
             'accounts' => $this->accountOptions($video),
             'held' => self::isHeld($video),
             'can_release' => self::isHeld($video) && $video->status === AutoVideo::NEW,
+            // Video Kho riêng có thư mục nhạc: nghe thử bản sẽ đăng và đổi bài nhạc khác.
+            'music' => $post !== null && filled(data_get($post->meta, 'fork_music')) ? app(RiengMusic::class)->choicesFor($video, $post) : null,
         ];
     }
 
@@ -179,6 +182,73 @@ final class PostEdits
             : 'Đã bỏ xếp lịch. Video đã về kho và tạm không tự xếp lịch — sửa xong bấm "Cho xếp lịch lại".'];
     }
 
+    /**
+     * Xoá hẳn video khỏi lịch và khỏi kho: như "Bỏ xếp lịch" (bài đã hẹn trên TikTok thì xoá trên TikTok trước, đã kiểm lại),
+     * rồi video thành "Bỏ qua" để không bao giờ được xếp lịch lại. File video trên ổ đĩa không bị xoá.
+     *
+     * @return array{state: string, message: string, id?: string}
+     */
+    public function remove(AutoVideo $video): array
+    {
+        // Video chưa xếp lịch (còn trong kho / lỗi): bỏ luôn.
+        if ($video->post_id === null && in_array($video->status, [AutoVideo::NEW, AutoVideo::FAILED], true)) {
+            $this->discard($video);
+
+            return ['state' => 'done', 'message' => 'Đã xoá video khỏi kho. File trên ổ đĩa vẫn còn.'];
+        }
+
+        if ($this->reschedules->openFor($video) !== null) {
+            throw new RuntimeException('Bài này đang chờ xoá bài hẹn cũ trên TikTok — chờ xong rồi hãy làm tiếp.');
+        }
+
+        $info = $this->reschedules->inspect($video);
+
+        if ($info['kind'] === null) {
+            throw new RuntimeException((string) $info['reason']);
+        }
+
+        /** @var Post $post */
+        $post = $info['post'];
+
+        if ($info['kind'] === 'tiktok') {
+            return $this->reschedules->requestDeleteFor($video, $post, $info['job'], CarbonImmutable::instance($post->scheduled_at), 'remove');
+        }
+
+        if (CarbonImmutable::instance($post->scheduled_at)->lessThan(CarbonImmutable::now()->addSeconds(Reschedules::LOCAL_MIN_AHEAD))) {
+            throw new RuntimeException('Bài sắp tới giờ đăng — không xoá được nữa.');
+        }
+
+        DB::transaction(function () use ($video, $post): void {
+            $post = Post::query()->whereKey($post->id)->lockForUpdate()->first();
+            $video = AutoVideo::query()->whereKey($video->id)->lockForUpdate()->first();
+            $this->assertStillLocal($video, $post);
+            $this->unscheduleNow($video, $post);
+            $this->discard($video);
+        });
+
+        Log::info('Xoá hẳn video chưa lên TikTok khỏi lịch.', ['video_id' => $video->id]);
+
+        return ['state' => 'done', 'message' => 'Đã xoá video khỏi lịch và khỏi kho. File trên ổ đĩa vẫn còn.'];
+    }
+
+    /** Video thành "Bỏ qua" (chủ app xoá): bộ xếp lịch không lấy lại. Gọi trong giao dịch hoặc riêng lẻ. */
+    public function discard(AutoVideo $video): void
+    {
+        $video->refresh();
+        $meta = (array) $video->meta;
+        unset($meta[self::HOLD_KEY], $meta['hub_claimed_at']);
+        $meta['removed_by_owner'] = now()->toIso8601String();
+
+        $video->forceFill([
+            'status' => AutoVideo::SKIPPED,
+            'skip_reason' => 'Anh đã xoá video này',
+            'social_account_id' => null,
+            'post_id' => null,
+            'scheduled_for' => null,
+            'meta' => $meta,
+        ])->save();
+    }
+
     /** Video AI đã bỏ xếp lịch: cho bộ xếp lịch tự động lấy lại. */
     public function release(AutoVideo $video): void
     {
@@ -256,6 +326,16 @@ final class PostEdits
             if ($pick !== null) {
                 $meta['fork_cover'] = $pick;
             }
+        }
+
+        // Đổi nhạc trước (ghép lại từ file gốc, thay file đăng); lỗi thì không đổi gì khác.
+        if (! empty($clean['music'])) {
+            if (($err = app(RiengMusic::class)->remix($video, $post, (string) $clean['music'])) !== null) {
+                return $err;
+            }
+
+            $post->refresh();
+            $meta = array_merge($meta, array_intersect_key((array) $post->meta, ['fork_music' => 1, 'fork_music_mode' => 1]));
         }
 
         $postFill['meta'] = $meta;
@@ -402,6 +482,26 @@ final class PostEdits
             $clean['cover_token'] = (string) $changes['cover_token'];
         } elseif (! empty($changes['cover_reset']) && data_get($post->meta, 'fork_cover_src') === RiengCovers::SOURCE) {
             $clean['cover_reset'] = true;
+        }
+
+        // Đổi nhạc (video Kho riêng đã ghép nhạc): một bài trong thư mục nhạc, hoặc "*" = bốc ngẫu nhiên bài khác.
+        if (filled($changes['music'] ?? null)) {
+            $music = app(RiengMusic::class);
+            $choices = $music->choicesFor($video, $post);
+
+            if ($choices === null || $choices['tracks'] === []) {
+                throw new RuntimeException('Thư mục nhạc của video này không có bài nào (hoặc ổ đĩa đang tắt).');
+            }
+
+            $rel = (string) $changes['music'];
+
+            if ($rel === '*') {
+                $pool = array_values(array_filter($choices['tracks'], fn (array $t): bool => basename($t['rel']) !== $choices['current']));
+                $rel = ($pool === [] ? $choices['tracks'] : $pool)[random_int(0, count($pool === [] ? $choices['tracks'] : $pool) - 1)]['rel'];
+            }
+
+            $path = $music->resolve($video, $rel) ?? throw new RuntimeException('Không tìm thấy bài nhạc đã chọn trong thư mục nhạc.');
+            $clean['music'] = $path;
         }
 
         return $clean;

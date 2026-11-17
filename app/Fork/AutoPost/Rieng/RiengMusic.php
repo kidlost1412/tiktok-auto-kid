@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Rieng;
 
+use App\Dto\MediaItem;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Models\Media;
+use App\Models\Post;
+use App\Support\VideoDurationProbe;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -133,6 +138,131 @@ final class RiengMusic
         $this->mix($source, $track, $out, $s['mode'], $s['gain_db']);
 
         return ['path' => $out, 'track' => basename($track), 'mode' => $s['mode']];
+    }
+
+    /**
+     * Nhạc chọn được cho video này (thư mục nhạc của thư mục video), kèm bài đang dùng. null = video không ghép nhạc được.
+     *
+     * @return array{dir: string, mode: string, gain_db: int, current: ?string, tracks: list<array{name: string, rel: string}>}|null
+     */
+    public function choicesFor(AutoVideo $video, ?Post $post = null): ?array
+    {
+        if (! $video->isRieng()) {
+            return null;
+        }
+
+        $folder = RiengFolder::query()->find((int) data_get($video->meta, 'folder_id'));
+        $s = self::settings($folder);
+
+        if ($s['dir'] === null) {
+            return null;
+        }
+
+        $base = rtrim(str_replace('\\', '/', $s['dir']), '/').'/';
+        $tracks = array_map(fn (string $t): array => [
+            'name' => pathinfo($t, PATHINFO_FILENAME),
+            'rel' => ltrim(substr(str_replace('\\', '/', $t), strlen($base)), '/'),
+        ], $this->tracks($s['dir']));
+
+        return [
+            'dir' => $s['dir'], 'mode' => $s['mode'], 'gain_db' => $s['gain_db'],
+            'current' => $post !== null ? (data_get($post->meta, 'fork_music') ?: null) : null,
+            'tracks' => $tracks,
+        ];
+    }
+
+    /** Đường dẫn thật của một bài nhạc (theo đường tương đối trong thư mục nhạc của video). null = không có / ra ngoài thư mục. */
+    public function resolve(AutoVideo $video, string $rel): ?string
+    {
+        $c = $this->choicesFor($video);
+
+        if ($c === null || $rel === '' || str_contains($rel, '..')) {
+            return null;
+        }
+
+        foreach ($c['tracks'] as $t) {
+            if ($t['rel'] === str_replace('\\', '/', $rel)) {
+                return rtrim($c['dir'], '/\\').DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $t['rel']);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Đổi nhạc của bài đã xếp lịch (chưa lên TikTok, hoặc vừa xoá bài hẹn xong): ghép lại từ FILE GỐC với bài mới,
+     * thay file đăng của bài. null = xong; ngược lại là câu báo lỗi (không đổi gì).
+     */
+    public function remix(AutoVideo $video, Post $post, string $track): ?string
+    {
+        $c = $this->choicesFor($video, $post);
+
+        if ($c === null || ! is_file($track)) {
+            return 'Không tìm thấy bài nhạc đã chọn (thư mục nhạc đổi hoặc ổ đĩa đang tắt) — chưa đổi nhạc.';
+        }
+
+        if (! is_file((string) $video->path)) {
+            return 'Không còn thấy file video gốc trong thư mục — chưa đổi nhạc.';
+        }
+
+        $media = Media::query()->where('post_id', $post->id)->where('collection', Media::COLLECTION_MEDIA)->orderBy('order')->first();
+
+        if ($media === null) {
+            return 'Bài này không có file video — chưa đổi nhạc.';
+        }
+
+        $dir = storage_path('app/rieng-music');
+        @mkdir($dir, 0775, true);
+        $out = $dir.DIRECTORY_SEPARATOR.$video->id.'-'.Str::lower(Str::random(8)).'.mp4';
+
+        try {
+            $this->mix((string) $video->path, $track, $out, $c['mode'], $c['gain_db']);
+        } catch (Throwable $e) {
+            return mb_substr($e->getMessage(), 0, 300);
+        }
+
+        $old = (string) $media->path;
+        $new = 'medias/'.Str::uuid().'.mp4';
+
+        try {
+            $stream = fopen($out, 'rb');
+
+            if ($stream === false) {
+                return 'Không đọc được file vừa ghép nhạc — chưa đổi nhạc.';
+            }
+
+            try {
+                Storage::writeStream($new, $stream);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
+
+            $media->forceFill([
+                'path' => $new,
+                'mime_type' => 'video/mp4',
+                'size' => (int) filesize($out),
+                'original_filename' => pathinfo((string) $media->original_filename, PATHINFO_FILENAME).'.mp4',
+                'meta' => VideoDurationProbe::mergeInto((array) ($media->meta ?? []), VideoDurationProbe::fromFile($out)),
+            ])->save();
+
+            $meta = (array) $post->meta;
+            $meta['fork_music'] = basename($track);
+            $meta['fork_music_mode'] = $c['mode'];
+            $post->forceFill(['media' => [MediaItem::fromMedia($media)->toArray()], 'meta' => $meta])->save();
+        } finally {
+            @unlink($out);
+        }
+
+        try {
+            if ($old !== '' && $old !== $new) {
+                Storage::delete($old);
+            }
+        } catch (Throwable) {
+        }
+
+        return null;
     }
 
     /** Ghép bằng ffmpeg (hình chép nguyên, không nén lại). */

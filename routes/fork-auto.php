@@ -34,6 +34,9 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::get('videos/{video}/sua', [PostEditController::class, 'show'])->whereNumber('video')->name('videos.edit.show');
     Route::post('videos/{video}/sua', [PostEditController::class, 'update'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.edit');
     Route::post('videos/{video}/bo-xep-lich', [PostEditController::class, 'unschedule'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.unschedule');
+    Route::get('videos/{video}/ban-dang', [PostEditController::class, 'postedFile'])->whereNumber('video')->name('videos.posted-file');
+    Route::get('videos/{video}/nhac', [PostEditController::class, 'musicTrack'])->whereNumber('video')->name('videos.music-track');
+    Route::post('videos/{video}/xoa', [PostEditController::class, 'remove'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.remove');
     Route::post('videos/{video}/cho-xep-lai', [PostEditController::class, 'release'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.release');
     Route::post('accounts/{socialAccount}/pause', [AutoController::class, 'pause'])->name('accounts.pause');
     Route::post('accounts/{socialAccount}/apply-hours', [AutoController::class, 'applyHours'])->name('accounts.apply-hours');
