@@ -4,11 +4,11 @@
   "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
   "1.2.15": "Biên kịch được học cách nghĩ của người bán giỏi: mỗi bài chọn MỘT đòn bán chính (vì sao người này nên mua món này, lúc này) rồi ghi lại thành một câu ngắn. Có thêm hồ sơ bán hàng riêng của từng sản phẩm. Dù bạn đang giữ đề bài cũ, máy vẫn tự gắn phần kiến thức này vào.",
   "1.2.19": "Biên kịch có thêm phần \"Nói như người thật\": bớt dấu \"…\", bỏ kiểu tự hỏi tự đáp, câu cụt khẩu hiệu, câu hỏi ép chọn, nói quá hồ sơ. Vẫn giữ chuyện kể theo vai và tiếng địa phương. Máy cũng tự loại bản dính các tật này rồi bắt viết lại.",
-  "1.2.29": "Giọng nói là người làm nội dung bán hàng am hiểu nông nghiệp và sản phẩm (xưng em), tự tin, dám khoe món hàng; bỏ kể chuyện dài, đóng vai, chỉ giữ bằng chứng ngắn một hai câu. Hook là hook bán hàng đánh vào tâm lý khách: cụ thể (con số thật, tiền, cái mất thấy được), dứt khoát, phán thẳng; mỗi bài thử 3 hook và tự chấm theo thang 10 điểm. Được nói giá. Gọi \"các bác\" hoặc \"bà con\" ở chỗ tự nhiên, bỏ \"tôi\", \"bạn\", \"anh chị\"."
+  "1.2.30": "Giọng nói là người làm nội dung bán hàng am hiểu nông nghiệp và sản phẩm (xưng em), tự tin, dám khoe món hàng; bỏ kể chuyện dài, đóng vai, chỉ giữ bằng chứng ngắn một hai câu. Hook là hook bán hàng đánh vào tâm lý khách: cụ thể (con số thật, tiền, cái mất thấy được), dứt khoát, phán thẳng; mỗi bài thử 3 hook và tự chấm theo thang 10 điểm. Được nói giá. Gọi \"các bác\" hoặc \"bà con\" ở chỗ tự nhiên, bỏ \"tôi\", \"bạn\", \"anh chị\"."
  },
  "luat-san-xuat": {
   "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
-  "1.2.29": "Lời đọc theo giọng người làm nội dung am hiểu nông nghiệp, tự tin khẳng định công dụng, không kể chuyện dài; hook bán hàng cụ thể, dứt khoát, không mở bằng tiếng gọi; được nói giá; xưng hô \"các bác\"/\"bà con\" ngang nhau; điều nói về sản phẩm lấy ở hồ sơ và hồ sơ bán hàng riêng."
+  "1.2.30": "Lời đọc theo giọng người làm nội dung am hiểu nông nghiệp, tự tin khẳng định công dụng, không kể chuyện dài; hook bán hàng cụ thể, dứt khoát, không mở bằng tiếng gọi; được nói giá; xưng hô \"các bác\"/\"bà con\" ngang nhau; điều nói về sản phẩm lấy ở hồ sơ và hồ sơ bán hàng riêng."
  },
  "dien-phieu": {
   "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng.",
@@ -28,6 +28,6 @@
  },
  "kien-thuc-ban-hang": {
   "1.2.15": "Tài liệu MỚI: kiến thức bán hàng cho biên kịch (bán cái vườn sau khi dùng, nói mình khác ở đâu, tâm lý mua, giúp nhớ thương hiệu, người quanh mình đang dùng). Là cách nghĩ chứ không phải khuôn; bạn sửa được như các tài liệu luật khác.",
-  "1.2.29": "Nói lợi ích bằng lời bà con hay nói, tự tin; \"người quanh mình đã dùng\" nói thẳng, không dựng chuyện; được nói giá. Lời rao viral về độ tin dùng là hook, được dùng; công dụng, liều, quà vẫn đúng hồ sơ."
+  "1.2.30": "Nói lợi ích bằng lời bà con hay nói, tự tin; \"người quanh mình đã dùng\" nói thẳng, không dựng chuyện; được nói giá. Lời rao viral về độ tin dùng là hook, được dùng; công dụng, liều, quà vẫn đúng hồ sơ."
  }
 }
