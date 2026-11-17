@@ -1040,6 +1040,8 @@ const nothingYet = computed(() => {
 // ---------------------------------------------------------------- Tự cập nhật (video mới hiện sau ~10 giây)
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 let polling = false;
+// Chuyển tab qua lại liên tục (mỗi lần hiện lại đều quét): giữ cách nhau ít nhất 5 giây.
+let lastPollAt = 0;
 let lastSig = props.scan_sig;
 let lastTotal = props.counts.all ?? 0;
 
@@ -1061,12 +1063,14 @@ const poll = async () => {
         polling ||
         drag ||
         busy.value !== '' ||
-        document.visibilityState !== 'visible'
+        document.visibilityState !== 'visible' ||
+        Date.now() - lastPollAt < 5000
     ) {
         return;
     }
 
     polling = true;
+    lastPollAt = Date.now();
 
     try {
         const j = await postJson<{ sig: string; total: number; new: number }>(
@@ -1105,7 +1109,8 @@ const onVisible = () => {
 };
 
 onMounted(() => {
-    pollTimer = setInterval(() => void poll(), 10000);
+    // 20 giây: mỗi lượt có thể quét cả thư mục (nặng); tab ẩn thì bỏ qua, hiện lại thì quét ngay.
+    pollTimer = setInterval(() => void poll(), 20000);
     document.addEventListener('visibilitychange', onVisible);
     grid.value?.addEventListener('touchmove', onTouchMove, { passive: false });
     // Quét chọn bắt đầu được cả ở lề ngoài lưới (khi thẻ phủ kín màn hình vẫn kéo được).

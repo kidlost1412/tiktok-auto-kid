@@ -33,6 +33,9 @@ final class FailedPosts
 
     public const array BAD_STATES = ['failed', 'rejected', 'uncertain'];
 
+    /** Post meta: chủ app đã bấm "Đăng lại" lúc kênh bận, chờ kênh rảnh thì app tự giao. */
+    public const string RETRY_WANTED = 'fork_retry_wanted';
+
     public function __construct(private readonly ChromeJobs $chrome, private readonly RetryFailed $retry) {}
 
     /**
@@ -176,8 +179,12 @@ final class FailedPosts
     /**
      * Lý do không "Đăng lại" được, hoặc null nếu an toàn: lượt Chrome gần nhất lỗi và CHẮC CHẮN chưa gửi gì lên TikTok.
      */
-    private function jobRefusal(AutoVideo $v, ?Post $post, ?ChromeJob $job): ?string
+    private function jobRefusal(AutoVideo $v, ?Post $post, ?ChromeJob $job, bool $ignoreWanted = false): ?string
     {
+        if (! $ignoreWanted && $post !== null && filled(data_get($post->meta, self::RETRY_WANTED)) && $job !== null && $job->state === 'failed') {
+            return 'Đã xếp hàng đăng lại: kênh đang bận bài khác, app tự giao bài này cho Chrome ngay khi kênh rảnh.';
+        }
+
         if (! in_array($v->status, [AutoVideo::SCHEDULED, AutoVideo::RESERVED], true)) {
             return 'Bài này không còn ở trạng thái chờ đăng.';
         }
@@ -220,22 +227,93 @@ final class FailedPosts
      */
     public function retryJob(AutoVideo $video): ?string
     {
+        return $this->retryOrQueue($video)['error'];
+    }
+
+    /**
+     * Như retryJob, nhưng kênh đang bận một bài khác thì KHÔNG bắt chủ app bấm lại: đánh dấu bài "chờ đăng lại"
+     * (post meta fork_retry_wanted), ScheduledDispatcher giao ngay khi kênh rảnh.
+     *
+     * @return array{error: ?string, queued: bool}
+     */
+    public function retryOrQueue(AutoVideo $video): array
+    {
         $video = AutoVideo::query()->find($video->id) ?? $video;
         $post = $video->post_id !== null ? Post::query()->find($video->post_id) : null;
         $job = $post !== null ? $this->chrome->latestForPost($post) : null;
         $refusal = $this->jobRefusal($video, $post, $job);
 
         if ($refusal !== null) {
-            return $refusal;
+            return ['error' => $refusal, 'queued' => false];
         }
 
         try {
             $this->chrome->queueForPost($post, 'scheduled');
         } catch (ChromeRefusal $e) {
-            return $e->busy ? 'Kênh này đang có một bài khác chờ Chrome đăng. Chờ vài phút rồi bấm lại.' : $e->getMessage();
+            if (! $e->busy) {
+                return ['error' => $e->getMessage(), 'queued' => false];
+            }
+
+            // Ghi thẳng (không qua sự kiện model): ChromePostWatcher coi mọi lần lưu bài là "sửa bài" và thu hồi job.
+            Post::query()->whereKey($post->id)->update(['meta' => json_encode([...(array) $post->meta, self::RETRY_WANTED => now()->toIso8601String()], JSON_UNESCAPED_UNICODE)]);
+
+            return ['error' => null, 'queued' => true];
         }
 
-        return null;
+        self::clearRetryWanted($post);
+
+        return ['error' => null, 'queued' => false];
+    }
+
+    /**
+     * Bài đã bấm "Đăng lại" lúc kênh bận: giao một bài cho Chrome khi kênh rảnh (ScheduledDispatcher gọi, trước bài thường).
+     * Bài không còn đăng lại an toàn thì bỏ dấu. true = đã giao một job.
+     */
+    public function dispatchWanted(string $accountId): bool
+    {
+        $posts = Post::query()->where('social_account_id', $accountId)
+            ->whereNotNull('meta->'.self::RETRY_WANTED)
+            ->orderBy('scheduled_at')->limit(20)->get();
+
+        foreach ($posts as $post) {
+            $video = AutoVideo::query()->where('post_id', $post->id)->first();
+            $refusal = $video === null ? 'no video' : $this->jobRefusal($video, $post, $this->chrome->latestForPost($post), ignoreWanted: true);
+
+            if ($refusal !== null) {
+                self::clearRetryWanted($post);
+
+                continue;
+            }
+
+            try {
+                $this->chrome->queueForPost($post, 'scheduled');
+            } catch (ChromeRefusal $e) {
+                if ($e->busy) {
+                    return false;
+                }
+
+                self::clearRetryWanted($post);
+
+                continue;
+            }
+
+            self::clearRetryWanted($post);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function clearRetryWanted(Post $post): void
+    {
+        $meta = (array) $post->meta;
+
+        if (array_key_exists(self::RETRY_WANTED, $meta)) {
+            unset($meta[self::RETRY_WANTED]);
+            $post->setRawAttributes(['meta' => json_encode($meta, JSON_UNESCAPED_UNICODE)] + $post->getAttributes(), true);
+            Post::query()->whereKey($post->id)->update(['meta' => json_encode($meta, JSON_UNESCAPED_UNICODE)]);
+        }
     }
 
     /**

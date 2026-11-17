@@ -112,10 +112,18 @@ let timer: number | undefined;
 
 // Một lần hỏi hụt (máy bận, hub đang ghi file) không gỡ khung hub ra: phải hụt 2 lần liền mới coi là tắt.
 let misses = 0;
-const check = async () => {
-    if (document.hidden && up.value) {
+let lastCheck = 0;
+
+// Hỏi xưởng còn chạy không: tab ẩn thì thôi (hiện lại sẽ hỏi ngay); xưởng đang chạy ổn thì 15 giây một lần,
+// đang tắt / vừa lỗi thì 5 giây một lần để bật lên là thấy liền.
+const check = async (force = false) => {
+    if (
+        document.hidden ||
+        (!force && up.value && Date.now() - lastCheck < 15000)
+    ) {
         return;
     }
+    lastCheck = Date.now();
     let ok = false;
     try {
         const r = await fetch('/xuong/health', {
@@ -159,7 +167,7 @@ const restart = async () => {
     }
     window.setTimeout(() => {
         restarting.value = false;
-        void check();
+        void check(true);
     }, 6000);
 };
 
@@ -176,8 +184,8 @@ onMounted(() => {
         attributes: true,
         attributeFilter: ['class'],
     });
-    void check();
-    timer = window.setInterval(check, 5000);
+    void check(true);
+    timer = window.setInterval(() => void check(), 5000);
 });
 
 onBeforeUnmount(() => {
@@ -227,13 +235,13 @@ const pollNha = () => {
     nhaTimer = window.setTimeout(async () => {
         await loadNha();
         pollNha();
-    }, 6000);
+    }, 10000);
 };
 
 const onVis = () => {
     if (!document.hidden) {
         void loadNha();
-        void check();
+        void check(true);
     }
 };
 

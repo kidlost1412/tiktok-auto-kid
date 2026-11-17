@@ -6,6 +6,7 @@ namespace App\Fork\Chrome;
 
 use App\Enums\SocialAccount\Platform;
 use App\Enums\SocialAccount\Status as AccountStatus;
+use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\Chrome\Listeners\ChromePostWatcher;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeJob;
@@ -68,6 +69,11 @@ class ScheduledDispatcher
             }
 
             return 0;
+        }
+
+        // Bài chủ app đã bấm "Đăng lại" lúc kênh bận: giao trước, ngay khi kênh rảnh.
+        if (app(FailedPosts::class)->dispatchWanted((string) $account->id)) {
+            return 1;
         }
 
         $from = $now->addSeconds(ChromeJobs::SCHEDULE_LEAD + 120);

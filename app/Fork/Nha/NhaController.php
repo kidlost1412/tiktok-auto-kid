@@ -49,6 +49,16 @@ final class NhaController extends Controller
 
     public function state(): JsonResponse
     {
+        // Nhiều trang cùng hỏi (Khu Tự Trị, Xưởng Video, nhiều tab): dùng chung một kết quả trong 2 giây, đỡ gọi hub
+        // (mỗi lần có thể giữ một tiến trình PHP tới 6 giây khi hub chậm) và đỡ chạy lại các câu truy vấn.
+        $state = Cache::remember('nha.state', 2, fn (): array => $this->buildState());
+
+        return response()->json($state)->header('Cache-Control', 'no-store');
+    }
+
+    /** @return array<string, mixed> */
+    private function buildState(): array
+    {
         $now = CarbonImmutable::now();
 
         $app = $this->appFacts($now);
@@ -60,7 +70,7 @@ final class NhaController extends Controller
         // Địa chỉ hub để bấm cuộn phim mở video (trình duyệt gọi thẳng hub như khung Xưởng Video).
         $state['hub']['url'] = rtrim((string) config('fork.xuong.url'), '/');
 
-        return response()->json($state)->header('Cache-Control', 'no-store');
+        return $state;
     }
 
     /**
