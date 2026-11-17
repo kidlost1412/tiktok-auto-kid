@@ -617,8 +617,8 @@ watch(shownCover, () => {
                 v-if="confirmRemove && !editing"
                 class="text-xs text-muted-foreground"
             >
-                Video bị bỏ khỏi lịch và khỏi kho, không tự xếp lịch lại (file
-                trên ổ đĩa vẫn còn). Chỉ muốn sửa rồi đăng sau thì dùng "Bỏ xếp
+                Video bị bỏ khỏi lịch và khỏi kho, vào Thùng rác (khôi phục được
+                trong 30 ngày). Chỉ muốn sửa rồi đăng sau thì dùng "Bỏ xếp
                 lịch".
                 <template v-if="isTikTok"
                     >App nhờ Chrome xoá bài hẹn trên TikTok và kiểm lại trước,

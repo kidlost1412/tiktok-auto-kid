@@ -75,7 +75,8 @@ final class RiengController extends Controller
         $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
 
         $folders = RiengFolder::query()->orderBy('id')->get();
-        $base = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG);
+        // Video anh đã xoá nằm ở Thùng rác, không hiện trong kho.
+        $base = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at');
         $filtered = fn (): Builder => $base()
             ->when($folderId > 0, fn ($q) => $q->where('meta->folder_id', (string) $folderId))
             ->when($day !== '', fn ($q) => $q->whereDate('batch_date', $day))
@@ -165,7 +166,7 @@ final class RiengController extends Controller
     /** Dấu hiệu danh sách video riêng đã đổi (số lượng, video mới nhất, lần cập nhật gần nhất): trang so để biết cần tải lại. */
     private function signature(): string
     {
-        $q = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG);
+        $q = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at');
 
         return $q()->count().'|'.(int) $q()->max('id').'|'.$q()->max('updated_at');
     }

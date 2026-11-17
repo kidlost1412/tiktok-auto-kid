@@ -9,10 +9,12 @@ import {
     IconExternalLink,
     IconLoader2,
     IconShoppingCart,
+    IconShoppingCartOff,
     IconTrash,
 } from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
 
+import { channelColor } from '@/components/fork/auto/channelColors';
 import { dragging, proposeTime } from '@/components/fork/auto/dragMove';
 import RemoveDialog from '@/components/fork/auto/RemoveDialog.vue';
 import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
@@ -329,7 +331,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                         "
                         :class="
                             cn(
-                                'group grid cursor-pointer items-center rounded-lg px-2 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-[dragging=true]:opacity-40',
+                                'group relative grid cursor-pointer items-center rounded-lg px-2 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-[dragging=true]:opacity-40',
                                 compact
                                     ? 'mx-2 grid-cols-[40px_28px_minmax(0,1fr)_auto] gap-2.5 py-1.5'
                                     : 'mx-3 grid-cols-[52px_36px_minmax(0,1fr)_auto] gap-3 py-2',
@@ -352,6 +354,17 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                         @keydown.enter.self.prevent="open(e)"
                         @keydown.space.self.prevent="open(e)"
                     >
+                        <!-- Màu của kênh -->
+                        <span
+                            v-if="multi"
+                            aria-hidden="true"
+                            :class="
+                                cn(
+                                    'absolute inset-y-2 left-0 w-[3px] rounded-full',
+                                    channelColor(e.color).dot,
+                                )
+                            "
+                        />
                         <!-- Bấm giờ để đổi giờ ngay (bài đã xếp mà chưa đăng) -->
                         <button
                             v-if="canMove(e)"
@@ -430,7 +443,12 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 />
                                 <span
                                     v-if="multi"
-                                    class="shrink-0 text-[0.75rem] text-muted-foreground"
+                                    :class="
+                                        cn(
+                                            'max-w-[9rem] shrink-0 truncate rounded px-1.5 text-[0.7188rem] leading-[1.125rem] font-medium',
+                                            channelColor(e.color).chip,
+                                        )
+                                    "
                                     >@{{ e.username }}</span
                                 >
                             </div>
@@ -445,6 +463,24 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 :title="e.error_full ?? e.error"
                             >
                                 {{ e.error }}
+                            </p>
+                            <p
+                                v-else-if="e.cart_warn"
+                                :class="
+                                    cn(
+                                        'flex min-w-0 items-start gap-1 text-[0.75rem] font-medium',
+                                        toneClasses.danger.text,
+                                    )
+                                "
+                                :title="e.cart_warn"
+                                :data-testid="`fork-auto-cart-warn-${e.id}`"
+                            >
+                                <IconShoppingCartOff
+                                    class="mt-px size-3.5 shrink-0"
+                                />
+                                <span class="line-clamp-2">{{
+                                    e.cart_warn
+                                }}</span>
                             </p>
                             <p
                                 v-else-if="e.note"

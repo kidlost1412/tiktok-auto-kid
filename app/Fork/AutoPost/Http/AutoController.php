@@ -409,6 +409,28 @@ final class AutoController extends Controller
      * @param  Collection<string, AutoAccount>  $autoAccounts
      * @return array{days: list<array<string, string>>, channels: array<string, array<string, mixed>>}
      */
+    /** Số ngày dữ liệu sản phẩm shop của kênh được coi là cũ (tồn kho có thể đã đổi). */
+    private const int CART_STALE_DAYS = 3;
+
+    /**
+     * Câu báo khi kênh có bài sắp đăng gắn giỏ mà dữ liệu sản phẩm shop đã cũ (hoặc chưa lấy lần nào): app không biết giỏ còn hàng.
+     *
+     * @param  Collection<int, AutoVideo>  $upcoming
+     */
+    private function cartStale(?AutoAccount $auto, Collection $upcoming): ?string
+    {
+        $withCart = $upcoming->contains(fn (AutoVideo $v): bool => filled(data_get($v->post?->meta, 'fork_shop_product_id')));
+        $at = $auto?->products_synced_at;
+
+        if (! $withCart || ($at !== null && $at->greaterThan(now()->subDays(self::CART_STALE_DAYS)))) {
+            return null;
+        }
+
+        return $at === null
+            ? 'Kênh chưa lấy sản phẩm từ shop lần nào — app chưa kiểm được giỏ của các bài sắp đăng. Vào "Giỏ hàng" bấm lấy sản phẩm.'
+            : 'Sản phẩm shop của kênh cập nhật lần cuối '.$at->diffForHumans().' — hết hàng gần đây app chưa biết. Vào "Giỏ hàng" bấm lấy lại.';
+    }
+
     private function lich($accounts, $autoAccounts, ProductImageLookup $images, array $failedPosts = []): array
     {
         $failures = collect($failedPosts)->keyBy('id');
@@ -443,8 +465,12 @@ final class AutoController extends Controller
             // "Đổi giờ": bài nào đã nằm trên TikTok (job Chrome hẹn giờ đã xong), đổi giờ được không, yêu cầu gần nhất.
             $moves = app(Reschedules::class)->calendarInfo($videos);
 
-            // Cảnh báo sớm theo dữ liệu shop đã có: giỏ của bài đã hết hàng / không còn trong shop.
-            $cartWarnings = app(FailedPosts::class)->cartWarnings($videos->filter(fn (AutoVideo $v): bool => in_array($v->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED], true)));
+            // Kiểm giỏ trước giờ đăng (theo dữ liệu shop đã có): giỏ của bài sắp đăng, kể cả bài đã hẹn trên TikTok,
+            // đã hết hàng / không còn trong shop. Dữ liệu shop quá cũ thì báo ở đầu kênh.
+            $upcoming = $videos->filter(fn (AutoVideo $v): bool => in_array($v->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED], true)
+                || ($v->status === AutoVideo::POSTED && $v->posted_at?->isFuture()));
+            $cartWarnings = app(FailedPosts::class)->cartWarnings($upcoming);
+            $cartStale = $this->cartStale($auto, $upcoming);
 
             $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves, $failures, $cartWarnings, $window): array {
                 $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
@@ -484,7 +510,8 @@ final class AutoController extends Controller
                     'error' => $failure !== null ? 'Lỗi: '.$failure['short'] : ($state === 'failed' ? $v->skip_reason : null),
                     'error_full' => $failure['text'] ?? null,
                     // Bài chưa hẹn được lên TikTok vì kênh đã đủ số bài hẹn giờ: vẫn trong app, sẽ tự hẹn khi có chỗ.
-                    'note' => $state === 'scheduled' && ($move['held'] ?? false) ? ChromeJobs::QUOTA_HELD_TEXT : (in_array($state, ['scheduled', 'reserved'], true) ? ($cartWarnings[$v->id] ?? null) : null),
+                    'note' => $state === 'scheduled' && ($move['held'] ?? false) ? ChromeJobs::QUOTA_HELD_TEXT : null,
+                    'cart_warn' => in_array($state, ['scheduled', 'reserved', 'direct', 'uploading', 'tiktok_scheduled'], true) ? ($cartWarnings[$v->id] ?? null) : null,
                     'source' => $v->source,
                     'can_reschedule' => $move['can_reschedule'],
                     'reschedule' => $move['reschedule'],
@@ -529,6 +556,7 @@ final class AutoController extends Controller
             $channels[$a->id] = [
                 'items' => $items,
                 'note' => $p['note'],
+                'cart_stale' => $cartStale,
                 'blocked' => collect($p['blocked'])->map(fn (array $b): array => [...$b, 'image' => $images->forCode($b['code'] ?? null)])->all(),
                 'warnings' => array_slice($p['warnings'], 0, 6),
                 'today' => [

@@ -96,6 +96,8 @@ export interface LichItem {
     error_full?: string | null;
     /** Ghi chú cảnh báo (vd. bài đang giữ trong app vì kênh đã đủ số bài hẹn giờ trên TikTok). */
     note?: string | null;
+    /** Kiểm giỏ trước giờ đăng: giỏ của bài đã hết hàng / không còn trong shop. */
+    cart_warn?: string | null;
     /** Nguồn video: hub | rieng (Kho riêng) | ... */
     source?: string | null;
     /** Đổi giờ được không (bài đã xếp mà chưa đăng, Chrome không đang tải lên). */
@@ -134,6 +136,8 @@ export interface RescheduleInfo {
 export interface ScheduleEntry extends LichItem {
     channelId: string;
     username: string;
+    /** Chỉ số màu của kênh (channelColors.ts), cố định theo thứ tự kênh. */
+    color?: number;
 }
 
 export interface BlockedGroup {
@@ -147,6 +151,8 @@ export interface BlockedGroup {
 export interface LichChannel {
     items: LichItem[];
     note: string | null;
+    /** Dữ liệu sản phẩm shop của kênh đã cũ: app chưa kiểm được giỏ của bài sắp đăng. */
+    cart_stale?: string | null;
     blocked: BlockedGroup[];
     warnings: string[];
     today: { planned: number; posted: number; cap: number };

@@ -4,8 +4,10 @@
 import { router } from '@inertiajs/vue3';
 import { IconBrandTiktok, IconCalendarOff, IconTrash } from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 import type { ScheduleEntry } from '@/components/fork/auto/types';
+import { postJson, undoable } from '@/components/fork/auto/undo';
 import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,8 +31,6 @@ const done = ref('');
 const changed = ref(false);
 
 const onTikTok = computed(() => props.entry?.state === 'tiktok_scheduled');
-const xsrf = () =>
-    decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
 
 watch(open, (v) => {
     if (v) {
@@ -42,50 +42,38 @@ watch(open, (v) => {
     }
 });
 
-async function run(kind: 'unschedule' | 'remove') {
-    if (!props.entry?.id) {
+// Có "Hoàn tác": hộp đóng ngay, vài giây sau mới gửi đi.
+function run(kind: 'unschedule' | 'remove') {
+    const e = props.entry;
+
+    if (!e?.id) {
         return;
     }
 
-    busy.value = kind;
-    problem.value = '';
+    const name = e.product_label ?? e.product_code ?? 'Video';
+    const url = `/auto/videos/${e.id}/${kind === 'remove' ? 'xoa' : 'bo-xep-lich'}`;
+    open.value = false;
 
-    try {
-        const r = await fetch(
-            `/auto/videos/${props.entry.id}/${kind === 'remove' ? 'xoa' : 'bo-xep-lich'}`,
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-XSRF-TOKEN': xsrf(),
-                },
-                credentials: 'same-origin',
-                body: '{}',
-            },
-        );
-        const data = (await r.json().catch(() => null)) as {
-            ok?: boolean;
-            state?: string;
-            message?: string;
-        } | null;
+    undoable(
+        kind === 'remove'
+            ? `Xoá ${name} (${dayjs(e.at).format('HH:mm DD/MM')}) vào thùng rác`
+            : `Bỏ xếp lịch ${name} (${dayjs(e.at).format('HH:mm DD/MM')})`,
+        async () => {
+            const { ok, data } = await postJson(url);
 
-        if (!r.ok || !data?.ok) {
-            problem.value = data?.message ?? 'Không làm được, hãy thử lại.';
+            if (!ok) {
+                toast.error(data?.message ?? 'Không làm được, hãy thử lại.');
+            } else if (data?.state === 'pending') {
+                toast.info(
+                    'Đang nhờ Chrome xoá bài hẹn trên TikTok và kiểm lại. Xong là lịch tự cập nhật; không xác minh được thì app giữ nguyên bài.',
+                );
+            } else {
+                toast.success(data?.message ?? 'Đã xong.');
+            }
 
-            return;
-        }
-
-        changed.value = true;
-        done.value =
-            data.state === 'pending'
-                ? 'Đang nhờ Chrome xoá bài hẹn trên TikTok và kiểm lại. Xong là lịch tự cập nhật; không xác minh được thì app giữ nguyên bài.'
-                : (data.message ?? 'Đã xong.');
-    } catch {
-        problem.value = 'Mất kết nối với app, hãy thử lại.';
-    } finally {
-        busy.value = null;
-    }
+            router.reload({ only: ['lich', 'stock', 'products'] });
+        },
+    );
 }
 </script>
 
@@ -180,11 +168,11 @@ async function run(kind: 'unschedule' | 'remove') {
                     <span class="flex flex-col gap-0.5">
                         <b
                             class="text-sm font-medium text-red-700 dark:text-red-400"
-                            >Xoá hẳn video</b
+                            >Xoá video (vào thùng rác)</b
                         >
                         <span class="text-[0.8125rem] text-muted-foreground"
-                            >Bỏ khỏi lịch và khỏi kho, không tự xếp lại. File
-                            trên ổ đĩa vẫn còn.</span
+                            >Bỏ khỏi lịch và khỏi kho, không tự xếp lại. Khôi
+                            phục được trong 30 ngày ở Thùng rác.</span
                         >
                     </span>
                 </button>

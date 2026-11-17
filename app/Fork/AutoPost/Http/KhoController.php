@@ -104,7 +104,7 @@ final class KhoController extends Controller
 
         // Bản ghi cũ (nguồn `ra`) ẩn mặc định.
         // Video riêng của chủ app có trang "Kho riêng" riêng, không lẫn vào kho hub.
-        $base = fn () => AutoVideo::query()->notRieng()->when(! $showLegacy, fn ($q) => $q->where('source', '!=', 'ra'));
+        $base = fn () => AutoVideo::query()->notRieng()->whereNull('trashed_at')->when(! $showLegacy, fn ($q) => $q->where('source', '!=', 'ra'));
         $day = $request->query('day');
         $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
         $dayExpr = $this->dayExpression($tab);

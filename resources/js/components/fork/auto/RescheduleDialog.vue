@@ -9,11 +9,13 @@ import {
     IconInfoCircle,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 import type {
     RescheduleInfo,
     ScheduleEntry,
 } from '@/components/fork/auto/types';
+import { postJson, undoable } from '@/components/fork/auto/undo';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import { toneClasses } from '@/components/fork/shared/status';
 import { timeNotice } from '@/components/fork/shared/timeNotice';
@@ -50,8 +52,6 @@ const clock = setInterval(() => (nowTick.value = Date.now()), 30000);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pollUntil = 0;
 
-const xsrf = () =>
-    decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
 const url = computed(() =>
     props.entry?.id ? `/auto/videos/${props.entry.id}/doi-gio` : '',
 );
@@ -193,57 +193,34 @@ const unchanged = computed(() => {
     return !value.value || (!!cur && dayjs(cur).format(FORMAT) === value.value);
 });
 
-async function save() {
+// Đổi giờ có "Hoàn tác": hộp đóng ngay, vài giây sau mới gửi đi (bấm "Hoàn tác" là không đổi gì).
+function save() {
     if (!url.value || unchanged.value) {
         return;
     }
 
-    busy.value = true;
-    problem.value = '';
-    success.value = '';
+    const target = url.value;
+    const at = dayjs(value.value);
+    const name =
+        props.entry?.product_label ?? props.entry?.product_code ?? 'bài';
+    const onTikTok = isTikTok.value;
+    open.value = false;
 
-    try {
-        const r = await fetch(url.value, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-XSRF-TOKEN': xsrf(),
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({ at: dayjs(value.value).toISOString() }),
-        });
-        const body = (await r.json().catch(() => null)) as
-            | (RescheduleInfo & {
-                  ok?: boolean;
-                  state?: string;
-                  message?: string;
-              })
-            | null;
+    undoable(`Dời ${name} sang ${at.format('HH:mm DD/MM')}`, async () => {
+        const { ok, data } = await postJson(target, { at: at.toISOString() });
 
-        if (body && 'rules' in body) {
-            info.value = body;
-        }
-
-        if (!r.ok || !body?.ok) {
-            problem.value = body?.message ?? 'Không đổi được giờ, hãy thử lại.';
-
-            return;
-        }
-
-        changed.value = true;
-
-        if (body.state === 'pending') {
-            pollUntil = Date.now() + 17 * 60 * 1000;
-            poll();
+        if (!ok) {
+            toast.error(data?.message ?? 'Không đổi được giờ, hãy thử lại.');
+        } else if (data?.state === 'pending' || onTikTok) {
+            toast.info(
+                'Đang nhờ Chrome xoá bài hẹn cũ trên TikTok và kiểm lại, xong sẽ hẹn lại theo giờ mới.',
+            );
         } else {
-            success.value = body.message ?? 'Đã đổi giờ.';
+            toast.success(data?.message ?? 'Đã đổi giờ.');
         }
-    } catch {
-        problem.value = 'Mất kết nối với app, hãy thử lại.';
-    } finally {
-        busy.value = false;
-    }
+
+        router.reload({ only: ['lich'] });
+    });
 }
 </script>
 

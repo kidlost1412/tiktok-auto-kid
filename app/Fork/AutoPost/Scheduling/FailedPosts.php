@@ -347,12 +347,26 @@ final class FailedPosts
             ->get()
             ->keyBy(fn (ShopProduct $p): string => $p->social_account_id.'|'.$p->product_id);
 
+        // Kênh đã có dữ liệu shop: giỏ của bài không có trong đó là giỏ đã bị gỡ khỏi shop (kênh chưa lấy sản phẩm lần nào thì không đoán).
+        $hasShop = ShopProduct::query()->whereIn('social_account_id', array_map('strval', array_keys($wanted)))
+            ->distinct()->pluck('social_account_id')->map(fn ($id): string => (string) $id)->flip();
+
         $out = [];
 
         foreach ($videos as $v) {
-            $p = $products[$v->social_account_id.'|'.data_get($v->post?->meta, 'fork_shop_product_id')] ?? null;
+            $pid = data_get($v->post?->meta, 'fork_shop_product_id');
+
+            if (! is_string($pid) || $pid === '') {
+                continue;
+            }
+
+            $p = $products[$v->social_account_id.'|'.$pid] ?? null;
 
             if ($p === null) {
+                if (isset($hasShop[(string) $v->social_account_id])) {
+                    $out[$v->id] = 'Không thấy giỏ này trong shop của kênh — lấy lại sản phẩm hoặc đổi giỏ trước giờ đăng';
+                }
+
                 continue;
             }
 

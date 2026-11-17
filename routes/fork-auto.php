@@ -13,6 +13,7 @@ use App\Fork\AutoPost\Http\RiengAutoController;
 use App\Fork\AutoPost\Http\RiengController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
+use App\Fork\AutoPost\Http\TrashController;
 use App\Fork\Chrome\Http\Extension\AuthenticateExtension;
 use App\Fork\Chrome\Http\Extension\ExtensionCors;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,10 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::get('videos/{video}/ban-dang', [PostEditController::class, 'postedFile'])->whereNumber('video')->name('videos.posted-file');
     Route::get('videos/{video}/nhac', [PostEditController::class, 'musicTrack'])->whereNumber('video')->name('videos.music-track');
     Route::post('videos/{video}/xoa', [PostEditController::class, 'remove'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.remove');
+    Route::get('thung-rac', [TrashController::class, 'index'])->name('trash.index');
+    Route::post('thung-rac/don-sach', [TrashController::class, 'purgeAll'])->middleware('throttle:10,1')->name('trash.purge-all');
+    Route::post('thung-rac/{video}/khoi-phuc', [TrashController::class, 'restore'])->whereNumber('video')->middleware('throttle:60,1')->name('trash.restore');
+    Route::post('thung-rac/{video}/xoa', [TrashController::class, 'purge'])->whereNumber('video')->middleware('throttle:60,1')->name('trash.purge');
     Route::post('videos/{video}/cho-xep-lai', [PostEditController::class, 'release'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.release');
     Route::post('accounts/{socialAccount}/pause', [AutoController::class, 'pause'])->name('accounts.pause');
     Route::post('accounts/{socialAccount}/apply-hours', [AutoController::class, 'applyHours'])->name('accounts.apply-hours');

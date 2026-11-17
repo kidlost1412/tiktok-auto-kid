@@ -194,7 +194,7 @@ final class PostEdits
         if ($video->post_id === null && in_array($video->status, [AutoVideo::NEW, AutoVideo::FAILED], true)) {
             $this->discard($video);
 
-            return ['state' => 'done', 'message' => 'Đã xoá video khỏi kho. File trên ổ đĩa vẫn còn.'];
+            return ['state' => 'done', 'message' => 'Đã bỏ video vào thùng rác (khôi phục được trong '.Trash::DAYS.' ngày).'];
         }
 
         if ($this->reschedules->openFor($video) !== null) {
@@ -228,7 +228,7 @@ final class PostEdits
 
         Log::info('Xoá hẳn video chưa lên TikTok khỏi lịch.', ['video_id' => $video->id]);
 
-        return ['state' => 'done', 'message' => 'Đã xoá video khỏi lịch và khỏi kho. File trên ổ đĩa vẫn còn.'];
+        return ['state' => 'done', 'message' => 'Đã bỏ video khỏi lịch, vào thùng rác (khôi phục được trong '.Trash::DAYS.' ngày).'];
     }
 
     /** Video thành "Bỏ qua" (chủ app xoá): bộ xếp lịch không lấy lại. Gọi trong giao dịch hoặc riêng lẻ. */
@@ -242,6 +242,8 @@ final class PostEdits
         $video->forceFill([
             'status' => AutoVideo::SKIPPED,
             'skip_reason' => 'Anh đã xoá video này',
+            'trashed_at' => now(),
+            'purged_at' => null,
             'social_account_id' => null,
             'post_id' => null,
             'scheduled_for' => null,

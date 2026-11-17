@@ -1,13 +1,21 @@
 <script setup lang="ts">
 // Lịch đăng. Màn rộng (≥1536px): 3 ngày cạnh nhau, mỗi cột có đầu cột (ngày, số bài, thanh tiến độ) và cuộn riêng.
 // Màn hẹp hơn: chọn ngày bằng tab ở đầu thẻ, hiện một ngày. Nét đứt là giờ dự kiến, chưa hẹn lên TikTok.
-import { IconBolt, IconClock } from '@tabler/icons-vue';
+import { Link } from '@inertiajs/vue3';
+import {
+    IconBolt,
+    IconClock,
+    IconShoppingCartOff,
+    IconTrash,
+} from '@tabler/icons-vue';
 import { useMediaQuery } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
+import { channelColor } from '@/components/fork/auto/channelColors';
 import DirectWindowDialog from '@/components/fork/auto/DirectWindowDialog.vue';
 import { dragging } from '@/components/fork/auto/dragMove';
 import ScheduleDayList from '@/components/fork/auto/ScheduleDayList.vue';
+import TrashDialog from '@/components/fork/auto/TrashDialog.vue';
 import type {
     AccountRow,
     DirectWindow,
@@ -22,7 +30,6 @@ import {
     EDITABLE_STATES,
     toneClasses,
 } from '@/components/fork/shared/status';
-import { NativeSelect } from '@/components/ui/native-select';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +42,9 @@ const props = defineProps<{
 const directOpen = ref(false);
 // Chỉ hiện video còn nằm trong app (chưa lên TikTok): sửa / xoá thoải mái.
 const onlyEditable = ref(false);
+// Chỉ hiện bài sắp đăng mà giỏ có vấn đề (hết hàng / không còn trong shop).
+const onlyCart = ref(false);
+const trashOpen = ref(false);
 
 const wide = useMediaQuery('(min-width: 1536px)');
 
@@ -46,12 +56,16 @@ const picked = ref<string | null>(null);
 const entries = computed<ScheduleEntry[]>(() => {
     const out: ScheduleEntry[] = [];
 
-    for (const a of props.accounts) {
+    props.accounts.forEach((a, color) => {
         if (channel.value !== 'all' && channel.value !== a.id) {
-            continue;
+            return;
         }
 
         for (const item of props.lich.channels[a.id]?.items ?? []) {
+            if (onlyCart.value && !item.cart_warn) {
+                continue;
+            }
+
             // Giờ trống (không có video) chỉ hiện khi không lọc nguồn.
             if (
                 source.value !== 'all' &&
@@ -68,9 +82,10 @@ const entries = computed<ScheduleEntry[]>(() => {
                 ...item,
                 channelId: a.id,
                 username: a.username ?? a.display_name ?? '—',
+                color,
             });
         }
-    }
+    });
 
     return out.sort((x, y) => dayjs(x.at).valueOf() - dayjs(y.at).valueOf());
 });
@@ -78,12 +93,32 @@ const entries = computed<ScheduleEntry[]>(() => {
 const notes = computed(() =>
     props.accounts
         .filter((a) => channel.value === 'all' || channel.value === a.id)
-        .map((a) => ({
-            id: a.id,
-            username: a.username ?? '—',
-            note: props.lich.channels[a.id]?.note ?? null,
-        }))
+        .flatMap((a) => [
+            {
+                id: a.id,
+                username: a.username ?? '—',
+                note: props.lich.channels[a.id]?.note ?? null,
+                cart: false,
+            },
+            {
+                id: `${a.id}-cart`,
+                username: a.username ?? '—',
+                note: props.lich.channels[a.id]?.cart_stale ?? null,
+                cart: true,
+            },
+        ])
         .filter((n) => n.note),
+);
+
+// Số bài sắp đăng có giỏ lỗi (mọi kênh, mọi ngày đang xem).
+const cartCount = computed(() =>
+    props.accounts.reduce(
+        (n, a) =>
+            n +
+            (props.lich.channels[a.id]?.items ?? []).filter((i) => i.cart_warn)
+                .length,
+        0,
+    ),
 );
 
 const todayKey = computed(() => dayjs().format('YYYY-MM-DD'));
@@ -258,20 +293,91 @@ const pct = (n: number, d: Day) =>
                     >
                     <template v-else>Đăng thẳng: tắt</template>
                 </button>
-                <SourceFilter v-model="source" />
-                <NativeSelect
-                    v-if="multi"
-                    v-model="channel"
-                    class="h-8 w-44"
-                    aria-label="Lọc theo kênh"
+                <button
+                    v-if="cartCount || onlyCart"
+                    type="button"
+                    :aria-pressed="onlyCart"
+                    :class="
+                        cn(
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors',
+                            onlyCart
+                                ? 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
+                                : cn(
+                                      toneClasses.danger.chip,
+                                      'hover:opacity-90',
+                                  ),
+                        )
+                    "
+                    title="Bài sắp đăng mà giỏ đã hết hàng hoặc không còn trong shop. Bấm để chỉ xem các bài này."
+                    data-testid="fork-auto-only-cart"
+                    @click="onlyCart = !onlyCart"
                 >
-                    <option value="all">Tất cả kênh</option>
-                    <option v-for="a in accounts" :key="a.id" :value="a.id">
-                        @{{ a.username ?? a.display_name }}
-                    </option>
-                </NativeSelect>
+                    <IconShoppingCartOff class="size-4" />
+                    <b class="tabular-nums">{{ cartCount }}</b> lỗi giỏ
+                </button>
+                <SourceFilter v-model="source" />
+                <button
+                    type="button"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    title="Video anh đã xoá: khôi phục được trong 30 ngày"
+                    data-testid="fork-auto-trash-open"
+                    @click="trashOpen = true"
+                >
+                    <IconTrash class="size-4" /> Thùng rác
+                </button>
             </div>
         </header>
+
+        <!-- Lọc theo kênh: mỗi kênh một màu -->
+        <div
+            v-if="multi"
+            class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-5 py-2"
+            role="group"
+            aria-label="Lọc theo kênh"
+            data-testid="fork-auto-channel-filter"
+        >
+            <button
+                type="button"
+                :aria-pressed="channel === 'all'"
+                :class="
+                    cn(
+                        'inline-flex h-7 items-center rounded-full border px-3 text-[0.8125rem] font-medium transition-colors',
+                        channel === 'all'
+                            ? 'border-foreground/30 bg-foreground/5 text-foreground'
+                            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    )
+                "
+                @click="channel = 'all'"
+            >
+                Tất cả kênh
+            </button>
+            <button
+                v-for="(a, i) in accounts"
+                :key="a.id"
+                type="button"
+                :aria-pressed="channel === a.id"
+                :class="
+                    cn(
+                        'inline-flex h-7 max-w-[14rem] items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] font-medium transition-colors',
+                        channel === a.id
+                            ? cn('border-transparent', channelColor(i).chip)
+                            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                    )
+                "
+                :data-testid="`fork-auto-channel-${a.id}`"
+                @click="channel = channel === a.id ? 'all' : a.id"
+            >
+                <i
+                    :class="
+                        cn('size-2 shrink-0 rounded-full', channelColor(i).dot)
+                    "
+                    aria-hidden="true"
+                />
+                <span class="truncate"
+                    >@{{ a.username ?? a.display_name }}</span
+                >
+            </button>
+        </div>
 
         <div v-if="notes.length" class="flex shrink-0 flex-col gap-2 px-5 pt-3">
             <div
@@ -284,7 +390,17 @@ const pct = (n: number, d: Day) =>
                     )
                 "
             >
+                <IconShoppingCartOff
+                    v-if="n.cart"
+                    class="mr-1 inline size-4 align-[-3px]"
+                />
                 <b v-if="multi">@{{ n.username }}: </b>{{ n.note }}
+                <Link
+                    v-if="n.cart"
+                    href="/auto/gio-hang"
+                    class="ml-1 font-medium underline underline-offset-2"
+                    >Mở Giỏ hàng</Link
+                >
             </div>
         </div>
 
@@ -470,6 +586,7 @@ const pct = (n: number, d: Day) =>
             />
         </template>
 
+        <TrashDialog v-model:open="trashOpen" />
         <DirectWindowDialog
             v-if="directWindow"
             v-model:open="directOpen"

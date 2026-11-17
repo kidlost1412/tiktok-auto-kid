@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Models;
 
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,7 +37,7 @@ class AutoVideo extends Model
         // Video riêng bị xoá khỏi app: dọn ảnh bìa riêng của nó (file video của chủ không bao giờ bị đụng).
         static::deleting(function (self $v): void {
             if ($v->isRieng()) {
-                app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->forget((int) $v->id);
+                app(RiengCovers::class)->forget((int) $v->id);
             }
         });
     }
@@ -53,6 +54,8 @@ class AutoVideo extends Model
             'scheduled_for' => 'datetime',
             'posted_at' => 'datetime',
             'stats_written_at' => 'datetime',
+            'trashed_at' => 'datetime',
+            'purged_at' => 'datetime',
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\Reschedule;
+use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\Chrome\ChromeJobs;
@@ -479,4 +480,76 @@ test('nghe bản sẽ đăng và nghe thử nhạc: chỉ chủ app, chỉ file 
     // Người lạ không xem được.
     $stranger = User::factory()->create(['account_id' => Account::factory()->create()->id]);
     expect($this->actingAs($stranger)->get("/auto/videos/{$video->id}/ban-dang")->status())->toBeIn([302, 403, 404]);
+});
+
+// ---------------------------------------------------------------- Thùng rác
+
+test('video xoá vào thùng rác: không còn trong kho, khôi phục được về kho', function (): void {
+    [, $video] = rsPost($this, rsAt(10), 'rieng');
+    $this->actingAs($this->owner)->postJson("/auto/videos/{$video->id}/xoa")->assertOk()->assertJson(['state' => 'done']);
+
+    expect($video->refresh()->trashed_at)->not->toBeNull();
+    $this->actingAs($this->owner)->getJson('/auto/thung-rac')->assertOk()
+        ->assertJson(['days' => 30])->assertJsonPath('items.0.id', $video->id)->assertJsonPath('items.0.days_left', 30);
+
+    // Kho riêng không còn hiện video đã xoá.
+    $ids = collect($this->actingAs($this->owner)->get('/auto/kho/rieng?status=loi')->viewData('page')['props']['videos']['data'] ?? [])->pluck('id');
+    expect($ids)->not->toContain($video->id);
+
+    $this->actingAs($this->owner)->postJson("/auto/thung-rac/{$video->id}/khoi-phuc")->assertOk()->assertJson(['ok' => true]);
+    $video->refresh();
+    expect($video->status)->toBe(AutoVideo::NEW)->and($video->trashed_at)->toBeNull()
+        ->and(data_get($video->meta, 'removed_by_owner'))->toBeNull();
+    $this->actingAs($this->owner)->getJson('/auto/thung-rac')->assertJsonCount(0, 'items');
+    $ids = collect($this->actingAs($this->owner)->get('/auto/kho/rieng?status=chua')->viewData('page')['props']['videos']['data'])->pluck('id');
+    expect($ids)->toContain($video->id);
+});
+
+test('xoá trong thùng rác là xoá hẳn; quá 30 ngày cũng hết khôi phục; dọn sạch', function (): void {
+    [, $a] = rsPost($this, rsAt(10));
+    [, $b] = rsPost($this, rsAt(11));
+    [, $c] = rsPost($this, rsAt(12));
+    foreach ([$a, $b, $c] as $v) {
+        $this->actingAs($this->owner)->postJson("/auto/videos/{$v->id}/xoa")->assertOk();
+    }
+    $c->refresh()->forceFill(['trashed_at' => now()->subDays(31)])->save();
+
+    $this->actingAs($this->owner)->getJson('/auto/thung-rac')->assertJsonCount(2, 'items');
+    $this->actingAs($this->owner)->postJson("/auto/thung-rac/{$c->id}/khoi-phuc")->assertStatus(422);
+
+    $this->actingAs($this->owner)->postJson("/auto/thung-rac/{$a->id}/xoa")->assertOk();
+    expect($a->refresh()->purged_at)->not->toBeNull()->and($a->status)->toBe(AutoVideo::SKIPPED);
+    $this->actingAs($this->owner)->postJson("/auto/thung-rac/{$a->id}/khoi-phuc")->assertStatus(422);
+
+    $this->actingAs($this->owner)->postJson('/auto/thung-rac/don-sach')->assertOk();
+    expect($b->refresh()->purged_at)->not->toBeNull();
+    $this->actingAs($this->owner)->getJson('/auto/thung-rac')->assertJsonCount(0, 'items');
+});
+
+// ---------------------------------------------------------------- Kiểm giỏ trước giờ đăng
+
+test('kiểm giỏ trước giờ đăng: cả bài đã hẹn trên TikTok, giỏ hết hàng / không còn trong shop; dữ liệu shop cũ thì báo', function (): void {
+    $pid = '1729384756001234567';
+    ShopProduct::query()->create(['social_account_id' => $this->social->id, 'product_id' => $pid, 'source' => 'my_shop', 'title' => 'Giỏ A', 'stock_num' => 0, 'synced_at' => now()]);
+    AutoAccount::query()->whereKey($this->social->id)->update(['products_synced_at' => now()->subDays(5)]);
+
+    [$p1, $onTikTok] = rsPost($this, CarbonImmutable::now()->addHours(3));
+    $p1->forceFill(['meta' => [...$p1->meta, 'fork_shop_product_id' => $pid]])->save();
+    rsJob($p1, 'posted');
+    [$p2, $gone] = rsPost($this, CarbonImmutable::now()->addHours(5));
+    $p2->forceFill(['meta' => [...$p2->meta, 'fork_shop_product_id' => '1729384756009999999']])->save();
+    [, $noCart] = rsPost($this, CarbonImmutable::now()->addHours(6));
+
+    $lich = $this->actingAs($this->owner)->get('/auto')->assertOk()->viewData('page')['props']['lich']['channels'][$this->social->id];
+    $items = collect($lich['items'])->keyBy('id');
+
+    expect($items[$onTikTok->id]['state'])->toBe('tiktok_scheduled')
+        ->and($items[$onTikTok->id]['cart_warn'])->toContain('hết hàng')
+        ->and($items[$gone->id]['cart_warn'])->toContain('Không thấy giỏ')
+        ->and($items[$noCart->id]['cart_warn'])->toBeNull()
+        ->and($lich['cart_stale'])->toContain('cập nhật lần cuối');
+
+    AutoAccount::query()->whereKey($this->social->id)->update(['products_synced_at' => now()]);
+    $lich = $this->actingAs($this->owner)->get('/auto')->viewData('page')['props']['lich']['channels'][$this->social->id];
+    expect($lich['cart_stale'])->toBeNull();
 });

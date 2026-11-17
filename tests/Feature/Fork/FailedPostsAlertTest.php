@@ -161,7 +161,7 @@ test('overview lists failed posts with the reason, the Lich row is red, early ca
         ->and($items[$failed->id]['error'])->toBe('Lỗi: Hết hàng')
         ->and($items[$ok->id]['state'])->toBe('scheduled')
         ->and($items[$ok->id]['note'])->toBeNull()
-        ->and($items[$stock->id]['note'])->toContain('Giỏ hết hàng');
+        ->and($items[$stock->id]['cart_warn'])->toContain('Giỏ hết hàng');
 
     $info = $this->actingAs($this->owner)->getJson("/auto/kho/video/{$failed->id}/info")->assertOk()->json('failure');
     expect($info['kind'])->toBe('job')->and($info['can_retry'])->toBeTrue()->and($info['fix'])->toContain('Đăng lại');

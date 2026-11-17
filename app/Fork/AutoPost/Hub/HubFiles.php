@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Hub;
 
-use App\Fork\AutoPost\Models\AutoVideo;
 use App\Enums\Post\Status as PostStatus;
+use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Scheduling\MissingVideoFile;
+use App\Fork\AutoPost\Scheduling\Trash;
 use App\Models\Media;
 use App\Models\Post;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -165,7 +166,7 @@ class HubFiles
                 continue;
             }
 
-            $video = AutoVideo::query()->where('hub_id', $m[1])->first(['id', 'status', 'posted_at', 'updated_at']);
+            $video = AutoVideo::query()->where('hub_id', $m[1])->first(['id', 'status', 'posted_at', 'updated_at', 'trashed_at', 'purged_at']);
 
             if ($video === null) {
                 if (@unlink($file)) {
@@ -176,6 +177,11 @@ class HubFiles
             }
 
             if (! in_array($video->status, [AutoVideo::POSTED, AutoVideo::FAILED, AutoVideo::SKIPPED], true)) {
+                continue;
+            }
+
+            // Video còn trong thùng rác (khôi phục được): giữ file.
+            if ($video->trashed_at !== null && $video->purged_at === null && $video->trashed_at->greaterThan($now->subDays(Trash::DAYS))) {
                 continue;
             }
 
@@ -232,7 +238,7 @@ class HubFiles
                 // Ảnh bìa riêng của video riêng được giữ đúng bằng thời hạn giữ file video của bài.
                 foreach ($videos as $v) {
                     if ($v->isRieng() && in_array($v->post_id, $postIds, true)) {
-                        app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->forget((int) $v->id);
+                        app(RiengCovers::class)->forget((int) $v->id);
                     }
                 }
             }, 'id');
