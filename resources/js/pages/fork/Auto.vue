@@ -15,6 +15,7 @@ import ScheduleBoard from '@/components/fork/auto/ScheduleBoard.vue';
 import TodayHero from '@/components/fork/auto/TodayHero.vue';
 import type {
     AccountRow,
+    DirectWindow,
     FailedPostRow,
     FailedRow,
     Health,
@@ -49,6 +50,8 @@ const props = defineProps<{
     health: Health;
     hub?: HubStatus;
     lich: Lich;
+    /** Khung giờ đăng thẳng (tuỳ chọn). */
+    direct_window?: DirectWindow;
     recent: RecentRow[];
     failed_recent?: FailedRow[];
     /** Bài không đăng được trong 3 ngày gần đây (Chrome báo lỗi hoặc đã chốt lỗi), kèm lý do tiếng Việt. */
@@ -179,6 +182,7 @@ onMounted(() => {
                     'trend',
                     'onboarding',
                     'lich',
+                    'direct_window',
                     'health',
                     'accounts',
                 ],
@@ -210,10 +214,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
 
         <OnboardingCard v-if="onboarding" :onboarding="onboarding" />
 
-        <FailedPostsBlock
-            v-if="failed_posts?.length"
-            :rows="failed_posts"
-        />
+        <FailedPostsBlock v-if="failed_posts?.length" :rows="failed_posts" />
 
         <TodayHero
             :accounts="accounts"
@@ -285,6 +286,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                 <ScheduleBoard
                     :lich="lich"
                     :accounts="accounts"
+                    :direct-window="direct_window"
                     class="max-xl:max-h-[760px]"
                 />
 
@@ -423,9 +425,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                                     {{ fmtNum(p.counts.posted) }} đã
                                     đăng<template v-if="p.counts.failed">
                                         ·
-                                        {{
-                                            fmtNum(p.counts.failed)
-                                        }}
+                                        {{ fmtNum(p.counts.failed) }}
                                         lỗi</template
                                     ><template v-if="!p.enabled">
                                         · đang tắt</template

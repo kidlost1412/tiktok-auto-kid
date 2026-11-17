@@ -1,12 +1,14 @@
 // Bảng trạng thái dùng chung cho cả khu "Tự động đăng": một trạng thái = một màu, một biểu tượng, một nhãn ở mọi trang.
 import {
     IconAlertCircle,
+    IconBolt,
     IconBookmark,
+    IconBrandTiktok,
     IconCalendarCheck,
     IconCalendarTime,
-    IconBrandTiktok,
     IconCircleCheck,
     IconClock,
+    IconCloudUpload,
     IconLoader2,
     IconPlayerSkipForward,
 } from '@tabler/icons-vue';
@@ -112,6 +114,18 @@ export const statusMeta: Record<string, StatusMeta> = {
         icon: IconBrandTiktok,
         tone: 'info',
     },
+    // Lịch đăng: video đã xếp nhưng còn nằm trong app (sửa / xoá thoải mái).
+    in_app: {
+        label: 'Chưa lên TikTok',
+        icon: IconClock,
+        tone: 'neutral',
+    },
+    direct: { label: 'Đăng thẳng', icon: IconBolt, tone: 'violet' },
+    uploading: {
+        label: 'Đang gửi lên TikTok',
+        icon: IconCloudUpload,
+        tone: 'info',
+    },
     posted: { label: 'Đã đăng', icon: IconCircleCheck, tone: 'success' },
     failed: { label: 'Lỗi', icon: IconAlertCircle, tone: 'danger' },
     skipped: { label: 'Bỏ qua', icon: IconPlayerSkipForward, tone: 'neutral' },
@@ -122,6 +136,16 @@ export const statusMeta: Record<string, StatusMeta> = {
         dashed: true,
     },
 };
+
+/**
+ * Trạng thái hiển thị trên Lịch đăng: "scheduled" ở đây nghĩa là video đã xếp mà CHƯA gửi lên TikTok
+ * (nơi khác "Đã xếp lịch" vẫn giữ nghĩa cũ).
+ */
+export const lichStatus = (state: string): string =>
+    state === 'scheduled' ? 'in_app' : state;
+
+/** Video còn nằm trong app (chưa lên TikTok): sửa / xoá thoải mái. */
+export const EDITABLE_STATES = ['scheduled', 'direct', 'reserved'];
 
 export const statusOf = (key: string): StatusMeta =>
     statusMeta[key] ?? { label: key, icon: IconClock, tone: 'neutral' };

@@ -24,6 +24,7 @@ use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\AutoPost\Scheduling\PostEdits;
 use App\Fork\AutoPost\Scheduling\Readiness;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
+use App\Fork\AutoPost\Scheduling\ScheduleState;
 use App\Fork\AutoPost\Shop\HubCartAttach;
 use App\Fork\AutoPost\Sidecar;
 use App\Fork\AutoPost\VideoLibrary;
@@ -196,9 +197,11 @@ final class KhoController extends Controller
             'blockers' => fn (): array => $readiness->summarize($assessed(), $waiting()),
             'videos' => function () use ($videos, $products, $assessed, $images, $readiness): array {
                 $page = $videos();
+                $where = ScheduleState::forVideos($page->getCollection());
 
                 return [
-                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->videoRow($v, $products(), $assessed()[$v->id] ?? $this->singleAssessment($readiness, $v), $images()))->values()->all(),
+                    'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->videoRow($v, $products(), $assessed()[$v->id] ?? $this->singleAssessment($readiness, $v), $images())
+                        + ['schedule_state' => $where[$v->id] ?? null])->values()->all(),
                     'current_page' => $page->currentPage(),
                     'last_page' => $page->lastPage(),
                     'total' => $page->total(),
@@ -321,6 +324,7 @@ final class KhoController extends Controller
         $products = AutoProduct::query()->get()->keyBy('code');
 
         $row = $this->videoRow($video, $products, $this->singleAssessment($readiness, $video), ProductImages::lookup());
+        $row['schedule_state'] = ScheduleState::forVideos(collect([$video]))[$video->id] ?? null;
         $row['comments'] = $this->commentsOf($video);
         // Bài không đăng được: lý do tiếng Việt + việc làm được (khung đỏ trong khung xem video).
         $row['failure'] = app(FailedPosts::class)->forVideo($video);

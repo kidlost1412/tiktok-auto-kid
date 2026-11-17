@@ -2,6 +2,7 @@
 // Danh sách bài của MỘT ngày trong Lịch đăng. Dùng cho cả kiểu tab (màn hẹp) và kiểu 3 cột (màn rộng, `compact`).
 // Hôm nay: các bài đã đăng gấp lại thành một dòng để mắt đi thẳng tới bài sắp tới; có vạch "Bây giờ".
 import {
+    IconBolt,
     IconCalendarOff,
     IconChevronDown,
     IconClockEdit,
@@ -15,7 +16,11 @@ import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
 import type { ScheduleEntry } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
-import { statusOf, toneClasses } from '@/components/fork/shared/status';
+import {
+    lichStatus,
+    statusOf,
+    toneClasses,
+} from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { openVideo } from '@/components/fork/viewer';
 import dayjs from '@/dayjs';
@@ -94,7 +99,10 @@ const startMove = (e: ScheduleEntry) => {
 };
 
 // Kiểu gọn: trạng thái thường gặp chỉ là một chấm màu (có chú thích ở đầu bảng); trạng thái cần chú ý mới thành nhãn.
-const QUIET = ['scheduled', 'tiktok_scheduled', 'posted', 'projected'];
+// "Chưa lên TikTok" / "Đăng thẳng" luôn là nhãn chữ để phân biệt rõ với bài đã hẹn trên TikTok.
+const QUIET = ['tiktok_scheduled', 'posted', 'projected'];
+// Cột hẹp: video chưa lên TikTok / đăng thẳng / đang gửi chỉ hiện biểu tượng màu riêng (chú thích ở đầu bảng, rê chuột xem chữ).
+const ICON_ONLY = ['scheduled', 'direct', 'uploading'];
 
 const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
 </script>
@@ -262,12 +270,18 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             type="button"
                             :class="
                                 cn(
-                                    'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
-                                    compact ? '-mr-1 text-[0.8438rem]' : '-mr-1 text-[0.9375rem]',
+                                    'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
+                                    compact
+                                        ? '-mr-1 text-[0.8438rem]'
+                                        : '-mr-1 text-[0.9375rem]',
                                     moving(e) && 'text-primary-text',
                                 )
                             "
-                            :title="moving(e) ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…' : 'Bấm để đổi giờ'"
+                            :title="
+                                moving(e)
+                                    ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…'
+                                    : 'Bấm để đổi giờ'
+                            "
                             :data-testid="`fork-auto-time-${e.id}`"
                             @click.stop="startMove(e)"
                             @keydown.enter.stop
@@ -280,7 +294,9 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             :class="
                                 cn(
                                     'text-right font-semibold tabular-nums',
-                                    compact ? 'text-[0.8438rem]' : 'text-[0.9375rem]',
+                                    compact
+                                        ? 'text-[0.8438rem]'
+                                        : 'text-[0.9375rem]',
                                     e.state === 'projected' &&
                                         'font-medium text-muted-foreground',
                                     e.state === 'posted' &&
@@ -318,7 +334,11 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 >
                                 <SourceBadge
                                     :source="e.source"
-                                    :class="compact ? 'h-4 px-1 text-[0.625rem] [&_svg]:size-2.5' : ''"
+                                    :class="
+                                        compact
+                                            ? 'h-4 px-1 text-[0.625rem] [&_svg]:size-2.5'
+                                            : ''
+                                    "
                                 />
                                 <span
                                     v-if="multi"
@@ -391,19 +411,38 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                     cn(
                                         'flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
                                         compact ? 'size-6' : 'size-7',
-                                        compact && !moving(e) && 'opacity-0 group-hover:opacity-100',
+                                        compact &&
+                                            !moving(e) &&
+                                            'opacity-0 group-hover:opacity-100',
                                         moving(e) && 'text-primary-text',
                                     )
                                 "
-                                :title="moving(e) ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…' : 'Đổi giờ'"
-                                :aria-label="moving(e) ? 'Đang đổi giờ' : 'Đổi giờ'"
+                                :title="
+                                    moving(e)
+                                        ? 'Đang xoá bài hẹn cũ trên TikTok để đổi giờ…'
+                                        : 'Đổi giờ'
+                                "
+                                :aria-label="
+                                    moving(e) ? 'Đang đổi giờ' : 'Đổi giờ'
+                                "
                                 :data-testid="`fork-auto-move-${e.id}`"
                                 @click.stop="startMove(e)"
                                 @keydown.enter.stop
                                 @keydown.space.stop
                             >
-                                <IconLoader2 v-if="moving(e)" :class="cn('animate-spin', compact ? 'size-3.5' : 'size-4')" />
-                                <IconClockEdit v-else :class="compact ? 'size-3.5' : 'size-4'" />
+                                <IconLoader2
+                                    v-if="moving(e)"
+                                    :class="
+                                        cn(
+                                            'animate-spin',
+                                            compact ? 'size-3.5' : 'size-4',
+                                        )
+                                    "
+                                />
+                                <IconClockEdit
+                                    v-else
+                                    :class="compact ? 'size-3.5' : 'size-4'"
+                                />
                             </button>
                             <template v-if="compact">
                                 <a
@@ -418,16 +457,21 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 >
                                     <IconExternalLink class="size-3.5" />
                                 </a>
+                                <IconBolt
+                                    v-if="e.state === 'projected' && e.direct"
+                                    :class="
+                                        cn('size-3.5', toneClasses.violet.text)
+                                    "
+                                    title="Dự kiến · trong khung đăng thẳng"
+                                    aria-label="Dự kiến, đăng thẳng"
+                                />
                                 <span
-                                    v-if="QUIET.includes(e.state)"
+                                    v-else-if="QUIET.includes(e.state)"
                                     :class="
                                         cn(
                                             'size-2 rounded-full',
-                                            e.state === 'scheduled'
-                                                ? toneClasses.info.dot
-                                                : toneClasses[
-                                                      statusOf(e.state).tone
-                                                  ].dot,
+                                            toneClasses[statusOf(e.state).tone]
+                                                .dot,
                                             e.state === 'projected' &&
                                                 'border border-dashed border-muted-foreground bg-transparent',
                                         )
@@ -437,21 +481,36 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 />
                                 <StatusChip
                                     v-else
-                                    :status="e.state"
+                                    :status="lichStatus(e.state)"
+                                    :icon-only="ICON_ONLY.includes(e.state)"
                                     class="h-5 gap-1 px-1.5 text-[0.7188rem] [&_svg]:size-3"
                                 />
                             </template>
                             <template v-else>
                                 <StatusChip
-                                    :status="e.state"
+                                    :status="lichStatus(e.state)"
                                     class="h-6 px-2 text-[0.75rem] max-sm:hidden"
                                 />
+                                <span
+                                    v-if="e.state === 'projected' && e.direct"
+                                    :class="
+                                        cn(
+                                            'inline-flex items-center gap-1 text-[0.75rem] max-sm:hidden',
+                                            toneClasses.violet.text,
+                                        )
+                                    "
+                                    title="Giờ dự kiến trong khung đăng thẳng: tới giờ Chrome đăng luôn"
+                                    ><IconBolt class="size-3.5" />Đăng
+                                    thẳng</span
+                                >
                                 <span
                                     :class="
                                         cn(
                                             'size-2 rounded-full sm:hidden',
-                                            toneClasses[statusOf(e.state).tone]
-                                                .dot,
+                                            toneClasses[
+                                                statusOf(lichStatus(e.state))
+                                                    .tone
+                                            ].dot,
                                         )
                                     "
                                 />

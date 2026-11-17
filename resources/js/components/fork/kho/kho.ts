@@ -42,6 +42,8 @@ export interface KhoVideo {
     can_preview: boolean;
     /** Bài đã hẹn sẵn trên TikTok : chưa tới giờ đăng. */
     on_tiktok_schedule?: boolean;
+    /** Video đã xếp đang ở đâu: tiktok | uploading | direct | in_app (ScheduleState.php). */
+    schedule_state?: ScheduleWhere | null;
     product_image?: string | null;
     channel_avatar?: string | null;
     stats?: {
@@ -102,14 +104,28 @@ export const fmtDuration = (s: number | null): string => {
 export const coverUrl = (id: number): string => `/auto/kho/video/${id}/cover`;
 export const videoUrl = (id: number): string => `/auto/kho/video/${id}`;
 
+export type ScheduleWhere = 'tiktok' | 'uploading' | 'direct' | 'in_app';
+
+/** Nhãn ngắn cho video đã xếp: đã lên TikTok chưa (sửa / xoá thoải mái khi chưa lên). */
+export const whereLabel: Record<ScheduleWhere, string> = {
+    tiktok: 'Đã hẹn trên TikTok',
+    uploading: 'Đang gửi lên TikTok',
+    direct: 'Đăng thẳng (chưa lên TikTok)',
+    in_app: 'Chưa lên TikTok',
+};
+
 /** Dòng tóm tắt hiện dưới thẻ video. */
 export const cardLine = (v: KhoVideo): { text: string; tone: Tone } => {
     if (v.status === 'scheduled' || v.status === 'reserved') {
+        const where = v.schedule_state
+            ? `${whereLabel[v.schedule_state]} · `
+            : '';
+
         return {
             text: v.scheduled_for
-                ? `Đăng ${fmtTime(v.scheduled_for)}${v.channel ? ` · ${v.channel}` : ''}`
+                ? `${where}Đăng ${fmtTime(v.scheduled_for)}${v.channel ? ` · ${v.channel}` : ''}`
                 : 'Đang giữ chỗ',
-            tone: 'success',
+            tone: v.schedule_state === 'tiktok' ? 'success' : 'info',
         };
     }
 

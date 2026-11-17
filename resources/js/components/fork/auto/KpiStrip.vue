@@ -35,7 +35,7 @@ const next = computed(() => {
 
     for (const a of props.accounts) {
         for (const e of props.lich.channels[a.id]?.items ?? []) {
-            if (!['scheduled', 'tiktok_scheduled', 'reserved', 'publishing'].includes(e.state) || !dayjs(e.at).isAfter(now.subtract(5, 'minute'))) {
+            if (!['scheduled', 'tiktok_scheduled', 'direct', 'uploading', 'reserved', 'publishing'].includes(e.state) || !dayjs(e.at).isAfter(now.subtract(5, 'minute'))) {
                 continue;
             }
 

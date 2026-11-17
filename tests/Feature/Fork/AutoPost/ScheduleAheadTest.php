@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Post\Status as PostStatus;
 use App\Enums\SocialAccount\Status as AccountStatus;
+use App\Exceptions\PlatformUnavailableException;
 use App\Fork\AutoPost\Models\AnchorTemplate;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
@@ -11,11 +12,13 @@ use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Scheduling\FutureUploads;
-use App\Fork\AutoPost\Scheduling\PlanPreview;
 use App\Fork\AutoPost\Scheduling\Planner;
+use App\Fork\AutoPost\Scheduling\PlanPreview;
+use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\AutoPost\Scheduling\ResultWatcher;
 use App\Fork\AutoPost\Stats\StatsCollector;
 use App\Fork\Chrome\ChromeJobs;
+use App\Fork\Chrome\DirectWindow;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Fork\Chrome\Publishing\ChromeAwareTikTokPublisher;
@@ -27,6 +30,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -264,7 +268,7 @@ test('a post TikTok rejected because the channel is full is kept, retried when t
         ->and($dispatcher->dispatchForAccount($account))->toBe(0);
 
     // Hết hạn ghi nhớ (hoặc có chỗ): giao lại đúng bài đó, lần từ chối vì đầy không tính vào số lần thử.
-    \Illuminate\Support\Facades\Cache::forget(ChromeJobs::QUOTA_FULL_KEY.$account->id);
+    Cache::forget(ChromeJobs::QUOTA_FULL_KEY.$account->id);
     ChromeJob::query()->where('post_id', $job->post_id)->update(['attempt' => 3]);
     expect($dispatcher->dispatchForAccount($account))->toBe(1)
         ->and(ChromeJob::query()->where('state', 'queued')->value('post_id'))->toBe($job->post_id);
@@ -276,11 +280,11 @@ test('a post TikTok rejected because the channel is full is kept, retried when t
     try {
         app(ChromeAwareTikTokPublisher::class)->publish($post->fresh(['socialAccount']));
         $thrown = null;
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         $thrown = $e;
     }
 
-    expect($thrown)->toBeInstanceOf(\App\Exceptions\PlatformUnavailableException::class)
+    expect($thrown)->toBeInstanceOf(PlatformUnavailableException::class)
         ->and(ChromeJob::query()->where('post_id', $post->id)->where('state', 'queued')->value('mode'))->toBe('now');
 });
 
@@ -294,12 +298,12 @@ test('the calendar shows a post held because TikTok is full, and it can still be
     ]);
     aheadJob($post->id, $account->id, 'rejected', ['result' => ['outcome' => 'rejected', 'status_code' => 3013021]]);
 
-    $info = app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->calendarInfo(collect([$video]));
+    $info = app(Reschedules::class)->calendarInfo(collect([$video]));
     expect($info[$video->id]['held'])->toBeTrue()->and($info[$video->id]['can_reschedule'])->toBeTrue()
-        ->and(app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->inspect($video)['kind'])->toBe('local');
+        ->and(app(Reschedules::class)->inspect($video)['kind'])->toBe('local');
 
     $other = aheadJob($post->id, $account->id, 'rejected', ['attempt' => 2, 'result' => ['outcome' => 'rejected', 'status_code' => 3013099]]);
-    expect(app(\App\Fork\AutoPost\Scheduling\Reschedules::class)->calendarInfo(collect([$video]))[$video->id]['held'])->toBeFalse()
+    expect(app(Reschedules::class)->calendarInfo(collect([$video]))[$video->id]['held'])->toBeFalse()
         ->and(ChromeJobs::isQuotaRejection($other))->toBeFalse();
 });
 
@@ -396,4 +400,106 @@ test('stats are filled before 24h and linked through the post or the scheduled t
         ->and($byPost->fresh()->stats['latest']['views'])->toBe(10)
         ->and($byPost->fresh()->stats)->not->toHaveKey('h24')
         ->and($byTime->fresh()->stats['latest']['views'])->toBe(20);
+});
+
+// ---------------------------------------------------------------- Khung giờ đăng thẳng
+
+test('direct window: covers only the set hours, weekdays and channels, and leaves the last minutes to scheduling', function (): void {
+    $s = DirectWindow::normalize(['enabled' => true, 'start' => '08:00', 'end' => '17:00', 'days' => [1, 2, 3, 4, 5], 'margin_minutes' => 40, 'off_channels' => ['off-id']]);
+    $vn = fn (string $t): CarbonImmutable => CarbonImmutable::parse($t, 'Asia/Ho_Chi_Minh');
+
+    // 2026-11-16 là thứ 2, 2026-11-21 là thứ 7.
+    expect(DirectWindow::covers('a', $vn('2026-11-16 08:00'), $s))->toBeTrue()
+        ->and(DirectWindow::covers('a', $vn('2026-11-16 16:19'), $s))->toBeTrue()
+        ->and(DirectWindow::covers('a', $vn('2026-11-16 16:20'), $s))->toBeFalse() // 40 phút cuối: hẹn trước
+        ->and(DirectWindow::covers('a', $vn('2026-11-16 07:59'), $s))->toBeFalse()
+        ->and(DirectWindow::covers('a', $vn('2026-11-16 20:00'), $s))->toBeFalse()
+        ->and(DirectWindow::covers('a', $vn('2026-11-21 10:00'), $s))->toBeFalse() // thứ 7 máy tắt
+        ->and(DirectWindow::covers('off-id', $vn('2026-11-16 10:00'), $s))->toBeFalse()
+        ->and(DirectWindow::covers('a', $vn('2026-11-16 10:00'), [...$s, 'enabled' => false]))->toBeFalse()
+        // mặc định tắt
+        ->and(DirectWindow::get()['enabled'])->toBeFalse();
+});
+
+test('direct window: posts inside it stay in the app (never pre-scheduled on TikTok); posts outside still go up ahead', function (): void {
+    $account = ($this->account)(['schedule_ahead_days' => 3, 'daily_cap' => 8]);
+    ($this->videos)(30);
+    app(Planner::class)->planAll($this->now);
+    DirectWindow::save(['enabled' => true, 'start' => '08:00', 'end' => '17:00', 'days' => [1, 2, 3, 4, 5, 6, 7], 'margin_minutes' => 40]);
+    $s = DirectWindow::get();
+
+    $posts = Post::query()->where('social_account_id', $account->id)->get();
+    expect($posts->filter(fn (Post $p): bool => DirectWindow::covers($account->id, $p->scheduled_at, $s))->count())->toBeGreaterThan(0)
+        ->and($posts->reject(fn (Post $p): bool => DirectWindow::covers($account->id, $p->scheduled_at, $s))->count())->toBeGreaterThan(0);
+
+    $dispatcher = app(ScheduledDispatcher::class);
+
+    for ($i = 0; $i < 40 && $dispatcher->dispatchForAccount($account) === 1; $i++) {
+        ChromeJob::query()->where('state', 'queued')->update(['state' => 'posted']);
+    }
+
+    $sent = ChromeJob::query()->where('mode', 'scheduled')->pluck('post_id');
+    $outside = $posts->reject(fn (Post $p): bool => DirectWindow::covers($account->id, $p->scheduled_at, $s))->pluck('id');
+
+    expect($sent->sort()->values()->all())->toBe($outside->sort()->values()->all());
+
+    // Lịch đăng: bài trong khung hiện "Đăng thẳng", bài đã gửi lên hiện "Đã hẹn trên TikTok".
+    $this->actingAs($this->user)->get('/auto')->assertOk()->assertInertia(function ($page) use ($account): void {
+        $items = collect($page->toArray()['props']['lich']['channels'][$account->id]['items'])->where('id', '!=', null);
+        expect($items->pluck('state')->unique()->sort()->values()->all())->toContain('direct', 'tiktok_scheduled')
+            ->and($page->toArray()['props']['direct_window']['enabled'])->toBeTrue();
+    });
+});
+
+test('direct window: a direct post that is due holds back new scheduled uploads on that channel', function (): void {
+    $account = ($this->account)();
+    DirectWindow::save(['enabled' => true, 'start' => '00:00', 'end' => '23:59', 'days' => [1, 2, 3, 4, 5, 6, 7], 'margin_minutes' => 0]);
+    $due = Post::factory()->forAccount($account)->create(['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addMinutes(5)]);
+
+    expect(app(DirectWindow::class)->dueSoon($account->id, CarbonImmutable::now()))->toBeTrue();
+
+    $due->forceFill(['scheduled_at' => now()->addHours(2)])->save();
+    expect(app(DirectWindow::class)->dueSoon($account->id, CarbonImmutable::now()))->toBeFalse();
+});
+
+test('direct window: after the PC was off, a late direct post within the catch-up time still posts; a much later one moves to the next free slot', function (): void {
+    $account = ($this->account)();
+    DirectWindow::save(['enabled' => true, 'start' => '00:00', 'end' => '23:59', 'days' => [1, 2, 3, 4, 5, 6, 7], 'margin_minutes' => 0, 'catch_up_minutes' => 120]);
+    $now = CarbonImmutable::now()->startOfMinute();
+    $make = function (CarbonImmutable $at, string $hash) use ($account): array {
+        $post = Post::factory()->forAccount($account)->create(['status' => PostStatus::Scheduled, 'scheduled_at' => $at]);
+        $video = AutoVideo::create([
+            'hash' => $hash, 'path' => '/'.$hash.'.mp4', 'batch_date' => '2026-11-09', 'file_name' => $hash.'_MIXKIT_1.mp4', 'product_code' => 'nano-dong',
+            'status' => 'scheduled', 'social_account_id' => $account->id, 'post_id' => $post->id, 'scheduled_for' => $at,
+        ]);
+
+        return [$post, $video];
+    };
+    [$stale, $staleVideo] = $make($now->subHours(3), 'stale');
+    [$late, $lateVideo] = $make($now->subMinutes(30), 'late');
+
+    expect(app(DirectWindow::class)->deferStale($now))->toBe(1);
+
+    $stale->refresh();
+    $staleVideo->refresh();
+    expect($stale->scheduled_at->greaterThan($now))->toBeTrue()
+        ->and($staleVideo->scheduled_for->getTimestamp())->toBe($stale->scheduled_at->getTimestamp())
+        ->and(data_get($stale->meta, 'fork_direct_deferred_from'))->not->toBeNull()
+        ->and($late->fresh()->scheduled_at->getTimestamp())->toBe($now->subMinutes(30)->getTimestamp());
+
+    // Tắt khung: không dời gì nữa.
+    DirectWindow::save(['enabled' => false]);
+    $late->forceFill(['scheduled_at' => $now->subHours(5)])->save();
+    expect(app(DirectWindow::class)->deferStale($now))->toBe(0);
+});
+
+test('direct window settings are saved from the schedule card and validated', function (): void {
+    $this->actingAs($this->user)->put('/auto/dang-thang', ['enabled' => true, 'start' => '17:00', 'end' => '08:00', 'days' => [1], 'off_channels' => []])
+        ->assertSessionHasErrors('end');
+    $this->actingAs($this->user)->put('/auto/dang-thang', ['enabled' => true, 'start' => '08:00', 'end' => '17:00', 'days' => [], 'off_channels' => []])
+        ->assertSessionHas('flash.error');
+    $this->actingAs($this->user)->put('/auto/dang-thang', ['enabled' => true, 'start' => '08:30', 'end' => '17:00', 'days' => [1, 2, 3], 'off_channels' => ['x']])
+        ->assertSessionHas('flash.success');
+
+    expect(DirectWindow::get())->toMatchArray(['enabled' => true, 'start' => '08:30', 'end' => '17:00', 'days' => [1, 2, 3], 'off_channels' => ['x'], 'margin_minutes' => 40]);
 });

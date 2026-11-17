@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\Post\Status as PostStatus;
+use App\Fork\Chrome\DirectWindow;
 use App\Jobs\PublishPost;
 use App\Models\Post;
 use Illuminate\Console\Command;
@@ -18,6 +19,13 @@ class ProcessScheduledPosts extends Command
 
     public function handle(): void
     {
+        // Khung giờ đăng thẳng: máy tắt quá lâu lúc tới giờ thì dời bài sang giờ trống kế tiếp, không đăng dồn.
+        try {
+            app(DirectWindow::class)->deferStale();
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
         Post::query()
             ->due()
             ->each(function (Post $post) {

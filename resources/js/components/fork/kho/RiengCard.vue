@@ -10,7 +10,7 @@ import {
 } from '@tabler/icons-vue';
 import { ref } from 'vue';
 
-import { fmtDuration } from '@/components/fork/kho/kho';
+import { fmtDuration, whereLabel } from '@/components/fork/kho/kho';
 import type { RiengVideo } from '@/components/fork/kho/rieng';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { toneClasses, type Tone } from '@/components/fork/shared/status';
@@ -50,6 +50,24 @@ const status = (): { label: string; tone: Tone } => {
 
     if (v.gone && v.status === 'new') {
         return { label: 'Mất file', tone: 'warn' };
+    }
+
+    // Đã xếp: nói rõ đã lên TikTok chưa (chưa lên thì sửa / xoá thoải mái).
+    if (
+        (v.status === 'scheduled' || v.status === 'reserved') &&
+        v.schedule_state
+    ) {
+        return {
+            label: whereLabel[v.schedule_state],
+            tone: (
+                {
+                    tiktok: 'info',
+                    uploading: 'info',
+                    direct: 'violet',
+                    in_app: 'neutral',
+                } as Record<string, Tone>
+            )[v.schedule_state],
+        };
     }
 
     return (

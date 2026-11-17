@@ -67,6 +67,10 @@ export type SlotState =
     | 'posted'
     | 'scheduled'
     | 'tiktok_scheduled'
+    /** Khung giờ đăng thẳng: nằm trong app tới giờ, Chrome đăng ngay lúc đó. */
+    | 'direct'
+    /** Chrome đang tải bài hẹn giờ lên TikTok (khoá tạm vài phút). */
+    | 'uploading'
     | 'publishing'
     | 'reserved'
     | 'failed'
@@ -84,6 +88,8 @@ export interface LichItem {
     product_image?: string | null;
     caption?: string | null;
     empty_reason?: string | null;
+    /** Giờ dự kiến nằm trong khung đăng thẳng. */
+    direct?: boolean;
     link: string | null;
     error: string | null;
     /** Lý do đầy đủ của bài không đăng được (hiện khi rê chuột vào dòng lỗi). */
@@ -144,6 +150,17 @@ export interface LichChannel {
     blocked: BlockedGroup[];
     warnings: string[];
     today: { planned: number; posted: number; cap: number };
+}
+
+/** "Khung giờ đăng thẳng" (DirectWindow.php). */
+export interface DirectWindow {
+    enabled: boolean;
+    start: string;
+    end: string;
+    days: number[];
+    margin_minutes: number;
+    catch_up_minutes: number;
+    off_channels: string[];
 }
 
 export interface Lich {

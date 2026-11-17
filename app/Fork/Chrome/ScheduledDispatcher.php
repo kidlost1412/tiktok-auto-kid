@@ -71,6 +71,11 @@ class ScheduledDispatcher
             return 0;
         }
 
+        // Khung giờ đăng thẳng: bài đăng thẳng sắp tới giờ thì nhường kênh cho nó, chưa gửi bài hẹn nào lên TikTok.
+        if (app(DirectWindow::class)->dueSoon((string) $account->id, $now)) {
+            return 0;
+        }
+
         // Bài chủ app đã bấm "Đăng lại" lúc kênh bận: giao trước, ngay khi kênh rảnh.
         if (app(FailedPosts::class)->dispatchWanted((string) $account->id)) {
             return 1;
@@ -78,6 +83,7 @@ class ScheduledDispatcher
 
         $from = $now->addSeconds(ChromeJobs::SCHEDULE_LEAD + 120);
         $to = $now->addSeconds(ChromeJobs::SCHEDULE_MAX_AHEAD);
+        $window = DirectWindow::get();
 
         $posts = Post::query()
             ->with('socialAccount')
@@ -92,10 +98,15 @@ class ScheduledDispatcher
                     ->orWhereRaw("coalesce(result->>'status_code', '') <> ?", [(string) ChromeJobs::SCHEDULE_QUOTA_CODE]))
                 ->select('post_id'))
             ->orderBy('scheduled_at')
-            ->limit(self::CANDIDATES_PER_ACCOUNT)
+            ->limit(self::CANDIDATES_PER_ACCOUNT * ($window['enabled'] ? 4 : 1))
             ->get();
 
         foreach ($posts as $post) {
+            // Trong khung giờ đăng thẳng: giữ bài trong app, tới giờ Chrome đăng ngay (không hẹn trước lên TikTok).
+            if (DirectWindow::covers((string) $account->id, $post->scheduled_at, $window)) {
+                continue;
+            }
+
             if ($this->needsScheduledJob($post) && $this->queueScheduled($post)) {
                 return 1;
             }

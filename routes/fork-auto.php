@@ -23,6 +23,7 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::post('plan-now', [AutoController::class, 'planNow'])->middleware('throttle:10,1')->name('plan-now');
     Route::patch('accounts/{socialAccount}', [AutoController::class, 'updateAccount'])->name('accounts.update');
     Route::post('huong-dan/an', [AutoController::class, 'hideOnboarding'])->name('onboarding.hide');
+    Route::put('dang-thang', [AutoController::class, 'saveDirectWindow'])->name('direct-window');
     Route::post('videos/{video}/thu-lai', [AutoController::class, 'retryVideo'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.retry');
     // "Đăng lại" bài hẹn giờ mà Chrome báo lỗi (hết hàng...): giao lượt mới cho Chrome, chỉ khi chắc chắn chưa đăng gì.
     Route::post('videos/{video}/dang-lai', [AutoController::class, 'retryPost'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.repost');

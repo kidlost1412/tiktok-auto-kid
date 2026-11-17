@@ -26,6 +26,7 @@ use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\AutoPost\Stats\Insights;
 use App\Fork\AutoPost\VideoLibrary;
 use App\Fork\Chrome\ChromeJobs;
+use App\Fork\Chrome\DirectWindow;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Notify\Telegram;
@@ -149,6 +150,7 @@ final class AutoController extends Controller
             'health' => fn (): array => $this->health($accounts, $chromeRows),
             'hub' => Inertia::defer(fn (): array => $this->hubStatus()),
             'lich' => fn (): array => $this->lich($accounts, $autoAccounts, $images(), $failedPosts()),
+            'direct_window' => DirectWindow::get(),
             'upcoming' => fn (): array => $this->upcoming($accounts),
             'recent' => fn (): array => $this->recent($accounts, $images()),
             'failed_recent' => fn (): array => $this->failedRecent($accounts, $images()),
@@ -225,6 +227,33 @@ final class AutoController extends Controller
     }
 
     /** "Ẩn hướng dẫn": không hiện thẻ "Bắt đầu" nữa. */
+    /** "Khung giờ đăng thẳng": trong khung tới giờ Chrome đăng ngay, ngoài khung hẹn trước lên TikTok như cũ. */
+    public function saveDirectWindow(Request $request): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'start' => ['required', 'date_format:H:i'],
+            'end' => ['required', 'date_format:H:i', 'after:start'],
+            'days' => ['present', 'array'],
+            'days.*' => ['integer', 'between:1,7'],
+            'off_channels' => ['present', 'array'],
+            'off_channels.*' => ['string', 'max:64'],
+        ], [
+            'end.after' => 'Giờ kết thúc phải sau giờ bắt đầu.',
+        ]);
+
+        if ($data['enabled'] && $data['days'] === []) {
+            return back()->with('flash.error', 'Chọn ít nhất một ngày trong tuần cho khung đăng thẳng.');
+        }
+
+        $s = DirectWindow::save($data);
+
+        return back()->with('flash.success', $s['enabled']
+            ? "Đã bật đăng thẳng {$s['start']}–{$s['end']}: bài trong khung giữ trong app tới giờ rồi Chrome đăng ngay."
+            : 'Đã tắt đăng thẳng: mọi bài lại được hẹn trước lên TikTok như cũ.');
+    }
+
     public function hideOnboarding(Request $request): RedirectResponse
     {
         $this->authorizeOwner($request);
@@ -395,6 +424,7 @@ final class AutoController extends Controller
 
         $preview = app(PlanPreview::class)->forAccounts($autoAccounts->values(), $now, count($labels));
         $hub = AutoProduct::query()->get()->keyBy('code');
+        $window = DirectWindow::get();
         $channels = [];
 
         foreach ($accounts as $a) {
@@ -416,10 +446,10 @@ final class AutoController extends Controller
             // Cảnh báo sớm theo dữ liệu shop đã có: giỏ của bài đã hết hàng / không còn trong shop.
             $cartWarnings = app(FailedPosts::class)->cartWarnings($videos->filter(fn (AutoVideo $v): bool => in_array($v->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED], true)));
 
-            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves, $failures, $cartWarnings): array {
+            $items = $videos->map(function (AutoVideo $v) use ($hub, $tz, $images, $a, $moves, $failures, $cartWarnings, $window): array {
                 $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
                 $postStatus = $v->post?->status;
-                $move = $moves[$v->id] ?? ['on_tiktok' => false, 'held' => false, 'can_reschedule' => false, 'reschedule' => null];
+                $move = $moves[$v->id] ?? ['on_tiktok' => false, 'held' => false, 'uploading' => false, 'can_reschedule' => false, 'reschedule' => null];
                 $failure = $failures[$v->id] ?? null;
                 $state = match (true) {
                     // Chrome đã báo lỗi bài hẹn giờ này (hết hàng...): hiện đỏ ngay, không đợi tới giờ đăng.
@@ -432,6 +462,11 @@ final class AutoController extends Controller
                     $v->status === AutoVideo::FAILED, $postStatus === PostStatus::Failed => 'failed',
                     $v->status === AutoVideo::RESERVED => 'reserved',
                     $postStatus === PostStatus::Publishing => 'publishing',
+                    // Chrome đang tải lên TikTok (hẹn giờ): khoá tạm vài phút.
+                    $move['uploading'] => 'uploading',
+                    // Khung giờ đăng thẳng: nằm trong app tới giờ, Chrome đăng ngay lúc đó.
+                    DirectWindow::covers((string) $a->id, $v->scheduled_for, $window) => 'direct',
+                    // Đã xếp video nhưng chưa gửi lên TikTok: sửa / xoá thoải mái.
                     default => 'scheduled',
                 };
 
@@ -472,6 +507,8 @@ final class AutoController extends Controller
                     'caption' => $this->snippet($slot['video']['caption'] ?? null),
                     'video_id' => $slot['video']['id'] ?? null,
                     'empty_reason' => $slot['reason'],
+                    // Giờ dự kiến rơi vào khung đăng thẳng: tới giờ Chrome đăng ngay, không hẹn trước.
+                    'direct' => DirectWindow::covers((string) $a->id, $at, $window),
                     'link' => null,
                     'error' => null,
                     // Giờ dự kiến chỉ đến từ bộ xếp lịch tự động: luôn là video AI.

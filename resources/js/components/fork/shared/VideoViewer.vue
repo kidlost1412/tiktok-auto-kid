@@ -185,7 +185,15 @@ const timeRow = computed<[string, string] | null>(() => {
 
     if (v.scheduled_for) {
         return [
-            v.on_tiktok_schedule ? 'Hẹn trên TikTok lúc' : 'Giờ đăng dự kiến',
+            v.on_tiktok_schedule || v.schedule_state === 'tiktok'
+                ? 'Hẹn trên TikTok lúc'
+                : v.schedule_state === 'uploading'
+                  ? 'Đang gửi lên TikTok, hẹn lúc'
+                  : v.schedule_state === 'direct'
+                    ? 'Chưa lên TikTok · đăng thẳng lúc'
+                    : v.schedule_state === 'in_app'
+                      ? 'Chưa lên TikTok · giờ đăng'
+                      : 'Giờ đăng dự kiến',
             fmtTime(v.scheduled_for),
         ];
     }

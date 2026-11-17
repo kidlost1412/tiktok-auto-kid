@@ -1,6 +1,7 @@
 // Kiểu dữ liệu + hàm gọi máy chủ dùng chung của trang Kho riêng.
 
 import type { BatchAccount } from '@/components/fork/kho/BatchDialog.vue';
+import type { ScheduleWhere } from '@/components/fork/kho/kho';
 
 /** Video trùng nội dung với một video đã có: `text` là câu hiển thị sẵn (do máy chủ ghép). */
 export interface Folder {
@@ -76,6 +77,8 @@ export interface RiengProduct {
 
 export interface RiengVideo {
     id: number;
+    /** Video đã xếp đang ở đâu: tiktok | uploading | direct | in_app (ScheduleState.php). */
+    schedule_state?: ScheduleWhere | null;
     file_name: string;
     folder: string;
     rel_path: string | null;

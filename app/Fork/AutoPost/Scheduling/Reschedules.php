@@ -188,7 +188,7 @@ final class Reschedules
      * Dữ liệu gộp cho Lịch đăng: mỗi video -> bài đã nằm trên TikTok chưa, đổi giờ được không, yêu cầu đổi giờ gần nhất.
      *
      * @param  Collection<int, AutoVideo>  $videos
-     * @return array<int, array{on_tiktok: bool, held: bool, can_reschedule: bool, reschedule: ?array<string, mixed>}>
+     * @return array<int, array{on_tiktok: bool, held: bool, uploading: bool, can_reschedule: bool, reschedule: ?array<string, mixed>}>
      */
     public function calendarInfo(Collection $videos): array
     {
@@ -216,6 +216,8 @@ final class Reschedules
                 'on_tiktok' => $onTikTok || ($req !== null && $req->isOpen()),
                 // TikTok đã từ chối vì kênh đầy lịch hẹn: bài vẫn giữ trong app, chờ chỗ trống.
                 'held' => ChromeJobs::isQuotaRejection($job),
+                // Chrome đang tải bài này lên TikTok (đã nhận việc, chưa xong): khoá tạm vài phút.
+                'uploading' => $job !== null && $job->state !== 'queued' && in_array($job->state, ChromeJob::OPEN, true),
                 'can_reschedule' => $can || ($req !== null && $req->isOpen()),
                 'reschedule' => $req ? $this->summary($req) : null,
             ];

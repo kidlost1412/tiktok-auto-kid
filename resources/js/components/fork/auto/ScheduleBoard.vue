@@ -1,19 +1,26 @@
 <script setup lang="ts">
 // Lịch đăng. Màn rộng (≥1536px): 3 ngày cạnh nhau, mỗi cột có đầu cột (ngày, số bài, thanh tiến độ) và cuộn riêng.
 // Màn hẹp hơn: chọn ngày bằng tab ở đầu thẻ, hiện một ngày. Nét đứt là giờ dự kiến, chưa hẹn lên TikTok.
+import { IconBolt, IconClock } from '@tabler/icons-vue';
 import { useMediaQuery } from '@vueuse/core';
 import { computed, ref } from 'vue';
 
+import DirectWindowDialog from '@/components/fork/auto/DirectWindowDialog.vue';
 import ScheduleDayList from '@/components/fork/auto/ScheduleDayList.vue';
-import { matchesSource } from '@/components/fork/shared/source';
-import type { SourceFilter as SourceFilterValue } from '@/components/fork/shared/source';
-import SourceFilter from '@/components/fork/shared/SourceFilter.vue';
 import type {
     AccountRow,
+    DirectWindow,
     Lich,
     ScheduleEntry,
 } from '@/components/fork/auto/types';
-import { cardCls, toneClasses } from '@/components/fork/shared/status';
+import { matchesSource } from '@/components/fork/shared/source';
+import type { SourceFilter as SourceFilterValue } from '@/components/fork/shared/source';
+import SourceFilter from '@/components/fork/shared/SourceFilter.vue';
+import {
+    cardCls,
+    EDITABLE_STATES,
+    toneClasses,
+} from '@/components/fork/shared/status';
 import { NativeSelect } from '@/components/ui/native-select';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -21,7 +28,12 @@ import { cn } from '@/lib/utils';
 const props = defineProps<{
     lich: Lich;
     accounts: AccountRow[];
+    directWindow?: DirectWindow | null;
 }>();
+
+const directOpen = ref(false);
+// Chỉ hiện video còn nằm trong app (chưa lên TikTok): sửa / xoá thoải mái.
+const onlyEditable = ref(false);
 
 const wide = useMediaQuery('(min-width: 1536px)');
 
@@ -44,6 +56,10 @@ const entries = computed<ScheduleEntry[]>(() => {
                 source.value !== 'all' &&
                 !(item.source && matchesSource(item.source, source.value))
             ) {
+                continue;
+            }
+
+            if (onlyEditable.value && !EDITABLE_STATES.includes(item.state)) {
                 continue;
             }
 
@@ -77,6 +93,12 @@ const days = computed(() =>
         const real = list.filter((e) => e.state !== 'projected').length;
         const posted = list.filter((e) => e.state === 'posted').length;
         const failed = list.filter((e) => e.state === 'failed').length;
+        const onTikTok = list.filter(
+            (e) => e.state === 'tiktok_scheduled' || e.state === 'uploading',
+        ).length;
+        const inApp = list.filter((e) =>
+            EDITABLE_STATES.includes(e.state),
+        ).length;
         const planned = list.filter(
             (e) => e.state === 'projected' && e.video_id,
         ).length;
@@ -88,6 +110,8 @@ const days = computed(() =>
             real,
             posted,
             failed,
+            onTikTok,
+            inApp,
             planned,
             empty: list.length - real - planned,
             isToday: d.key === todayKey.value,
@@ -102,6 +126,29 @@ const current = computed(
 );
 
 const multi = computed(() => props.accounts.length > 1);
+
+// Số video đã xếp mà còn nằm trong app (mọi ngày đang xem, đúng bộ lọc kênh / nguồn).
+const editableCount = computed(() => {
+    let n = 0;
+
+    for (const a of props.accounts) {
+        if (channel.value !== 'all' && channel.value !== a.id) {
+            continue;
+        }
+
+        for (const item of props.lich.channels[a.id]?.items ?? []) {
+            if (
+                EDITABLE_STATES.includes(item.state) &&
+                (source.value === 'all' ||
+                    (item.source && matchesSource(item.source, source.value)))
+            ) {
+                n++;
+            }
+        }
+    }
+
+    return n;
+});
 const pct = (n: number, d: Day) =>
     `${(n / (d.real + d.planned + d.empty || 1)) * 100}%`;
 </script>
@@ -121,8 +168,9 @@ const pct = (n: number, d: Day) =>
                     Lịch đăng
                 </h2>
                 <p class="text-[0.7812rem] text-muted-foreground">
-                    Bấm một dòng để xem và sửa video, bấm giờ để đổi giờ. Nét
-                    đứt là giờ dự kiến, chưa hẹn lên TikTok.
+                    Bấm một dòng để xem và sửa video, bấm giờ để đổi giờ. Video
+                    “Chưa lên TikTok” sửa, xoá thoải mái; bài “Đã hẹn trên
+                    TikTok” thì app phải xoá bài hẹn trên TikTok trước.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -147,7 +195,20 @@ const pct = (n: number, d: Day) =>
                             :class="
                                 cn('size-2 rounded-full', toneClasses.info.dot)
                             "
-                        />Đã xếp lịch</span
+                        />Đã hẹn trên TikTok</span
+                    >
+                    <span class="inline-flex items-center gap-1"
+                        ><IconClock class="size-3.5" />Chưa lên TikTok</span
+                    >
+                    <span
+                        v-if="directWindow?.enabled"
+                        :class="
+                            cn(
+                                'inline-flex items-center gap-1',
+                                toneClasses.violet.text,
+                            )
+                        "
+                        ><IconBolt class="size-3.5" />Đăng thẳng</span
                     >
                     <span class="inline-flex items-center gap-1.5"
                         ><i
@@ -155,6 +216,47 @@ const pct = (n: number, d: Day) =>
                         />Dự kiến</span
                     >
                 </div>
+                <button
+                    type="button"
+                    :aria-pressed="onlyEditable"
+                    :class="
+                        cn(
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors',
+                            onlyEditable
+                                ? 'border-primary bg-primary/10 text-primary-text'
+                                : 'bg-card text-foreground hover:bg-accent',
+                        )
+                    "
+                    title="Video đã xếp mà chưa gửi lên TikTok: sửa, xoá thoải mái. Bấm để chỉ xem các video này."
+                    data-testid="fork-auto-only-editable"
+                    @click="onlyEditable = !onlyEditable"
+                >
+                    <b class="tabular-nums">{{ editableCount }}</b>
+                    chưa lên TikTok
+                </button>
+                <button
+                    v-if="directWindow"
+                    type="button"
+                    :class="
+                        cn(
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors hover:bg-accent',
+                            directWindow.enabled
+                                ? toneClasses.violet.chip
+                                : 'bg-card text-muted-foreground',
+                        )
+                    "
+                    title="Khung giờ đăng thẳng: trong khung tới giờ Chrome đăng luôn, không hẹn trước lên TikTok"
+                    data-testid="fork-auto-direct-open"
+                    @click="directOpen = true"
+                >
+                    <IconBolt class="size-4" />
+                    <template v-if="directWindow.enabled"
+                        >Đăng thẳng {{ directWindow.start }}–{{
+                            directWindow.end
+                        }}</template
+                    >
+                    <template v-else>Đăng thẳng: tắt</template>
+                </button>
                 <SourceFilter v-model="source" />
                 <NativeSelect
                     v-if="multi"
@@ -254,8 +356,11 @@ const pct = (n: number, d: Day) =>
                         class="mt-1.5 flex flex-wrap gap-x-2.5 text-[0.75rem] text-muted-foreground tabular-nums"
                     >
                         <span v-if="d.posted">{{ d.posted }} đã đăng</span>
-                        <span v-if="d.real - d.posted - d.failed"
-                            >{{ d.real - d.posted - d.failed }} đã xếp</span
+                        <span v-if="d.onTikTok"
+                            >{{ d.onTikTok }} đã hẹn TikTok</span
+                        >
+                        <span v-if="d.inApp"
+                            >{{ d.inApp }} chưa lên TikTok</span
                         >
                         <span v-if="d.planned">{{ d.planned }} dự kiến</span>
                         <span v-if="d.failed" :class="toneClasses.danger.text"
@@ -360,5 +465,12 @@ const pct = (n: number, d: Day) =>
                 class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
             />
         </template>
+
+        <DirectWindowDialog
+            v-if="directWindow"
+            v-model:open="directOpen"
+            :value="directWindow"
+            :accounts="accounts"
+        />
     </section>
 </template>

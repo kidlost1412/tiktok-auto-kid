@@ -20,7 +20,9 @@ import {
     fmtNum,
     toneClasses,
     type Tone,
+    lichStatus,
 } from '@/components/fork/shared/status';
+import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { openVideo } from '@/components/fork/viewer';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -80,7 +82,14 @@ const C = 2 * Math.PI * R;
 const arc = (n: number) =>
     today.value.cap > 0 ? Math.min(1, n / today.value.cap) * C : 0;
 
-const NEXT_STATES = ['scheduled', 'tiktok_scheduled', 'reserved', 'publishing'];
+const NEXT_STATES = [
+    'scheduled',
+    'tiktok_scheduled',
+    'direct',
+    'uploading',
+    'reserved',
+    'publishing',
+];
 
 const next = computed<(LichItem & { username: string | null }) | null>(() => {
     let best: (LichItem & { username: string | null }) | null = null;
@@ -323,7 +332,8 @@ const label =
                         class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
                         >{{ today.posted }}</span
                     >
-                    <span class="text-[0.9375rem] text-muted-foreground tabular-nums"
+                    <span
+                        class="text-[0.9375rem] text-muted-foreground tabular-nums"
                         >/ {{ today.cap }} bài</span
                     >
                 </div>
@@ -365,7 +375,13 @@ const label =
                     />
                 </button>
                 <div class="min-w-0 flex-1">
-                    <div :class="label">Bài kế tiếp · {{ nextDay }}</div>
+                    <div class="flex items-center gap-2">
+                        <span :class="label">Bài kế tiếp · {{ nextDay }}</span>
+                        <StatusChip
+                            :status="lichStatus(next.state)"
+                            class="h-5 gap-1 px-1.5 text-[0.7188rem] [&_svg]:size-3"
+                        />
+                    </div>
                     <div class="mt-1 flex items-baseline gap-2">
                         <span
                             class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
@@ -438,7 +454,9 @@ const label =
                         fmtNum(stock.new_total + (stock.scheduled_total ?? 0))
                     }}</span
                 >
-                <span class="text-[0.9375rem] text-muted-foreground">video</span>
+                <span class="text-[0.9375rem] text-muted-foreground"
+                    >video</span
+                >
             </div>
             <div
                 :class="

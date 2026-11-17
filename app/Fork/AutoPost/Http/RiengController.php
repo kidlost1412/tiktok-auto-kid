@@ -25,6 +25,7 @@ use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
+use App\Fork\AutoPost\Scheduling\ScheduleState;
 use App\Fork\Update\LauncherClient;
 use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
@@ -133,10 +134,11 @@ final class RiengController extends Controller
                 $products = AutoProduct::query()->get()->keyBy('code');
                 $images = ProductImages::lookup();
                 $autoSettings = RiengAutoSettings::get();
+                $where = ScheduleState::forVideos($page->getCollection());
 
                 return [
                     'data' => $page->getCollection()->map(fn (AutoVideo $v): array => $this->row($v, $names, $dups()[$v->id] ?? null, $info->product($v, $products, $images))
-                        + ['auto' => RiengAutoController::videoAuto($v, $autoSettings)])->values()->all(),
+                        + ['auto' => RiengAutoController::videoAuto($v, $autoSettings), 'schedule_state' => $where[$v->id] ?? null])->values()->all(),
                     'current_page' => $page->currentPage(),
                     'last_page' => $page->lastPage(),
                     'total' => $page->total(),
