@@ -9,7 +9,9 @@ use App\Fork\AutoPost\Console\AutoIngestCommand;
 use App\Fork\AutoPost\Console\AutoPlanCommand;
 use App\Fork\AutoPost\Console\AutoStatsCommand;
 use App\Fork\AutoPost\Console\RiengAiCommand;
+use App\Fork\Http\PerRouteThrottle;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\ServiceProvider;
 
 /** Tự động đăng từ hub sản xuất: lệnh, lịch chạy, route, theo dõi kết quả bài. */
@@ -19,6 +21,8 @@ final class AutoPostServiceProvider extends ServiceProvider
     {
         $this->app->singleton(VideoLibrary::class);
         $this->app->singleton(CaptionService::class);
+        // Mỗi đường dẫn một bộ đếm giới hạn (mặc định Laravel đếm chung, trang tự hỏi làm nút khác bị chặn 429).
+        $this->app->bind(ThrottleRequests::class, PerRouteThrottle::class);
     }
 
     public function boot(): void

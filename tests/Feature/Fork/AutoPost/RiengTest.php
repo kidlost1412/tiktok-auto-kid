@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\SocialAccount\Status as AccountStatus;
+use App\Fork\AutoPost\Hub\HubOutboxItem;
+use App\Fork\AutoPost\Hub\HubReporter;
 use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\KhoStore;
 use App\Fork\AutoPost\Models\AutoAccount;
@@ -12,15 +14,20 @@ use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Rieng\RiengBatch;
 use App\Fork\AutoPost\Rieng\RiengFolder;
+use App\Fork\AutoPost\Rieng\RiengInfo;
 use App\Fork\AutoPost\Rieng\RiengQueueItem;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PostBuilder;
+use App\Fork\AutoPost\Scheduling\Readiness;
 use App\Fork\AutoPost\Sidecar;
+use App\Fork\AutoPost\Stats\HubFeedback;
 use App\Fork\AutoPost\VideoLibrary;
+use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Models\Account;
+use App\Models\Media;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
@@ -214,7 +221,7 @@ test('a duplicate is still taken in, flagged with its original, and the unique h
     expect(app(RiengScanner::class)->scan()['duplicate'])->toBe(1)
         ->and(AutoVideo::query()->where('file_name', 'x3.mp4')->firstOrFail()->meta['duplicate_of'])->toBe($orig->id);
 
-    $dups = (new \App\Fork\AutoPost\Rieng\RiengInfo)->duplicates(AutoVideo::query()->where('source', 'rieng')->get());
+    $dups = (new RiengInfo)->duplicates(AutoVideo::query()->where('source', 'rieng')->get());
     expect($dups[$hubCopy->id]['text'])->toStartWith('Trùng video #'.$hub->id.' · Kho Xưởng Video · đã hẹn ')
         ->and($dups[$copy->id]['text'])->toBe('Trùng video #'.$orig->id.' · trùng video riêng khác')
         ->and($dups)->not->toHaveKey($orig->id);
@@ -226,7 +233,7 @@ test('a duplicate is still taken in, flagged with its original, and the unique h
 
     // Đã đăng thì ghi "đã đăng" kèm liên kết.
     $hub->forceFill(['status' => 'posted', 'posted_at' => now()->subHour(), 'stats' => ['link' => 'https://www.tiktok.com/@a/video/1']])->save();
-    $info = (new \App\Fork\AutoPost\Rieng\RiengInfo)->duplicates([$hubCopy->refresh()]);
+    $info = (new RiengInfo)->duplicates([$hubCopy->refresh()]);
     expect($info[$hubCopy->id]['text'])->toBe('Trùng video #'.$hub->id.' · Kho Xưởng Video · đã đăng')
         ->and($info[$hubCopy->id]['link'])->toBe('https://www.tiktok.com/@a/video/1');
 });
@@ -319,7 +326,7 @@ test('a private video detail shows a neutral hint, never the hub product error',
         ->and($json['rieng_selectable'])->toBeTrue()->and($json['duplicate'])->toBeNull();
 
     // Kể cả khi dùng bộ đánh giá chung: không có kiểm tra sản phẩm hub cho video riêng.
-    $assessed = app(\App\Fork\AutoPost\Scheduling\Readiness::class)->assess(collect([$v]));
+    $assessed = app(Readiness::class)->assess(collect([$v]));
     expect($assessed[$v->id]['reason'])->not->toContain('đang tắt');
 
     // Video hub vẫn bị kiểm sản phẩm hub như cũ.
@@ -361,7 +368,7 @@ test('a mov or webm private video is posted with its own file type and an m4v go
     $done = ($this->batch)()->commit(($this->input)($account, [$mov, $webm, $m4v]), false, $this->now);
     expect($done['done'])->toBe(3);
 
-    $media = Post::query()->get()->mapWithKeys(fn (Post $p) => [$p->meta['fork_auto_video_id'] => \App\Models\Media::query()->where('post_id', $p->id)->firstOrFail()]);
+    $media = Post::query()->get()->mapWithKeys(fn (Post $p) => [$p->meta['fork_auto_video_id'] => Media::query()->where('post_id', $p->id)->firstOrFail()]);
 
     expect($media[$mov->id]->mime_type)->toBe('video/quicktime')->and($media[$mov->id]->path)->toEndWith('.mov')
         ->and($media[$mov->id]->original_filename)->toBe('quay-tay.MOV')
@@ -382,19 +389,68 @@ test('the preview stream answers with the right video type for mov and webm', fu
         ->and($this->actingAs($owner)->get('/auto/kho/video/'.$mp4->id)->assertOk()->headers->get('Content-Type'))->toBe('video/mp4');
 });
 
-test('a file removed from disk while still new is flagged and never offered, and comes back when restored', function () {
+test('a file deleted from a folder that still opens is dropped from the list; on an unplugged drive it is only flagged and comes back', function () {
     RiengFolder::create(['path' => $this->own]);
     file_put_contents($this->own.'/gone.mp4', 'gone');
+    file_put_contents($this->own.'/copy.mp4', 'gone');
+    touch($this->own.'/gone.mp4', time() - 100);
     app(RiengScanner::class)->scan();
-    $video = AutoVideo::query()->firstOrFail();
+    $video = AutoVideo::query()->where('file_name', 'gone.mp4')->firstOrFail();
+    $copy = AutoVideo::query()->where('file_name', 'copy.mp4')->firstOrFail();
+    expect(data_get($copy->meta, 'duplicate_of'))->toBe($video->id);
 
+    // Thư mục còn mở được mà file mất: bỏ video khỏi danh sách, bản trùng hết bị gắn cờ trùng.
     unlink($this->own.'/gone.mp4');
-    expect(app(RiengScanner::class)->scan()['gone'])->toBe(1);
-    expect($video->refresh()->files_deleted_at)->not->toBeNull()->and($video->skip_reason)->toBe(RiengScanner::REASON_GONE);
+    expect(app(RiengScanner::class)->scan()['gone'])->toBe(1)
+        ->and(AutoVideo::query()->find($video->id))->toBeNull()
+        ->and(data_get($copy->refresh()->meta, 'duplicate_of'))->toBeNull();
 
-    file_put_contents($this->own.'/gone.mp4', 'gone');
+    // Ổ rời chưa cắm (thư mục không mở được): chỉ đánh dấu mất file, cắm lại thì có lại.
+    $usb = $this->own.'/../usb-'.bin2hex(random_bytes(3));
+    File::ensureDirectoryExists($usb);
+    RiengFolder::create(['path' => $usb]);
+    file_put_contents($usb.'/u.mp4', 'usb');
     app(RiengScanner::class)->scan();
-    expect($video->refresh()->files_deleted_at)->toBeNull();
+    $u = AutoVideo::query()->where('file_name', 'u.mp4')->firstOrFail();
+    File::moveDirectory($usb, $usb.'-x');
+    app(RiengScanner::class)->scan();
+    expect($u->refresh()->files_deleted_at)->not->toBeNull()->and($u->skip_reason)->toBe(RiengScanner::REASON_FOLDER_GONE);
+
+    File::moveDirectory($usb.'-x', $usb);
+    app(RiengScanner::class)->scan();
+    expect($u->refresh()->files_deleted_at)->toBeNull();
+
+    // Nút "Bỏ khỏi danh sách" cho thẻ mất file.
+    File::moveDirectory($usb, $usb.'-x');
+    app(RiengScanner::class)->scan();
+    $this->actingAs(ownerUser())->delete("/auto/kho/rieng/video/{$u->id}")->assertRedirect();
+    expect(AutoVideo::query()->find($u->id))->toBeNull()->and(is_file($usb.'-x/u.mp4'))->toBeTrue();
+    // Video còn file thì không bỏ được bằng nút này.
+    $this->actingAs(ownerUser())->delete("/auto/kho/rieng/video/{$copy->id}")->assertNotFound();
+});
+
+test('a file moved to another watched folder keeps its video (AI result, product) and shows where it came from', function () {
+    $a = RiengFolder::create(['path' => $this->own]);
+    $other = $this->own.'/../moi-'.bin2hex(random_bytes(3));
+    File::ensureDirectoryExists($other);
+    RiengFolder::create(['path' => $other]);
+    file_put_contents($this->own.'/clip.mp4', 'clip');
+    app(RiengScanner::class)->scan();
+    $v = AutoVideo::query()->firstOrFail();
+    $v->forceFill(['product_code' => 'nano-dong', 'meta' => ['ai' => ['state' => 'ok']] + (array) $v->meta])->save();
+
+    rename($this->own.'/clip.mp4', $other.'/clip-moi.mp4');
+    app(RiengScanner::class)->scan();
+
+    expect(AutoVideo::query()->count())->toBe(1);
+    $v->refresh();
+    expect(str_replace('\\', '/', $v->path))->toEndWith('/clip-moi.mp4')
+        ->and($v->files_deleted_at)->toBeNull()
+        ->and($v->product_code)->toBe('nano-dong')
+        ->and(data_get($v->meta, 'ai.state'))->toBe('ok')
+        ->and(data_get($v->meta, 'duplicate_of'))->toBeNull()
+        ->and(data_get($v->meta, 'moved_from.folder_id'))->toBe($a->id)
+        ->and(data_get($v->meta, 'moved_from.rel_path'))->toBe('clip.mp4');
 });
 
 // ---------------------------------------------------------------- Planner không bao giờ lấy video riêng
@@ -601,7 +657,7 @@ test('caption and hashtags are optional: an empty caption schedules fine and the
 
     // Chrome nhận bài không caption và gửi chuỗi rỗng (không phải null).
     $account->refresh();
-    $job = app(\App\Fork\Chrome\ChromeJobs::class)->queueForPost($post, 'scheduled');
+    $job = app(ChromeJobs::class)->queueForPost($post, 'scheduled');
     expect($job->caption)->toBe('');
 });
 
@@ -677,13 +733,13 @@ test('hub outbox reports and so-lieu writing skip private videos', function () {
     $v = ($this->rieng)('a.mp4', null, ['status' => 'posted', 'posted_at' => now()->subDay(), 'social_account_id' => $account->id, 'batch_date' => '2026-11-09', 'hub_id' => 'oops']);
     Http::fake();
 
-    $reporter = app(App\Fork\AutoPost\Hub\HubReporter::class);
+    $reporter = app(HubReporter::class);
     $reporter->posted($v);
     $reporter->failed($v, 'x');
     $reporter->stats($v, ['h24' => ['views' => 5]]);
-    expect(App\Fork\AutoPost\Hub\HubOutboxItem::query()->count())->toBe(0);
+    expect(HubOutboxItem::query()->count())->toBe(0);
 
-    app(App\Fork\AutoPost\Stats\HubFeedback::class)->sync(['2026-11-09'], CarbonImmutable::now());
+    app(HubFeedback::class)->sync(['2026-11-09'], CarbonImmutable::now());
     expect(is_file($this->hub.'/ra/2026-11-09/so-lieu.csv'))->toBeFalse()->and(is_dir($this->hub.'/ra/2026-11-09/_kem'))->toBeFalse();
 });
 

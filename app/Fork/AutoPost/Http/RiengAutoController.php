@@ -10,6 +10,7 @@ use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
+use App\Fork\AutoPost\Rieng\Ai\RiengAiStatus;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
@@ -67,6 +68,7 @@ final class RiengAutoController extends Controller
         foreach (['model', 'effort', 'fast', 'enabled'] as $k) {
             if (($before[$k] ?? null) !== ($after[$k] ?? null)) {
                 app(RiengAnalyzer::class)->retryNow();
+                RiengAiCommand::launch();
                 break;
             }
         }
@@ -81,6 +83,25 @@ final class RiengAutoController extends Controller
         $n = $analyzer->retryNow();
 
         return response()->json(['retried' => $n] + $this->payload($accountId, $accounts));
+    }
+
+    /** Dòng trạng thái "AI xem video" trên trang Kho riêng (trang hỏi lại vài giây một lần). */
+    public function aiStatus(Request $request, ChatGptAccounts $accounts): JsonResponse
+    {
+        $this->authorizeOwner($request);
+
+        return response()->json(RiengAiStatus::get($accounts));
+    }
+
+    /** Nút "Cho AI xem ngay": video lỗi được thử lại từ đầu và AI chạy ở nền liền, không đợi lịch 2 phút. */
+    public function aiRunNow(Request $request, ChatGptAccounts $accounts, RiengAnalyzer $analyzer): JsonResponse
+    {
+        $this->authorizeOwner($request);
+        $analyzer->retryNow();
+        RiengAiStatus::beat(['dang' => true, 'note' => 'anh vừa bấm cho AI xem ngay']);
+        RiengAiCommand::launch();
+
+        return response()->json(RiengAiStatus::get($accounts));
     }
 
     /** Tự cài ChatGPT CLI (Codex) vào thư mục của app. POST bắt đầu cài (chạy nền); trả trạng thái để trang hỏi lại. */

@@ -11,6 +11,7 @@ use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Rieng\Ai\ChatGptAccounts;
 use App\Fork\AutoPost\Rieng\Ai\CodexLimited;
 use App\Fork\AutoPost\Rieng\Ai\CodexRunner;
+use App\Fork\AutoPost\Rieng\Ai\RiengAiStatus;
 use App\Fork\AutoPost\Rieng\Ai\RiengAnalyzer;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoPoster;
 use App\Fork\AutoPost\Rieng\Ai\RiengAutoSettings;
@@ -706,4 +707,75 @@ test('when the speech tool is installed the AI hears the speech from the first s
     expect($ai['state'])->toBe('ok')->and($speech->calls)->toBe(1)
         ->and($codex->calls[0][3])->toContain('em giới thiệu TC01')
         ->and($codex->calls[1][2])->not->toBe($codex->calls[0][2]);
+});
+
+test('the AI status line tells what the AI is doing, what is missing and when it retries', function () {
+    $status = fn () => $this->actingAs($this->owner)->getJson('/auto/kho/rieng/tu-dong/ai-trang-thai')->assertOk()->json();
+    $a = ($this->rieng)('a.mp4');
+
+    // Chưa cài ChatGPT CLI.
+    config(['fork.auto.codex_path' => '', 'fork.auto.codex_dir' => $this->gpt.'/cli']);
+    expect($status())->toMatchArray(['tone' => 'warn', 'fix' => 'settings', 'queued' => 1, 'can_run' => false]);
+
+    // Có CLI, chưa có tài khoản.
+    $exe = $this->gpt.'/cli/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe';
+    File::ensureDirectoryExists(dirname($exe));
+    file_put_contents($exe, '');
+    config(['fork.auto.codex_path' => $exe]);
+    expect($status()['title'])->toContain('chưa có tài khoản ChatGPT');
+
+    // Có tài khoản, AI chưa chạy lượt nào: nhắc bấm "Cho AI xem ngay".
+    ($this->gptAccount)('tk-aaaaaaaa');
+    $r = $status();
+    expect($r)->toMatchArray(['tone' => 'warn', 'can_run' => true, 'queued' => 1])->and($r['detail'])->toContain('Cho AI xem ngay');
+
+    // Lượt vừa chạy: chỉ báo đang chờ lượt tới.
+    RiengAiStatus::beat(['dang' => false, 'note' => 'không có video mới']);
+    expect($status())->toMatchArray(['tone' => 'info'])->and($status()['detail'])->toContain('2 phút');
+
+    // Đang xem.
+    $a->forceFill(['meta' => ['ai' => ['dang' => ['buoc' => 2, 'tong' => 4, 'viec' => 'Đang nghe lời nói', 'luc' => now()->toIso8601String()]]] + (array) $a->meta])->save();
+    $r = $status();
+    expect($r['running'])->toMatchArray(['id' => $a->id, 'buoc' => 2, 'tong' => 4])->and($r['title'])->toContain('a.mp4')->and($r['title'])->toContain('2/4');
+
+    // Lỗi, chờ thử lại: thẻ và dòng trạng thái đều nói giờ thử lại và lỗi gì.
+    $later = now()->addMinutes(30)->utc()->toIso8601String();
+    $a->forceFill(['meta' => ['ai' => ['state' => 'error', 'tries' => 1, 'error' => 'ChatGPT trả lời sai định dạng.', 'next_try_at' => $later]] + (array) $a->meta])->save();
+    $r = $status();
+    expect($r)->toMatchArray(['waiting' => 1, 'queued' => 0])->and($r['title'])->toContain('thử lại lúc')->and($r['detail'])->toContain('sai định dạng')
+        ->and(app(RiengAutoPoster::class)->blocker($a->refresh(), null, null, RiengAutoSettings::get()))->toStartWith('AI chưa xem được, thử lại lúc');
+
+    // Xong hết.
+    $a->forceFill(['product_code' => 'nano-dong', 'meta' => ['ai' => ['state' => 'ok', 'product_code' => 'nano-dong']] + (array) $a->meta])->save();
+    expect($status())->toMatchArray(['tone' => 'success', 'queued' => 0, 'waiting' => 0]);
+});
+
+test('the AI watches new videos even before auto-posting is turned on, and leaves a heartbeat', function () {
+    expect(RiengAutoSettings::get()['enabled'])->toBeFalse();
+    app()->instance(RiengAnalyzer::class, $spy = new class(app(ChatGptAccounts::class), app(CodexRunner::class), app(RiengThumbs::class)) extends RiengAnalyzer
+    {
+        public int $asked = 0;
+
+        public function pending(int $limit, ?CarbonImmutable $now = null): array
+        {
+            $this->asked++;
+
+            return [];
+        }
+    });
+
+    $this->artisan('fork:rieng-ai')->assertSuccessful();
+    expect($spy->asked)->toBe(1)
+        ->and(Cache::get(RiengAiStatus::KEY))->toMatchArray(['dang' => false, 'note' => 'không có video mới']);
+});
+
+test('a busy page polling one route does not use up the limit of another button', function () {
+    $v = ($this->rieng)('a.mp4');
+
+    foreach (range(1, 25) as $i) {
+        expect($this->actingAs($this->owner)->postJson("/auto/kho/rieng/video/{$v->id}/tu-dong", [])->status())->not->toBe(429);
+    }
+
+    // "Chọn thư mục" giới hạn 20/phút riêng của nó: không bị chặn vì các lần gọi ở trên.
+    expect($this->actingAs($this->owner)->postJson('/auto/kho/rieng/chon-thu-muc')->status())->not->toBe(429);
 });

@@ -201,6 +201,7 @@ final class RiengController extends Controller
             'duration' => $v->duration,
             'status' => $v->effectiveStatus(),
             'gone' => $gone,
+            'moved_from' => self::movedFrom($v, $names),
             'channel' => $v->socialAccount ? '@'.($v->socialAccount->username ?: $v->socialAccount->display_name) : null,
             'scheduled_for' => ($held ? $v->posted_at : $v->scheduled_for)?->copy()->timezone($tz)->toIso8601String(),
             'posted_at' => $held ? null : $v->posted_at?->copy()->timezone($tz)->toIso8601String(),
@@ -362,6 +363,30 @@ final class RiengController extends Controller
         }
 
         return response()->json(['ok' => true, 'path' => $path, 'name' => basename(str_replace('\\', '/', rtrim($path, '\\/')))]);
+    }
+
+    /** Nút "Bỏ khỏi danh sách" trên thẻ "Mất file": bỏ video chưa đăng mà file không còn (không đụng tới file nào). */
+    public function forgetVideo(Request $request, AutoVideo $video): RedirectResponse
+    {
+        $this->authorizeOwner($request);
+        abort_unless($video->isRieng() && $video->status === AutoVideo::NEW && ! is_file((string) $video->path), 404);
+        RiengScanner::forget($video);
+
+        return back()->with('flash.success', 'Đã bỏ video mất file khỏi danh sách.');
+    }
+
+    /** "Đã dời từ ..." trong 3 ngày sau khi app thấy anh dời file sang chỗ khác. */
+    private static function movedFrom(AutoVideo $v, $names): ?string
+    {
+        $m = data_get($v->meta, 'moved_from');
+
+        if (! is_array($m) || ! is_string($m['at'] ?? null) || now()->diffInDays($m['at'], true) > 3) {
+            return null;
+        }
+
+        $folder = (string) ($names[(int) ($m['folder_id'] ?? 0)] ?? 'thư mục đã bỏ');
+
+        return $folder.' / '.($m['rel_path'] ?? '');
     }
 
     /** Bỏ thư mục khỏi Kho riêng: chỉ xoá dòng trong app (video chưa đăng của thư mục này cũng bị bỏ khỏi danh sách); KHÔNG xoá file nào. */

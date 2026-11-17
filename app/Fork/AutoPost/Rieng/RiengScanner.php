@@ -29,6 +29,8 @@ final class RiengScanner
 
     public const REASON_GONE = 'file đã bị xoá hoặc dời khỏi thư mục';
 
+    public const REASON_FOLDER_GONE = 'thư mục không mở được (ổ rời hoặc ổ mạng chưa cắm?)';
+
     public function __construct(private readonly KhoStore $kho = new KhoStore, private readonly ?RiengReady $ready = null) {}
 
     private function ready(): RiengReady
@@ -188,6 +190,26 @@ final class RiengScanner
         $rel = ltrim(substr($path, strlen($root)), '/');
         $when = CarbonImmutable::createFromTimestamp($mtime, self::TZ);
 
+        // Video chưa đăng mà file cũ không còn, nay thấy đúng nội dung đó ở chỗ khác: anh vừa dời file.
+        // Nối video cũ sang chỗ mới (giữ kết quả AI, sản phẩm, caption), không tạo video "trùng" mới.
+        $moved = AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->where('status', AutoVideo::NEW)
+            ->where(fn ($q) => $q->where('hash', $hash)->orWhere('content_hash', $hash))
+            ->where('path', '!=', $path)->orderBy('id')->get()
+            ->first(fn (AutoVideo $v): bool => ! is_file((string) $v->path));
+
+        if ($moved !== null) {
+            $meta = (array) $moved->meta;
+            $oldFolder = (int) ($meta['folder_id'] ?? 0);
+            $meta['moved_from'] = ['folder_id' => $oldFolder, 'rel_path' => $meta['rel_path'] ?? basename((string) $moved->path), 'at' => now()->toIso8601String()];
+            $meta['folder_id'] = $folder->id;
+            $meta['rel_path'] = $rel;
+            $moved->forceFill(['path' => $path, 'file_name' => basename($path), 'files_deleted_at' => null, 'skip_reason' => null, 'meta' => $meta])->save();
+            app(RiengThumbs::class)->forget($moved);
+            Log::info('Kho riêng: video được dời sang chỗ mới.', ['video_id' => $moved->id, 'path' => $path]);
+
+            return 'known';
+        }
+
         try {
             AutoVideo::query()->create([
                 // `hash` là UNIQUE: bản đầu tiên giữ sha256 thật; bản trùng dùng mã dẫn xuất (nội dung + đường dẫn).
@@ -214,21 +236,57 @@ final class RiengScanner
         return $original === null ? 'new' : 'duplicate';
     }
 
-    /** Video riêng còn `new` mà file không còn trên đĩa: đánh dấu để không đăng (cột files_deleted_at như video hub). */
+    /**
+     * Video riêng còn `new` mà file không còn trên đĩa (dời đi chỗ app không theo dõi, hoặc đã xoá):
+     * - thư mục của video vẫn mở được = file thật sự đã đi: bỏ video khỏi danh sách (không cần anh dọn tay);
+     * - thư mục không mở được (ổ rời / ổ mạng chưa cắm): chỉ đánh dấu "Mất file", cắm lại ổ thì video tự có lại.
+     */
     private function markGone(): int
     {
         $n = 0;
+        $roots = RiengFolder::query()->get(['id', 'path'])
+            ->mapWithKeys(fn (RiengFolder $f): array => [(int) $f->id => rtrim(Paths::slash((string) $f->path), '/')]);
 
-        AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->where('status', AutoVideo::NEW)->whereNull('files_deleted_at')
-            ->orderBy('id')->each(function (AutoVideo $v) use (&$n): void {
-                if (! is_file((string) $v->path)) {
-                    $v->forceFill(['files_deleted_at' => now(), 'skip_reason' => self::REASON_GONE])->save();
-                    Log::info('Kho riêng: file không còn, không đăng.', ['video_id' => $v->id]);
+        AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->where('status', AutoVideo::NEW)
+            ->orderBy('id')->each(function (AutoVideo $v) use (&$n, $roots): void {
+                if (is_file((string) $v->path)) {
+                    return;
+                }
+
+                $root = $roots[(int) data_get($v->meta, 'folder_id')] ?? null;
+
+                if ($root !== null && is_dir($root)) {
+                    self::forget($v);
+                    Log::info('Kho riêng: file không còn, bỏ video khỏi danh sách.', ['video_id' => $v->id]);
+                    $n++;
+
+                    return;
+                }
+
+                if ($v->files_deleted_at === null) {
+                    $v->forceFill(['files_deleted_at' => now(), 'skip_reason' => $root === null ? self::REASON_GONE : self::REASON_FOLDER_GONE])->save();
+                    Log::info('Kho riêng: thư mục không mở được, tạm coi là mất file.', ['video_id' => $v->id]);
                     $n++;
                 }
             });
 
         return $n;
+    }
+
+    /** Bỏ hẳn một video chưa đăng khỏi app (không đụng tới file): ảnh xem trước, ảnh bìa, giỏ chờ, cờ "trùng" trỏ tới nó. */
+    public static function forget(AutoVideo $v): void
+    {
+        app(RiengThumbs::class)->forget($v);
+        app(RiengCovers::class)->forget((int) $v->id);
+        RiengQueueItem::forget((int) $v->id);
+
+        AutoVideo::query()->whereRaw("(meta->>'duplicate_of') = ?", [(string) $v->id])->each(function (AutoVideo $d): void {
+            $meta = (array) $d->meta;
+            unset($meta['duplicate_of'], $meta['dup_ok']);
+            $d->forceFill(['meta' => $meta])->save();
+        });
+
+        $v->delete();
     }
 
     /**

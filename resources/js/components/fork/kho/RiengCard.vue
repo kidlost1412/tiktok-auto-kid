@@ -6,6 +6,7 @@ import {
     IconMovie,
     IconPlaylistAdd,
     IconSparkles,
+    IconTrash,
 } from '@tabler/icons-vue';
 import { ref } from 'vue';
 
@@ -32,6 +33,7 @@ const emit = defineEmits<{
     queue: [];
     retry: [];
     auto: [];
+    forget: [];
 }>();
 
 // Phần "tự đăng theo khung" chỉ hiện cho video còn chờ đăng.
@@ -185,6 +187,13 @@ const onClick = (e: MouseEvent) => {
             >
                 {{ video.folder }}
             </div>
+            <div
+                v-if="video.moved_from"
+                class="truncate text-xs text-sky-700 dark:text-sky-300"
+                :title="`Anh vừa dời video từ ${video.moved_from}`"
+            >
+                Đã dời từ {{ video.moved_from }}
+            </div>
             <div class="text-xs text-muted-foreground">
                 Làm lúc
                 {{
@@ -326,6 +335,17 @@ const onClick = (e: MouseEvent) => {
                     <IconCheck v-if="queued" class="size-4" />
                     <IconPlaylistAdd v-else class="size-4" />
                     {{ queued ? 'Trong giỏ chờ' : '+ Giỏ chờ' }}
+                </Button>
+                <Button
+                    v-if="video.gone && video.status === 'new'"
+                    size="sm"
+                    variant="outline"
+                    class="h-8"
+                    title="Bỏ video này khỏi danh sách (không xoá file nào)"
+                    :data-testid="`fork-rieng-forget-${video.id}`"
+                    @click.stop="emit('forget')"
+                >
+                    <IconTrash class="size-4" /> Bỏ khỏi danh sách
                 </Button>
                 <Button
                     v-if="video.can_retry"
