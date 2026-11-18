@@ -18,13 +18,19 @@ use DateTimeZone;
  *
  * Luật: chỉ tránh bài CÙNG KÊNH (kênh khác không tính); cách mỗi bài cùng kênh ít nhất Planner::gapSeconds() (mặc định 20 phút);
  * LUÔN trong khung giờ đăng của kênh (window_start..window_end, giờ địa phương), hết khung thì sang khung của ngày hôm sau;
- * cách hiện tại ít nhất Planner::MIN_LEAD; không xa quá giới hạn hẹn giờ của TikTok. Không tính trần bài/ngày của kênh
- * (trần đó là của Xưởng Video tự xếp; video riêng do chủ app chủ động đăng).
+ * cách hiện tại ít nhất self::MIN_LEAD; không xa quá giới hạn hẹn giờ của TikTok; KHÔNG vượt số bài/ngày (daily_cap) của kênh
+ * (tính chung mọi video đã giữ chỗ/xếp/đăng của kênh trong ngày địa phương, như Planner), ngày đủ thì sang ngày sau.
  */
 final class RiengSchedule
 {
     /** Trạng thái video làm bận giờ (giống Planner). */
     private const array COUNTED = ['reserved', 'scheduled', 'posted'];
+
+    /**
+     * Giờ sớm nhất cho video riêng: cách bây giờ 5 phút. Bài gần hơn ChromeJobs::SCHEDULE_LEAD không được gửi trước lên
+     * TikTok dạng hẹn giờ; tới giờ posts:process-scheduled giao Chrome đăng thẳng (đường 'now').
+     */
+    public const int MIN_LEAD = 5 * 60;
 
     public function __construct(private readonly Planner $planner) {}
 
@@ -62,7 +68,7 @@ final class RiengSchedule
     /** Giờ sớm nhất được phép hẹn (đã làm tròn lên phút). */
     public function earliest(CarbonImmutable $now): int
     {
-        return $this->ceilMinute($now->getTimestamp() + Planner::MIN_LEAD);
+        return $this->ceilMinute($now->getTimestamp() + self::MIN_LEAD);
     }
 
     /** Giờ xa nhất TikTok cho hẹn (chừa 1 giờ an toàn như Planner). */
@@ -104,13 +110,57 @@ final class RiengSchedule
     }
 
     /**
-     * Giờ trống sớm nhất từ $from: trong khung giờ (hết khung thì sang khung ngày sau), cách mọi mốc trong $busy ít nhất $gap giây.
-     * null nếu vượt $max.
+     * Số bài đã chiếm chỗ của kênh theo từng ngày địa phương ('Y-m-d' => số), cùng cách đếm với Planner::usedOn
+     * (bài "đăng ngay" không có scheduled_for cũng tính theo posted_at/updated_at).
+     *
+     * @return array<string, int>
+     */
+    public function dayCounts(AutoAccount $a, int $from, int $to): array
+    {
+        $tz = $this->planner->timezoneFor($a);
+        $out = [];
+
+        AutoVideo::query()
+            ->where('social_account_id', $a->social_account_id)
+            ->whereIn('status', self::COUNTED)
+            ->whereRaw('COALESCE(scheduled_for, posted_at, updated_at) >= ? AND COALESCE(scheduled_for, posted_at, updated_at) < ?', [
+                CarbonImmutable::createFromTimestampUTC($from), CarbonImmutable::createFromTimestampUTC($to),
+            ])
+            ->get(['scheduled_for', 'posted_at', 'updated_at'])
+            ->each(function (AutoVideo $v) use (&$out, $tz): void {
+                $at = $v->scheduled_for ?? $v->posted_at ?? $v->updated_at;
+
+                if ($at !== null) {
+                    $k = CarbonImmutable::parse($at)->setTimezone($tz)->format('Y-m-d');
+                    $out[$k] = ($out[$k] ?? 0) + 1;
+                }
+            });
+
+        return $out;
+    }
+
+    /** Ngày địa phương của kênh ('Y-m-d') chứa $ts. */
+    public function dayKey(AutoAccount $a, int $ts): string
+    {
+        return CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($this->planner->timezoneFor($a))->format('Y-m-d');
+    }
+
+    /** Số bài/ngày tối đa của kênh; 0 = không giới hạn. */
+    public function cap(AutoAccount $a): int
+    {
+        return max(0, (int) $a->daily_cap);
+    }
+
+    /**
+     * Giờ trống sớm nhất từ $from: trong khung giờ (hết khung thì sang khung ngày sau), cách mọi mốc trong $busy ít nhất $gap giây,
+     * và ngày đó chưa đủ số bài/ngày của kênh theo $dayCounts (null = không xét). null nếu vượt $max.
      *
      * @param  list<int>  $busy
+     * @param  array<string, int>|null  $dayCounts
      */
-    public function next(AutoAccount $a, int $from, int $max, array $busy, ?int $gap = null): ?int
+    public function next(AutoAccount $a, int $from, int $max, array $busy, ?int $gap = null, ?array $dayCounts = null): ?int
     {
+        $cap = $dayCounts === null ? 0 : $this->cap($a);
         $gap ??= $this->planner->gapSeconds();
         $tz = $this->planner->timezoneFor($a);
         [$ws, $we] = $this->window($a);
@@ -130,8 +180,10 @@ final class RiengSchedule
                 continue;
             }
 
-            if ($t > $winEnd) {
-                // Sang khung của ngày hôm sau (dùng mốc 0h ngày sau theo giờ địa phương, đúng cả khi đổi giờ mùa hè).
+            $full = $cap > 0 && ($dayCounts[CarbonImmutable::createFromTimestampUTC($t)->setTimezone($tz)->format('Y-m-d')] ?? 0) >= $cap;
+
+            if ($t > $winEnd || $full) {
+                // Hết khung hoặc ngày đã đủ bài: sang khung của ngày hôm sau (mốc 0h ngày sau theo giờ địa phương, đúng cả khi đổi giờ mùa hè).
                 [, $t] = $this->dayBounds($dayStart + 36 * 3600, $tz, $ws, $we);
 
                 continue;

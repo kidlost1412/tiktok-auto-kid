@@ -213,9 +213,10 @@ const setOrder = (o: 'list' | 'random', reshuffle = false) => {
     void propose();
 };
 
-const rules = ref<{ window: string | null; gap: number }>({
+const rules = ref<{ window: string | null; gap: number; cap: number }>({
     window: null,
     gap: 20,
+    cap: 0,
 });
 // Khoảng cách giờ (tính ngay trên máy, cập nhật khi sửa giờ): còn bao lâu nữa, và cách bài trước cùng kênh bao nhiêu phút.
 const nowTick = ref(Date.now());
@@ -450,6 +451,7 @@ async function propose() {
         rows: ProposeRow[];
         window: string | null;
         gap_minutes: number;
+        daily_cap?: number;
     }>('/auto/kho/rieng/dat-lich/goi-y', {
         social_account_id: accountId.value,
         items: ordered.value.map((it) => ({
@@ -474,7 +476,11 @@ async function propose() {
     }
 
     slotProblem.value = '';
-    rules.value = { window: res.window, gap: res.gap_minutes };
+    rules.value = {
+        window: res.window,
+        gap: res.gap_minutes,
+        cap: res.daily_cap ?? 0,
+    };
     const nextTimes = { ...times.value };
     const info: typeof slotInfo.value = {};
     const prods: typeof videoProducts.value = {};
@@ -1220,9 +1226,14 @@ const areaCls =
                             >
                                 Trong khung giờ của kênh{{
                                     rules.window ? ` (${rules.window})` : ''
-                                }}, hết khung thì sang hôm sau. Cách bài khác
-                                cùng kênh ít nhất {{ rules.gap }} phút. Sớm nhất
-                                sau {{ limits.min_lead_minutes }} phút.
+                                }}, hết khung thì sang hôm sau.{{
+                                    rules.cap
+                                        ? ` Mỗi ngày tối đa ${rules.cap} bài (tính cả bài đã có), đủ thì sang hôm sau.`
+                                        : ''
+                                }}
+                                Cách bài khác cùng kênh ít nhất
+                                {{ rules.gap }} phút. Sớm nhất sau
+                                {{ limits.min_lead_minutes }} phút.
                             </HelpToggle>
                             <span
                                 v-if="slotProblem"

@@ -22,6 +22,7 @@ use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Rieng\RiengQueueItem;
 use App\Fork\AutoPost\Rieng\RiengReady;
 use App\Fork\AutoPost\Rieng\RiengScanner;
+use App\Fork\AutoPost\Rieng\RiengSchedule;
 use App\Fork\AutoPost\Rieng\RiengThumbs;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
@@ -152,7 +153,7 @@ final class RiengController extends Controller
             'accounts' => fn (): array => $this->accounts($accountId),
             // Gợi ý hashtag cho hộp thoại đăng hàng loạt (không tính lại khi chỉ tải lại danh sách video).
             'hashtag_suggestions' => fn (): array => HashtagSuggestions::top(),
-            'limits' => ['min_lead_minutes' => intdiv(Planner::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
+            'limits' => ['min_lead_minutes' => intdiv(RiengSchedule::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
             'last_scan_at' => fn (): mixed => Cache::get('fork-rieng:last-scan'),
         ]);
     }

@@ -152,6 +152,7 @@ final class RiengBatch
             'left' => $left,
             'window' => app(RiengSchedule::class)->windowLabel($auto),
             'gap_minutes' => $gapMinutes,
+            'daily_cap' => app(RiengSchedule::class)->cap($auto),
         ];
     }
 
@@ -580,9 +581,9 @@ final class RiengBatch
 
     /**
      * Đặt giờ cho các dòng (gán `at` + bỏ `_at`). Giờ chủ app đã sửa (`_at`) được giữ và kiểm; dòng chưa có giờ được tự đề xuất
-     * giờ trống sớm nhất (RiengSchedule). Lỗi cứng (status `error`): gần hơn 45 phút, quá xa theo TikTok, ngoài khung giờ đăng,
+     * giờ trống sớm nhất (RiengSchedule). Lỗi cứng (status `error`): gần hơn 5 phút, quá xa theo TikTok, ngoài khung giờ đăng,
      * trùng giờ y hệt trên cùng kênh, vượt hạn mức bài chờ. Cảnh báo (status `warn`, cho phép "Vẫn hẹn"): cách bài cùng kênh
-     * chưa đủ giãn cách. Kênh khác không tính. Trả số video không còn giờ (status `skip`).
+     * chưa đủ giãn cách, hoặc ngày đó kênh đã đủ số bài/ngày. Giờ tự đề xuất không bao giờ vượt số bài/ngày (đủ thì sang ngày sau). Kênh khác không tính. Trả số video không còn giờ (status `skip`).
      *
      * @param  list<array<string, mixed>>  $rows
      */
@@ -592,10 +593,13 @@ final class RiengBatch
         $tz = $this->planner->timezoneFor($auto);
         $gap = $this->planner->gapSeconds();
         $gapMin = intdiv($gap, 60);
-        $minTs = $now->getTimestamp() + Planner::MIN_LEAD;
+        $minTs = $now->getTimestamp() + RiengSchedule::MIN_LEAD;
         $maxTs = $sched->latest($now);
         $room = $this->planner->futureRoom($auto, $now);
         $busy = $sched->busy($auto, $now->getTimestamp() - $gap, $maxTs + $gap);
+        // Đếm bài từng ngày (giờ địa phương) để không vượt số bài/ngày của kênh; bài trong lượt này cộng dồn vào.
+        $counts = $sched->dayCounts($auto, $now->getTimestamp() - 2 * 86400, $maxTs + 2 * 86400);
+        $cap = $sched->cap($auto);
         $window = $sched->windowLabel($auto);
         $iso = fn (int $ts): string => CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->toIso8601String();
         $batch = [];
@@ -624,7 +628,7 @@ final class RiengBatch
 
             if ($ts < $minTs) {
                 $r['status'] = 'error';
-                $r['messages'][] = 'Giờ đăng phải cách bây giờ ít nhất '.intdiv(Planner::MIN_LEAD, 60).' phút (để Chrome kịp nhận bài).';
+                $r['messages'][] = 'Giờ đăng phải cách bây giờ ít nhất '.intdiv(RiengSchedule::MIN_LEAD, 60).' phút.';
 
                 continue;
             }
@@ -680,6 +684,14 @@ final class RiengBatch
                 }
             }
 
+            $day = $sched->dayKey($auto, $ts);
+
+            if ($cap > 0 && ($counts[$day] ?? 0) >= $cap) {
+                $r['status'] = 'warn';
+                $r['messages'][] = 'Ngày '.CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->format('d/m').' kênh đã đủ '.$cap.' bài (số bài mỗi ngày trong Cài đặt kênh).';
+            }
+
+            $counts[$day] = ($counts[$day] ?? 0) + 1;
             $batch[] = $ts;
             $used++;
         }
@@ -692,19 +704,21 @@ final class RiengBatch
                 continue;
             }
 
-            $ts = $used < $room ? $sched->next($auto, $minTs, $maxTs, [...$busy, ...$batch], $gap) : null;
+            $ts = $used < $room ? $sched->next($auto, $minTs, $maxTs, [...$busy, ...$batch], $gap, $counts) : null;
 
             if ($ts === null) {
                 $r['status'] = 'skip';
                 $r['messages'][] = $used >= $room
                     ? 'Kênh đã đủ số bài chờ đăng.'
-                    : 'Không còn giờ trống trong khung giờ đăng ('.$window.') tới ngày xa nhất TikTok cho hẹn, video này để lại.';
+                    : 'Không còn giờ trống trong khung giờ đăng ('.$window.') và số bài mỗi ngày của kênh tới ngày xa nhất TikTok cho hẹn, video này để lại.';
                 $left++;
 
                 continue;
             }
 
             $r['at'] = $iso($ts);
+            $day = $sched->dayKey($auto, $ts);
+            $counts[$day] = ($counts[$day] ?? 0) + 1;
             $batch[] = $ts;
             $used++;
         }

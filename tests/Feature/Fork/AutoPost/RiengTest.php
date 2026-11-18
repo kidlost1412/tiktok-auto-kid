@@ -494,7 +494,7 @@ test('auto batch takes the earliest free slots and skips busy ones, never touchi
 
     expect($preview['ok'])->toBeTrue()->and($preview['left'])->toBe(0)
         ->and($times)->not->toContain($busyAt->getTimestamp())
-        ->and($times[0])->toBeGreaterThanOrEqual($this->now->addMinutes(45)->getTimestamp())
+        ->and($times[0])->toBeGreaterThanOrEqual($this->now->addMinutes(5)->getTimestamp())
         ->and($times[1] - $times[0])->toBeGreaterThanOrEqual(20 * 60);
     // Preview không ghi gì.
     expect(Post::query()->count())->toBe(0)->and($a->refresh()->status)->toBe('new');
@@ -517,13 +517,16 @@ test('auto batch takes the earliest free slots and skips busy ones, never touchi
     expect($a->refresh()->status)->toBe('scheduled');
 });
 
-test('auto batch is not limited by the hub daily cap or ahead days, only by the pending-post limit', function () {
-    // Trần bài/ngày và số ngày xếp trước là của Xưởng Video; video riêng vẫn được xếp (tràn sang ngày sau nếu cần).
+test('auto batch keeps the channel daily cap (spilling to later days) and is not limited by ahead days, only by the pending-post limit', function () {
+    // Số bài/ngày của kênh luôn giữ: ngày đủ thì sang ngày sau. Số ngày xếp trước là của Xưởng Video, không áp cho video riêng.
     $account = ($this->account)(['daily_cap' => 2, 'window_start' => 6, 'window_end' => 23, 'schedule_ahead_days' => 1]);
     $videos = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4'), ($this->rieng)('4.mp4'), ($this->rieng)('5.mp4')];
 
     $result = ($this->batch)()->commit(($this->input)($account, $videos), false, $this->now);
     expect($result['done'])->toBe(5)->and($result['left'])->toBe(0);
+    $perDay = AutoVideo::query()->where('status', 'scheduled')->get()
+        ->countBy(fn ($v) => $v->scheduled_for->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d'));
+    expect($perDay->max())->toBeLessThanOrEqual(2)->and($perDay->count())->toBeGreaterThanOrEqual(3);
 
     config(['fork.auto.max_future_posts' => 7]);
     $more = [($this->rieng)('6.mp4'), ($this->rieng)('7.mp4'), ($this->rieng)('8.mp4')];
@@ -536,8 +539,8 @@ test('auto batch is not limited by the hub daily cap or ahead days, only by the 
 test('auto times always stay inside the posting window and spill to the next day, 20 minutes apart on the same channel only', function () {
     $account = ($this->account)(['window_start' => 6, 'window_end' => 23]);
     $other = ($this->account)();
-    // 22:30 giờ VN: sau 45 phút đã quá 23:00 => phải sang 06:00 sáng hôm sau, không bao giờ 01:00–02:00.
-    $now = CarbonImmutable::parse('2026-11-20 22:30', 'Asia/Ho_Chi_Minh')->utc();
+    // 22:50 giờ VN: bài đầu 22:55, bài kế (23:15) quá 23:00 => phải sang 06:00 sáng hôm sau, không bao giờ 01:00–02:00.
+    $now = CarbonImmutable::parse('2026-11-20 22:50', 'Asia/Ho_Chi_Minh')->utc();
     $sixAm = CarbonImmutable::parse('2026-11-21 06:00', 'Asia/Ho_Chi_Minh');
     // Kênh khác đăng đúng 06:00: không ảnh hưởng. Cùng kênh có bài 06:30: bài kế phải cách >= 20 phút.
     AutoVideo::create(['hash' => 'o1', 'path' => '/o1', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'o1.mp4', 'status' => 'scheduled', 'social_account_id' => $other->id, 'scheduled_for' => $sixAm->utc()]);
@@ -548,7 +551,52 @@ test('auto times always stay inside the posting window and spill to the next day
     $local = array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i'), $r['rows']);
 
     expect($r['ok'])->toBeTrue()->and($r['window'])->toBe('06:00–23:00')
-        ->and($local)->toBe(['2026-11-21 06:00', '2026-11-21 06:50', '2026-11-21 07:10']);
+        ->and($local)->toBe(['2026-11-20 22:55', '2026-11-21 06:00', '2026-11-21 06:50']);
+});
+
+test('a batch never goes over the channel daily cap: 10 videos with 9 per day put 9 today from now + 5 minutes and 1 tomorrow', function () {
+    $account = ($this->account)(['daily_cap' => 9, 'window_start' => 5, 'window_end' => 22]);
+    $now = CarbonImmutable::parse('2026-11-20 10:00', 'Asia/Ho_Chi_Minh')->utc();
+    $v = array_map(fn ($i) => ($this->rieng)($i.'.mp4'), range(1, 10));
+
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => array_map(fn ($x) => ['id' => $x->id], $v)], $now);
+    $local = array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh'), $r['rows']);
+    $days = collect($local)->countBy(fn ($t) => $t->format('Y-m-d'))->all();
+
+    expect($r['ok'])->toBeTrue()
+        ->and($local[0]->format('Y-m-d H:i'))->toBe('2026-11-20 10:05')
+        ->and($local[1]->format('H:i'))->toBe('10:25')
+        ->and($days)->toBe(['2026-11-20' => 9, '2026-11-21' => 1])
+        ->and($local[9]->format('Y-m-d H:i'))->toBe('2026-11-21 05:00');
+});
+
+test('posts already on the channel that day count toward the daily cap, and an edited time on a full day is only a warning', function () {
+    $account = ($this->account)(['daily_cap' => 3, 'window_start' => 5, 'window_end' => 22]);
+    $now = CarbonImmutable::parse('2026-11-20 10:00', 'Asia/Ho_Chi_Minh')->utc();
+    $seven = CarbonImmutable::parse('2026-11-20 07:00', 'Asia/Ho_Chi_Minh')->utc();
+    // Hôm nay kênh đã có 2 bài (1 đã đăng sáng nay, 1 hẹn chiều).
+    AutoVideo::create(['hash' => 'd1', 'path' => '/d1', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'd1.mp4', 'status' => 'posted', 'social_account_id' => $account->id, 'scheduled_for' => $seven, 'posted_at' => $seven]);
+    AutoVideo::create(['hash' => 'd2', 'path' => '/d2', 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'd2.mp4', 'status' => 'scheduled', 'social_account_id' => $account->id, 'scheduled_for' => CarbonImmutable::parse('2026-11-20 15:00', 'Asia/Ho_Chi_Minh')->utc()]);
+    $v = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4')];
+
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => [
+        ['id' => $v[0]->id],
+        ['id' => $v[1]->id],
+        ['id' => $v[2]->id, 'at' => CarbonImmutable::parse('2026-11-20 18:00', 'Asia/Ho_Chi_Minh')->toIso8601String()],
+    ]], $now);
+    $at = fn (int $i) => CarbonImmutable::parse($r['rows'][$i]['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i');
+
+    // Giờ sửa tay 18:00 chiếm chỗ thứ 3 của hôm nay => hai video tự xếp sang ngày mai.
+    expect($r['rows'][2]['status'])->toBe('ok')->and($at(2))->toBe('2026-11-20 18:00')
+        ->and($at(0))->toBe('2026-11-21 05:00')->and($at(1))->toBe('2026-11-21 05:20');
+
+    // Sửa tay vào một ngày đã đủ: chỉ cảnh báo (vẫn hẹn được).
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => [
+        ['id' => $v[0]->id, 'at' => CarbonImmutable::parse('2026-11-20 12:00', 'Asia/Ho_Chi_Minh')->toIso8601String()],
+        ['id' => $v[1]->id, 'at' => CarbonImmutable::parse('2026-11-20 13:00', 'Asia/Ho_Chi_Minh')->toIso8601String()],
+    ]], $now);
+    expect($r['rows'][0]['status'])->toBe('ok')
+        ->and($r['rows'][1]['status'])->toBe('warn')->and(implode(' ', $r['rows'][1]['messages']))->toContain('đã đủ 3 bài');
 });
 
 test('posting times always use Vietnam time even when the channel was saved with UTC (fresh install)', function () {
@@ -587,8 +635,8 @@ test('an edited time is kept and checked; outside the window it is refused, the 
     $at = fn (int $i) => CarbonImmutable::parse($r['rows'][$i]['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('H:i');
 
     expect($r['rows'][0]['status'])->toBe('ok')->and($r['rows'][0]['edited'])->toBeTrue()->and($at(0))->toBe('10:00')
-        // Đề xuất sớm nhất là 09:45 nhưng phải cách 10:00 ít nhất 20 phút => 10:20.
-        ->and($r['rows'][1]['status'])->toBe('ok')->and($r['rows'][1]['edited'])->toBeFalse()->and($at(1))->toBe('10:20')
+        // Đề xuất sớm nhất là 09:05 (bây giờ + 5 phút), cách 10:00 đủ 20 phút => giữ 09:05.
+        ->and($r['rows'][1]['status'])->toBe('ok')->and($r['rows'][1]['edited'])->toBeFalse()->and($at(1))->toBe('09:05')
         ->and($r['rows'][2]['status'])->toBe('error')->and(implode(' ', $r['rows'][2]['messages']))->toContain('Ngoài khung giờ');
 });
 
@@ -616,7 +664,7 @@ test('edited times refuse under the minimum lead and exact duplicates, warn on t
 
     $v = [($this->rieng)('1.mp4'), ($this->rieng)('2.mp4'), ($this->rieng)('3.mp4'), ($this->rieng)('4.mp4'), ($this->rieng)('5.mp4')];
     $items = [
-        ['id' => $v[0]->id, 'at' => $this->now->addMinutes(20)->toIso8601String()],      // quá gần
+        ['id' => $v[0]->id, 'at' => $this->now->addMinutes(2)->toIso8601String()],       // quá gần
         ['id' => $v[1]->id, 'at' => $t->toIso8601String()],                               // y hệt bài của kênh
         ['id' => $v[2]->id, 'at' => $t->addMinutes(10)->toIso8601String()],               // trong 20 phút
         ['id' => $v[3]->id, 'at' => $t->addMinutes(30)->addSeconds(30)->toIso8601String()], // sát kênh khác
@@ -626,7 +674,7 @@ test('edited times refuse under the minimum lead and exact duplicates, warn on t
     $r = ($this->batch)()->preview(($this->input)($a1, $items, ['mode' => 'manual']), $this->now);
     $rows = $r['rows'];
 
-    expect($rows[0]['status'])->toBe('error')->and($rows[0]['messages'][0])->toContain('45 phút')
+    expect($rows[0]['status'])->toBe('error')->and($rows[0]['messages'][0])->toContain('5 phút')
         ->and($rows[1]['status'])->toBe('error')->and($rows[1]['messages'][0])->toContain('đúng giờ')
         ->and($rows[2]['status'])->toBe('warn')->and(implode(' ', $rows[2]['messages']))->toContain('Gần bài')
         // Sát giờ kênh khác: không sao (chỉ tránh bài cùng kênh).
