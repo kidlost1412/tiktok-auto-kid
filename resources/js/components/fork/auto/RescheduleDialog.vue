@@ -200,7 +200,7 @@ function save() {
 
     const at = dayjs(value.value).toISOString();
     open.value = false;
-    moveWithUndo(props.entry ?? {}, at, () =>
+    void moveWithUndo(props.entry ?? {}, at, () =>
         router.reload({ only: ['lich'] }),
     );
 }

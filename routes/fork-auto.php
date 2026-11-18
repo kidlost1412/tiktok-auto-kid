@@ -31,6 +31,7 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     // "Đổi giờ" bài đã xếp lịch mà chưa đăng (bài đã hẹn trên TikTok: xoá bài hẹn cũ qua Chrome rồi hẹn lại).
     Route::get('videos/{video}/doi-gio', [RescheduleController::class, 'show'])->whereNumber('video')->name('videos.reschedule.show');
     Route::post('videos/{video}/doi-gio', [RescheduleController::class, 'store'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.reschedule');
+    Route::post('videos/{video}/doi-gio/kiem', [RescheduleController::class, 'dayLoad'])->whereNumber('video')->middleware('throttle:120,1')->name('videos.reschedule.day');
     // Sửa bài đã xếp lịch (giờ, kênh, caption, hashtag, ảnh bìa), bỏ xếp lịch, cho xếp lịch lại (khung xem video, Lịch đăng).
     Route::get('videos/{video}/sua', [PostEditController::class, 'show'])->whereNumber('video')->name('videos.edit.show');
     Route::post('videos/{video}/sua', [PostEditController::class, 'update'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.edit');

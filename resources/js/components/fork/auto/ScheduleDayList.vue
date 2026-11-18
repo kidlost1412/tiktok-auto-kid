@@ -162,7 +162,7 @@ const onListDrop = (ev: DragEvent) => {
         return;
     }
 
-    moveWithUndo(d, p.at, () => router.reload({ only: ['lich'] }));
+    void moveWithUndo(d, p.at, () => router.reload({ only: ['lich'] }));
 };
 const dropLabel = computed(() => {
     const p = drop.value;

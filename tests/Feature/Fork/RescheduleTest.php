@@ -553,3 +553,34 @@ test('kiểm giỏ trước giờ đăng: cả bài đã hẹn trên TikTok, gi�
     $lich = $this->actingAs($this->owner)->get('/auto')->viewData('page')['props']['lich']['channels'][$this->social->id];
     expect($lich['cart_stale'])->toBeNull();
 });
+
+test('moving onto a day that already has the channel daily cap is flagged so the UI can ask before moving', function (): void {
+    AutoAccount::query()->whereKey($this->social->id)->update(['daily_cap' => 2]);
+    $day = CarbonImmutable::parse('2026-12-02 09:00', 'Asia/Ho_Chi_Minh');
+    rsPost($this, $day);
+    rsPost($this, $day->addHours(2));
+    [, $other] = rsPost($this, $day->addDay());
+    $check = fn (AutoVideo $v, CarbonImmutable $at) => $this->actingAs($this->owner)
+        ->postJson("/auto/videos/{$v->id}/doi-gio/kiem", ['at' => $at->toIso8601String()])->assertOk()->json();
+
+    // Ngày 02/12 đã có 2/2 bài: dời bài ngày 03/12 vào thì báo đủ.
+    $full = $check($other, $day->addHours(5));
+    expect($full['full'])->toBeTrue()->and($full['count'])->toBe(2)->and($full['cap'])->toBe(2)
+        ->and($full['message'])->toContain('02/12')->toContain('@kenh_rs')->toContain('thành 3 bài');
+
+    // Dời trong cùng ngày 03/12 (chỉ có chính nó) thì không sao.
+    expect($check($other, $day->addDay()->addHours(3))['full'])->toBeFalse();
+
+    // Chỉ kiểm, không đổi gì.
+    expect($other->refresh()->scheduled_for->getTimestamp())->toBe($day->addDay()->getTimestamp());
+});
+
+test('a post already on the full day can still be moved within that day without a warning', function (): void {
+    AutoAccount::query()->whereKey($this->social->id)->update(['daily_cap' => 2]);
+    $day = CarbonImmutable::parse('2026-12-02 09:00', 'Asia/Ho_Chi_Minh');
+    [, $v] = rsPost($this, $day);
+    rsPost($this, $day->addHours(2));
+
+    $res = $this->actingAs($this->owner)->postJson("/auto/videos/{$v->id}/doi-gio/kiem", ['at' => $day->addHours(6)->toIso8601String()])->assertOk()->json();
+    expect($res['full'])->toBeFalse()->and($res['count'])->toBe(1);
+});

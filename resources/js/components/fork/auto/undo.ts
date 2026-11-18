@@ -2,6 +2,7 @@
 // Trong lúc đó thông báo có nút "Hoàn tác" — bấm là coi như chưa làm gì, không cần gọi lại server.
 import { toast } from 'vue-sonner';
 
+import { confirm } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 
 const UNDO_SECONDS = 8;
@@ -94,8 +95,28 @@ export async function postJson(
     }
 }
 
+/**
+ * Ngày mới đã đủ số bài/ngày của kênh thì hỏi lại "Vẫn dời" / "Thôi" (app không tự chặn quyết định của chủ app).
+ * Không kiểm được (mất mạng...) thì coi như cho dời, như trước.
+ */
+async function okForDay(id: number, at: string): Promise<boolean> {
+    const { data } = await postJson(`/auto/videos/${id}/doi-gio/kiem`, { at });
+    const load = data as { full?: boolean; message?: string | null } | null;
+
+    if (!load?.full) {
+        return true;
+    }
+
+    return confirm({
+        title: 'Ngày này kênh đã đủ bài',
+        description: `${load.message ?? ''} Vẫn dời bài sang ngày này?`,
+        confirmText: 'Vẫn dời',
+        cancelText: 'Thôi',
+    });
+}
+
 /** Dời giờ một bài trên Lịch đăng, có "Hoàn tác". `at`: giờ mới (ISO). */
-export function moveWithUndo(
+export async function moveWithUndo(
     entry: {
         id?: number | null;
         state?: string;
@@ -104,8 +125,15 @@ export function moveWithUndo(
     },
     at: string,
     onDone?: () => void,
-): void {
+): Promise<void> {
     if (!entry.id) {
+        return;
+    }
+
+    if (!(await okForDay(entry.id, at))) {
+        toast('Đã giữ nguyên giờ cũ.');
+        onDone?.();
+
         return;
     }
 

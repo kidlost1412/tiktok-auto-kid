@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Http;
 
+use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Rieng\RiengSchedule;
+use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -45,6 +48,57 @@ final class RescheduleController extends Controller
         }
 
         return response()->json(['ok' => true, ...$result, ...$reschedules->describe($video->refresh())]);
+    }
+
+    /**
+     * Kiểm trước khi dời (kéo thả / đổi giờ): ngày mới của kênh đã đủ số bài/ngày (Cài đặt kênh) chưa. Chỉ đọc.
+     * Đủ rồi thì giao diện hỏi lại "Vẫn dời" / "Thôi"; app không tự chặn quyết định của chủ app.
+     */
+    public function dayLoad(Request $request, AutoVideo $video): JsonResponse
+    {
+        $this->own($request, $video);
+        $data = $request->validate(['at' => ['required', 'string', 'max:40']]);
+
+        try {
+            $at = CarbonImmutable::parse($data['at'])->utc();
+        } catch (Throwable) {
+            return response()->json(['ok' => false, 'message' => 'Giờ mới không hợp lệ.'], 422);
+        }
+
+        $auto = AutoAccount::query()->find($video->social_account_id);
+        $sched = app(RiengSchedule::class);
+        $cap = $auto === null ? 0 : $sched->cap($auto);
+
+        if ($auto === null || $cap === 0) {
+            return response()->json(['ok' => true, 'full' => false, 'count' => 0, 'cap' => $cap]);
+        }
+
+        $ts = $at->getTimestamp();
+        $day = $sched->dayKey($auto, $ts);
+        $count = $sched->dayCounts($auto, $ts - 2 * 86400, $ts + 2 * 86400)[$day] ?? 0;
+
+        // Bài này đang nằm sẵn trong ngày đó (dời giờ trong cùng ngày) thì không tính thêm.
+        $current = $video->scheduled_for ?? $video->posted_at;
+
+        if ($current !== null && in_array($video->status, [AutoVideo::RESERVED, AutoVideo::SCHEDULED, AutoVideo::POSTED], true)
+            && $sched->dayKey($auto, CarbonImmutable::parse($current)->getTimestamp()) === $day) {
+            $count = max(0, $count - 1);
+        }
+
+        $full = $count >= $cap;
+        $label = CarbonImmutable::createFromTimestampUTC($ts)->setTimezone(app(Planner::class)->timezoneFor($auto))->format('d/m');
+        $name = $video->socialAccount?->username;
+
+        return response()->json([
+            'ok' => true,
+            'full' => $full,
+            'count' => $count,
+            'cap' => $cap,
+            'day' => $label,
+            'message' => $full
+                ? 'Ngày '.$label.($name ? ' kênh @'.$name : '').' đã có '.$count.' bài, đủ '.$cap.' bài/ngày trong Cài đặt kênh. Dời bài này vào thì thành '.($count + 1).' bài.'
+                : null,
+        ]);
     }
 
     private function own(Request $request, AutoVideo $video): void
