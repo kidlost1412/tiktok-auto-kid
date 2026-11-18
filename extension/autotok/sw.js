@@ -227,11 +227,48 @@ async function createStudioWindow(url, s) {
     const w = await chrome.windows.create({ url, focused: false, state: 'normal', width: 1100, height: 800, left: 40, top: 40 });
     tab = w.tabs[0]; windowId = w.id;
   } else {
+    // One reusable minimized work window: created once (with a blank tab that keeps it alive), every later job / sync /
+    // collection opens as a tab inside it. On Windows creating a window can take the foreground even when minimized
+    // (CapCut etc. lost focus at every scheduled post), so Chrome must not create a new window per job.
+    const ww = await workWindow();
+    if (ww) {
+      tab = await chrome.tabs.create({ windowId: ww.id, url, active: true });
+      return finishStudioTab(tab, ww.id, 'tab');
+    }
     if (strategy === 'tab') strategy = 'minimized';   // no normal window to hold a tab: use a minimized one
     const w = await chrome.windows.create({ url, state: 'minimized', focused: false });
     tab = w.tabs[0]; windowId = w.id;
     if (w.state && w.state !== 'minimized') { try { await chrome.windows.update(w.id, { state: 'minimized', focused: false }); } catch (e) { await log('thu nhỏ cửa sổ: ' + e.message, 'WARN'); } }
+    // Turn it into the work window: a blank placeholder tab keeps it open when this job's tab is closed.
+    if (chrome.storage.session && chrome.windows.get) {
+      try {
+        await chrome.tabs.create({ windowId: w.id, url: 'about:blank', active: false });
+        await setWorkWindow(w.id);
+        strategy = 'tab';
+      } catch (e) { await log('cửa sổ làm việc: ' + e.message, 'WARN'); }
+    }
   }
+  return finishStudioTab(tab, windowId, strategy);
+}
+
+// The work window id lives in session storage (cleared when Chrome restarts, so a reused window id can never point at
+// one of the owner's own windows). Unknown / closed / restored-by-the-owner window -> null (a new one is created).
+async function workWindow() {
+  try {
+    const area = chrome.storage.session;
+    if (!area || !chrome.windows.get) return null;
+    const { workWindowId } = await area.get('workWindowId');
+    if (workWindowId == null) return null;
+    const w = await chrome.windows.get(workWindowId);
+    return w && w.type === 'normal' && w.state === 'minimized' ? w : null;
+  } catch (_) { return null; }
+}
+
+async function setWorkWindow(id) {
+  if (chrome.storage.session) await chrome.storage.session.set({ workWindowId: id });
+}
+
+async function finishStudioTab(tab, windowId, strategy) {
   try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) { await log('autoDiscardable: ' + e.message, 'WARN'); }
   return { tab, windowId, strategy };
 }

@@ -405,6 +405,10 @@ cover (first frame) and the result carries `cover_status: "failed"` + `cover_war
 Job / sync / collection windows follow `windowStrategy`. A `tab` strategy with no normal window open (Chrome started in the background)
 uses a minimized, unfocused window instead of letting `tabs.create` open a visible one; a minimized window that came up in the normal
 state is minimized again. The extension closes what it opened.
+Since 1.4.9 the minimized strategy keeps ONE work window per Chrome session (id in `chrome.storage.session`, with a blank
+keeper tab): it is created once and every later job / sync / collection opens as a tab inside it, closed as a tab. Creating a
+window per job could take the Windows foreground from another app (CapCut) even when minimized. A work window the owner
+restored or closed is not reused.
 
 ## 12. "Đổi giờ": delete a post already scheduled on TikTok (extension 1.4.6) -- optional, protocol stays v1
 
