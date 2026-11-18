@@ -322,13 +322,118 @@ def xoa_cuoc_tro_chuyen(cid):
             huy_cuoc_tro_chuyen(cid)
         except Exception:
             pass
-        if _goi_ls("DeleteCascadeTrajectory", {"cascadeId": str(cid)}) is not None:
-            return True
-        if tim_hub() is None:
-            return _xoa_file_cuoc(cid)
+        for lan in range(2):
+            if _goi_ls("DeleteCascadeTrajectory", {"cascadeId": str(cid)}, timeout=10) is not None:
+                return True
+            if tim_hub() is None:
+                return _xoa_file_cuoc(cid)
+            time.sleep(1)
     except Exception:
         pass
     return False
+
+
+# --- Dọn bù chat của app còn sót trong Antigravity -----------------------------------------------------------------------------
+# Xoá ngay sau mỗi lần hỏi có thể trượt (Antigravity bận / đóng giữa chừng, gửi việc lỗi trước khi có mã chat, chat có từ trước bản
+# biết tự xoá) → chat nằm lại mãi. Dọn bù: CHỈ những chat thuộc Project do chính hub tạo (id = uuid5 của thư mục, xem
+# id_project_hoc_canh) — không bao giờ đụng chat của chủ máy — đã im lặng quá DON_SAU_S. Xoá bằng RPC (gỡ khỏi danh sách bên trái).
+DON_SAU_S = 30 * 60          # chat của app im lặng quá chừng này mới dọn bù (lô Học cảnh dài vẫn cập nhật liên tục)
+DON_CACH_S = 10 * 60
+TIEU_DE_APP = "Xưởng Video · "    # tiêu đề chat Học cảnh do hub đặt (xem chạy lô)         # dọn bù nền tối đa 1 lần / chừng này giây
+_DON = {"t": 0.0, "dang": False}
+_DON_LOCK = threading.Lock()
+
+
+def project_cua_app():
+    """Tập id Project do hub tạo: file %USERPROFILE%\\.gemini\\config\\projects\\<id>.json có id = uuid5 của một thư mục làm việc của nó."""
+    ids = set()
+    try:
+        files = list(PROJECT_DIR.glob("*.json"))
+    except OSError:
+        return ids
+    for f in files:
+        try:
+            j = json.loads(f.read_text(encoding="utf-8"))
+            for res in ((j.get("projectResources") or {}).get("resources") or []):
+                u = res.get("folderUri") if isinstance(res, dict) else None
+                if u and j.get("id") == str(uuid.uuid5(uuid.NAMESPACE_URL, "xuong-video-hoc-canh:" + _uri_thanh_duong_dan(u))):
+                    ids.add(j["id"])
+        except Exception:
+            pass
+    return ids
+
+
+def _thoi_diem(v):
+    """'2026-11-16 09:18:30.9547956+00:00' (Antigravity ghi 7 chữ số lẻ) → datetime có múi giờ, hoặc None."""
+    import datetime as _dt, re
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?", str(v or ""))
+    if not m:
+        return None
+    tz = m.group(4) or "+00:00"
+    tz = "+00:00" if tz == "Z" else (tz if ":" in tz else tz[:3] + ":" + tz[3:])
+    try:
+        return _dt.datetime.fromisoformat(f"{m.group(1)}T{m.group(2)}.{(m.group(3) or '0')[:6].ljust(6, '0')}{tz}")
+    except ValueError:
+        return None
+
+
+def chat_sot(bay_gio=None, du_lieu=None, ids=None):
+    """[mã chat] của app đã im lặng quá DON_SAU_S và không còn chạy. Chỉ ĐỌC conversation_summaries.db (mở chế độ chỉ đọc).
+    Của app = nằm trong Project do hub tạo, HOẶC tiêu đề bắt đầu bằng TIEU_DE_APP (Học cảnh khi không có Project riêng)."""
+    import datetime as _dt, sqlite3
+    ids = project_cua_app() if ids is None else ids
+    f = Path(du_lieu) if du_lieu else NHA / ".gemini" / "antigravity" / "conversation_summaries.db"
+    if not f.is_file():
+        return []
+    try:
+        c = sqlite3.connect(f"file:{f.as_posix()}?mode=ro", uri=True, timeout=2)
+        try:
+            rows = c.execute("select conversation_id, project_id, last_modified_time, not_fully_idle, title from conversation_summaries").fetchall()
+        finally:
+            c.close()
+    except Exception:
+        return []
+    han = (bay_gio or _dt.datetime.now(_dt.timezone.utc)) - _dt.timedelta(seconds=DON_SAU_S)
+    with _RUN_LOCK:
+        dang = {c for r in _RUNS.values() for c in r.get("conv", ())} if isinstance(_RUNS, dict) else set()
+    out = []
+    for cid, pid, m, ban, tieu_de in rows:
+        t = _thoi_diem(m)
+        cua_app = pid in ids or str(tieu_de or "").startswith(TIEU_DE_APP)
+        if cid and cua_app and not ban and cid not in dang and t is not None and t < han:
+            out.append(str(cid))
+    return out
+
+
+def don_chat_sot(toi_da=300):
+    """Xoá các chat sót của app (RPC). Antigravity đóng thì để lần sau (xoá file khi đóng không gỡ được khỏi danh sách). → số chat đã xoá."""
+    if not tim_hub():
+        return 0
+    n = 0
+    for cid in chat_sot()[:toi_da]:
+        if _goi_ls("DeleteCascadeTrajectory", {"cascadeId": cid}, timeout=10) is not None:
+            n += 1
+    return n
+
+
+def don_chat_sot_nen(cach_s=DON_CACH_S):
+    """Chạy don_chat_sot ở luồng nền, tối đa 1 lần / cach_s giây. → True nếu đã bắt đầu một lượt."""
+    with _DON_LOCK:
+        if _DON["dang"] or time.time() - _DON["t"] < cach_s:
+            return False
+        _DON.update(dang=True, t=time.time())
+
+    def chay():
+        try:
+            n = don_chat_sot()
+            if n:
+                print(f"Antigravity: đã dọn {n} cuộc trò chuyện cũ của app còn sót.")
+        except Exception as e:
+            print("Dọn chat Antigravity còn sót bị lỗi:", e)
+        finally:
+            _DON["dang"] = False
+    threading.Thread(target=chay, daemon=True, name="don-chat-agy").start()
+    return True
 
 
 def gui_hoi(model, prompt, tieu_de, project=None):
@@ -584,6 +689,8 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
             with _RUN_LOCK:
                 run["conv"].discard(cid)
             _luu()
+        if xoa_cuoc is xoa_cuoc_tro_chuyen:                  # việc thật: dọn bù chat cũ của app còn sót (nền, tối đa 10 phút/lần)
+            don_chat_sot_nen()
     return xong
 
 
@@ -640,6 +747,8 @@ def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy
                     xoa_cuoc(cid)
                 except Exception:
                     pass
+        if xoa_cuoc is xoa_cuoc_tro_chuyen:                  # việc thật: dọn bù chat cũ của app còn sót (nền, tối đa 10 phút/lần)
+            don_chat_sot_nen()
         don()
 
 

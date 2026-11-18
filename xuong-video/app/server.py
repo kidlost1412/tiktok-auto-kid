@@ -1642,6 +1642,7 @@ def main():
         print("Không ghim được bản gốc prompt:", e)
     try:                                         # lần trước tắt giữa lúc học cảnh → huỷ gọn cuộc trò chuyện Antigravity còn mở, dọn file tạm
         import hoc_canh; hoc_canh.khoi_phuc()
+        hoc_canh.don_chat_sot_nen(cach_s=0)      # dọn bù chat cũ của app còn sót trong Antigravity (nền; Antigravity đóng thì để lần sau)
     except Exception as e:
         print("Không khôi phục được trạng thái học cảnh:", e)
     if "--log" in sys.argv:
