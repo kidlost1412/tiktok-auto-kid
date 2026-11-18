@@ -9,13 +9,12 @@ import {
     IconInfoCircle,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { toast } from 'vue-sonner';
 
 import type {
     RescheduleInfo,
     ScheduleEntry,
 } from '@/components/fork/auto/types';
-import { postJson, undoable } from '@/components/fork/auto/undo';
+import { moveWithUndo } from '@/components/fork/auto/undo';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import { toneClasses } from '@/components/fork/shared/status';
 import { timeNotice } from '@/components/fork/shared/timeNotice';
@@ -76,7 +75,7 @@ const rulesText = computed(() => {
     const r = info.value?.rules;
 
     return r
-        ? `Cách bây giờ ít nhất ${r.min_lead_minutes} phút, tối đa khoảng ${Math.floor(r.max_ahead_hours / 24)} ngày tới.`
+        ? `Sớm nhất sau ${r.min_lead_minutes} phút, xa nhất ${Math.floor(r.max_ahead_hours / 24)} ngày.`
         : '';
 });
 const notice = computed(() =>
@@ -199,28 +198,11 @@ function save() {
         return;
     }
 
-    const target = url.value;
-    const at = dayjs(value.value);
-    const name =
-        props.entry?.product_label ?? props.entry?.product_code ?? 'bài';
-    const onTikTok = isTikTok.value;
+    const at = dayjs(value.value).toISOString();
     open.value = false;
-
-    undoable(`Dời ${name} sang ${at.format('HH:mm DD/MM')}`, async () => {
-        const { ok, data } = await postJson(target, { at: at.toISOString() });
-
-        if (!ok) {
-            toast.error(data?.message ?? 'Không đổi được giờ, hãy thử lại.');
-        } else if (data?.state === 'pending' || onTikTok) {
-            toast.info(
-                'Đang nhờ Chrome xoá bài hẹn cũ trên TikTok và kiểm lại, xong sẽ hẹn lại theo giờ mới.',
-            );
-        } else {
-            toast.success(data?.message ?? 'Đã đổi giờ.');
-        }
-
-        router.reload({ only: ['lich'] });
-    });
+    moveWithUndo(props.entry ?? {}, at, () =>
+        router.reload({ only: ['lich'] }),
+    );
 }
 </script>
 
@@ -269,12 +251,9 @@ function save() {
                 >
                     <IconBrandTiktok class="mt-0.5 size-4 shrink-0" />
                     <span>
-                        Bài này <b>đã được hẹn sẵn trên TikTok</b>. TikTok không
-                        cho sửa giờ hẹn, nên app sẽ nhờ Chrome
-                        <b>xoá hẳn bài hẹn cũ</b> trên TikTok, kiểm lại là đã
-                        xoá, rồi mới <b>tải lên lại</b> với giờ mới. Nếu không
-                        xác minh được việc xoá thì app giữ nguyên lịch cũ.
-                        Chrome của kênh cần đang mở.
+                        <b>Đã hẹn trên TikTok:</b> app xoá bài hẹn cũ, kiểm lại
+                        rồi hẹn giờ mới (cần Chrome đang mở). Không xoá được thì
+                        giữ nguyên.
                     </span>
                 </p>
 

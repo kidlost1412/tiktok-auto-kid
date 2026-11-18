@@ -102,9 +102,8 @@ function run(kind: 'unschedule' | 'remove') {
             >
                 <IconBrandTiktok class="mt-0.5 size-4 shrink-0" />
                 <span
-                    >Bài đã hẹn trên TikTok: app nhờ Chrome xoá bài hẹn và kiểm
-                    lại trước (Chrome cần đang mở). Không xác minh được thì giữ
-                    nguyên.</span
+                    >Đã hẹn trên TikTok: app xoá bài hẹn trước (cần Chrome đang
+                    mở).</span
                 >
             </div>
 

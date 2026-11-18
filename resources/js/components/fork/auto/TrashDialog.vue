@@ -101,9 +101,7 @@ async function act(id: number | 'all', kind: 'restore' | 'purge') {
                     rác</DialogTitle
                 >
                 <DialogDescription>
-                    Video anh đã xoá nằm đây {{ days }} ngày, khôi phục được về
-                    kho. Xoá trong thùng rác là xoá hẳn, không lấy lại được
-                    (file video gốc trên ổ đĩa vẫn còn).
+                    Khôi phục được trong {{ days }} ngày. Xoá ở đây là mất hẳn.
                 </DialogDescription>
             </DialogHeader>
 

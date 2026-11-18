@@ -12,6 +12,7 @@ import Callout from '@/components/fork/shared/Callout.vue';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import HashtagChips from '@/components/fork/shared/HashtagChips.vue';
 import type { TagSuggestion } from '@/components/fork/shared/hashtags';
+import HelpToggle from '@/components/fork/shared/HelpToggle.vue';
 import MediaLightbox from '@/components/fork/shared/MediaLightbox.vue';
 import { humanMinutes } from '@/components/fork/shared/timeNotice';
 import { Button } from '@/components/ui/button';
@@ -301,12 +302,28 @@ const pickerOptions = computed(() => [
     {
         key: PER_VIDEO,
         name: 'Theo sản phẩm của từng video',
-        label: 'Mỗi video gắn giỏ sản phẩm AI đã nhận ra hoặc anh đã chọn',
+        label: 'Giỏ AI nhận ra hoặc anh đã chọn',
         image: null,
     },
     ...productOptions.value,
 ]);
 const perVideo = computed(() => productKey.value === PER_VIDEO);
+// Ảnh sản phẩm (giỏ trên kênh đang chọn) để nhìn là nhận ra ngay.
+const imageOf = (
+    code: string | null | undefined,
+    quyCach: string | null | undefined = null,
+): string | null => {
+    const list = account.value?.products ?? [];
+
+    return (
+        list.find(
+            (o) =>
+                o.code === code && (o.quy_cach ?? null) === (quyCach ?? null),
+        )?.image ??
+        list.find((o) => o.code === code && o.image)?.image ??
+        null
+    );
+};
 // Video đã có sản phẩm khác với sản phẩm chung đang chọn: cảnh báo ngay trên dòng.
 const mismatchOf = (id: number): string | null => {
     const vp = videoProducts.value[id];
@@ -878,9 +895,7 @@ const areaCls =
                     >Đăng hàng loạt · {{ items.length }} video</DialogTitle
                 >
                 <DialogDescription>
-                    Chọn kênh và sản phẩm giỏ hàng (mặc định theo sản phẩm của
-                    từng video), viết caption (để trống = dùng caption của từng
-                    video), rồi hẹn giờ đăng.
+                    Chọn kênh, giỏ, caption rồi hẹn giờ.
                 </DialogDescription>
             </DialogHeader>
 
@@ -950,9 +965,8 @@ const areaCls =
                             tone="warn"
                             data-testid="fork-rieng-product-missing"
                         >
-                            Có {{ missingCount }} video chưa có sản phẩm gắn
-                            được trên kênh này: chọn sản phẩm ở từng video bên
-                            dưới, không thì video đó được để lại.
+                            {{ missingCount }} video chưa có giỏ trên kênh này:
+                            chọn giỏ ở video đó, không thì bỏ qua video đó.
                         </Callout>
 
                         <Callout
@@ -961,9 +975,8 @@ const areaCls =
                             data-testid="fork-rieng-dup-warning"
                         >
                             <div>
-                                Có {{ dupItems.length }} video trùng với video
-                                đã có. Bạn vẫn đăng được, nhưng hãy kiểm tra để
-                                khỏi đăng trùng:
+                                {{ dupItems.length }} video trùng video đã có
+                                (vẫn đăng được, kiểm lại cho chắc):
                                 <ul
                                     class="mt-1.5 list-disc pl-5 text-sm font-normal"
                                 >
@@ -983,7 +996,7 @@ const areaCls =
                                 for="rieng-caption"
                                 >Caption chung cho cả lượt
                                 <span class="font-normal text-muted-foreground"
-                                    >(có thể để trống)</span
+                                    >(bỏ trống được)</span
                                 ></label
                             >
                             <textarea
@@ -1024,9 +1037,14 @@ const areaCls =
                             class="flex flex-col gap-2"
                             data-testid="fork-rieng-cover"
                         >
-                            <span class="text-sm font-medium"
-                                >Ảnh bìa chung</span
+                            <HelpToggle
+                                title="Ảnh bìa chung"
+                                title-class="text-sm"
                             >
+                                Video nào cần bìa riêng thì bấm "Tải ảnh bìa"
+                                hoặc "Chọn khung" ở video đó. Ảnh chọn được nhớ
+                                cho lần sau.
+                            </HelpToggle>
                             <div class="grid gap-2 sm:grid-cols-3">
                                 <label
                                     :class="
@@ -1126,8 +1144,7 @@ const areaCls =
                                 v-if="coverMode === 'product' && perVideo"
                                 class="text-xs text-muted-foreground"
                             >
-                                Mỗi video dùng ảnh bìa của sản phẩm gắn giỏ của
-                                nó (xoay vòng).
+                                Mỗi video dùng ảnh bìa của giỏ nó gắn.
                             </p>
                             <p
                                 v-else-if="
@@ -1146,8 +1163,8 @@ const areaCls =
                                 v-else-if="coverMode === 'product'"
                                 class="text-xs text-muted-foreground"
                             >
-                                Dùng {{ product?.cover_count ?? 0 }} ảnh bìa của
-                                sản phẩm, xoay vòng đều giữa các bài.
+                                Xoay vòng {{ product?.cover_count ?? 0 }} ảnh
+                                bìa của sản phẩm.
                             </p>
 
                             <div
@@ -1181,16 +1198,10 @@ const areaCls =
                                     </span>
                                 </label>
                                 <span class="text-xs text-muted-foreground"
-                                    >jpg, png hoặc webp, tối đa 5 MB. Ảnh dọc
-                                    9:16 hoặc 3:4 được giữ nguyên; tỉ lệ khác
-                                    được cắt giữa về tỉ lệ gần nhất.</span
+                                    >jpg / png / webp, tối đa 5 MB</span
                                 >
                             </div>
-                            <p class="text-xs text-muted-foreground">
-                                Muốn video nào có bìa riêng thì bấm "Tải ảnh"
-                                hoặc "Chọn khung" ở video đó bên dưới. Ảnh bạn
-                                chọn được nhớ cho lần sau.
-                            </p>
+
                             <p
                                 v-if="coverError"
                                 class="text-xs text-red-600 dark:text-red-400"
@@ -1204,18 +1215,15 @@ const areaCls =
                             class="flex flex-col gap-1 rounded-lg border bg-muted/40 p-3 text-sm"
                             data-testid="fork-rieng-time-rules"
                         >
-                            <span class="font-medium"
-                                >Giờ đăng: app tự xếp, bạn bấm vào giờ để
-                                sửa</span
+                            <HelpToggle
+                                title="Giờ đăng: app tự xếp, bấm giờ để sửa"
                             >
-                            <span class="text-xs text-muted-foreground">
-                                Luôn trong khung giờ đăng của kênh{{
+                                Trong khung giờ của kênh{{
                                     rules.window ? ` (${rules.window})` : ''
-                                }}, hết khung thì sang ngày hôm sau; cách bài
-                                khác của cùng kênh ít nhất {{ rules.gap }} phút
-                                (kênh khác không tính); sớm nhất sau
-                                {{ limits.min_lead_minutes }} phút nữa.
-                            </span>
+                                }}, hết khung thì sang hôm sau. Cách bài khác
+                                cùng kênh ít nhất {{ rules.gap }} phút. Sớm nhất
+                                sau {{ limits.min_lead_minutes }} phút.
+                            </HelpToggle>
                             <span
                                 v-if="slotProblem"
                                 class="text-xs text-red-600 dark:text-red-400"
@@ -1268,8 +1276,8 @@ const areaCls =
                                 </button>
                                 <span class="text-xs text-muted-foreground">{{
                                     order === 'random'
-                                        ? 'Xáo trộn cả lượt, video nào cũng có thể lên trước.'
-                                        : 'Video ở trên đăng trước.'
+                                        ? 'Xáo cả lượt.'
+                                        : 'Trên trước, dưới sau.'
                                 }}</span>
                             </div>
                         </div>
@@ -1374,7 +1382,7 @@ const areaCls =
                                                 "
                                                 :class="
                                                     cn(
-                                                        'mt-1 block text-xs',
+                                                        'mt-1 flex items-center gap-2 text-sm',
                                                         videoProducts[it.id]
                                                             ?.cart
                                                             ? 'text-muted-foreground'
@@ -1383,20 +1391,45 @@ const areaCls =
                                                 "
                                                 :data-testid="`fork-rieng-row-product-${it.id}`"
                                             >
-                                                Giỏ:
-                                                <b>{{
-                                                    videoProducts[it.id]?.label
-                                                }}</b>
-                                                ({{
-                                                    videoProducts[it.id]?.by ===
-                                                    'kid'
-                                                        ? 'anh đã chọn'
-                                                        : 'AI nhận ra'
-                                                }}){{
-                                                    videoProducts[it.id]?.cart
-                                                        ? ''
-                                                        : ' · chưa có giỏ trên kênh này'
-                                                }}
+                                                <img
+                                                    v-if="
+                                                        imageOf(
+                                                            videoProducts[it.id]
+                                                                ?.code,
+                                                            videoProducts[it.id]
+                                                                ?.quy_cach,
+                                                        )
+                                                    "
+                                                    :src="
+                                                        imageOf(
+                                                            videoProducts[it.id]
+                                                                ?.code,
+                                                            videoProducts[it.id]
+                                                                ?.quy_cach,
+                                                        ) ?? undefined
+                                                    "
+                                                    alt=""
+                                                    class="size-10 shrink-0 rounded-md border bg-muted object-cover"
+                                                    loading="lazy"
+                                                />
+                                                <span class="min-w-0">
+                                                    Giỏ:
+                                                    <b>{{
+                                                        videoProducts[it.id]
+                                                            ?.label
+                                                    }}</b>
+                                                    ({{
+                                                        videoProducts[it.id]
+                                                            ?.by === 'kid'
+                                                            ? 'anh đã chọn'
+                                                            : 'AI nhận ra'
+                                                    }}){{
+                                                        videoProducts[it.id]
+                                                            ?.cart
+                                                            ? ''
+                                                            : ' · chưa có giỏ trên kênh này'
+                                                    }}
+                                                </span>
                                             </span>
                                             <span
                                                 v-else-if="
@@ -1774,10 +1807,23 @@ const areaCls =
                                     {{ nameOf(r) }}
                                     <span
                                         v-if="r.product"
-                                        class="block text-xs font-normal"
+                                        class="mt-0.5 flex items-center gap-1.5 text-[0.8125rem] font-normal"
                                         :data-testid="`fork-rieng-preview-product-${r.id}`"
                                     >
-                                        Giỏ: <b>{{ r.product.label }}</b>
+                                        <img
+                                            v-if="imageOf(r.product.code)"
+                                            :src="
+                                                imageOf(r.product.code) ??
+                                                undefined
+                                            "
+                                            alt=""
+                                            class="size-7 shrink-0 rounded border bg-muted object-cover"
+                                            loading="lazy"
+                                        />
+                                        Giỏ:
+                                        <b class="truncate">{{
+                                            r.product.label
+                                        }}</b>
                                         <span class="text-muted-foreground"
                                             >({{
                                                 {

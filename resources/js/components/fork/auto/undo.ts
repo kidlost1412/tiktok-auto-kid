@@ -2,6 +2,8 @@
 // Trong lúc đó thông báo có nút "Hoàn tác" — bấm là coi như chưa làm gì, không cần gọi lại server.
 import { toast } from 'vue-sonner';
 
+import dayjs from '@/dayjs';
+
 const UNDO_SECONDS = 8;
 
 // Thao tác đang chờ gửi: rời trang thì gửi luôn (không để mất thao tác anh đã chọn).
@@ -90,4 +92,45 @@ export async function postJson(
             data: { message: 'Mất kết nối với app, hãy thử lại.' },
         };
     }
+}
+
+/** Dời giờ một bài trên Lịch đăng, có "Hoàn tác". `at`: giờ mới (ISO). */
+export function moveWithUndo(
+    entry: {
+        id?: number | null;
+        state?: string;
+        product_label?: string | null;
+        product_code?: string | null;
+    },
+    at: string,
+    onDone?: () => void,
+): void {
+    if (!entry.id) {
+        return;
+    }
+
+    const url = `/auto/videos/${entry.id}/doi-gio`;
+    const name = entry.product_label ?? entry.product_code ?? 'bài';
+    const onTikTok = entry.state === 'tiktok_scheduled';
+
+    undoable(
+        `Dời ${name} sang ${dayjs(at).format('HH:mm DD/MM')}`,
+        async () => {
+            const { ok, data } = await postJson(url, { at });
+
+            if (!ok) {
+                toast.error(
+                    data?.message ?? 'Không đổi được giờ, hãy thử lại.',
+                );
+            } else if (data?.state === 'pending' || onTikTok) {
+                toast.info(
+                    'Đang nhờ Chrome xoá bài hẹn cũ trên TikTok rồi hẹn lại giờ mới.',
+                );
+            } else {
+                toast.success(data?.message ?? 'Đã đổi giờ.');
+            }
+
+            onDone?.();
+        },
+    );
 }

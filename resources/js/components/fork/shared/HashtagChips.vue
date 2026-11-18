@@ -5,7 +5,10 @@
 import { IconPlus, IconX } from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
 
-import { parseTags, type TagSuggestion } from '@/components/fork/shared/hashtags';
+import {
+    parseTags,
+    type TagSuggestion,
+} from '@/components/fork/shared/hashtags';
 import { cn } from '@/lib/utils';
 
 const props = withDefaults(
@@ -17,7 +20,13 @@ const props = withDefaults(
         inputId?: string;
         testid?: string;
     }>(),
-    { suggestions: () => [], max: 50, placeholder: 'Gõ hashtag rồi bấm Enter', inputId: undefined, testid: undefined },
+    {
+        suggestions: () => [],
+        max: 50,
+        placeholder: 'Gõ hashtag rồi bấm Enter',
+        inputId: undefined,
+        testid: undefined,
+    },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -62,7 +71,11 @@ const onKey = (e: KeyboardEvent) => {
 
         e.preventDefault();
         flush();
-    } else if (e.key === 'Backspace' && draft.value === '' && list.value.length) {
+    } else if (
+        e.key === 'Backspace' &&
+        draft.value === '' &&
+        list.value.length
+    ) {
         remove(list.value[list.value.length - 1]);
     }
 };
@@ -77,8 +90,12 @@ const onPaste = (e: ClipboardEvent) => {
 };
 
 const have = computed(() => new Set(list.value.map((t) => t.toLowerCase())));
-const pending = computed(() => props.suggestions.filter((s) => !have.value.has(s.tag.toLowerCase())));
-const shown = computed(() => (showAll.value ? pending.value : pending.value.slice(0, 12)));
+const pending = computed(() =>
+    props.suggestions.filter((s) => !have.value.has(s.tag.toLowerCase())),
+);
+const shown = computed(() =>
+    showAll.value ? pending.value : pending.value.slice(0, 12),
+);
 </script>
 
 <template>
@@ -124,23 +141,41 @@ const shown = computed(() => (showAll.value ? pending.value : pending.value.slic
             />
         </div>
 
-        <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>Bấm Enter, Space hoặc dấu phẩy để thêm; dán cả danh sách cũng được.</span>
-            <span :class="cn('shrink-0 tabular-nums', full && 'font-semibold text-amber-700 dark:text-amber-300')">
+        <div
+            class="flex items-center justify-between gap-2 text-xs text-muted-foreground"
+        >
+            <span>Enter để thêm · dán cả danh sách được</span>
+            <span
+                :class="
+                    cn(
+                        'shrink-0 tabular-nums',
+                        full &&
+                            'font-semibold text-amber-700 dark:text-amber-300',
+                    )
+                "
+            >
                 {{ list.length }}/{{ max }} hashtag
             </span>
         </div>
 
-        <div v-if="suggestions.length" class="flex flex-col gap-1.5" data-testid="fork-hashtag-suggestions">
+        <div
+            v-if="suggestions.length"
+            class="flex flex-col gap-1.5"
+            data-testid="fork-hashtag-suggestions"
+        >
             <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-medium text-muted-foreground">Gợi ý từ các bài đã đăng (bấm để thêm)</span>
+                <span class="text-xs font-medium text-muted-foreground"
+                    >Đã dùng trước đây · bấm để thêm</span
+                >
                 <button
                     v-if="pending.length > 12"
                     type="button"
                     class="text-xs font-medium text-primary-text hover:underline"
                     @click="showAll = !showAll"
                 >
-                    {{ showAll ? 'Thu gọn' : `Xem thêm ${pending.length - 12}` }}
+                    {{
+                        showAll ? 'Thu gọn' : `Xem thêm ${pending.length - 12}`
+                    }}
                 </button>
             </div>
             <div v-if="shown.length" class="flex flex-wrap gap-1.5">
@@ -149,7 +184,9 @@ const shown = computed(() => (showAll.value ? pending.value : pending.value.slic
                     :key="s.tag"
                     type="button"
                     :disabled="full"
-                    :title="s.uses > 1 ? `Đã dùng ${s.uses} lần` : 'Đã dùng 1 lần'"
+                    :title="
+                        s.uses > 1 ? `Đã dùng ${s.uses} lần` : 'Đã dùng 1 lần'
+                    "
                     class="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-1 text-xs transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary-text focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
                     :data-testid="`fork-hashtag-suggestion`"
                     @click="add(s.tag)"
@@ -158,7 +195,9 @@ const shown = computed(() => (showAll.value ? pending.value : pending.value.slic
                     {{ s.tag }}
                 </button>
             </div>
-            <p v-else class="text-xs text-muted-foreground">Đã thêm hết các hashtag gợi ý.</p>
+            <p v-else class="text-xs text-muted-foreground">
+                Đã thêm hết các hashtag gợi ý.
+            </p>
         </div>
     </div>
 </template>

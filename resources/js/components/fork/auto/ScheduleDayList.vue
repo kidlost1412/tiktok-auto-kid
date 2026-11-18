@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Danh sách bài của MỘT ngày trong Lịch đăng. Dùng cho cả kiểu tab (màn hẹp) và kiểu 3 cột (màn rộng, `compact`).
 // Hôm nay: các bài đã đăng gấp lại thành một dòng để mắt đi thẳng tới bài sắp tới; có vạch "Bây giờ".
+import { router } from '@inertiajs/vue3';
 import {
     IconBolt,
     IconCalendarOff,
@@ -15,10 +16,12 @@ import {
 import { computed, ref, watch } from 'vue';
 
 import { channelColor } from '@/components/fork/auto/channelColors';
-import { dragging, proposeTime } from '@/components/fork/auto/dragMove';
+import type { DropPoint } from '@/components/fork/auto/dragMove';
+import { dragging, pointAt } from '@/components/fork/auto/dragMove';
 import RemoveDialog from '@/components/fork/auto/RemoveDialog.vue';
 import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
 import type { ScheduleEntry } from '@/components/fork/auto/types';
+import { moveWithUndo } from '@/components/fork/auto/undo';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import {
@@ -98,15 +101,15 @@ const canMove = (e: ScheduleEntry) =>
 const moving = (e: ScheduleEntry) => !!e.reschedule?.open;
 const moveOpen = ref(false);
 const moveEntry = ref<ScheduleEntry | null>(null);
-const moveAt = ref<string | null>(null);
-const startMove = (e: ScheduleEntry, proposed: string | null = null) => {
+const startMove = (e: ScheduleEntry) => {
     moveEntry.value = e;
-    moveAt.value = proposed;
     moveOpen.value = true;
 };
 
-// Kéo thả: kéo một bài (đổi giờ được) thả vào chỗ mới, ngày nào cũng được; hộp đổi giờ mở với giờ gợi ý để xác nhận.
-const dropKey = ref<string | null>(null);
+// Kéo thả: kéo một bài (đổi giờ được) thả vào bất kỳ chỗ nào trong danh sách ngày (cả ngày khác). Kéo tới đâu hiện giờ
+// tới đó; thả ra là đổi giờ luôn, có "Hoàn tác" vài giây.
+const rootEl = ref<HTMLElement | null>(null);
+const drop = ref<DropPoint | null>(null);
 const keyOf = (e: ScheduleEntry | null) =>
     e ? `${e.channelId}-${e.id ?? e.video_id ?? e.at}` : 'end';
 const onDragStart = (ev: DragEvent, e: ScheduleEntry) => {
@@ -119,17 +122,12 @@ const onDragStart = (ev: DragEvent, e: ScheduleEntry) => {
 };
 const onDragEnd = () => {
     dragging.value = null;
-    dropKey.value = null;
+    drop.value = null;
 };
-const onDragOver = (ev: DragEvent, target: ScheduleEntry | null) => {
+const onListOver = (ev: DragEvent) => {
     const d = dragging.value;
 
-    // Chỉ thả vào cùng kênh (đổi kênh làm ở "Sửa bài").
-    if (
-        !d ||
-        (target &&
-            (target.channelId !== d.channelId || keyOf(target) === keyOf(d)))
-    ) {
+    if (!d || !rootEl.value) {
         return;
     }
 
@@ -139,22 +137,46 @@ const onDragOver = (ev: DragEvent, target: ScheduleEntry | null) => {
         ev.dataTransfer.dropEffect = 'move';
     }
 
-    dropKey.value = keyOf(target);
+    drop.value = pointAt(rootEl.value, ev.clientY, props.dayKey, keyOf(d));
 };
-const onDrop = (ev: DragEvent, target: ScheduleEntry | null) => {
-    const d = dragging.value;
-    dropKey.value = null;
+const onListLeave = (ev: DragEvent) => {
+    const to = ev.relatedTarget as Node | null;
 
-    if (!d) {
+    if (!to || !rootEl.value?.contains(to)) {
+        drop.value = null;
+    }
+};
+const onListDrop = (ev: DragEvent) => {
+    const d = dragging.value;
+    const p = drop.value;
+    drop.value = null;
+    dragging.value = null;
+
+    if (!d || !p) {
         return;
     }
 
     ev.preventDefault();
-    const sameChannel = props.list.filter((x) => x.channelId === d.channelId);
-    const at = proposeTime(d, props.dayKey, sameChannel, target);
-    dragging.value = null;
-    startMove(d, at);
+
+    if (dayjs(p.at).isSame(dayjs(d.at), 'minute')) {
+        return;
+    }
+
+    moveWithUndo(d, p.at, () => router.reload({ only: ['lich'] }));
 };
+const dropLabel = computed(() => {
+    const p = drop.value;
+
+    if (!p) {
+        return '';
+    }
+
+    const at = dayjs(p.at);
+
+    return at.isSame(dayjs(), 'day')
+        ? at.format('HH:mm')
+        : `${at.format('HH:mm')} · ${at.format('DD/MM')}`;
+});
 
 // Xoá / bỏ xếp lịch ngay trên dòng lịch.
 const removeOpen = ref(false);
@@ -175,14 +197,44 @@ const QUIET = ['tiktok_scheduled', 'posted', 'projected'];
 // Cột hẹp: video chưa lên TikTok / đăng thẳng / đang gửi chỉ hiện biểu tượng màu riêng (chú thích ở đầu bảng, rê chuột xem chữ).
 const ICON_ONLY = ['scheduled', 'direct', 'uploading'];
 
-const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
+const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
 </script>
 
 <template>
     <div
+        ref="rootEl"
         :data-testid="`fork-auto-day-${dayKey}`"
-        :class="cn('flex flex-col', compact ? 'py-1.5' : 'py-2')"
+        :class="cn('relative flex flex-col', compact ? 'py-1.5' : 'py-2')"
+        @dragover="onListOver"
+        @dragleave="onListLeave"
+        @drop="onListDrop"
     >
+        <!-- Vạch thả + giờ ở chỗ đang kéo tới -->
+        <div
+            v-if="drop && dragging"
+            class="pointer-events-none absolute inset-x-1 z-30 flex -translate-y-1/2 items-center gap-1.5"
+            :style="{ top: `${drop.y}px` }"
+            data-testid="fork-auto-drop-marker"
+        >
+            <span
+                :class="
+                    cn(
+                        'rounded-full px-2.5 py-1 text-[1rem] leading-none font-bold text-white tabular-nums shadow-lg',
+                        drop.tooSoon ? 'bg-red-600' : 'bg-primary',
+                    )
+                "
+                >{{ dropLabel
+                }}<template v-if="drop.tooSoon"> · quá sát giờ</template></span
+            >
+            <span
+                :class="
+                    cn(
+                        'h-0.5 flex-1 rounded-full',
+                        drop.tooSoon ? 'bg-red-600' : 'bg-primary',
+                    )
+                "
+            />
+        </div>
         <div
             v-if="!list.length"
             :class="
@@ -193,8 +245,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
             "
         >
             <IconCalendarOff class="size-7 text-muted-foreground/60" />
-            <div class="text-[0.8438rem] font-medium">Chưa có giờ đăng nào</div>
-            <p class="max-w-xs text-[0.7812rem] text-muted-foreground">
+            <div class="text-[0.9375rem] font-medium">Chưa có giờ đăng nào</div>
+            <p class="max-w-xs text-[0.8438rem] text-muted-foreground">
                 Kênh đang tắt, đã đủ hạn mức hoặc ngoài khung giờ. Nới khung giờ
                 bằng nút “Chỉnh” ở thẻ kênh.
             </p>
@@ -206,7 +258,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
             type="button"
             :class="
                 cn(
-                    'flex items-center gap-3 rounded-lg text-left text-[0.8125rem] transition-colors hover:bg-accent/50',
+                    'flex items-center gap-3 rounded-lg text-left text-[0.875rem] transition-colors hover:bg-accent/50',
                     compact ? 'mx-2 px-2 py-1.5' : 'mx-3 px-2 py-2',
                 )
             "
@@ -241,7 +293,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     }}</span
                 >
             </span>
-            <span class="ml-auto shrink-0 text-[0.7812rem] text-primary-text">{{
+            <span class="ml-auto shrink-0 text-[0.8438rem] text-primary-text">{{
                 showDone ? 'Ẩn' : 'Xem'
             }}</span>
         </button>
@@ -266,7 +318,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     <span
                         :class="
                             cn(
-                                'text-right text-[0.75rem] font-semibold text-primary-text tabular-nums',
+                                'text-right text-[0.8125rem] font-semibold text-primary-text tabular-nums',
                                 timeW,
                             )
                         "
@@ -274,21 +326,15 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                     >
                     <span class="size-2 rounded-full bg-primary" />
                     <span class="h-px flex-1 bg-primary/40" />
-                    <span class="text-[0.75rem] font-medium text-primary-text"
+                    <span class="text-[0.8125rem] font-medium text-primary-text"
                         >Bây giờ</span
                     >
                 </li>
                 <li
-                    :class="
-                        cn(
-                            'relative',
-                            dropKey === keyOf(e) &&
-                                'before:absolute before:inset-x-3 before:-top-px before:z-10 before:h-0.5 before:rounded-full before:bg-primary',
-                        )
-                    "
-                    @dragover="onDragOver($event, e)"
-                    @dragleave="dropKey === keyOf(e) && (dropKey = null)"
-                    @drop="onDrop($event, e)"
+                    class="relative"
+                    :data-row-at="e.at"
+                    :data-row-key="keyOf(e)"
+                    :data-slot="isEmptySlot(e) ? '1' : undefined"
                 >
                     <div
                         v-if="isEmptySlot(e)"
@@ -296,8 +342,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             cn(
                                 'grid items-center gap-3 rounded-lg px-2 text-muted-foreground',
                                 compact
-                                    ? 'mx-2 grid-cols-[40px_minmax(0,1fr)] py-1 text-[0.7812rem]'
-                                    : 'mx-3 grid-cols-[52px_minmax(0,1fr)] py-2 text-[0.8125rem]',
+                                    ? 'mx-2 grid-cols-[46px_minmax(0,1fr)] py-1 text-[0.8438rem]'
+                                    : 'mx-3 grid-cols-[58px_minmax(0,1fr)] py-2 text-[0.875rem]',
                             )
                         "
                     >
@@ -333,8 +379,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             cn(
                                 'group relative grid cursor-pointer items-center rounded-lg px-2 transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring data-[dragging=true]:opacity-40',
                                 compact
-                                    ? 'mx-2 grid-cols-[40px_28px_minmax(0,1fr)_auto] gap-2.5 py-1.5'
-                                    : 'mx-3 grid-cols-[52px_36px_minmax(0,1fr)_auto] gap-3 py-2',
+                                    ? 'mx-2 grid-cols-[46px_30px_minmax(0,1fr)_auto] gap-2.5 py-1.5'
+                                    : 'mx-3 grid-cols-[58px_38px_minmax(0,1fr)_auto] gap-3 py-2',
                                 e.state === 'failed' &&
                                     'bg-red-50/60 dark:bg-red-950/20',
                                 compact &&
@@ -373,8 +419,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 cn(
                                     'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
                                     compact
-                                        ? '-mr-1 text-[0.8438rem]'
-                                        : '-mr-1 text-[0.9375rem]',
+                                        ? '-mr-1 text-[0.9375rem]'
+                                        : '-mr-1 text-[1rem]',
                                     moving(e) && 'text-primary-text',
                                 )
                             "
@@ -396,8 +442,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 cn(
                                     'text-right font-semibold tabular-nums',
                                     compact
-                                        ? 'text-[0.8438rem]'
-                                        : 'text-[0.9375rem]',
+                                        ? 'text-[0.9375rem]'
+                                        : 'text-[1rem]',
                                     e.state === 'projected' &&
                                         'font-medium text-muted-foreground',
                                     e.state === 'posted' &&
@@ -412,8 +458,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             :class="
                                 cn(
                                     compact
-                                        ? 'h-[48px] w-[28px] rounded'
-                                        : 'h-[64px] w-[36px] rounded-md',
+                                        ? 'h-[52px] w-[30px] rounded'
+                                        : 'h-[68px] w-[38px] rounded-md',
                                     e.state === 'projected' && 'opacity-70',
                                 )
                             "
@@ -425,8 +471,8 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                         cn(
                                             'truncate font-medium',
                                             compact
-                                                ? 'text-[0.8125rem]'
-                                                : 'text-[0.875rem]',
+                                                ? 'text-[0.875rem]'
+                                                : 'text-[0.9375rem]',
                                         )
                                     "
                                     >{{
@@ -445,7 +491,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                     v-if="multi"
                                     :class="
                                         cn(
-                                            'max-w-[9rem] shrink-0 truncate rounded px-1.5 text-[0.7188rem] leading-[1.125rem] font-medium',
+                                            'max-w-[9rem] shrink-0 truncate rounded px-1.5 text-[0.75rem] leading-[1.125rem] font-medium',
                                             channelColor(e.color).chip,
                                         )
                                     "
@@ -456,7 +502,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-if="e.error"
                                 :class="
                                     cn(
-                                        'truncate text-[0.75rem]',
+                                        'truncate text-[0.8125rem]',
                                         toneClasses.danger.text,
                                     )
                                 "
@@ -468,7 +514,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-else-if="e.cart_warn"
                                 :class="
                                     cn(
-                                        'flex min-w-0 items-start gap-1 text-[0.75rem] font-medium',
+                                        'flex min-w-0 items-start gap-1 text-[0.8125rem] font-medium',
                                         toneClasses.danger.text,
                                     )
                                 "
@@ -486,7 +532,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-else-if="e.note"
                                 :class="
                                     cn(
-                                        'line-clamp-2 text-[0.75rem]',
+                                        'line-clamp-2 text-[0.8125rem]',
                                         toneClasses.warn.text,
                                     )
                                 "
@@ -496,14 +542,14 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                             </p>
                             <p
                                 v-else-if="e.caption"
-                                class="truncate text-[0.75rem] text-muted-foreground"
+                                class="truncate text-[0.8125rem] text-muted-foreground"
                                 :title="e.caption"
                             >
                                 {{ e.caption }}
                             </p>
                             <div
                                 v-if="!compact && e.cart_name"
-                                class="mt-0.5 flex min-w-0 items-center gap-1 text-[0.75rem] text-muted-foreground/90"
+                                class="mt-0.5 flex min-w-0 items-center gap-1 text-[0.8125rem] text-muted-foreground/90"
                             >
                                 <IconShoppingCart class="size-3.5 shrink-0" />
                                 <span class="truncate">{{ e.cart_name }}</span>
@@ -521,7 +567,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                 v-if="isLate(e)"
                                 :class="
                                     cn(
-                                        'rounded-full px-2 py-0.5 text-[0.7188rem] font-medium',
+                                        'rounded-full px-2 py-0.5 text-[0.75rem] font-medium',
                                         toneClasses.warn.chip,
                                     )
                                 "
@@ -627,19 +673,19 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                                     v-else
                                     :status="lichStatus(e.state)"
                                     :icon-only="ICON_ONLY.includes(e.state)"
-                                    class="h-5 gap-1 px-1.5 text-[0.7188rem] [&_svg]:size-3"
+                                    class="h-5 gap-1 px-1.5 text-[0.75rem] [&_svg]:size-3"
                                 />
                             </template>
                             <template v-else>
                                 <StatusChip
                                     :status="lichStatus(e.state)"
-                                    class="h-6 px-2 text-[0.75rem] max-sm:hidden"
+                                    class="h-6 px-2 text-[0.8125rem] max-sm:hidden"
                                 />
                                 <span
                                     v-if="e.state === 'projected' && e.direct"
                                     :class="
                                         cn(
-                                            'inline-flex items-center gap-1 text-[0.75rem] max-sm:hidden',
+                                            'inline-flex items-center gap-1 text-[0.8125rem] max-sm:hidden',
                                             toneClasses.violet.text,
                                         )
                                     "
@@ -687,7 +733,7 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                 <span
                     :class="
                         cn(
-                            'text-right text-[0.75rem] font-semibold text-primary-text tabular-nums',
+                            'text-right text-[0.8125rem] font-semibold text-primary-text tabular-nums',
                             timeW,
                         )
                     "
@@ -695,32 +741,14 @@ const timeW = computed(() => (props.compact ? 'w-[40px]' : 'w-[52px]'));
                 >
                 <span class="size-2 rounded-full bg-primary" />
                 <span class="h-px flex-1 bg-primary/40" />
-                <span class="text-[0.75rem] font-medium text-primary-text"
+                <span class="text-[0.8125rem] font-medium text-primary-text"
                     >Bây giờ · hết bài trong ngày</span
                 >
             </li>
-            <!-- Thả vào cuối cột (sau bài cuối, hoặc ngày chưa có bài) -->
-            <li
-                v-if="dragging"
-                :class="
-                    cn(
-                        'mx-3 mt-1 rounded-lg border border-dashed px-3 py-3 text-center text-[0.75rem] text-muted-foreground',
-                        dropKey === 'end' &&
-                            'border-primary bg-primary/5 text-primary-text',
-                    )
-                "
-                @dragover="onDragOver($event, null)"
-                @dragleave="dropKey === 'end' && (dropKey = null)"
-                @drop="onDrop($event, null)"
-            >
-                Thả vào đây để đăng ngày này
-            </li>
         </ol>
-        <RescheduleDialog
-            v-model:open="moveOpen"
-            :entry="moveEntry"
-            :proposed="moveAt"
-        />
+        <!-- Chỗ trống dưới bài cuối: vẫn thả được (giờ tăng dần theo khoảng kéo xuống) -->
+        <div v-if="dragging" class="min-h-24 flex-1" aria-hidden="true" />
+        <RescheduleDialog v-model:open="moveOpen" :entry="moveEntry" />
         <RemoveDialog v-model:open="removeOpen" :entry="removeEntry" />
     </div>
 </template>

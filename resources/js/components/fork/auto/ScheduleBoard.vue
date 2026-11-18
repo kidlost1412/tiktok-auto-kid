@@ -22,6 +22,7 @@ import type {
     Lich,
     ScheduleEntry,
 } from '@/components/fork/auto/types';
+import HelpToggle from '@/components/fork/shared/HelpToggle.vue';
 import { matchesSource } from '@/components/fork/shared/source';
 import type { SourceFilter as SourceFilterValue } from '@/components/fork/shared/source';
 import SourceFilter from '@/components/fork/shared/SourceFilter.vue';
@@ -198,22 +199,24 @@ const pct = (n: number, d: Day) =>
             class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-5 py-3"
         >
             <div class="min-w-0">
-                <h2
-                    class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
-                >
-                    Lịch đăng
-                </h2>
-                <p class="text-[0.7812rem] text-muted-foreground">
-                    Bấm một dòng để xem và sửa video, bấm giờ để đổi giờ. Video
-                    “Chưa lên TikTok” sửa, xoá thoải mái; bài “Đã hẹn trên
-                    TikTok” thì app phải xoá bài hẹn trên TikTok trước.
-                </p>
+                <HelpToggle>
+                    <template #title>
+                        <h2
+                            class="font-heading text-[1.0625rem] font-semibold tracking-[-0.01em]"
+                        >
+                            Lịch đăng
+                        </h2>
+                    </template>
+                    Bấm dòng để xem / sửa video. Bấm giờ hoặc kéo thả để đổi
+                    giờ. Bài đã hẹn trên TikTok thì app xoá bài hẹn cũ rồi hẹn
+                    lại.
+                </HelpToggle>
             </div>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <!-- Chú thích chấm trạng thái (kiểu 3 cột) -->
                 <div
                     v-if="wide"
-                    class="flex items-center gap-3 text-[0.75rem] text-muted-foreground"
+                    class="flex items-center gap-3 text-[0.8125rem] text-muted-foreground"
                     aria-hidden="true"
                 >
                     <span class="inline-flex items-center gap-1.5"
@@ -257,7 +260,7 @@ const pct = (n: number, d: Day) =>
                     :aria-pressed="onlyEditable"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors',
                             onlyEditable
                                 ? 'border-primary bg-primary/10 text-primary-text'
                                 : 'bg-card text-foreground hover:bg-accent',
@@ -275,7 +278,7 @@ const pct = (n: number, d: Day) =>
                     type="button"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors hover:bg-accent',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors hover:bg-accent',
                             directWindow.enabled
                                 ? toneClasses.violet.chip
                                 : 'bg-card text-muted-foreground',
@@ -299,7 +302,7 @@ const pct = (n: number, d: Day) =>
                     :aria-pressed="onlyCart"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-medium transition-colors',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors',
                             onlyCart
                                 ? 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
                                 : cn(
@@ -318,7 +321,7 @@ const pct = (n: number, d: Day) =>
                 <SourceFilter v-model="source" />
                 <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title="Video anh đã xoá: khôi phục được trong 30 ngày"
                     data-testid="fork-auto-trash-open"
                     @click="trashOpen = true"
@@ -341,7 +344,7 @@ const pct = (n: number, d: Day) =>
                 :aria-pressed="channel === 'all'"
                 :class="
                     cn(
-                        'inline-flex h-7 items-center rounded-full border px-3 text-[0.8125rem] font-medium transition-colors',
+                        'inline-flex h-7 items-center rounded-full border px-3 text-[0.875rem] font-medium transition-colors',
                         channel === 'all'
                             ? 'border-foreground/30 bg-foreground/5 text-foreground'
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -358,7 +361,7 @@ const pct = (n: number, d: Day) =>
                 :aria-pressed="channel === a.id"
                 :class="
                     cn(
-                        'inline-flex h-7 max-w-[14rem] items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] font-medium transition-colors',
+                        'inline-flex h-7 max-w-[14rem] items-center gap-1.5 rounded-full border px-3 text-[0.875rem] font-medium transition-colors',
                         channel === a.id
                             ? cn('border-transparent', channelColor(i).chip)
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -385,7 +388,7 @@ const pct = (n: number, d: Day) =>
                 :key="n.id"
                 :class="
                     cn(
-                        'rounded-lg border px-3.5 py-2 text-[0.8125rem]',
+                        'rounded-lg border px-3.5 py-2 text-[0.875rem]',
                         toneClasses.warn.box,
                     )
                 "
@@ -430,7 +433,7 @@ const pct = (n: number, d: Day) =>
                             <span
                                 :class="
                                     cn(
-                                        'text-[0.8438rem] font-semibold',
+                                        'text-[0.9375rem] font-semibold',
                                         d.isToday
                                             ? 'text-primary-text'
                                             : 'text-foreground',
@@ -439,16 +442,16 @@ const pct = (n: number, d: Day) =>
                                 >{{ d.label }}</span
                             >
                             <span
-                                class="text-[0.7812rem] text-muted-foreground tabular-nums"
+                                class="text-[0.8438rem] text-muted-foreground tabular-nums"
                                 >{{ d.date }}</span
                             >
                         </span>
                         <span class="flex items-baseline gap-1">
                             <span
-                                class="font-heading text-[1.25rem] leading-none font-[650] tracking-tight tabular-nums"
+                                class="font-heading text-[1.5rem] leading-none font-[650] tracking-tight tabular-nums"
                                 >{{ d.real + d.planned }}</span
                             >
-                            <span class="text-[0.75rem] text-muted-foreground"
+                            <span class="text-[0.8125rem] text-muted-foreground"
                                 >bài</span
                             >
                         </span>
@@ -470,7 +473,7 @@ const pct = (n: number, d: Day) =>
                         />
                     </div>
                     <div
-                        class="mt-1.5 flex flex-wrap gap-x-2.5 text-[0.75rem] text-muted-foreground tabular-nums"
+                        class="mt-1.5 flex flex-wrap gap-x-2.5 text-[0.8125rem] text-muted-foreground tabular-nums"
                     >
                         <span v-if="d.posted">{{ d.posted }} đã đăng</span>
                         <span v-if="d.onTikTok"
@@ -533,7 +536,7 @@ const pct = (n: number, d: Day) =>
                         aria-hidden="true"
                     />
                     <span
-                        class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
+                        class="flex items-baseline justify-between gap-2 text-[0.875rem]"
                     >
                         <span
                             :class="
@@ -552,10 +555,10 @@ const pct = (n: number, d: Day) =>
                     </span>
                     <span class="flex items-baseline gap-1">
                         <span
-                            class="font-heading text-[1.375rem] leading-none font-[650] tracking-tight tabular-nums"
+                            class="font-heading text-[1.625rem] leading-none font-[650] tracking-tight tabular-nums"
                             >{{ d.real + d.planned }}</span
                         >
-                        <span class="text-[0.7812rem] text-muted-foreground"
+                        <span class="text-[0.8438rem] text-muted-foreground"
                             >bài<template v-if="d.planned">
                                 · {{ d.planned }} dự kiến</template
                             ></span
