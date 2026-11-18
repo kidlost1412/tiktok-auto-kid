@@ -34,8 +34,8 @@ use Throwable;
  */
 final class Planner
 {
-    /** Giờ đăng phải cách hiện tại ít nhất ngần này giây: Chrome phải nhận bài trước giờ đăng 35 phút (ChromeJobs::SCHEDULE_LEAD) + dự phòng; TikTok cần hẹn cách ít nhất 15 phút. */
-    public const int MIN_LEAD = 45 * 60;
+    /** Giờ đăng phải cách hiện tại ít nhất ngần này giây: Chrome phải nhận bài trước giờ đăng 25 phút (ChromeJobs::SCHEDULE_LEAD) + dự phòng; TikTok cần hẹn cách ít nhất 15 phút. */
+    public const int MIN_LEAD = 35 * 60;
 
     public const int MAX_AHEAD_DAYS = 9;
 

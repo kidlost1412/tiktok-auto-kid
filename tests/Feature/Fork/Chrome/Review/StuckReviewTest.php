@@ -67,7 +67,7 @@ test('AN TOAN: don vi cua cac han chot (giay, khong phai phut)', function () {
         ->and(ChromeJobs::STALE_AFTER)->toBe(120)
         ->and(ChromeJobs::ORPHAN_CLAIM_AFTER)->toBe(60)
         ->and(ChromeJobs::UPLOAD_WITHIN)->toBe(900)
-        ->and(ChromeJobs::SCHEDULE_LEAD)->toBe(2100)
+        ->and(ChromeJobs::SCHEDULE_LEAD)->toBe(1500)
         ->and(ChromeJobs::SCHEDULE_MAX_AHEAD)->toBe(9 * 86400 + 43200)
         ->and(ChromeJobs::ONLINE_WINDOW)->toBe(90)
         ->and(ChromeJobs::nowClaimWithin())->toBe(7200)
@@ -158,12 +158,12 @@ test('AN TOAN: schedule-expired (not_sent) -> publisher tao job now; cancel cua 
     expect(fn () => app(ChromeAwareTikTokPublisher::class)->publish($post2))->toThrow(TikTokPublishException::class);
 });
 
-test('AN TOAN: dispatch khong giao bai < 37 phut; queueForPost scheduled tu choi < 35 phut', function () {
-    $near = rvPost($this, $this->social, ['scheduled_at' => now()->addMinutes(30)]);
+test('AN TOAN: dispatch khong giao bai < 27 phut; queueForPost scheduled tu choi < 25 phut', function () {
+    $near = rvPost($this, $this->social, ['scheduled_at' => now()->addMinutes(26)]);
     Artisan::call('fork:chrome-dispatch');
     expect(ChromeJob::query()->where('post_id', $near->id)->count())->toBe(0);
 
-    $edge = rvPost($this, $this->social, ['scheduled_at' => now()->addMinutes(34)]);
+    $edge = rvPost($this, $this->social, ['scheduled_at' => now()->addMinutes(24)]);
     expect(fn () => $this->chrome->queueForPost($edge, 'scheduled'))->toThrow(App\Fork\Chrome\Support\ChromeRefusal::class);
 });
 

@@ -126,7 +126,7 @@ test('video sai định dạng, thiếu file hoặc file rỗng bị từ chối
     expect(fn () => chromeJobs()->queueForPost($empty, 'now'))->toThrow(ChromeRefusal::class, 'rỗng');
 });
 
-test('hẹn giờ: schedule_time, deliver_by trước giờ hẹn 35 phút', function () {
+test('hẹn giờ: schedule_time, deliver_by trước giờ hẹn 25 phút', function () {
     [$sa] = chromeSetup();
     $at = CarbonImmutable::now()->addDays(2)->startOfMinute();
     $post = chromePost($sa, [], ['scheduled_at' => $at]);
@@ -135,7 +135,7 @@ test('hẹn giờ: schedule_time, deliver_by trước giờ hẹn 35 phút', fun
 
     expect($job->mode)->toBe('scheduled')
         ->and($job->options['schedule_time'])->toBe($at->utc()->format('Y-m-d\TH:i:s\Z'))
-        ->and($job->deliver_by->equalTo($at->subMinutes(35)))->toBeTrue();
+        ->and($job->deliver_by->equalTo($at->subMinutes(25)))->toBeTrue();
 
     $payload = chromeJobs()->jobPayload($job, ChromeClient::first());
     expect($payload['schedule_unix'])->toBe($at->getTimestamp())->and($payload['visibility'])->toBe('public')->and($payload)->toHaveKey('product')->and($payload['product'])->toBeNull();
@@ -299,7 +299,7 @@ test('reconcile thu hồi job queued quá hạn nhận, ghi chú khác nhau theo
 
     $at = CarbonImmutable::now()->addDays(1);
     $sched = chromeJobs()->queueForPost(chromePost($sa, [], ['scheduled_at' => $at], 'v/s.mp4'), 'scheduled');
-    chromeJobs()->reconcile($at->subMinutes(30));
+    chromeJobs()->reconcile($at->subMinutes(20));
     expect($sched->refresh()->state)->toBe('revoked')->and($sched->note)->toBe(ChromeJobs::MISSED_SCHEDULED_TEXT);
 });
 

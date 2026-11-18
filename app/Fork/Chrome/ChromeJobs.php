@@ -43,7 +43,11 @@ final class ChromeJobs
 
     public const int ONLINE_WINDOW = 90;
 
-    public const int SCHEDULE_LEAD = 35 * 60;
+    /**
+     * Chrome phải nhận bài hẹn giờ trước giờ đăng ngần này: tải video lên thực tế 3–5 phút + TikTok đòi hẹn cách >= 15 phút
+     * + dự phòng. (Trước là 35 phút, quá dư: bài trong 37 phút tới phải đăng thẳng.)
+     */
+    public const int SCHEDULE_LEAD = 25 * 60;
 
     /** Job claimed quá lâu mà chưa có progress thì trả về queued (claim mồ côi). */
     public const int ORPHAN_CLAIM_AFTER = 60;
@@ -95,7 +99,7 @@ final class ChromeJobs
 
     public const string TOO_LONG_TEXT = 'Chrome tải quá 15 phút — đã dừng, chưa đăng';
 
-    public const string MISSED_SCHEDULED_TEXT = 'Chrome không mở kịp trước giờ hẹn (cần nhận việc trước giờ hẹn 35 phút) — chưa đăng';
+    public const string MISSED_SCHEDULED_TEXT = 'Chrome không mở kịp trước giờ hẹn (cần nhận việc trước giờ hẹn 25 phút) — chưa đăng';
 
     public const string MISSED_NOW_TEXT = 'Chrome không mở kịp trong thời gian chờ — chưa đăng';
 

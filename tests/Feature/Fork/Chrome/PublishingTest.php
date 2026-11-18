@@ -210,7 +210,7 @@ test('a now job that was not picked up in time gets a new attempt', function () 
 
 test('dispatch queues the earliest scheduled post inside the window as a scheduled job', function () {
     $account = ($this->makeAccount)();
-    $tooSoon = ($this->makePost)($account, ['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addMinutes(30)]);
+    $tooSoon = ($this->makePost)($account, ['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addMinutes(20)]);
     $inWindow = ($this->makePost)($account, ['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addHours(3)]);
     $later = ($this->makePost)($account, ['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addDays(2)]);
     $tooFar = ($this->makePost)($account, ['status' => PostStatus::Scheduled, 'scheduled_at' => now()->addDays(40)]);

@@ -105,7 +105,7 @@ test('does not exceed daily cap and keeps minimum gap', function () {
     }
 });
 
-test('never schedules within 45 minutes from now', function () {
+test('never schedules within 35 minutes from now', function () {
     ($this->account)(auto: ['daily_cap' => 40, 'window_start' => 0, 'window_end' => 24]);
     ($this->videos)(40);
 
@@ -113,7 +113,7 @@ test('never schedules within 45 minutes from now', function () {
 
     $earliest = AutoVideo::query()->whereNotNull('scheduled_for')->min('scheduled_for');
     expect($earliest)->not->toBeNull()
-        ->and(CarbonImmutable::parse($earliest)->getTimestamp())->toBeGreaterThanOrEqual($this->now->addMinutes(45)->getTimestamp());
+        ->and(CarbonImmutable::parse($earliest)->getTimestamp())->toBeGreaterThanOrEqual($this->now->addMinutes(35)->getTimestamp());
 });
 
 test('running again does not create duplicates', function () {
