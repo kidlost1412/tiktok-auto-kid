@@ -322,7 +322,80 @@ def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
         return _goi(vai, prompt, anh, model, effort, timeout)
 
 
+def nao_ai():
+    """Bộ não AI của mọi vai đang gọi Claude: "claude" (mặc định) hoặc "gpt" (ChatGPT qua Codex CLI). Biến môi trường XUONG_AI (thử 1 lô) > config "ai_nao"."""
+    v = (os.environ.get("XUONG_AI") or cfg().get("ai_nao") or "claude").strip().lower()
+    return "gpt" if v in ("gpt", "chatgpt", "codex", "openai") else "claude"
+
+
+def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
+    """Gọi ChatGPT qua `codex exec` (đăng nhập ChatGPT sẵn của máy): cùng lời dặn hệ thống + đề bài + ảnh (-i). Không công cụ, không ghi file.
+    config "gpt": {"model": "gpt-6.2-sol", "effort": "high"}; effort vai truyền vào (vd. "low" cho gom bài học) được giữ. → (text, usage kiểu Claude)."""
+    import shutil, tempfile
+    import truc_tiep as TT
+    g = cfg().get("gpt") or {}
+    model = str(g.get("model") or "gpt-6.2-sol")
+    effort = str(effort if effort in ("low", "medium", "high", "xhigh", "max") and effort != "high" else (g.get("effort") or "high"))
+    codex = cfg().get("duong_dan", {}).get("codex") or shutil.which("codex") or "codex"
+    full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
+            + (("Ảnh đính kèm theo thứ tự: " + " ".join(f"{i}) {Path(str(a)).name}" for i, a in enumerate(anh, 1)) + "\n\n") if anh else "")
+            + "Trả lời thẳng bằng nội dung đề bài yêu cầu. Không dùng công cụ, không chạy lệnh, không đọc/ghi file.\n")
+    t0 = datetime.datetime.now()
+    with tempfile.TemporaryDirectory(prefix="xv-gpt-") as td:
+        cmd = [codex, "exec", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-c", "notify=[]", "--skip-git-repo-check",
+               "-s", "read-only", "--ephemeral", "--json", "-C", td]
+        for a in anh or []:
+            cmd += ["-i", str(a)]
+        cmd.append("-")
+        pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                              errors="replace", cwd=td)
+        try:
+            out, err = pr.communicate(full, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
+            pr.communicate()
+            raise RuntimeError(f"ChatGPT quá {timeout}s ({vai}) — đã dừng")
+    msg, u, loi = "", {}, ""
+    tt = TT.hien_tai()
+    for line in out.splitlines():
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+        it, k = ev.get("item") or {}, ev.get("type")
+        if k == "item.completed" and it.get("type") == "agent_message":
+            msg = it.get("text") or msg
+            if tt is not None:
+                try:
+                    tt.chu(msg)
+                except Exception:
+                    pass
+        elif k == "turn.completed":
+            u = ev.get("usage") or {}
+        elif k in ("error", "turn.failed"):
+            loi = str(ev.get("message") or (ev.get("error") or {}).get("message") or line)[:300]
+    usage = {"input_tokens": max(0, int(u.get("input_tokens") or 0) - int(u.get("cached_input_tokens") or 0)), "cache_creation_input_tokens": 0,
+             "cache_read_input_tokens": int(u.get("cached_input_tokens") or 0), "output_tokens": int(u.get("output_tokens") or 0),
+             "reasoning_output_tokens": int(u.get("reasoning_output_tokens") or 0)}
+    import su_kien as _sk
+    _sk.noi_them(HUB / "lich-su" / "token.csv", _sk.dong_csv([
+        t0.strftime("%Y-%m-%d %H:%M:%S"), vai, model, effort, round((datetime.datetime.now() - t0).total_seconds(), 1),
+        usage["input_tokens"], 0, usage["cache_read_input_tokens"], usage["output_tokens"], 0, 1, len(anh or []), "chatgpt",
+        getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
+        dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
+    txt = loi + " " + (err or "")[-500:]
+    if not msg and re.search(r"usage limit|rate limit|limit reached|quota|too many requests", txt, re.I):
+        raise HetHanMuc("ChatGPT đã hết hạn mức: " + loi[:200])
+    if not msg and re.search(r"login|not logged in|unauthorized|401|auth", txt, re.I):
+        raise HetHanMuc("ChatGPT chưa đăng nhập (mở Codex/ChatGPT đăng nhập lại): " + loi[:200])
+    if not msg:
+        raise RuntimeError(f"ChatGPT lỗi ({vai}): {(loi or err or out)[-300:]}")
+    return msg, usage
+
+
 def _goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
+    if nao_ai() == "gpt":
+        return _goi_gpt(vai, prompt, anh, effort, timeout)
     cl = cfg().get("claude", {})
     model = model or cl.get("model", "opus"); effort = effort or cl.get("effort", "high")
     prompt_goc = prompt

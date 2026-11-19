@@ -125,6 +125,15 @@ def segs_may_dung(voice, sc, sp, shots, tranh, rng):
     return segs_theo_luat(sents, total, shots, per, rng, yc)
 
 
+def _ten_nao():
+    """Tên bộ não AI đang dùng cho nhật ký lô."""
+    from ai import nao_ai
+    if nao_ai() == "gpt":
+        g = CFG.get("gpt") or {}
+        return f"ChatGPT {g.get('model') or 'gpt-6.2-sol'} {g.get('effort') or 'high'}"
+    return f"{CFG['claude']['model']} {CFG['claude']['effort']}"
+
+
 def chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     cu = khoa_con_song(F_KHOA)             # lô khởi động bằng bản CLI cũ (khoá không mã) đang làm đúng sản phẩm này → không chạy chồng
     token = None if (cu and cu.get("ma") in ("", ma_sp)) else lay_khoa_lo(ma_sp)     # khoá riêng sản phẩm (O_EXCL): cùng sản phẩm 2 lô cùng giây chỉ 1 lô qua
@@ -164,10 +173,10 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     ten_sp = sp.get("ten_ngan") or sp.get("ten_goi") or ma_sp
     SK.ghi("he-thong", "bat-dau-lo", f"Bắt đầu lô {ten_sp}", ma=ma_sp, ten=ten_sp, so_video=(len(lam_lai) if lam_lai else so_video), lam_lai=bool(lam_lai) or None)
     if lam_lai:                           # LÀM LẠI video anh không ưng: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý của anh
-        log(f"BẮT ĐẦU LÀM LẠI (ê-kíp AI · {CFG['claude']['model']} {CFG['claude']['effort']}) {ma_sp}: {len(lam_lai)} video theo góp ý của anh")
+        log(f"BẮT ĐẦU LÀM LẠI (ê-kíp AI · {_ten_nao()}) {ma_sp}: {len(lam_lai)} video theo góp ý của anh")
         scripts = []
     else:
-        log(f"BẮT ĐẦU (ê-kíp AI · {CFG['claude']['model']} {CFG['claude']['effort']}) {ma_sp}: {so_video} video ← "
+        log(f"BẮT ĐẦU (ê-kíp AI · {_ten_nao()}) {ma_sp}: {so_video} video ← "
             f"{math.ceil(so_video / per)} lời × {per} đạo diễn")
         SK.ghi("bien-kich", "bat-dau", "Đang viết lời đọc", so=math.ceil(so_video / per))
         try:
@@ -197,7 +206,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
 
     def co_tai_khoan():
         try:
-            from ai import chon_tai_khoan
+            from ai import chon_tai_khoan, nao_ai
+            if nao_ai() == "gpt":
+                return True                           # ChatGPT: hết hạn mức thì lượt gọi báo HetHanMuc, không có danh sách tài khoản để đọc
             return chon_tai_khoan() is not None       # chỉ đọc trạng thái tài khoản, không gọi AI
         except Exception:
             return True
