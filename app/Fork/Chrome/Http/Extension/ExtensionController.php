@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Fork\Chrome\Http\Extension;
 
-use App\Fork\AutoPost\Shop\ShopSync;
+use App\Fork\AutoPost\Media\ChannelAvatars;
+use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Paths;
+use App\Fork\AutoPost\Persona\CoverStore;
+use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Scheduling\Reschedules;
+use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\AutoPost\Stats\CommentIngest;
 use App\Fork\AutoPost\Stats\StatsIngest;
 use App\Fork\Chrome\ChromeJobs;
@@ -14,7 +18,7 @@ use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
 use App\Fork\Chrome\Models\ChromeJob;
 use App\Fork\Chrome\Support\ChromeAccountLinker;
-use App\Fork\AutoPost\Media\ChannelAvatars;
+use App\Fork\Chrome\Support\ChromeLiveProgress;
 use App\Models\SocialAccount;
 use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
@@ -370,11 +374,11 @@ final class ExtensionController
     {
         $job = $this->videoJob($request);
         $cv = is_array($job->options['cover'] ?? null) ? $job->options['cover'] : null;
-        if ($cv !== null && ($cv['src'] ?? null) === \App\Fork\AutoPost\Rieng\RiengCovers::SOURCE) {
-            $path = app(\App\Fork\AutoPost\Rieng\RiengCovers::class)->path((int) ($cv['video'] ?? 0), (string) ($cv['file'] ?? ''));
+        if ($cv !== null && ($cv['src'] ?? null) === RiengCovers::SOURCE) {
+            $path = app(RiengCovers::class)->path((int) ($cv['video'] ?? 0), (string) ($cv['file'] ?? ''));
         } else {
-            $product = $cv === null ? null : \App\Fork\AutoPost\Models\AutoProduct::query()->find((string) ($cv['code'] ?? ''));
-            $path = $product === null ? null : \App\Fork\AutoPost\Persona\CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
+            $product = $cv === null ? null : AutoProduct::query()->find((string) ($cv['code'] ?? ''));
+            $path = $product === null ? null : CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
         }
 
         if ($path === null) {
@@ -389,6 +393,7 @@ final class ExtensionController
         $body = $this->body($request);
         $job = $this->owned($body);
         $state = $this->chrome->heartbeat($job, ($body['phase'] ?? null) === 'ready');
+        ChromeLiveProgress::record((string) $job->id, $body);
 
         if ($state === 'revoked') {
             return response()->json(['ok' => false, 'state' => $state, 'cancelled' => true]);

@@ -4,20 +4,14 @@
 import { router } from '@inertiajs/vue3';
 import { IconAlertTriangle, IconRefresh } from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
+import ConfirmRetryDialog from '@/components/fork/auto/ConfirmRetryDialog.vue';
 import type { FailedPostRow } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import { toneClasses } from '@/components/fork/shared/status';
 import { openVideo } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -31,6 +25,9 @@ const shown = computed(() =>
 );
 
 const busy = ref<number | null>(null);
+// "Thử lại tất cả": đang gửi bài thứ mấy trên tổng số.
+const all = ref<{ done: number; total: number } | null>(null);
+const retryable = computed(() => props.rows.filter((r) => r.can_retry));
 // Bài "chưa rõ đã lên chưa": chủ app phải tự kiểm tra TikTok Studio rồi xác nhận, app mới đăng lại.
 const confirming = ref<FailedPostRow | null>(null);
 
@@ -41,21 +38,56 @@ const open = (id: number) =>
     );
 
 // Bài hẹn giờ (job): giao lại cho Chrome. Bài đã chốt lỗi (video): về kho để app xếp lại.
-const retry = (r: FailedPostRow, checked = false) => {
-    busy.value = r.id;
-    router.post(
-        r.kind === 'job'
-            ? `/auto/videos/${r.id}/dang-lai`
-            : `/auto/videos/${r.id}/thu-lai`,
-        checked ? { da_kiem_tra: true } : {},
-        {
+const retryUrl = (r: FailedPostRow) =>
+    r.kind === 'job'
+        ? `/auto/videos/${r.id}/dang-lai`
+        : `/auto/videos/${r.id}/thu-lai`;
+
+// Gửi một bài; trả về true nếu server nhận (không có lỗi).
+const post = (r: FailedPostRow, checked = false) =>
+    new Promise<boolean>((resolve) => {
+        let ok = true;
+        router.post(retryUrl(r), checked ? { da_kiem_tra: true } : {}, {
             preserveScroll: true,
-            onFinish: () => {
-                busy.value = null;
-                confirming.value = null;
+            onError: () => {
+                ok = false;
             },
-        },
-    );
+            onFinish: () => resolve(ok),
+        });
+    });
+
+const retry = async (r: FailedPostRow, checked = false) => {
+    busy.value = r.id;
+    await post(r, checked);
+    busy.value = null;
+    confirming.value = null;
+};
+
+// Lần lượt từng bài (không gửi dồn một lúc để khỏi nghẽn).
+const retryAll = async () => {
+    const list = [...retryable.value];
+
+    if (!list.length || all.value) {
+        return;
+    }
+
+    all.value = { done: 0, total: list.length };
+    let sent = 0;
+    let n = 0;
+
+    for (const r of list) {
+        busy.value = r.id;
+
+        if (await post(r)) {
+            sent++;
+        }
+
+        all.value = { done: ++n, total: list.length };
+    }
+
+    busy.value = null;
+    all.value = null;
+    toast.success(`Đã gửi lại ${sent} bài`);
 };
 
 const when = (iso: string | null) => {
@@ -86,6 +118,23 @@ const when = (iso: string | null) => {
                 class="hidden text-[0.8125rem] font-normal opacity-80 sm:inline"
                 >Bấm vào bài để xem lý do và xử lý.</span
             >
+            <Button
+                v-if="retryable.length > 1"
+                size="sm"
+                variant="outline"
+                class="ml-auto h-8 shrink-0 bg-background px-2.5 text-[0.8125rem]"
+                :disabled="busy !== null"
+                data-testid="fork-auto-failed-retry-all"
+                @click="retryAll"
+            >
+                <Spinner v-if="all" class="size-3.5" />
+                <IconRefresh v-else class="size-3.5" />
+                {{
+                    all
+                        ? `Đang gửi ${all.done}/${all.total}…`
+                        : `Thử lại tất cả (${retryable.length})`
+                }}
+            </Button>
         </header>
 
         <ul
@@ -192,45 +241,19 @@ const when = (iso: string | null) => {
             </button>
         </div>
 
-        <Dialog
-            :open="confirming !== null"
-            @update:open="
-                (o) => {
-                    if (!o && busy === null) confirming = null;
-                }
+        <ConfirmRetryDialog
+            :target="
+                confirming
+                    ? {
+                          label: confirming.product_label ?? 'này',
+                          username: confirming.username,
+                      }
+                    : null
             "
-        >
-            <DialogContent class="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Bài này thật sự chưa lên TikTok?</DialogTitle>
-                    <DialogDescription>
-                        Chrome không báo được kết quả nên app không biết bài
-                        <b>{{ confirming?.product_label }}</b>
-                        <template v-if="confirming?.username">
-                            của @{{ confirming.username }}</template
-                        >
-                        đã lên hay chưa. Hãy mở TikTok Studio, xem cả mục bài hẹn
-                        giờ. Chỉ bấm đăng lại khi chắc chắn không thấy bài, nếu
-                        không sẽ bị đăng trùng.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter class="gap-2">
-                    <Button
-                        variant="outline"
-                        :disabled="busy !== null"
-                        @click="confirming = null"
-                        >Để sau</Button
-                    >
-                    <Button
-                        :disabled="busy !== null"
-                        data-testid="fork-auto-failed-post-confirm-ok"
-                        @click="confirming && retry(confirming, true)"
-                    >
-                        <Spinner v-if="busy !== null" class="size-4" />
-                        Chưa lên, đăng lại
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            :busy="busy !== null"
+            ok-testid="fork-auto-failed-post-confirm-ok"
+            @cancel="confirming = null"
+            @confirm="confirming && retry(confirming, true)"
+        />
     </section>
 </template>

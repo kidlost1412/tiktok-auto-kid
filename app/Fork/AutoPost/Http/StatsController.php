@@ -33,11 +33,26 @@ final class StatsController extends Controller
 
     private const int MAX_DAYS = 120;
 
+    /** Số bài mỗi lần tải; nút "Tải thêm" cộng đúng bấy nhiêu, tối đa LIST_MAX. */
     private const int LIST_LIMIT = 60;
 
-    private const array RANGES = ['today', '7d', '30d', 'custom'];
+    private const int LIST_MAX = 600;
 
-    private const array SORTS = ['moi', 'view', 'tuong-tac'];
+    /** Cỡ mỗi lượt whereIn khi có rất nhiều id (tránh câu truy vấn quá dài). */
+    private const int CHUNK = 500;
+
+    private const array RANGES = ['today', 'yesterday', '7d', '30d', 'this-month', 'last-month', 'custom'];
+
+    /** Khoá sắp xếp được phép (whitelist) => cột trong dòng số liệu. */
+    private const array SORTS = [
+        'moi' => 'posted_at',
+        'view' => 'views',
+        'tuong-tac' => 'interactions',
+        'tim' => 'likes',
+        'binh-luan' => 'comments',
+        'chia-se' => 'shares',
+        'ty-le' => 'engagement',
+    ];
 
     /** Tiện ích từ bản này trở lên mới thu được số liệu + bình luận từ TikTok Studio. */
     public const string MIN_EXTENSION_VERSION = '1.4.0';
@@ -53,7 +68,9 @@ final class StatsController extends Controller
         $range = $request->query('range');
         $range = is_string($range) && in_array($range, self::RANGES, true) ? $range : '7d';
         $sort = $request->query('sort');
-        $sort = is_string($sort) && in_array($sort, self::SORTS, true) ? $sort : 'moi';
+        $sort = is_string($sort) && array_key_exists($sort, self::SORTS) ? $sort : 'moi';
+        $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
+        $limit = $this->limit($request->query('limit'));
 
         [$from, $to] = $this->period($request, $range, $tz);
         $days = (int) $from->diffInDays($to);
@@ -68,6 +85,8 @@ final class StatsController extends Controller
             'goc' => $this->scalar($request, 'goc'),
             'giong' => $this->scalar($request, 'giong'),
             'sort' => $sort,
+            'dir' => $dir,
+            'limit' => $limit,
             'cm' => $request->query('cm') === 'mua' ? 'mua' : 'all',
             // Nguồn video: all | ai (Xưởng Video) | rieng (Kho riêng).
             'nguon' => in_array($request->query('nguon'), ['ai', 'rieng'], true) ? (string) $request->query('nguon') : 'all',
@@ -76,12 +95,19 @@ final class StatsController extends Controller
         // Phần nặng (đọc bài đã đăng + số liệu) tính một lần và chỉ khi có prop nào cần: partial reload của bàn Cú
         // chỉ xin vài prop nên các prop khác (bảng so sánh, video, người theo dõi...) không bị tính.
         $stats = null;
-        $load = function () use (&$stats, $accountIds, $accounts, $filters, $from, $to, $prevFrom, $sort, $tz): array {
+        // Danh mục sản phẩm đọc một lần, dùng chung cho bảng so sánh, tuỳ chọn lọc và bình luận.
+        $productsCache = null;
+        $products = function () use (&$productsCache): Collection {
+            return $productsCache ??= AutoProduct::query()->orderBy('short_name')->get()->keyBy('code');
+        };
+        $load = function () use (&$stats, $accountIds, $filters, $from, $to, $prevFrom, $sort, $dir, $limit, $tz): array {
             if ($stats !== null) {
                 return $stats;
             }
 
+            // Chỉ lấy các cột trang này dùng (bảng video rất rộng).
             $base = fn () => AutoVideo::query()
+                ->select(['id', 'file_name', 'source', 'posted_at', 'social_account_id', 'product_code', 'quy_cach', 'product_name', 'goc', 'giong', 'nhac', 'meta', 'duration', 'caption', 'post_id', 'tiktok_video_id', 'stats'])
                 ->with('socialAccount:id,username,display_name,timezone')
                 ->where('status', AutoVideo::POSTED)
                 ->whereNotNull('posted_at')
@@ -103,40 +129,40 @@ final class StatsController extends Controller
             $rows = $current->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
             $prevRows = $previous->map(fn (AutoVideo $v): array => $this->row($v, $metrics[$v->id], $tz));
 
-            $products = AutoProduct::query()->orderBy('short_name')->get()->keyBy('code');
-
-            $sorted = $this->sorted($rows, $sort);
+            $sorted = $this->sorted($rows, $sort, $dir, $limit);
             $ranked = $rows->filter(fn (array $r): bool => $r['has_metrics'])->sortByDesc('views')->values();
 
-            return $stats = compact('rows', 'prevRows', 'products', 'sorted', 'ranked');
+            return $stats = compact('rows', 'prevRows', 'sorted', 'ranked');
         };
 
         return Inertia::render('fork/SoLieu', [
             'filters' => $filters,
-            'options' => fn (): array => $this->options($accounts, $accountIds, $load()['products']),
+            'options' => fn (): array => $this->options($accounts, $accountIds, $products()),
             'kpis' => fn (): array => $this->kpis($load()['rows'], $load()['prevRows']),
             'daily' => fn (): array => $this->daily($load()['rows'], $from, $days),
-            'breakdowns' => function () use ($load): array {
+            'breakdowns' => function () use ($load, $products): array {
                 $rows = $load()['rows'];
-                $products = $load()['products'];
+                $catalog = $products();
+                $channels = $rows->pluck('channel', 'social_account_id');
 
                 return [
-                    'product' => $this->group($rows, fn (array $r): string => (string) ($r['product_code'] ?? ''), fn (string $k): string => (string) ($products[$k]?->short_name ?? $k)),
+                    'product' => $this->group($rows, fn (array $r): string => (string) ($r['product_code'] ?? ''), fn (string $k): string => (string) ($catalog[$k]?->short_name ?? $k)),
+                    'channel' => $this->group($rows, fn (array $r): string => (string) ($r['social_account_id'] ?? ''), fn (string $k): string => (string) ($channels[$k] ?? $k)),
                     'goc' => $this->group($rows, fn (array $r): string => (string) ($r['goc'] ?? '')),
                     'hour' => $this->group($rows, fn (array $r): string => sprintf('%02d', $r['hour']), fn (string $k): string => (int) $k.'h', 'key'),
                     'giong' => $this->group($rows, fn (array $r): string => (string) ($r['giong'] ?? '')),
                     'nhac' => $this->group($rows, fn (array $r): string => (string) ($r['nhac'] ?? '')),
                 ];
             },
-            'videos' => fn (): array => $load()['sorted']->take(self::LIST_LIMIT)->values()->all(),
+            'videos' => fn (): array => $load()['sorted']->all(),
             'videos_total' => fn (): int => $load()['rows']->count(),
             'top' => fn (): array => $load()['ranked']->take(5)->values()->all(),
             'bottom' => fn (): array => $load()['ranked']->count() > 5 ? $load()['ranked']->reverse()->take(5)->values()->all() : [],
             'metrics_count' => fn (): int => $load()['ranked']->count(),
             'updated_at' => now()->toIso8601String(),
-            'collected_at' => fn (): ?string => $this->collectedAt($accountIds),
+            'collected_at' => fn (): ?string => $this->collectedAt($accountIds, $filters['channel']),
             'followers' => fn (): ?array => $this->followers($accountIds, $filters['channel'], $from, $to, $tz),
-            'comments' => fn (): array => $this->comments($accountIds, $filters['channel'], $filters['cm']),
+            'comments' => fn (): array => $this->comments($accountIds, $filters['channel'], $filters['cm'], $filters['product'], $from, $to, $products()),
             'extension' => fn (): array => $this->extension($this->authorizeOwner($request)),
         ]);
     }
@@ -178,9 +204,38 @@ final class StatsController extends Controller
 
         return match ($range) {
             'today' => [$today, $today->addDay()],
+            'yesterday' => [$today->subDay(), $today],
             '30d' => [$today->subDays(29), $today->addDay()],
+            'this-month' => [$today->startOfMonth(), $today->addDay()],
+            'last-month' => [$today->subMonthNoOverflow()->startOfMonth(), $today->startOfMonth()],
             default => [$today->subDays(6), $today->addDay()],
         };
+    }
+
+    /** Số bài muốn hiện: bội của LIST_LIMIT, ít nhất một lượt, nhiều nhất LIST_MAX. */
+    private function limit(mixed $raw): int
+    {
+        $n = is_numeric($raw) ? (int) $raw : self::LIST_LIMIT;
+
+        return max(self::LIST_LIMIT, min(self::LIST_MAX, (int) (ceil($n / self::LIST_LIMIT) * self::LIST_LIMIT)));
+    }
+
+    /**
+     * Chạy một truy vấn whereIn theo từng lượt CHUNK id rồi gộp kết quả (danh sách id có thể rất dài).
+     *
+     * @param  list<int|string>  $ids
+     * @param  callable(list<int|string>): Collection<int, mixed>  $query
+     * @return Collection<int, mixed>
+     */
+    private function chunked(array $ids, callable $query): Collection
+    {
+        $out = collect();
+
+        foreach (array_chunk($ids, self::CHUNK) as $chunk) {
+            $out = $out->concat($query($chunk));
+        }
+
+        return $out;
     }
 
     /**
@@ -194,22 +249,21 @@ final class StatsController extends Controller
         $postIds = $videos->pluck('post_id')->filter()->unique()->values()->all();
         $remoteIds = $videos->pluck('tiktok_video_id')->filter()->unique()->values()->all();
 
-        $publications = ($postIds === [] && $remoteIds === []) ? collect() : AnalyticsPublication::query()
-            ->where(fn ($q) => $q
-                ->when($postIds !== [], fn ($q2) => $q2->whereIn('post_id', $postIds))
-                ->when($remoteIds !== [], fn ($q2) => $q2->orWhereIn('remote_id', $remoteIds)))
-            ->get();
+        // Khớp theo post_id HOẶC remote_id: mỗi vế chạy theo từng lượt 500 id rồi gộp (bỏ trùng theo id).
+        $publications = $this->chunked($postIds, fn (array $ids) => AnalyticsPublication::query()->whereIn('post_id', $ids)->get())
+            ->concat($this->chunked($remoteIds, fn (array $ids) => AnalyticsPublication::query()->whereIn('remote_id', $ids)->get()))
+            ->unique('id')->sortBy('id')->values();
 
         $byPost = $publications->filter(fn ($p) => $p->post_id)->keyBy('post_id');
         $byRemote = $publications->filter(fn ($p) => $p->remote_id)->groupBy(fn ($p): string => (string) $p->remote_id);
 
-        $snapshots = $publications->isEmpty() ? collect() : AnalyticsPublicationDailySnapshot::query()
-            ->whereIn('publication_id', $publications->pluck('id')->all())
+        $snapshots = $this->chunked($publications->pluck('id')->all(), fn (array $ids) => AnalyticsPublicationDailySnapshot::query()
+            ->whereIn('publication_id', $ids)
             ->orderBy('date')
-            ->get()
+            ->get())
             ->groupBy('publication_id');
 
-        $vstats = $videos->isEmpty() ? collect() : VideoStat::query()->whereIn('auto_video_id', $videos->pluck('id')->all())->get()->keyBy('auto_video_id');
+        $vstats = $this->chunked($videos->pluck('id')->all(), fn (array $ids) => VideoStat::query()->whereIn('auto_video_id', $ids)->get())->keyBy('auto_video_id');
 
         $out = [];
 
@@ -344,34 +398,48 @@ final class StatsController extends Controller
     }
 
     /**
+     * Sắp xếp TOÀN BỘ bài trong khoảng (theo khoá whitelist + chiều), rồi mới cắt $limit bài đầu và bổ sung ảnh/giỏ cho chúng.
+     * Cùng giá trị thì bài mới hơn (id lớn hơn) đứng trước, để thứ tự ổn định giữa các lần tải.
+     *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return Collection<int, array<string, mixed>>
      */
-    private function sorted(Collection $rows, string $sort): Collection
+    private function sorted(Collection $rows, string $sort, string $dir, int $limit): Collection
     {
-        $rows = match ($sort) {
-            'view' => $rows->sortByDesc('views'),
-            'tuong-tac' => $rows->sortByDesc('interactions'),
-            default => $rows->sortByDesc('posted_at'),
-        };
+        $page = $rows->sortBy([[self::SORTS[$sort] ?? 'posted_at', $dir], ['id', 'desc']])->take($limit)->values();
 
-        $videos = AutoVideo::query()
-            ->whereIn('id', $rows->take(self::LIST_LIMIT)->pluck('id')->all())->get()->keyBy('id');
+        // Tên giỏ cho bài chưa có: một truy vấn cho cả trang thay vì một truy vấn mỗi dòng.
+        $need = $page->filter(fn (array $r): bool => ! filled($r['cart_name']) && $r['social_account_id'] && $r['product_code'])->keyBy('id');
+        $links = $need->isEmpty() ? collect() : ProductLink::query()
+            ->whereIn('social_account_id', $need->pluck('social_account_id')->map(fn ($id): string => (string) $id)->unique()->values()->all())
+            ->whereIn('auto_product_id', $need->pluck('product_code')->unique()->values()->all())
+            ->orderBy('id')
+            ->get(['social_account_id', 'auto_product_id', 'quy_cach', 'display_name'])
+            ->reverse()
+            ->mapWithKeys(fn (ProductLink $l): array => [$this->slotKey((string) $l->social_account_id, (string) $l->auto_product_id, $l->quy_cach, true) => $l->display_name]);
 
         $images = ProductImages::lookup();
 
-        return $rows->values()->map(function (array $r) use ($videos, $images): array {
-            $v = $videos[$r['id']] ?? null;
+        return $page->map(function (array $r) use ($links, $need, $images): array {
             $r['product_image'] = $images->forSlot($r['social_account_id'] ? (string) $r['social_account_id'] : null, $r['product_code'], $r['quy_cach']);
 
-            if ($v) {
-                if (! filled($r['cart_name']) && $v->social_account_id && $v->product_code) {
-                    $r['cart_name'] = ProductLink::slot((string) $v->social_account_id, (string) $v->product_code, $v->quy_cach)->value('display_name');
-                }
+            if ($need->has($r['id'])) {
+                $r['cart_name'] = $links[$this->slotKey((string) $r['social_account_id'], (string) $r['product_code'], $r['quy_cach'], false)] ?? null;
             }
 
             return $r;
         });
+    }
+
+    /** Khoá (kênh, mã, quy cách) giống ProductLink::slot: quy cách null hoặc rỗng chỉ khớp liên kết không quy cách. */
+    private function slotKey(string $account, string $code, ?string $quyCach, bool $fromLink): string
+    {
+        // Phía liên kết: quy cách '' (khác null) không bao giờ khớp ô "không quy cách" của slot().
+        $q = $fromLink
+            ? ($quyCach === null ? '' : ($quyCach === '' ? '<rong>' : $quyCach))
+            : ($quyCach === null || $quyCach === '' ? '' : $quyCach);
+
+        return $account.'|'.$code.'|'.$q;
     }
 
     /**
@@ -482,10 +550,13 @@ final class StatsController extends Controller
         ];
     }
 
-    /** Lần thu số liệu gần nhất của các kênh đang xem. */
-    private function collectedAt(array $accountIds): ?string
+    /** Lần thu số liệu gần nhất của các kênh đang xem (đang lọc một kênh thì chỉ tính kênh đó). */
+    private function collectedAt(array $accountIds, string $channel = ''): ?string
     {
-        $at = VideoStat::query()->whereIn('social_account_id', $accountIds)->max('collected_at');
+        $at = VideoStat::query()
+            ->whereIn('social_account_id', $accountIds)
+            ->when($channel !== '', fn ($q) => $q->where('social_account_id', $channel))
+            ->max('collected_at');
 
         return $at ? CarbonImmutable::parse($at, 'UTC')->toIso8601String() : null;
     }
@@ -558,21 +629,28 @@ final class StatsController extends Controller
     }
 
     /**
-     * Bình luận mới nhất (mới nhất trước) và số đếm cho huy hiệu.
+     * Bình luận mới nhất (mới nhất trước) và số đếm cho huy hiệu. Theo kênh, sản phẩm và khoảng ngày đang xem
+     * (số "24 giờ qua" chỉ theo kênh và sản phẩm: nó luôn tính từ bây giờ).
      *
      * @param  list<string>  $accountIds
+     * @param  Collection<string, AutoProduct>  $products
      * @return array{counts: array{total: int, buy: int, buy_24h: int}, rows: list<array<string, mixed>>}
      */
-    private function comments(array $accountIds, string $channel, string $filter): array
+    private function comments(array $accountIds, string $channel, string $filter, string $product, CarbonImmutable $from, CarbonImmutable $to, Collection $products): array
     {
-        $base = fn () => VideoComment::query()
+        $scope = fn () => VideoComment::query()
             ->whereIn('social_account_id', $accountIds)
-            ->when($channel !== '', fn ($q) => $q->where('social_account_id', $channel));
+            ->when($channel !== '', fn ($q) => $q->where('social_account_id', $channel))
+            ->when($product !== '', fn ($q) => $q->whereIn('auto_video_id', AutoVideo::query()->where('product_code', $product)->select('id')));
+        // Ngày của bình luận: giờ bình luận trên TikTok, chưa có thì giờ app thu được.
+        $base = fn () => $scope()
+            ->whereRaw('COALESCE(commented_at, created_at) >= ?', [$from->utc()])
+            ->whereRaw('COALESCE(commented_at, created_at) < ?', [$to->utc()]);
 
         $counts = [
             'total' => $base()->count(),
             'buy' => $base()->where('is_buy_intent', true)->count(),
-            'buy_24h' => $base()->where('is_buy_intent', true)->where('commented_at', '>=', now()->subDay())->count(),
+            'buy_24h' => $scope()->where('is_buy_intent', true)->where('commented_at', '>=', now()->subDay())->count(),
         ];
 
         $list = $base()
@@ -583,7 +661,6 @@ final class StatsController extends Controller
 
         $names = SocialAccount::query()->whereIn('id', $list->pluck('social_account_id')->filter()->unique())->pluck('username', 'id');
         $captions = VideoStat::query()->whereIn('item_id', $list->pluck('item_id')->unique())->pluck('caption', 'item_id');
-        $products = AutoProduct::query()->get()->keyBy('code');
         $videos = AutoVideo::query()->whereIn('id', $list->pluck('auto_video_id')->filter()->unique())->get(['id', 'product_code'])->keyBy('id');
 
         $rows = $list->map(function (VideoComment $c) use ($names, $captions, $videos, $products): array {

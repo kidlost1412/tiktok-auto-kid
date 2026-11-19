@@ -7,10 +7,12 @@ import {
     IconArrowDownRight,
     IconArrowUpRight,
     IconChartBar,
+    IconCopy,
     IconExternalLink,
     IconFilterOff,
 } from '@tabler/icons-vue';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
@@ -37,6 +39,7 @@ import type {
     Kpi,
     KpiKey,
     Options,
+    SortKey,
     StatVideo,
 } from '@/components/fork/so-lieu/types';
 import VideoStatRow from '@/components/fork/so-lieu/VideoStatRow.vue';
@@ -70,16 +73,53 @@ const { loading, callbacks } = useVisitLoading();
 
 const ranges = [
     { key: 'today', label: 'Hôm nay' },
+    { key: 'yesterday', label: 'Hôm qua' },
     { key: '7d', label: '7 ngày' },
     { key: '30d', label: '30 ngày' },
+    { key: 'this-month', label: 'Tháng này' },
+    { key: 'last-month', label: 'Tháng trước' },
     { key: 'custom', label: 'Tuỳ chọn' },
 ] as const;
+
+const PAGE_STEP = 60;
+const MAX_CUSTOM_DAYS = 120;
+const LIST_MAX = 600;
+const todayStr = dayjs().format('YYYY-MM-DD');
 
 const customOpen = ref(props.filters.range === 'custom');
 const customFrom = ref(props.filters.from);
 const customTo = ref(props.filters.to);
+// Máy chủ có thể đổi khoảng (vd ngày sai thì rơi về 7 ngày): khung "Tuỳ chọn" luôn khớp bộ lọc đang áp dụng.
+watch(
+    () => [props.filters.range, props.filters.from, props.filters.to] as const,
+    ([range, from, to]) => {
+        customFrom.value = from;
+        customTo.value = to;
 
-const apply = (patch: Partial<Filters>) => {
+        if (range === 'custom') {
+            customOpen.value = true;
+        }
+    },
+);
+const customBad = computed(
+    () =>
+        !!customFrom.value &&
+        !!customTo.value &&
+        customFrom.value > customTo.value,
+);
+const customDays = computed(() =>
+    customFrom.value && customTo.value && !customBad.value
+        ? dayjs(customTo.value).diff(dayjs(customFrom.value), 'day') + 1
+        : 0,
+);
+const customOk = computed(
+    () => !!customFrom.value && !!customTo.value && !customBad.value,
+);
+
+// Tải thêm bài không được làm nháy cả bảng thành khung xương.
+const loadingMore = ref(false);
+
+const apply = (patch: Partial<Filters>, more = false) => {
     const next = { ...props.filters, ...patch };
     const query: Record<string, string> = { range: next.range };
 
@@ -98,6 +138,15 @@ const apply = (patch: Partial<Filters>) => {
         query.sort = next.sort;
     }
 
+    if (next.dir === 'asc') {
+        query.dir = 'asc';
+    }
+
+    // Số bài chỉ giữ khi bấm "Tải thêm"; đổi bất kỳ bộ lọc / cách sắp xếp nào thì quay về 60 bài đầu.
+    if (patch.limit && patch.limit > PAGE_STEP) {
+        query.limit = String(patch.limit);
+    }
+
     if (next.cm === 'mua') {
         query.cm = 'mua';
     }
@@ -106,10 +155,15 @@ const apply = (patch: Partial<Filters>) => {
         query.nguon = next.nguon;
     }
 
+    loadingMore.value = more;
     router.get('/auto/so-lieu', query, {
         preserveScroll: true,
         preserveState: true,
         ...callbacks,
+        onFinish: () => {
+            callbacks.onFinish();
+            loadingMore.value = false;
+        },
     });
 };
 
@@ -122,11 +176,7 @@ const pickRange = (key: Filters['range']) => {
 };
 
 const applyCustom = () => {
-    if (
-        customFrom.value &&
-        customTo.value &&
-        customFrom.value <= customTo.value
-    ) {
+    if (customOk.value) {
         apply({ range: 'custom', from: customFrom.value, to: customTo.value });
     }
 };
@@ -273,66 +323,58 @@ const collectedText = computed(() =>
 
 const setComments = (cm: Filters['cm']) => apply({ cm });
 
-const sorts = [
+// Mọi cách sắp xếp đều chạy ở máy chủ trên TOÀN BỘ bài trong khoảng (rồi mới cắt 60 bài đầu), nên bấm tiêu đề cột
+// hay chọn trong ô "Sắp xếp" đều ra đúng bài nhiều/ít nhất, không chỉ trong số 60 bài mới nhất.
+const sorts: { key: SortKey; label: string }[] = [
     { key: 'moi', label: 'Mới nhất' },
     { key: 'view', label: 'Nhiều view nhất' },
     { key: 'tuong-tac', label: 'Tương tác nhiều nhất' },
-] as const;
+    { key: 'tim', label: 'Nhiều tim nhất' },
+    { key: 'binh-luan', label: 'Nhiều bình luận nhất' },
+    { key: 'chia-se', label: 'Nhiều chia sẻ nhất' },
+    { key: 'ty-le', label: 'Tỉ lệ tương tác cao nhất' },
+];
 
 // Top video: một thẻ, đổi giữa nhiều view nhất / ít view nhất.
 const rankMode = ref<'top' | 'bottom'>('top');
 const rankList = computed(() =>
     rankMode.value === 'top' ? props.top : props.bottom,
 );
-const rankMax = computed(() => Math.max(1, ...props.top.map((v) => v.views)));
+// Thanh so sánh tính theo chính danh sách đang hiện (ít view nhất thì thanh dài nhất là bài nhiều view nhất trong 5 bài đó).
+const rankMax = computed(() =>
+    Math.max(1, ...rankList.value.map((v) => v.views)),
+);
 
 const maxViews = computed(() =>
     Math.max(1, ...props.videos.map((v) => v.views)),
 );
 
-// Bảng video: phân trang phía trình duyệt + bấm tiêu đề cột để sắp xếp trong số bài đang tải.
+// Bảng video: phân trang phía trình duyệt trên số bài đã tải; bấm tiêu đề cột để máy chủ sắp xếp lại.
 const videoGridCls =
     'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]';
 const pageSize = 15;
 const page = ref(1);
-type SortKey =
-    | 'posted_at'
-    | 'views'
-    | 'likes'
-    | 'comments'
-    | 'shares'
-    | 'engagement';
-const sortKey = ref<SortKey | null>(null);
-const sortDesc = ref(true);
 
 const toggleSort = (k: SortKey) => {
-    if (sortKey.value === k) {
-        sortDesc.value = !sortDesc.value;
+    if (props.filters.sort === k) {
+        apply({ sort: k, dir: props.filters.dir === 'desc' ? 'asc' : 'desc' });
     } else {
-        sortKey.value = k;
-        sortDesc.value = true;
+        apply({ sort: k, dir: 'desc' });
     }
-
-    page.value = 1;
 };
 const sortMark = (k: SortKey) =>
-    sortKey.value === k ? (sortDesc.value ? ' ↓' : ' ↑') : '';
+    props.filters.sort === k ? (props.filters.dir === 'asc' ? ' ↑' : ' ↓') : '';
+const ariaSort = (k: SortKey) =>
+    props.filters.sort === k
+        ? props.filters.dir === 'asc'
+            ? 'ascending'
+            : 'descending'
+        : 'none';
+const sortLabel = computed(
+    () => sorts.find((s) => s.key === props.filters.sort)?.label ?? 'Mới nhất',
+);
 
-const sortedVideos = computed(() => {
-    const k = sortKey.value;
-
-    if (!k) {
-        return props.videos;
-    }
-
-    const dir = sortDesc.value ? -1 : 1;
-
-    return [...props.videos].sort((a, b) =>
-        k === 'posted_at'
-            ? dir * a.posted_at.localeCompare(b.posted_at)
-            : dir * ((a[k] as number) - (b[k] as number)),
-    );
-});
+const sortedVideos = computed(() => props.videos);
 const pageCount = computed(() =>
     Math.max(1, Math.ceil(sortedVideos.value.length / pageSize)),
 );
@@ -343,13 +385,66 @@ const pagedVideos = computed(() =>
     ),
 );
 
+// Tối đa 7 nút trang: 1 … 4 5 6 … 20 (không kéo dài hàng nút khi có nhiều trang).
+const pageItems = computed<(number | '…')[]>(() => {
+    const n = pageCount.value;
+    const c = page.value;
+
+    if (n <= 7) {
+        return Array.from({ length: n }, (_, i) => i + 1);
+    }
+
+    if (c <= 4) {
+        return [1, 2, 3, 4, 5, '…', n];
+    }
+
+    if (c >= n - 3) {
+        return [1, '…', n - 4, n - 3, n - 2, n - 1, n];
+    }
+
+    return [1, '…', c - 1, c, c + 1, '…', n];
+});
+
+// Tải thêm: giữ nguyên trang đang xem; đổi cách sắp xếp / bộ lọc thì về trang 1.
+const canLoadMore = computed(
+    () =>
+        props.videos.length < props.videos_total &&
+        props.videos.length >= props.filters.limit &&
+        props.filters.limit < LIST_MAX,
+);
+const remaining = computed(() => props.videos_total - props.videos.length);
+const loadMore = () => {
+    keepPage = true;
+    apply({ limit: props.filters.limit + PAGE_STEP }, true);
+};
+let keepPage = false;
+
 watch(
     () => props.videos,
     () => {
-        page.value = 1;
-        sortKey.value = null;
+        if (keepPage) {
+            keepPage = false;
+        } else {
+            page.value = 1;
+        }
     },
 );
+
+// Bấm một dòng ở bảng "So sánh hiệu quả" = lọc cả trang theo nhóm đó.
+const filterBy = (dim: 'product' | 'channel' | 'goc' | 'giong', key: string) =>
+    apply({ [dim]: key });
+
+// Banner tiện ích: Chrome không cho app tự mở chrome://extensions, nên có nút sao chép địa chỉ.
+const copyExtensions = async () => {
+    try {
+        await navigator.clipboard.writeText('chrome://extensions');
+        toast.success('Đã sao chép. Dán vào thanh địa chỉ Chrome rồi Enter.');
+    } catch {
+        toast.error(
+            'Chưa sao chép được. Anh gõ chrome://extensions vào thanh địa chỉ Chrome.',
+        );
+    }
+};
 
 const seg = (on: boolean) =>
     cn(
@@ -369,17 +464,16 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
     >
         <template #actions>
             <div
-                class="flex gap-0.5 rounded-lg bg-muted p-1"
-                role="tablist"
+                class="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-muted p-1"
+                role="group"
                 aria-label="Khoảng thời gian"
             >
                 <button
                     v-for="r in ranges"
                     :key="r.key"
                     type="button"
-                    role="tab"
-                    :aria-selected="filters.range === r.key"
-                    :class="seg(filters.range === r.key)"
+                    :aria-pressed="filters.range === r.key"
+                    :class="cn(seg(filters.range === r.key), 'shrink-0')"
                     @click="pickRange(r.key)"
                 >
                     {{ r.label }}
@@ -396,6 +490,8 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                 <Input
                     v-model="customFrom"
                     type="date"
+                    :max="todayStr"
+                    :aria-invalid="customBad"
                     class="h-9 w-40"
                     aria-label="Từ ngày"
                 />
@@ -403,11 +499,40 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                 <Input
                     v-model="customTo"
                     type="date"
+                    :max="todayStr"
+                    :aria-invalid="customBad"
                     class="h-9 w-40"
                     aria-label="Đến ngày"
                 />
-                <Button size="sm" class="h-9" @click="applyCustom"
+                <Button
+                    size="sm"
+                    class="h-9"
+                    :disabled="!customOk"
+                    data-testid="fork-so-lieu-custom-apply"
+                    @click="applyCustom"
                     >Áp dụng</Button
+                >
+                <span
+                    v-if="customBad"
+                    :class="cn('text-xs font-medium', toneClasses.danger.text)"
+                    role="alert"
+                    data-testid="fork-so-lieu-custom-error"
+                    >Ngày bắt đầu phải trước ngày kết thúc</span
+                >
+                <span
+                    v-else
+                    :class="
+                        cn(
+                            'text-xs',
+                            customDays > MAX_CUSTOM_DAYS
+                                ? toneClasses.warn.text
+                                : 'text-muted-foreground',
+                        )
+                    "
+                    >Tối đa {{ MAX_CUSTOM_DAYS }} ngày<template
+                        v-if="customDays > MAX_CUSTOM_DAYS"
+                        >, app chỉ lấy {{ MAX_CUSTOM_DAYS }} ngày cuối</template
+                    ></span
                 >
                 <span class="mx-1 hidden h-5 w-px bg-border sm:block" />
             </template>
@@ -484,10 +609,30 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
         >
             <b>Tải lại tiện ích để thu số liệu.</b>
             Chrome đang chạy tiện ích bản {{ extension.version || 'cũ' }}, chưa
-            thu được số liệu và bình luận (cần từ bản {{ extension.min }}). Mở
-            chrome://extensions, bấm ⟳ ở tiện ích TikTok Auto Kid (nạp từ thư
-            mục <code>extension\autotok</code> của app) rồi mở lại Chrome
-            profile đó.
+            thu được số liệu và bình luận (cần từ bản {{ extension.min }}).
+            <ol class="mt-2 ml-5 list-decimal space-y-1 font-normal">
+                <li>
+                    Sao chép địa chỉ
+                    <code>chrome://extensions</code>, dán vào thanh địa chỉ
+                    Chrome rồi Enter (Chrome không cho app tự mở trang này).
+                </li>
+                <li>
+                    Tìm tiện ích TikTok Auto Kid (nạp từ thư mục
+                    <code>extension\autotok</code> của app), bấm ⟳ để tải lại.
+                </li>
+                <li>Mở lại Chrome profile đang đăng nhập TikTok.</li>
+            </ol>
+            <template #action>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid="fork-so-lieu-copy-extensions"
+                    @click="copyExtensions"
+                >
+                    <IconCopy class="size-4" />
+                    Sao chép chrome://extensions
+                </Button>
+            </template>
         </Callout>
 
         <!-- Khi chưa có bài nào -->
@@ -533,6 +678,12 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                 Có {{ videos_total }} bài đã đăng nhưng chưa có số liệu. Tiện
                 ích Chrome tự thu mỗi giờ (cần mở Chrome đã đăng nhập TikTok);
                 số liệu hiện ra sau lần thu đầu tiên.
+                <Link
+                    href="/settings#chrome"
+                    class="ml-1 font-medium whitespace-nowrap underline underline-offset-2"
+                    data-testid="fork-so-lieu-open-chrome-settings"
+                    >Mở Cài đặt → Chrome</Link
+                >
             </Callout>
 
             <!-- Chỉ số -->
@@ -604,7 +755,10 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                     </div>
                 </div>
                 <p
-                    v-if="!loading && primary.every((t) => kpis[t.key].delta_pct === null)"
+                    v-if="
+                        !loading &&
+                        primary.every((t) => kpis[t.key].delta_pct === null)
+                    "
                     class="border-t bg-card px-5 py-2 text-[0.7812rem] text-muted-foreground sm:px-6"
                     data-testid="fork-so-lieu-no-prev"
                 >
@@ -654,10 +808,14 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             class="flex flex-wrap items-start justify-between gap-2"
                         >
                             <div>
-                                <h2 :class="h2">Lượt xem theo ngày</h2>
-                                <p class="text-[0.7812rem] text-muted-foreground">
-                                    Tổng lượt xem của các bài đăng trong ngày đó
-                                    (số liệu mới nhất).
+                                <h2 :class="h2">
+                                    Lượt xem của bài theo ngày đăng
+                                </h2>
+                                <p
+                                    class="text-[0.7812rem] text-muted-foreground"
+                                >
+                                    Mỗi cột = tổng lượt xem hiện tại của các bài
+                                    đăng vào ngày đó.
                                 </p>
                             </div>
                             <div
@@ -688,7 +846,12 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             v-if="loading"
                             class="h-72 w-full rounded-[14px]"
                         />
-                        <BreakdownCard v-else :breakdowns="breakdowns" />
+                        <BreakdownCard
+                            v-else
+                            :breakdowns="breakdowns"
+                            :filters="filters"
+                            @filter="filterBy"
+                        />
 
                         <section
                             v-if="top.length"
@@ -703,6 +866,8 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                 <h2 :class="h2">Video nổi bật</h2>
                                 <div
                                     class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[0.7812rem]"
+                                    role="group"
+                                    aria-label="Xếp hạng video"
                                 >
                                     <button
                                         v-for="m in [
@@ -711,6 +876,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                         ] as const"
                                         :key="m.k"
                                         type="button"
+                                        :aria-pressed="rankMode === m.k"
                                         :class="
                                             cn(
                                                 'rounded-md px-2.5 py-1 font-medium transition',
@@ -725,11 +891,23 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                     </button>
                                 </div>
                             </header>
-                            <ol class="flex flex-col p-2">
-                                <li v-for="(v, i) in rankList" :key="v.id">
+                            <p
+                                v-if="!rankList.length"
+                                class="px-5 py-8 text-center text-[0.8125rem] text-muted-foreground"
+                                data-testid="fork-so-lieu-ranking-empty"
+                            >
+                                Cần ít nhất 6 bài có số liệu để xếp hạng.
+                            </p>
+                            <ol v-else class="flex flex-col p-2">
+                                <li
+                                    v-for="(v, i) in rankList"
+                                    :key="v.id"
+                                    class="flex items-center gap-1 rounded-lg pr-2 transition-colors hover:bg-accent/50"
+                                >
                                     <button
                                         type="button"
-                                        class="grid w-full grid-cols-[20px_32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                                        class="grid min-w-0 flex-1 grid-cols-[20px_32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
+                                        :aria-label="`Xem video ${productName(v.product_code)} (${fmtNum(v.views)} lượt xem)`"
                                         @click="
                                             openVideo(
                                                 rankList.map((x) => x.id),
@@ -781,25 +959,22 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                                 />
                                             </span>
                                         </span>
-                                        <span class="flex items-center gap-2">
-                                            <span
-                                                class="text-[0.875rem] font-semibold tabular-nums"
-                                                >{{ fmtCompact(v.views) }}</span
-                                            >
-                                            <a
-                                                v-if="v.link"
-                                                :href="v.link"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                                                title="Mở trên TikTok"
-                                                aria-label="Mở trên TikTok"
-                                                @click.stop
-                                                ><IconExternalLink
-                                                    class="size-4"
-                                            /></a>
-                                        </span>
+                                        <span
+                                            class="text-[0.875rem] font-semibold tabular-nums"
+                                            >{{ fmtCompact(v.views) }}</span
+                                        >
                                     </button>
+                                    <a
+                                        v-if="v.link"
+                                        :href="v.link"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                                        title="Mở trên TikTok"
+                                        :aria-label="`Mở video ${productName(v.product_code)} trên TikTok`"
+                                        ><IconExternalLink class="size-4"
+                                    /></a>
+                                    <span v-else class="size-7 shrink-0" />
                                 </li>
                             </ol>
                         </section>
@@ -850,7 +1025,10 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                     có thêm ngày.
                                 </p>
                             </template>
-                            <p v-else class="text-[0.8125rem] text-muted-foreground">
+                            <p
+                                v-else
+                                class="text-[0.8125rem] text-muted-foreground"
+                            >
                                 Chưa có số liệu người theo dõi. Tiện ích đọc từ
                                 TikTok Studio mỗi giờ.
                             </p>
@@ -873,18 +1051,23 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                     <h2 :class="h2">Bình luận</h2>
                                     <p
                                         class="text-[0.7812rem] text-muted-foreground"
+                                        data-testid="fork-so-lieu-comments-sub"
                                     >
                                         {{ fmtNum(comments.counts.total) }} bình
-                                        luận đã thu ·
+                                        luận trong khoảng này ·
                                         {{ fmtNum(comments.counts.buy) }} hỏi
-                                        mua / hỏi giá ({{
-                                            comments.counts.buy_24h
-                                        }}
-                                        trong 24 giờ qua)
+                                        mua<template
+                                            v-if="comments.counts.buy_24h"
+                                        >
+                                            ({{ comments.counts.buy_24h }} trong
+                                            24 giờ qua)</template
+                                        >
                                     </p>
                                 </div>
                                 <div
                                     class="flex gap-0.5 rounded-lg bg-muted p-1"
+                                    role="group"
+                                    aria-label="Lọc bình luận"
                                 >
                                     <button
                                         v-for="o in [
@@ -893,6 +1076,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                         ] as const"
                                         :key="o.k"
                                         type="button"
+                                        :aria-pressed="filters.cm === o.k"
                                         :class="seg(filters.cm === o.k)"
                                         @click="setComments(o.k)"
                                     >
@@ -1044,69 +1228,121 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                     <div>
                         <h2 :class="h2">Video đã đăng</h2>
                         <p class="text-[0.7812rem] text-muted-foreground">
-                            {{
-                                videos_total > videos.length
-                                    ? `Hiển thị ${videos.length} / ${videos_total} video trong khoảng đã chọn.`
-                                    : `${videos_total} video trong khoảng đã chọn.`
-                            }}
+                            {{ videos_total }} bài trong khoảng đã chọn · xếp
+                            theo {{ sortLabel.toLowerCase()
+                            }}{{ filters.dir === 'asc' ? ' (tăng dần)' : '' }}.
                         </p>
                     </div>
-                    <NativeSelect
-                        :model-value="filters.sort"
-                        class="h-9"
-                        aria-label="Sắp xếp"
-                        @update:model-value="
-                            apply({ sort: String($event) as Filters['sort'] })
-                        "
-                    >
-                        <option v-for="s in sorts" :key="s.key" :value="s.key">
-                            {{ s.label }}
-                        </option>
-                    </NativeSelect>
+                    <div class="flex items-center gap-2">
+                        <NativeSelect
+                            :model-value="filters.sort"
+                            class="h-9"
+                            aria-label="Sắp xếp"
+                            @update:model-value="
+                                apply({
+                                    sort: String($event) as Filters['sort'],
+                                    dir: 'desc',
+                                })
+                            "
+                        >
+                            <option
+                                v-for="s in sorts"
+                                :key="s.key"
+                                :value="s.key"
+                            >
+                                {{ s.label }}
+                            </option>
+                        </NativeSelect>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="h-9"
+                            :aria-label="
+                                filters.dir === 'asc'
+                                    ? 'Đang xếp tăng dần, bấm để xếp giảm dần'
+                                    : 'Đang xếp giảm dần, bấm để xếp tăng dần'
+                            "
+                            data-testid="fork-so-lieu-sort-dir"
+                            @click="toggleSort(filters.sort)"
+                            >{{
+                                filters.dir === 'asc' ? '↑ Tăng' : '↓ Giảm'
+                            }}</Button
+                        >
+                    </div>
                 </header>
                 <div
-                    :class="
-                        cn(
-                            'hidden border-b bg-muted/40 px-5 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid lg:gap-x-4',
-                            videoGridCls,
-                        )
-                    "
-                    data-testid="fork-so-lieu-videos-head"
+                    role="table"
+                    aria-label="Cột sắp xếp của bảng video"
+                    class="hidden lg:block"
                 >
-                    <span />
-                    <button
-                        type="button"
-                        class="text-left uppercase hover:text-foreground"
-                        @click="toggleSort('posted_at')"
+                    <div
+                        role="row"
+                        :class="
+                            cn(
+                                'grid gap-x-4 border-b bg-muted/40 px-5 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase',
+                                videoGridCls,
+                            )
+                        "
+                        data-testid="fork-so-lieu-videos-head"
                     >
-                        Video{{ sortMark('posted_at') }}
-                    </button>
-                    <span>Góc · giọng</span>
-                    <button
-                        type="button"
-                        class="text-left uppercase hover:text-foreground"
-                        @click="toggleSort('views')"
-                    >
-                        Lượt xem{{ sortMark('views') }}
-                    </button>
-                    <button
-                        v-for="c in [
-                            { k: 'likes', t: 'Tim' },
-                            { k: 'comments', t: 'B.luận' },
-                            { k: 'shares', t: 'Chia sẻ' },
-                            { k: 'engagement', t: 'Tương tác' },
-                        ] as const"
-                        :key="c.k"
-                        type="button"
-                        class="text-right uppercase hover:text-foreground"
-                        @click="toggleSort(c.k)"
-                    >
-                        {{ c.t }}{{ sortMark(c.k) }}
-                    </button>
-                    <span class="text-right">24h / 72h</span>
-                    <span />
+                        <span role="presentation" />
+                        <div
+                            role="columnheader"
+                            :aria-sort="ariaSort('moi')"
+                            class="text-left"
+                        >
+                            <button
+                                type="button"
+                                class="uppercase hover:text-foreground"
+                                @click="toggleSort('moi')"
+                            >
+                                Video{{ sortMark('moi') }}
+                            </button>
+                        </div>
+                        <span role="columnheader">Góc · giọng</span>
+                        <div
+                            role="columnheader"
+                            :aria-sort="ariaSort('view')"
+                            class="text-left"
+                        >
+                            <button
+                                type="button"
+                                class="uppercase hover:text-foreground"
+                                @click="toggleSort('view')"
+                            >
+                                Lượt xem{{ sortMark('view') }}
+                            </button>
+                        </div>
+                        <div
+                            v-for="c in [
+                                { k: 'tim', t: 'Tim' },
+                                { k: 'binh-luan', t: 'B.luận' },
+                                { k: 'chia-se', t: 'Chia sẻ' },
+                                { k: 'ty-le', t: 'Tương tác' },
+                            ] as const"
+                            :key="c.k"
+                            role="columnheader"
+                            :aria-sort="ariaSort(c.k)"
+                            class="text-right"
+                        >
+                            <button
+                                type="button"
+                                class="uppercase hover:text-foreground"
+                                @click="toggleSort(c.k)"
+                            >
+                                {{ c.t }}{{ sortMark(c.k) }}
+                            </button>
+                        </div>
+                        <span role="columnheader" class="text-right"
+                            >24h / 72h</span
+                        >
+                        <span role="presentation" />
+                    </div>
                 </div>
-                <div v-if="loading" class="flex flex-col divide-y">
+                <div
+                    v-if="loading && !loadingMore"
+                    class="flex flex-col divide-y"
+                >
                     <div
                         v-for="i in 5"
                         :key="i"
@@ -1136,9 +1372,12 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         >{{ (page - 1) * pageSize + 1 }}–{{
                             Math.min(page * pageSize, sortedVideos.length)
                         }}
-                        / {{ sortedVideos.length }} video</span
+                        / {{ sortedVideos.length }} bài</span
                     >
-                    <div class="flex items-center gap-1">
+                    <nav
+                        class="flex flex-wrap items-center gap-1"
+                        aria-label="Phân trang"
+                    >
                         <Button
                             variant="outline"
                             size="sm"
@@ -1147,15 +1386,26 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             @click="page--"
                             >Trước</Button
                         >
-                        <Button
-                            v-for="n in pageCount"
-                            :key="n"
-                            :variant="n === page ? 'default' : 'ghost'"
-                            size="sm"
-                            class="h-8 min-w-8 tabular-nums"
-                            @click="page = n"
-                            >{{ n }}</Button
+                        <template
+                            v-for="(n, i) in pageItems"
+                            :key="`${n}-${i}`"
                         >
+                            <span
+                                v-if="n === '…'"
+                                class="px-1 text-muted-foreground"
+                                aria-hidden="true"
+                                >…</span
+                            >
+                            <Button
+                                v-else
+                                :variant="n === page ? 'default' : 'ghost'"
+                                size="sm"
+                                class="h-8 min-w-8 tabular-nums"
+                                :aria-current="n === page ? 'page' : undefined"
+                                @click="page = n"
+                                >{{ n }}</Button
+                            >
+                        </template>
                         <Button
                             variant="outline"
                             size="sm"
@@ -1164,7 +1414,35 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             @click="page++"
                             >Sau</Button
                         >
-                    </div>
+                    </nav>
+                </footer>
+                <footer
+                    v-if="videos_total > videos.length"
+                    class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[0.8125rem] text-muted-foreground"
+                    data-testid="fork-so-lieu-videos-more"
+                >
+                    <span class="tabular-nums" role="status"
+                        >Hiển thị {{ videos.length }} /
+                        {{ videos_total }} bài</span
+                    >
+                    <Button
+                        v-if="canLoadMore"
+                        variant="outline"
+                        size="sm"
+                        class="h-8"
+                        :disabled="loadingMore"
+                        data-testid="fork-so-lieu-load-more"
+                        @click="loadMore"
+                        >{{
+                            loadingMore
+                                ? 'Đang tải…'
+                                : `Tải thêm ${Math.min(PAGE_STEP, remaining)} bài`
+                        }}</Button
+                    >
+                    <span v-else-if="filters.limit >= LIST_MAX"
+                        >Tối đa {{ LIST_MAX }} bài mỗi lần xem. Thu hẹp khoảng
+                        ngày hoặc bộ lọc để xem phần còn lại.</span
+                    >
                 </footer>
             </section>
         </template>

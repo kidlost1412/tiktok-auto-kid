@@ -35,7 +35,7 @@ const failed = ref<Record<number, boolean>>({});
                     <IconClipboardList class="size-5" /> Giỏ chờ đăng · {{ queue.length }} video
                 </DialogTitle>
                 <DialogDescription>
-                    Nơi để dành các video bạn định đăng sau. Video được hẹn giờ xong sẽ tự rời khỏi giỏ. (Đây không phải giỏ hàng TikTok Shop.)
+                    Nơi để dành các video anh định đăng sau. Video được hẹn giờ xong sẽ tự rời khỏi giỏ. (Đây không phải giỏ hàng TikTok Shop.)
                 </DialogDescription>
             </DialogHeader>
 

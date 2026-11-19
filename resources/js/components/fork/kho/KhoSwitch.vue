@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Chuyển giữa "Kho Xưởng Video" (video từ hub) và "Kho riêng" (video bạn tự làm).
+// Chuyển giữa "Kho Xưởng Video" (video từ hub) và "Kho riêng" (video anh tự làm).
 import { Link } from '@inertiajs/vue3';
 import { IconTrash } from '@tabler/icons-vue';
 import { ref } from 'vue';

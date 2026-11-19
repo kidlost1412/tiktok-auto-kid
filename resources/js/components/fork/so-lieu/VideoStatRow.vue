@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // Một dòng trong bảng "Video đã đăng": ảnh bìa · sản phẩm & giờ đăng · lượt xem · tim · bình luận · chia sẻ · tương tác · mốc 24h/72h.
+// Cả dòng bấm được để xem video: nút phủ kín dòng nằm DƯỚI nội dung (Tab + Enter/Space dùng được), còn link "Mở trên TikTok"
+// là phần tử anh em của nút (không lồng <a> trong <button>). Màn hẹp (< lg) có dòng thứ hai: ♥ tim · 💬 bình luận · ↗ chia sẻ · tương tác.
 import {
     IconExternalLink,
     IconHeart,
     IconMessageCircle,
     IconShare3,
 } from '@tabler/icons-vue';
+import { computed } from 'vue';
 
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
@@ -29,23 +32,37 @@ const props = defineProps<{
 const open = () => openVideo(props.ids ?? [props.video.id], props.video.id);
 const pct = (n: number) =>
     `${Math.max(2, Math.min(100, (n / Math.max(1, props.maxViews ?? n)) * 100))}%`;
+const label = computed(() =>
+    props.video.has_metrics
+        ? `Xem video ${props.productName} (${fmtNum(props.video.views)} lượt xem)`
+        : `Xem video ${props.productName}`,
+);
+const rate = computed(() =>
+    props.video.engagement > 0
+        ? `${props.video.engagement.toLocaleString('vi-VN')}%`
+        : '—',
+);
 </script>
 
 <template>
     <li
         :class="
             cn(
-                'grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-2 transition-colors hover:bg-accent/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring lg:min-h-14',
+                'relative isolate grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-2 transition-colors hover:bg-accent/40 lg:min-h-14',
                 gridCls ??
                     'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]',
             )
         "
-        tabindex="0"
-        role="button"
         :data-testid="`fork-so-lieu-video-${video.id}`"
         @click="open"
-        @keydown.enter.self.prevent="open"
     >
+        <!-- Nút phủ kín dòng, nằm dưới nội dung: bấm vào khoảng trống hay Tab + Enter/Space đều mở video -->
+        <button
+            type="button"
+            class="absolute inset-0 -z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            :aria-label="label"
+        />
+
         <CoverThumb
             :id="video.id"
             :fallback="video.product_image"
@@ -81,6 +98,33 @@ const pct = (n: number) =>
                     >{{ t }}</span
                 >
             </div>
+        </div>
+
+        <!-- Dòng thứ hai (màn hẹp): ♥ 1,2K · 💬 34 · ↗ 5 · 4,1% -->
+        <div
+            v-if="video.has_metrics"
+            class="col-start-2 row-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.75rem] text-muted-foreground tabular-nums lg:hidden"
+            data-testid="fork-so-lieu-video-line2"
+        >
+            <span
+                ><span aria-hidden="true">♥</span
+                ><span class="sr-only">Tim </span>
+                {{ fmtCompact(video.likes) }}</span
+            >
+            <span aria-hidden="true">·</span>
+            <span
+                ><span aria-hidden="true">💬</span
+                ><span class="sr-only">Bình luận </span>
+                {{ fmtCompact(video.comments) }}</span
+            >
+            <span aria-hidden="true">·</span>
+            <span
+                ><span aria-hidden="true">↗</span
+                ><span class="sr-only">Chia sẻ </span>
+                {{ fmtCompact(video.shares) }}</span
+            >
+            <span aria-hidden="true">·</span>
+            <span><span class="sr-only">Tỉ lệ tương tác </span>{{ rate }}</span>
         </div>
 
         <!-- Góc · giọng (màn rộng) -->
@@ -144,11 +188,7 @@ const pct = (n: number) =>
             <span
                 class="hidden text-right text-[0.8125rem] tabular-nums lg:block"
                 title="Tỉ lệ tương tác = (tim + bình luận + chia sẻ) / lượt xem"
-                >{{
-                    video.engagement > 0
-                        ? `${video.engagement.toLocaleString('vi-VN')}%`
-                        : '—'
-                }}</span
+                >{{ rate }}</span
             >
             <span
                 class="hidden text-right text-[0.7188rem] leading-tight text-muted-foreground tabular-nums lg:block"
@@ -172,14 +212,15 @@ const pct = (n: number) =>
             </span>
         </template>
 
+        <!-- Link ngoài: hiện ở mọi cỡ màn hình (màn hẹp nằm dưới số lượt xem) -->
         <a
             v-if="video.link"
             :href="video.link"
             target="_blank"
             rel="noopener noreferrer"
-            class="hidden size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:flex"
+            class="col-start-3 row-start-2 flex size-7 items-center justify-center justify-self-end rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:col-start-auto lg:row-start-auto lg:justify-self-auto"
             title="Mở trên TikTok"
-            aria-label="Mở trên TikTok"
+            :aria-label="`Mở video ${productName} trên TikTok`"
             @click.stop
         >
             <IconExternalLink class="size-4" />

@@ -12,6 +12,7 @@ from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, kh
 CFG = cfg_hub()
 from ai import goi, lay_json, HetHanMuc  # noqa: E402
 import su_kien as SK  # noqa: E402  (tự thoại của Biên kịch ở Khu Tự Trị: chỉ ghi sự kiện, nuốt mọi lỗi)
+import truc_tiep as TT  # noqa: E402  (việc trực tiếp của Biên kịch: ekip mở sẵn, viet() chỉ cập nhật bước + dòng thật)
 import prompt_mau  # noqa: E402
 
 MIN_VIDEO_SO_LIEU, MIN_TRUNG_VI = 15, 200       # số liệu TikTok chỉ gửi/dùng khi nhóm ≥ 15 video và trung vị ≥ 200 view/24h (nhỏ hơn là nhiễu)
@@ -771,6 +772,9 @@ def viet(ma_sp, so_ban, log=print):
             if errs:
                 log(f"  loại 1 bản ({it.get('goc')}/{t['mo']}): {'; '.join(errs)}")
                 SK.ghi("bien-kich", "nghi", "Loại 1 bài", buoc="loai", kieu=t["mo"], loi=str(errs[0])[:90], so_loi=len(errs))
+                _tt = TT.hien_tai()
+                if _tt is not None:
+                    _tt.them_dong(f"Loại 1 bài: {errs[0]}")          # lý do máy kiểm thật (vd. trùng câu cũ, thiếu tên sản phẩm)
                 loi_truoc = [x for x in loi_truoc if x not in errs] + errs      # lý do mới nhất ở cuối; gửi tối đa 5 lý do gần nhất
                 continue
             for s in sents:
@@ -805,6 +809,10 @@ def viet(ma_sp, so_ban, log=print):
             _dh = [h["diem"] for h in it["hook_thu"] if h.get("diem") is not None]
             SK.ghi("bien-kich", "nghi", f"Chốt bài {len(out)}/{so_ban}", buoc="dat", kieu=t["mo"], hook=(sents[0] if sents else "")[:120],
                    diem=max(_dh) if _dh else None, so=len(out), tong=so_ban)
+            _tt = TT.hien_tai()
+            if _tt is not None:
+                _tt.cap(buoc=f"Bài {len(out)}/{so_ban}", tien_do=min(1.0, len(out) / max(1, so_ban)))
+                _tt.them_dong(f"Chốt bài {len(out)}/{so_ban}: {sents[0] if sents else ''}")      # câu mở đầu (hook) của bài vừa được nhận
             if len(out) >= so_ban:
                 break
     return out

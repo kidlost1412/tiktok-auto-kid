@@ -21,6 +21,15 @@ export interface FolderMusic {
     gain_db: number;
 }
 
+/** Kết quả của GET /auto/kho/rieng/chon-tat-ca. */
+export interface SelectAllResult {
+    ok: boolean;
+    total: number;
+    max: number;
+    capped: boolean;
+    items: Selectable[];
+}
+
 export interface Selectable {
     id: number;
     file_name: string;
@@ -34,12 +43,20 @@ export interface RiengLoc {
     status: string;
     day: string;
     page?: number;
+    q?: string;
+    sort?: string;
 }
 
 /** Props của trang Kho riêng (và của KhoRiengBody dùng chung với bàn Thủ kho). */
 export type RiengPageProps = {
     folders: Folder[];
-    filters: { folder: number; status: string; day: string };
+    filters: {
+        folder: number;
+        status: string;
+        day: string;
+        q?: string;
+        sort?: string;
+    };
     counts: Record<string, number>;
     days: string[];
     videos: {
@@ -48,7 +65,8 @@ export type RiengPageProps = {
         last_page: number;
         total: number;
     };
-    selectable: Selectable[];
+    /** Số video chọn được (chưa đăng) theo bộ lọc hiện tại, mọi trang. Danh sách chi tiết lấy khi anh bấm "Chọn tất cả". */
+    selectable_count?: number;
     queue: QueueItem[];
     scan_sig: string;
     accounts: BatchAccount[];

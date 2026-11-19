@@ -72,15 +72,37 @@ export interface DailyPoint {
     views: number;
 }
 
+export type Range =
+    | 'today'
+    | 'yesterday'
+    | '7d'
+    | '30d'
+    | 'this-month'
+    | 'last-month'
+    | 'custom';
+
+/** Khoá sắp xếp bảng video (khớp StatsController::SORTS). */
+export type SortKey =
+    | 'moi'
+    | 'view'
+    | 'tuong-tac'
+    | 'tim'
+    | 'binh-luan'
+    | 'chia-se'
+    | 'ty-le';
+
 export interface Filters {
-    range: 'today' | '7d' | '30d' | 'custom';
+    range: Range;
     from: string;
     to: string;
     channel: string;
     product: string;
     goc: string;
     giong: string;
-    sort: 'moi' | 'view' | 'tuong-tac';
+    sort: SortKey;
+    dir: 'asc' | 'desc';
+    /** Số bài đang xin ở bảng video (60, 120, …). */
+    limit: number;
     cm: 'all' | 'mua';
     nguon: 'all' | 'ai' | 'rieng';
 }

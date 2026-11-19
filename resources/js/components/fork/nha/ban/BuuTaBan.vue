@@ -247,7 +247,7 @@ const labelCls =
 
         <!-- Đang tải lần đầu -->
         <template v-else-if="!p && loading">
-            <div class="grid grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-[14px]" />
             </div>
             <Skeleton class="h-[420px] rounded-[14px]" />
@@ -277,7 +277,10 @@ const labelCls =
             </div>
 
             <!-- Dải tóm tắt -->
-            <div class="grid grid-cols-4 gap-3" data-testid="ban-buuta-tomtat">
+            <div
+                class="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                data-testid="ban-buuta-tomtat"
+            >
                 <div :class="tileCls">
                     <span :class="labelCls">Hôm nay đã đăng</span>
                     <span class="flex items-baseline gap-1">

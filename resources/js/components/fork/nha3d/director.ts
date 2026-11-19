@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 import { lineFor, noi } from '../nha/loi-thoai';
 import { tatCaTuThoai, type TuThoai } from '../nha/tu-thoai';
-import type { NhaData, NhaEvent } from '../nha/types';
+import type { NhaData, NhaEvent, VaiState } from '../nha/types';
 import type { Actor, Step, Talker } from './actor';
 import type { Owl } from './cast';
 import type { Cat } from './cat';
@@ -102,6 +102,11 @@ export class Director {
     private talkQ: { t: TuThoai; until: number }[] = [];
     data: NhaData | null = null;
     log: string[] = [];
+    /** Lời thoại trực tiếp (việc đang chạy thật, xem nha/truc-tiep.ts): khoá nhân vật → câu đang nói. */
+    private liveSay: Record<string, string | null> = {};
+    private liveWorking = new Set<string>();
+    private liveOwl = '';
+    private liveCat = '';
 
     constructor(
         private A: Record<string, Actor>,
@@ -175,6 +180,32 @@ export class Director {
         }
     }
 
+    /**
+     * Nhận câu bong bóng + danh sách nhân vật đang có việc chạy trực tiếp từ trang. Có việc thật thì nhân vật ngồi làm việc
+     * (kể cả khi trạng thái chung đang "rảnh") và bong bóng là câu trực tiếp; hết việc thì trả về lời thoại cũ.
+     */
+    setLive(say: Record<string, string | null>, working: ReadonlySet<string>) {
+        this.liveSay = say;
+        this.liveWorking = new Set(working);
+        // Cú và Mèo nói bằng bong bóng riêng: có câu mới thì nói một lần (mỗi câu giữ ~5 giây)
+        const cu = say.cu ?? '';
+        const meo = say.meo ?? '';
+
+        if (cu && cu !== this.liveOwl && !this.owl.sleeping) {
+            this.owl.say(cu, 5);
+        }
+
+        if (meo && meo !== this.liveCat) {
+            this.cat.say(meo, 5, 'work');
+        }
+        this.liveOwl = cu;
+        this.liveCat = meo;
+
+        if (this.data) {
+            this.applyStates(this.data);
+        }
+    }
+
     private queueTalk(data: NhaData) {
         const now = this.now();
         for (const t of tatCaTuThoai(data)) {
@@ -238,13 +269,26 @@ export class Director {
         for (const [k, a] of Object.entries(this.A)) {
             const role = ROLE[k] ?? k;
             const v = d.vai[role];
-            const st = down ? 'sleep' : (v?.state ?? 'idle');
+            let st: VaiState = down ? 'sleep' : (v?.state ?? 'idle');
+            if (!down && st === 'idle' && this.liveWorking.has(role)) {
+                st = 'working'; // có việc chạy thật thì ngồi làm, không đi dạo
+            }
             if (st === 'working') {
                 working.add(role);
             }
             const prev = this.lastStates.get(k);
             a.base = st;
-            a.bubbleText = v?.bubble ?? null;
+            const live = down
+                ? null
+                : k === 'daodienB'
+                  ? (this.liveSay.daodien2 ?? null)
+                  : (this.liveSay[role] ?? null);
+            a.liveTalk = live != null;
+            a.bubbleText =
+                live ??
+                (k === 'daodienB' && this.liveWorking.has(role)
+                    ? null // Đạo diễn thứ hai không có việc riêng thì im, đừng nhại câu của người kia
+                    : (v?.bubble ?? null));
             if (
                 prev !== undefined &&
                 prev !== st &&

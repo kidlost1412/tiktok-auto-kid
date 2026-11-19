@@ -337,6 +337,8 @@ final class Reschedules
             $post->scheduled_at = $at;
             $post->save();
             $video->forceFill(['scheduled_for' => $at])->save();
+            // Giờ chủ app tự chọn: "Trộn xen kẽ sản phẩm" không đổi bài này.
+            ProductMix::pin($video);
         });
 
         Log::info('Đổi giờ bài chưa lên TikTok.', ['video_id' => $video->id, 'post_id' => $post->id, 'new_at' => $at->toIso8601String()]);
@@ -573,6 +575,7 @@ final class Reschedules
         $post->scheduled_at = $row->new_at;
         $post->save();
         $video->forceFill(['scheduled_for' => $row->new_at])->save();
+        ProductMix::pin($video);
 
         return null;
     }

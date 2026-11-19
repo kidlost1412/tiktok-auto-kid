@@ -174,7 +174,12 @@ final class PostBuilder
 
                 $post->forceFill(['media' => [MediaItem::fromMedia($media)->toArray()]])->save();
 
+                // Bài mới xếp: bỏ dấu "giờ do chủ app chọn" của lần hẹn trước (nếu có), nơi gọi tự đánh dấu lại khi cần.
+                $meta = (array) ($video->meta ?? []);
+                unset($meta[ProductMix::PIN]);
+
                 $video->forceFill([
+                    'meta' => $meta === [] ? null : $meta,
                     'status' => 'scheduled',
                     'social_account_id' => $social->id,
                     'post_id' => $post->id,

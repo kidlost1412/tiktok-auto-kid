@@ -158,16 +158,23 @@ const slotInfo = ref<
 >({});
 const slotsBusy = ref(false);
 const slotProblem = ref('');
-// Thứ tự xếp giờ: theo danh sách (video trước đăng trước) hoặc ngẫu nhiên (xáo cả lượt). Nhớ lựa chọn trên máy này.
+// Thứ tự xếp giờ: theo danh sách (video trước đăng trước), ngẫu nhiên (xáo cả lượt) hoặc xen kẽ sản phẩm (máy chủ xếp
+// để hai video liền nhau khác sản phẩm). Nhớ lựa chọn trên máy này; chưa chọn bao giờ thì theo cài đặt "Tự trộn" của kênh.
+type Order = 'list' | 'random' | 'mix';
 const ORDER_KEY = 'fork-rieng-batch-order';
-const readOrder = (): 'list' | 'random' => {
+const readOrder = (): Order | null => {
     try {
-        return localStorage.getItem(ORDER_KEY) === 'random' ? 'random' : 'list';
+        const v = localStorage.getItem(ORDER_KEY);
+
+        return v === 'random' || v === 'mix' || v === 'list' ? v : null;
     } catch {
-        return 'list';
+        return null;
     }
 };
-const order = ref<'list' | 'random'>(readOrder());
+const storedOrder = readOrder();
+const order = ref<Order>(storedOrder ?? 'list');
+// Anh đã tự bấm chọn thứ tự (trên máy này hoặc trong hộp này) thì không bao giờ tự đổi theo kênh nữa.
+let orderChosen = storedOrder !== null;
 const shuffled = ref<number[]>([]);
 const shuffle = () => {
     const ids = props.items.map((i) => i.id);
@@ -196,12 +203,13 @@ const ordered = computed<BatchItem[]>(() => {
         ...props.items.filter((i) => !shuffled.value.includes(i.id)),
     ];
 });
-const setOrder = (o: 'list' | 'random', reshuffle = false) => {
+const setOrder = (o: Order, reshuffle = false) => {
     if (o === 'random' && (reshuffle || order.value !== 'random')) {
         shuffle();
     }
 
     order.value = o;
+    orderChosen = true;
 
     try {
         localStorage.setItem(ORDER_KEY, o);
@@ -434,6 +442,17 @@ watch(productKey, (k, old) => {
     }
 });
 
+// "Xen kẽ sản phẩm": đổi sản phẩm (chung hoặc riêng từng video) thì xếp lại giờ cho khớp.
+watch(
+    [productKey, rowProduct],
+    () => {
+        if (order.value === 'mix') {
+            proposeSoon();
+        }
+    },
+    { deep: true },
+);
+
 // ---------------------------------------------------------------- Giờ đăng (luôn tự đề xuất, sửa tay được)
 let proposeSeq = 0;
 let proposeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -452,10 +471,19 @@ async function propose() {
         window: string | null;
         gap_minutes: number;
         daily_cap?: number;
+        mix_default?: boolean;
     }>('/auto/kho/rieng/dat-lich/goi-y', {
         social_account_id: accountId.value,
+        // Cùng sản phẩm như lúc đăng, để giờ xen kẽ ở đây khớp giờ thật.
+        product_code: perVideo.value
+            ? 'theo-video'
+            : (product.value?.code ?? null),
+        mix: order.value === 'mix',
         items: ordered.value.map((it) => ({
             id: it.id,
+            ...(rowProduct.value[it.id]
+                ? { product: rowProduct.value[it.id] }
+                : {}),
             ...(edited.value[it.id] && times.value[it.id]
                 ? { at: dayjs(times.value[it.id]).toISOString() }
                 : {}),
@@ -476,6 +504,18 @@ async function propose() {
     }
 
     slotProblem.value = '';
+
+    // Anh chưa từng chọn thứ tự: theo kênh — bật "Tự trộn xen kẽ sản phẩm" thì "Xen kẽ sản phẩm", không thì "Theo danh sách".
+    // Chỉ khi anh chưa bấm chọn; bấm rồi thì giữ đúng lựa chọn của anh (trước đây mỗi lần tính giờ lại bị đổi về "Xen kẽ").
+    const byChannel: Order = res.mix_default ? 'mix' : 'list';
+
+    if (!orderChosen && order.value !== 'random' && order.value !== byChannel) {
+        order.value = byChannel;
+        void propose();
+
+        return;
+    }
+
     rules.value = {
         window: res.window,
         gap: res.gap_minutes,
@@ -594,6 +634,7 @@ watch(product, (p) => {
 
 const payload = (acceptWarnings: boolean) => ({
     social_account_id: accountId.value,
+    mix: order.value === 'mix',
     product_code: perVideo.value ? 'theo-video' : (product.value?.code ?? ''),
     quy_cach: perVideo.value ? null : (product.value?.quy_cach ?? null),
     caption: caption.value,
@@ -1258,6 +1299,10 @@ const areaCls =
                                             v: 'random' as const,
                                             l: 'Ngẫu nhiên',
                                         },
+                                        {
+                                            v: 'mix' as const,
+                                            l: 'Xen kẽ sản phẩm',
+                                        },
                                     ]"
                                     :key="o.v"
                                     type="button"
@@ -1288,7 +1333,9 @@ const areaCls =
                                 <span class="text-xs text-muted-foreground">{{
                                     order === 'random'
                                         ? 'Xáo cả lượt.'
-                                        : 'Trên trước, dưới sau.'
+                                        : order === 'mix'
+                                          ? 'Hai video liền nhau khác sản phẩm, có chút ngẫu nhiên.'
+                                          : 'Trên trước, dưới sau.'
                                 }}</span>
                             </div>
                         </div>

@@ -301,12 +301,12 @@ const tagModes = [
     {
         v: 'append',
         t: 'Thêm vào cuối caption',
-        d: 'Giữ hashtag hub đã viết, thêm hashtag của bạn phía sau.',
+        d: 'Giữ hashtag hub đã viết, thêm hashtag của anh phía sau.',
     },
     {
         v: 'replace',
         t: 'Thay toàn bộ hashtag',
-        d: 'Bỏ hashtag cũ trong caption, chỉ dùng hashtag của bạn.',
+        d: 'Bỏ hashtag cũ trong caption, chỉ dùng hashtag của anh.',
     },
 ] as const;
 

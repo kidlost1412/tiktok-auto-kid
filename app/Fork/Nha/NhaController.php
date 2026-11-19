@@ -51,7 +51,32 @@ final class NhaController extends Controller
     {
         // Nhiều trang cùng hỏi (Khu Tự Trị, Xưởng Video, nhiều tab): dùng chung một kết quả trong 2 giây, đỡ gọi hub
         // (mỗi lần có thể giữ một tiến trình PHP tới 6 giây khi hub chậm) và đỡ chạy lại các câu truy vấn.
-        $state = Cache::remember('nha.state', 2, fn (): array => $this->buildState());
+        $state = Cache::get('nha.state');
+
+        if (! is_array($state)) {
+            // Hết đệm: chỉ MỘT yêu cầu dựng lại, các yêu cầu khác chờ rồi lấy kết quả đó (không dồn cùng lúc vào hub).
+            $lock = null;
+            $got = false;
+            try {
+                $lock = Cache::lock('nha.state.lock', 15);
+                $got = $lock->block(5);
+            } catch (Throwable) {
+                // kho đệm không có khoá, hoặc chờ quá lâu: cứ dựng như cũ
+            }
+
+            try {
+                $state = Cache::get('nha.state');
+
+                if (! is_array($state)) {
+                    $state = $this->buildState();
+                    Cache::put('nha.state', $state, 2);
+                }
+            } finally {
+                if ($got && $lock !== null) {
+                    $lock->release();
+                }
+            }
+        }
 
         return response()->json($state)->header('Cache-Control', 'no-store');
     }
@@ -72,6 +97,8 @@ final class NhaController extends Controller
         // Việc thật của các vai lo app (đăng bài, giỏ, AI Kho riêng, bình luận, Chrome) cho lời tự thoại.
         $state['hoat_dong'] = NhaHoatDong::build($now);
         $state['bay_gio_app'] = (float) $now->getTimestamp();
+        // Việc đang diễn ra ngay lúc này (app + hub chuyển tiếp); trình duyệt không với tới hub thì dùng bản này.
+        $state['truc_tiep'] = [...NhaTrucTiep::app($now), ...(($hub['up'] ?? false) ? NhaTrucTiep::hub() : [])];
 
         return $state;
     }
@@ -83,6 +110,11 @@ final class NhaController extends Controller
      */
     private function hub(): array
     {
+        // Hub vừa không trả lời: 10 giây tới coi là tắt luôn, không hỏi lại (mỗi lần hỏi có thể giữ một tiến trình PHP vài giây).
+        if (Cache::get('nha.hub-down') === true) {
+            return ['up' => false];
+        }
+
         $base = rtrim((string) config('fork.xuong.url'), '/');
         try {
             $r = Http::timeout(3)->connectTimeout(1)->acceptJson()->get($base.'/api/su-kien', ['max' => 600]);
@@ -98,6 +130,8 @@ final class NhaController extends Controller
                     'cho_duyet' => is_numeric($r->json('cho_duyet')) ? (int) $r->json('cho_duyet') : null,
                 ];
             }
+            // Chỉ khi hub trả lời nhưng không có sổ sự kiện (hub cũ: 404 / không OK) mới thử đường cũ.
+            // Hết giờ hoặc không kết nối được thì nhảy thẳng xuống catch, KHÔNG hỏi thêm lần hai.
             $r = Http::timeout(3)->connectTimeout(1)->acceptJson()->get($base.'/api/trang-thai');
             if ($r->successful()) {
                 return ['up' => true, 'dang_chay' => (bool) $r->json('dang_chay'), 'tien_do' => (array) $r->json('tien_do', []), 'su_kien' => []];
@@ -105,6 +139,8 @@ final class NhaController extends Controller
         } catch (Throwable) {
             // rơi xuống "hub tắt"
         }
+
+        Cache::put('nha.hub-down', true, 10);
 
         return ['up' => false];
     }
@@ -118,7 +154,8 @@ final class NhaController extends Controller
     {
         $dem = ['loi' => 0, 'gio_tam_dung' => 0, 'chua_gio' => 0, 'kho' => null, 'kho_thap' => false, 'cap_nhat' => null];
         try {
-            $dem['loi'] = AutoVideo::query()->where('status', AutoVideo::FAILED)->where('updated_at', '>=', $now->subDay())->count();
+            // Cùng định nghĩa với danh sách bài lỗi ở bàn Sảnh/Bưu tá (failed_recent): bài lỗi trong 14 ngày qua.
+            $dem['loi'] = AutoVideo::query()->where('status', AutoVideo::FAILED)->where('updated_at', '>=', $now->subDays(14))->count();
             $dem['gio_tam_dung'] = ProductLink::query()->whereNotNull('paused_reason')->where('paused_reason', '!=', '')->count();
 
             // Sản phẩm (mã x quy cách) đang có video chờ mà chưa chọn giỏ trên kênh nào (cùng ý với CartRules::forAccount).

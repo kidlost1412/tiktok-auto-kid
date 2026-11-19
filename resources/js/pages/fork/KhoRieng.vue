@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Kho riêng: video bạn tự làm. Thêm thư mục, chọn video (bấm, kéo, Shift) rồi đăng / hẹn giờ, hoặc cất vào "Giỏ chờ đăng".
+// Kho riêng: video anh tự làm. Thêm thư mục, chọn video (bấm, kéo, Shift) rồi đăng / hẹn giờ, hoặc cất vào "Giỏ chờ đăng".
 // Trang tự cập nhật: video mới bỏ vào thư mục xuất hiện trong ~10 giây, không cần bấm gì.
 // Phần thân nằm ở KhoRiengBody (dùng chung với bàn Thủ kho trong Khu Tự Trị).
 import { IconRefresh } from '@tabler/icons-vue';
@@ -22,7 +22,7 @@ const fmt = (iso: string | null) =>
 <template>
     <AutoShell
         title="Kho riêng"
-        :description="`Video bạn tự làm. Quét lần cuối ${fmt(props.last_scan_at)}. Video mới bỏ vào thư mục sẽ tự hiện sau khoảng 10 giây.`"
+        :description="`Video anh tự làm. Quét lần cuối ${fmt(props.last_scan_at)}. Video mới bỏ vào thư mục sẽ tự hiện sau khoảng 10 giây.`"
         testid="fork-rieng-page"
     >
         <template #actions>

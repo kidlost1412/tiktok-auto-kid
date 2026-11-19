@@ -1,23 +1,13 @@
 <script setup lang="ts">
 // Trang "Xưởng Video": nhúng giao diện hub sản xuất (iframe trỏ thẳng cổng hub).
 // Hub báo đổi tab qua postMessage; app báo đổi giao diện sáng/tối cho hub. Hub tắt thì hiện thẻ "Bật lại".
-import { Head, Link } from '@inertiajs/vue3';
-import {
-    IconArrowUpRight,
-    IconChevronDown,
-    IconChevronUp,
-    IconMovie,
-    IconNotes,
-    IconPower,
-} from '@tabler/icons-vue';
+import { Head } from '@inertiajs/vue3';
+import { IconExternalLink, IconMovie, IconPower } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import type { NhaData } from '@/components/fork/nha/types';
-import MiniScene from '@/components/fork/nha3d/MiniScene.vue';
-import NhatKyDaoDien from '@/components/fork/nha3d/NhatKyDaoDien.vue';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { cn } from '@/lib/utils';
 
 const props = defineProps<{
     url: string;
@@ -55,6 +45,13 @@ const bgHex = () => {
 
 // Địa chỉ iframe chỉ tính một lần lúc mở (đổi tab/giao diện sau đó dùng postMessage, không tải lại hub).
 const src = ref('');
+// Khung hub nạp xong chưa (hub dựng giao diện mất vài giây): chưa xong thì phủ lớp "Đang mở…" lên trên.
+const frameLoaded = ref(false);
+watch(src, () => {
+    frameLoaded.value = false;
+});
+// Mở hub ở cửa sổ riêng (khi khung nhúng chậm hoặc anh muốn xem rộng hơn).
+const openUrl = computed(() => `${props.url}/`);
 const buildSrc = () => {
     const q = new URLSearchParams({
         nhung: '1',
@@ -171,6 +168,13 @@ const restart = async () => {
     }, 6000);
 };
 
+// Quay lại tab: hỏi xưởng còn chạy không ngay (không đợi nhịp 5 giây).
+const onVis = () => {
+    if (!document.hidden) {
+        void check(true);
+    }
+};
+
 onMounted(() => {
     window.addEventListener('message', onMessage);
     observer = new MutationObserver(() => {
@@ -186,105 +190,14 @@ onMounted(() => {
     });
     void check(true);
     timer = window.setInterval(() => void check(), 5000);
+    document.addEventListener('visibilitychange', onVis);
 });
 
 onBeforeUnmount(() => {
     window.removeEventListener('message', onMessage);
     observer?.disconnect();
     window.clearInterval(timer);
-});
-
-// ---------------------------------------------------------------- "Khu Tự Trị" thu nhỏ
-// Luôn hiện ở góc dưới bên phải (không ẩn): hai Đạo diễn ngồi làm khi xưởng có việc, đứng dậy đi lại khi rảnh,
-// bấm vào để trò chuyện. Nhật ký "đang làm gì" thì gấp lại mặc định, bấm "Nhật ký" mới mở.
-// Một nguồn dữ liệu chung (/nha/trang-thai) cho cả cảnh 3D lẫn nhật ký; chỉ hỏi khi tab đang hiện.
-const nha = ref<NhaData | null>(null);
-const sep = ref<string | undefined>(undefined);
-const miniFailed = ref(false);
-const diaryOpen = ref(false);
-const mini = ref(false); // chỉ có tác dụng dưới 1536px: thu khung nổi thành viên thuốc
-let alive = true;
-let nhaTimer: number | undefined;
-let nhaBusy = false;
-
-const loadNha = async () => {
-    if (nhaBusy || document.hidden) {
-        return;
-    }
-    nhaBusy = true;
-    try {
-        const r = await fetch('/nha/trang-thai', {
-            headers: { Accept: 'application/json' },
-            credentials: 'same-origin',
-        });
-        if (r.ok && alive) {
-            nha.value = (await r.json()) as NhaData;
-        }
-    } catch {
-        // im lặng: chỉ là khung trang trí, không ảnh hưởng xưởng
-    } finally {
-        nhaBusy = false;
-    }
-};
-
-const pollNha = () => {
-    window.clearTimeout(nhaTimer);
-    if (!alive) {
-        return;
-    }
-    nhaTimer = window.setTimeout(async () => {
-        await loadNha();
-        pollNha();
-    }, 10000);
-};
-
-const onVis = () => {
-    if (!document.hidden) {
-        void loadNha();
-        void check(true);
-    }
-};
-
-onMounted(() => {
-    void loadNha();
-    pollNha();
-    document.addEventListener('visibilitychange', onVis);
-    fetch('/nha/nhan-vat/chinh', {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j: { avatar?: { ten?: string } } | null) => {
-            if (alive && j?.avatar?.ten) {
-                sep.value = j.avatar.ten;
-            }
-        })
-        .catch(() => {});
-});
-
-onBeforeUnmount(() => {
-    alive = false;
-    window.clearTimeout(nhaTimer);
     document.removeEventListener('visibilitychange', onVis);
-});
-
-const status = computed(() => {
-    const d = nha.value;
-    if (!d) {
-        return { text: 'đang xem…', dot: 'bg-muted-foreground/40' };
-    }
-    if (!d.hub.up) {
-        return { text: 'xưởng tắt, đang ngủ', dot: 'bg-muted-foreground/40' };
-    }
-    const st = d.vai.daodien?.state ?? 'idle';
-    if (st === 'working') {
-        return { text: 'đang làm việc', dot: 'bg-emerald-500 animate-pulse' };
-    }
-    if (st === 'sleep') {
-        return { text: 'đang ngủ', dot: 'bg-sky-400' };
-    }
-
-    return { text: 'đang rảnh, đi dạo', dot: 'bg-amber-400' };
 });
 </script>
 
@@ -293,7 +206,7 @@ const status = computed(() => {
 
     <AppLayout title="Xưởng Video" :icon="IconMovie" full-width>
         <div
-            class="relative flex min-h-0 flex-1 flex-col 2xl:flex-row"
+            class="relative flex min-h-0 flex-1 flex-col"
             style="height: calc(100vh - 4rem)"
             data-testid="fork-xuong"
         >
@@ -306,7 +219,29 @@ const status = computed(() => {
                     class="size-full flex-1 border-0"
                     allow="clipboard-write; fullscreen"
                     data-testid="fork-xuong-frame"
+                    @load="frameLoaded = true"
                 />
+                <div
+                    v-if="up && src && !frameLoaded"
+                    class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background text-muted-foreground"
+                    role="status"
+                    data-testid="fork-xuong-loading"
+                >
+                    <Spinner class="size-6" />
+                    <p class="text-sm">Đang mở Xưởng Video…</p>
+                </div>
+                <a
+                    v-if="up && src"
+                    :href="openUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border bg-background/90 px-2.5 py-1 text-[0.75rem] font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+                    title="Mở Xưởng Video trong một cửa sổ mới"
+                    data-testid="fork-xuong-open-new"
+                >
+                    <IconExternalLink class="size-3.5" />
+                    Mở trong cửa sổ mới
+                </a>
                 <div
                     v-else-if="up === false"
                     class="m-auto flex max-w-md flex-col items-center gap-4 p-8 text-center"
@@ -339,145 +274,6 @@ const status = computed(() => {
                     Đang kiểm tra Xưởng Video…
                 </div>
             </div>
-
-            <!-- "Khu Tự Trị": từ 1536px là cột phải cố định cạnh hub; màn hẹp hơn là khung nổi, thu nhỏ được thành viên thuốc. -->
-            <section
-                :class="
-                    cn(
-                        'absolute right-4 bottom-4 z-20 flex flex-col overflow-hidden border bg-card shadow-[0_12px_32px_-8px_rgba(0,0,0,.28)]',
-                        'w-[min(20rem,calc(100vw-2rem))] rounded-2xl',
-                        mini && 'max-2xl:w-auto max-2xl:rounded-full',
-                        '2xl:static 2xl:z-auto 2xl:w-[340px] 2xl:shrink-0 2xl:rounded-none 2xl:border-y-0 2xl:border-r-0 2xl:border-l 2xl:shadow-none',
-                    )
-                "
-                aria-label="Khu Tự Trị"
-                data-testid="xuong-mini-panel"
-            >
-                <header
-                    :class="
-                        cn(
-                            'flex shrink-0 items-center gap-2 px-3 pt-2.5 pb-1.5',
-                            mini && 'max-2xl:py-1.5 max-2xl:pr-1.5',
-                            '2xl:px-4 2xl:pt-3 2xl:pb-2',
-                        )
-                    "
-                >
-                    <span
-                        :class="cn('size-2 shrink-0 rounded-full', status.dot)"
-                    />
-                    <div class="min-w-0 flex-1 leading-tight">
-                        <div
-                            :class="
-                                cn(
-                                    'text-[0.8125rem] font-semibold',
-                                    mini && 'max-2xl:hidden',
-                                )
-                            "
-                        >
-                            Khu Tự Trị
-                        </div>
-                        <div
-                            class="truncate text-[0.7188rem] text-muted-foreground"
-                            data-testid="xuong-mini-status"
-                        >
-                            Đạo diễn {{ status.text }}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        :class="
-                            cn(
-                                'flex h-7 items-center gap-1 rounded-md px-2 text-[0.75rem] font-medium transition-colors',
-                                diaryOpen
-                                    ? 'bg-secondary text-foreground'
-                                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                                mini && 'max-2xl:hidden',
-                                '2xl:hidden',
-                            )
-                        "
-                        :aria-expanded="diaryOpen"
-                        data-testid="xuong-mini-toggle"
-                        @click="diaryOpen = !diaryOpen"
-                    >
-                        <IconNotes class="size-3.5" />
-                        Nhật ký
-                    </button>
-                    <Link
-                        href="/nha"
-                        :class="
-                            cn(
-                                'flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground',
-                                mini && 'max-2xl:hidden',
-                            )
-                        "
-                        title="Mở Khu Tự Trị đầy đủ"
-                        aria-label="Mở Khu Tự Trị đầy đủ"
-                        data-testid="xuong-mini-ve-xuong"
-                    >
-                        <IconArrowUpRight class="size-4" />
-                    </Link>
-                    <button
-                        type="button"
-                        class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground 2xl:hidden"
-                        :title="mini ? 'Mở rộng' : 'Thu nhỏ'"
-                        :aria-label="
-                            mini ? 'Mở rộng Khu Tự Trị' : 'Thu nhỏ Khu Tự Trị'
-                        "
-                        :aria-expanded="!mini"
-                        data-testid="xuong-mini-thu-nho"
-                        @click="mini = !mini"
-                    >
-                        <IconChevronDown v-if="!mini" class="size-4" />
-                        <IconChevronUp v-else class="size-4" />
-                    </button>
-                </header>
-                <div
-                    :class="
-                        cn(
-                            'flex min-h-0 flex-1 flex-col',
-                            mini && 'max-2xl:hidden',
-                        )
-                    "
-                >
-                    <div
-                        :class="
-                            cn(
-                                'relative mx-2 h-44 shrink-0 overflow-hidden rounded-xl bg-gradient-to-b from-violet-100/70 to-secondary/40 2xl:mx-3 2xl:h-80 dark:from-violet-950/40 dark:to-secondary/30',
-                            )
-                        "
-                    >
-                        <MiniScene
-                            v-if="!miniFailed"
-                            :data="nha"
-                            :sep="sep"
-                            @fail="miniFailed = true"
-                        />
-                        <div
-                            v-else
-                            class="grid h-full place-items-center px-4 text-center text-xs text-muted-foreground"
-                        >
-                            Máy này không dựng được cảnh 3D — mở Khu Tự Trị đầy
-                            đủ để xem bản 2D.
-                        </div>
-                    </div>
-                    <p
-                        class="shrink-0 px-3 pt-1.5 pb-2 text-[0.6875rem] text-muted-foreground 2xl:px-4"
-                    >
-                        Bấm vào một Đạo diễn để trò chuyện.
-                    </p>
-                    <!-- Cột riêng (≥1536px) không che gì nên nhật ký luôn hiện, lấp phần dưới cột; màn hẹp thì bấm "Nhật ký" mới mở. -->
-                    <div
-                        :class="
-                            cn(
-                                'flex max-h-32 min-h-0 flex-col border-t px-2.5 py-2 2xl:max-h-none 2xl:flex-1 2xl:px-4',
-                                !diaryOpen && 'hidden 2xl:flex',
-                            )
-                        "
-                    >
-                        <NhatKyDaoDien :data="nha" class="min-h-0 flex-1" />
-                    </div>
-                </div>
-            </section>
         </div>
     </AppLayout>
 </template>

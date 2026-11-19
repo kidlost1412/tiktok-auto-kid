@@ -2,7 +2,7 @@
 // Bong bóng lời nói trong toạ độ cả ngôi nhà. (x, y) = đầu nhọn của đuôi bong bóng (ngay trên đầu nhân vật).
 import { computed } from 'vue';
 
-const props = withDefaults(defineProps<{ x: number; y: number; text: string; max?: number; vw?: number }>(), { max: 21, vw: 1000 });
+const props = withDefaults(defineProps<{ x: number; y: number; text: string; max?: number; vw?: number }>(), { max: 24, vw: 1000 });
 
 const lines = computed(() => {
     const out: string[] = [];
@@ -19,7 +19,13 @@ const lines = computed(() => {
         out.push(cur);
     }
 
-    return out.slice(0, 3);
+    // Quá 4 dòng thì cắt và thêm "…" (không cắt cụt im lặng)
+    if (out.length > 4) {
+        out.length = 4;
+        out[3] = `${out[3].replace(/[\s,.;:!?-]+$/u, '').slice(0, props.max - 1)}…`;
+    }
+
+    return out;
 });
 const W = computed(() => Math.max(46, Math.max(...lines.value.map((l) => l.length)) * 6.5 + 20));
 const H = computed(() => lines.value.length * 15 + 11);

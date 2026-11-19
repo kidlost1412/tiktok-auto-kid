@@ -10,8 +10,11 @@ import BanLamViec from '@/components/fork/nha/ban/BanLamViec.vue';
 import { onMoBan } from '@/components/fork/nha/ban/bus';
 import { BAN } from '@/components/fork/nha/ban/registry';
 import House from '@/components/fork/nha/House.vue';
+import { loiChao } from '@/components/fork/nha/loi-chao';
+import NhaViecHomNay from '@/components/fork/nha/NhaViecHomNay.vue';
 import { DICH, type NhaData } from '@/components/fork/nha/types';
 import { useHubLuong } from '@/components/fork/nha/useHubLuong';
+import { useTrucTiep } from '@/components/fork/nha/useTrucTiep';
 import Nha3D from '@/components/fork/nha3d/Nha3D.vue';
 import VideoViewer from '@/components/fork/shared/VideoViewer.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -34,17 +37,10 @@ const hour =
 let demoSrc: { snapshot: () => NhaData } | null = null;
 const now = ref(new Date());
 
-const greeting = computed(() => {
-    const h = now.value.getHours();
-
-    return h < 11
-        ? 'Chào buổi sáng'
-        : h < 14
-          ? 'Chào buổi trưa'
-          : h < 18
-            ? 'Chào buổi chiều'
-            : 'Chào buổi tối';
-});
+const greeting = computed(() => loiChao(now.value.getHours()));
+// Hỏi trạng thái lỗi nhưng vẫn còn số cũ trên màn hình: báo anh biết số đang cũ (không xoá số cũ đi).
+const stale = computed(() => failed.value && data.value !== null);
+const refreshing = ref(false);
 const line = computed(() =>
     failed.value && !data.value
         ? 'Chưa hỏi được trạng thái xưởng, đang thử lại…'
@@ -89,6 +85,13 @@ let alive = true;
 const luong = useHubLuong(() =>
     !demo && data.value?.hub.up ? data.value.hub.url : null,
 );
+// Việc đang chạy thật (chữ Biên kịch đang viết, bước Thợ dựng đang làm…): gộp `data.truc_tiep` với hỏi thẳng hub mỗi khi luồng
+// SSE báo mốc `tt` mới; cấp cho bong bóng (2D + 3D), màn hình ở bàn làm việc và bảng tin Sảnh (provide/inject).
+const truc = useTrucTiep({
+    data: () => data.value,
+    hubUrl: () => (!demo && data.value?.hub.up ? data.value.hub.url : null),
+    onDoi: luong.onDoi,
+});
 let lai = false;
 let gop: number | undefined;
 const load = async () => {
@@ -101,6 +104,7 @@ const load = async () => {
         return;
     }
     inflight = true;
+    refreshing.value = true;
     try {
         if (demo) {
             if (!demoSrc) {
@@ -117,6 +121,10 @@ const load = async () => {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         });
+        // 4xx/5xx (hết phiên, máy chủ lỗi…) KHÔNG được coi là dữ liệu: giữ số cũ và báo mất kết nối.
+        if (!r.ok) {
+            throw new Error(String(r.status));
+        }
         const d = (await r.json()) as NhaData;
         if (alive) {
             data.value = d;
@@ -126,6 +134,7 @@ const load = async () => {
         failed.value = true;
     } finally {
         inflight = false;
+        refreshing.value = false;
 
         if (lai && alive) {
             lai = false;
@@ -133,7 +142,15 @@ const load = async () => {
         }
     }
 };
-const offDoi = luong.onDoi(() => {
+let doiTruoc: string | null = null;
+const offDoi = luong.onDoi((d) => {
+    // Chỉ mốc "tt" (chữ trực tiếp) đổi thì kho trực tiếp tự lo (hỏi thẳng hub); đừng bắt cả trạng thái tải lại mỗi giây.
+    const k = `${d.n}|${d.cho_duyet}|${d.chay}`;
+
+    if (k === doiTruoc) {
+        return;
+    }
+    doiTruoc = k;
     window.clearTimeout(gop); // gộp nhiều tin dồn dập trong 250ms thành 1 lần hỏi
     gop = window.setTimeout(() => void load(), 250);
 });
@@ -146,17 +163,25 @@ const schedule = () => {
     }
     const busy =
         data.value?.mode === 'working' ||
-        data.value?.vai.buuta?.state === 'working';
+        data.value?.vai.buuta?.state === 'working' ||
+        truc.nhanh.value;
     timer = window.setTimeout(
         async () => {
             await load();
             now.value = new Date();
             schedule();
         },
-        demo ? 1000 : luong.ok.value ? 20000 : busy ? 3000 : 10000,
+        demo
+            ? 1000
+            : luong.ok.value && !truc.nhanh.value
+              ? 20000
+              : busy
+                ? 3000
+                : 10000,
     );
 };
 watch(luong.ok, () => schedule());
+watch(truc.nhanh, () => schedule());
 const onVis = () => {
     if (!document.hidden) {
         void load().then(schedule);
@@ -218,6 +243,14 @@ onBeforeUnmount(() => {
                             {{ line }}
                         </p>
                     </div>
+                    <NhaViecHomNay
+                        :data="data"
+                        :stale="stale"
+                        :refreshing="refreshing"
+                        glass
+                        @go="go"
+                        @retry="load"
+                    />
                     <span
                         v-if="demo"
                         class="self-start rounded-full bg-amber-300/90 px-2.5 py-0.5 text-[0.6875rem] font-bold text-amber-950 shadow sm:px-3 sm:py-1 sm:text-xs"
@@ -243,6 +276,13 @@ onBeforeUnmount(() => {
                         {{ line }}
                     </p>
                 </div>
+                <NhaViecHomNay
+                    :data="data"
+                    :stale="stale"
+                    :refreshing="refreshing"
+                    @go="go"
+                    @retry="load"
+                />
                 <div
                     class="relative overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
                 >

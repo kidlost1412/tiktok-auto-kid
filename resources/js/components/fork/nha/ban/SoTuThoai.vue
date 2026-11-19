@@ -6,7 +6,12 @@ import { computed } from 'vue';
 import { tatCaTuThoai } from '@/components/fork/nha/tu-thoai';
 import type { NhaData } from '@/components/fork/nha/types';
 
-const props = defineProps<{ data: NhaData | null; who: string }>();
+// dangLam: màn hình trực tiếp ngay phía trên đang chạy → sổ trống thì ẩn hẳn, đừng nói "chưa có việc" khi đang làm.
+const props = defineProps<{
+    data: NhaData | null;
+    who: string;
+    dangLam?: boolean;
+}>();
 
 const now = computed(
     () => props.data?.bay_gio_app ?? props.data?.bay_gio ?? Date.now() / 1000,
@@ -35,6 +40,7 @@ const dong = computed(() =>
 
 <template>
     <section
+        v-if="dong.length || !dangLam"
         class="mb-4 shrink-0 rounded-xl border bg-card px-4 py-3"
         data-testid="nha-tu-thoai"
     >

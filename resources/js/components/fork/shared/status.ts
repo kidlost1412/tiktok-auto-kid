@@ -102,7 +102,7 @@ export interface StatusMeta {
 export const statusMeta: Record<string, StatusMeta> = {
     new: { label: 'Chờ đăng', icon: IconClock, tone: 'neutral' },
     reserved: { label: 'Giữ chỗ', icon: IconBookmark, tone: 'violet' },
-    scheduled: { label: 'Đã xếp lịch', icon: IconCalendarCheck, tone: 'info' },
+    scheduled: { label: 'Đã hẹn giờ', icon: IconCalendarCheck, tone: 'info' },
     publishing: {
         label: 'Đang đăng',
         icon: IconLoader2,
@@ -139,7 +139,7 @@ export const statusMeta: Record<string, StatusMeta> = {
 
 /**
  * Trạng thái hiển thị trên Lịch đăng: "scheduled" ở đây nghĩa là video đã xếp mà CHƯA gửi lên TikTok
- * (nơi khác "Đã xếp lịch" vẫn giữ nghĩa cũ).
+ * (nơi khác "Đã hẹn giờ" vẫn giữ nghĩa cũ).
  */
 export const lichStatus = (state: string): string =>
     state === 'scheduled' ? 'in_app' : state;

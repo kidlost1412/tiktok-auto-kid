@@ -19,6 +19,7 @@ import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho
 import prompt_mau
+import truc_tiep as TT        # "việc trực tiếp" cho trang Khu Tự Trị (chỉ ghi file nhỏ, nuốt mọi lỗi)
 LS = HUB / "lich-su"
 MODELS = {"gemini-4-hydrogen-high": "Gemini 4 Hydrogen · High (mặc định)", "gemini-4-argon-high": "Gemini 4 Argon · High", "gemini-3.8-flash-high": "Gemini 3.8 Flash · High",
           "gemini-3.8-flash-medium": "Gemini 3.8 Flash · Medium"}      # id thật của Antigravity (agentapi tự rơi về bậc flash nếu id không có)
@@ -651,6 +652,7 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     try:
         while t <= han and len(xong) < len(outs) and not huy.is_set():
             ngu(CHU_KY_S); t += CHU_KY_S
+            TT.nhip(giay=int(t))                              # việc trực tiếp (nếu luồng này có): vẫn "đang chờ Antigravity" + số giây đã chờ thật
             if huy.is_set():
                 break
             for o in outs:
@@ -720,8 +722,10 @@ def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy
     try:
         cid = gui(chuan_model(model), prompt, tieu_de, project) if project else gui(chuan_model(model), prompt, tieu_de)
         cu, on, t = -1, 0, 0.0
+        TT.cap_hien_tai(buoc="Antigravity đang xem và chấm")
         while t <= han:
             ngu(CHU_KY_S); t += CHU_KY_S
+            TT.nhip(giay=int(t))                              # việc trực tiếp của giám khảo (ekip mở sẵn): số giây đã chờ Antigravity
             if huy.is_set():
                 raise Huy()
             try:
@@ -1206,19 +1210,25 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             tieu_de = f"Xưởng Video · {ten} · lô {so}/{tong_lo}" + ("" if lan == 1 else " (làm lại cảnh lỗi)")
             kw = {"project": pj} if pj else {}
             han = min(HAN_LO_TOI_DA_S, HAN_MOI_VIDEO_S * len(lo) + HAN_THEM_S)
-            nhan = runner(model, loi_nhac_phieu(viec, to, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
-            if huy.is_set():
-                return
-            text = ket.get("text")
-            if text is None and nhan and ra.exists():
-                text = ra.read_text(encoding="utf-8", errors="replace")
-            ly_chung = None
-            if text is None:
-                ly_chung = "Antigravity không ghi phiếu (có thể hết lượt model hoặc video khó đọc)"
-                ok, hong, info = {}, [], {}
-            else:
-                ok, hong = phieu.kiem_phieu(text, len(lo), [n for n, _, _ in phang])
-                info = phieu.doc_phieu_video(text, len(lo))
+            with TT.viec("hoc-canh", f"Antigravity đang điền phiếu lô {so}/{tong_lo}" + ("" if lan == 1 else " (làm lại cảnh lỗi)"), sp=ten,
+                         buoc=f"Lô {so}/{tong_lo}", video=", ".join(Path(v["rel"]).name for v, _ in lo)) as tt_hc:
+                tt_hc.cap(chi_tiet={"canh": dem, "video": len(lo), "han_s": int(han)})
+                nhan = runner(model, loi_nhac_phieu(viec, to, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+                if huy.is_set():
+                    return
+                text = ket.get("text")
+                if text is None and nhan and ra.exists():
+                    text = ra.read_text(encoding="utf-8", errors="replace")
+                ly_chung = None
+                if text is None:
+                    ly_chung = "Antigravity không ghi phiếu (có thể hết lượt model hoặc video khó đọc)"
+                    ok, hong, info = {}, [], {}
+                    tt_hc.ket("loi"); tt_hc.cap(viec="Antigravity không ghi phiếu"); tt_hc.them_dong(ly_chung)
+                else:
+                    ok, hong = phieu.kiem_phieu(text, len(lo), [n for n, _, _ in phang])
+                    info = phieu.doc_phieu_video(text, len(lo))
+                    tt_hc.cap(viec=f"Đã nhận phiếu lô {so}/{tong_lo}", tien_do=1.0, chi_tiet={"canh_dat": len(ok), "canh_loi": len(phang) - len(ok)})
+                    tt_hc.them_dong(f"Phiếu hợp lệ {len(ok)}/{len(phang)} cảnh", *[str(x) for x in list(dict(hong).values())[:2]])
             ly = dict(hong)
             for n, v, i in phang:
                 if n in ok:

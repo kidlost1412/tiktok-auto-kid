@@ -5,6 +5,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { IconAlertCircle, IconEye, IconRefresh } from '@tabler/icons-vue';
 import { ref } from 'vue';
 
+import ConfirmRetryDialog from '@/components/fork/auto/ConfirmRetryDialog.vue';
 import type { FailedRow, RecentRow } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
@@ -15,14 +16,6 @@ import {
 } from '@/components/fork/shared/status';
 import { openVideo } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -172,50 +165,20 @@ const when = (iso: string | null) => {
             </li>
         </ul>
 
-        <Dialog
-            :open="confirming !== null"
-            @update:open="
-                (o) => {
-                    if (!o && retrying === null) confirming = null;
-                }
+        <ConfirmRetryDialog
+            :target="
+                confirming
+                    ? {
+                          label: productName(confirming.product_code),
+                          username: confirming.username,
+                      }
+                    : null
             "
-        >
-            <DialogContent class="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Bài này thật sự chưa lên TikTok?</DialogTitle>
-                    <DialogDescription>
-                        Chrome không báo được kết quả nên app không biết bài
-                        <b>{{
-                            confirming
-                                ? productName(confirming.product_code)
-                                : ''
-                        }}</b>
-                        <template v-if="confirming?.username">
-                            của @{{ confirming.username }}</template
-                        >
-                        đã lên hay chưa. Hãy mở TikTok Studio, xem cả mục bài đã
-                        hẹn giờ. Chỉ bấm đăng lại khi chắc chắn không thấy bài,
-                        nếu không sẽ bị đăng trùng.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter class="gap-2">
-                    <Button
-                        variant="outline"
-                        :disabled="retrying !== null"
-                        @click="confirming = null"
-                        >Để sau</Button
-                    >
-                    <Button
-                        :disabled="retrying !== null"
-                        data-testid="fork-auto-confirm-retry-ok"
-                        @click="confirming && retry(confirming.id, true)"
-                    >
-                        <Spinner v-if="retrying !== null" class="size-4" />
-                        Chưa lên, đăng lại
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            :busy="retrying !== null"
+            ok-testid="fork-auto-confirm-retry-ok"
+            @cancel="confirming = null"
+            @confirm="confirming && retry(confirming.id, true)"
+        />
 
         <p
             v-if="!recent.length"
@@ -273,5 +236,16 @@ const when = (iso: string | null) => {
                 </button>
             </li>
         </ul>
+        <div
+            v-if="recent.length > limit"
+            class="shrink-0 border-t px-4 py-2 text-center"
+        >
+            <Link
+                href="/auto/so-lieu"
+                class="text-[0.7812rem] font-medium text-primary-text hover:underline"
+                data-testid="fork-auto-recent-all"
+                >Xem tất cả →</Link
+            >
+        </div>
     </section>
 </template>

@@ -3,8 +3,12 @@
 // chọn mục bằng tab bên trong trang. URL cũ (/settings/chrome, /settings/telegram,
 // /settings/cap-nhat) tự chuyển hướng vào đây kèm # để mở đúng mục.
 import { Head } from '@inertiajs/vue3';
-import { IconBrandChrome, IconBrandTelegram, IconCloudDownload } from '@tabler/icons-vue';
-import { computed, onMounted, ref, type Component } from 'vue';
+import {
+    IconBrandChrome,
+    IconBrandTelegram,
+    IconCloudDownload,
+} from '@tabler/icons-vue';
+import { computed, onBeforeUnmount, onMounted, ref, type Component } from 'vue';
 
 import ChromeSection from '@/components/fork/settings/ChromeSection.vue';
 import TelegramSection from '@/components/fork/settings/TelegramSection.vue';
@@ -30,13 +34,20 @@ const tabs: { key: TabKey; label: string; icon: Component }[] = [
 const active = ref<TabKey>(props.tab);
 
 // Bookmark/link cũ dùng #chrome, #telegram hoặc #cap-nhat: ưu tiên hơn giá trị mặc định từ server.
-onMounted(() => {
+const applyHash = () => {
     const hash = window.location.hash.replace('#', '') as TabKey;
 
     if (tabs.some((t) => t.key === hash)) {
         active.value = hash;
     }
+};
+
+// Đang ở Cài đặt mà bấm link tới mục khác (Tìm nhanh, chuông, "Mở phần Kết nối Chrome") chỉ đổi phần # nên cũng phải đổi mục.
+onMounted(() => {
+    applyHash();
+    window.addEventListener('hashchange', applyHash);
 });
+onBeforeUnmount(() => window.removeEventListener('hashchange', applyHash));
 
 function setTab(key: string): void {
     active.value = key as TabKey;
@@ -47,8 +58,10 @@ const description = computed(
     () =>
         ({
             chrome: 'Ghép nối tiện ích Chrome để đăng TikTok, xem Chrome nào đang kết nối và bài nào vừa được giao.',
-            telegram: 'Nhận tin ngay trên điện thoại khi bài lên, bài lỗi, mất kết nối, và tổng kết mỗi ngày.',
-            'cap-nhat': 'Cập nhật TikTok Auto Kid lên bản mới chỉ với một cú nhấp. Dữ liệu được sao lưu trước, lỗi thì tự quay về bản cũ.',
+            telegram:
+                'Nhận tin ngay trên điện thoại khi bài lên, bài lỗi, mất kết nối, và tổng kết mỗi ngày.',
+            'cap-nhat':
+                'Cập nhật TikTok Auto Kid lên bản mới chỉ với một cú nhấp. Dữ liệu được sao lưu trước, lỗi thì tự quay về bản cũ.',
         })[active.value],
 );
 </script>
@@ -59,9 +72,17 @@ const description = computed(
     <SettingsLayout title="Cài đặt" :description="description">
         <div class="flex flex-col gap-5" data-testid="fork-settings-page">
             <div class="max-w-full overflow-x-auto">
-                <Tabs :model-value="active" @update:model-value="setTab(String($event))">
+                <Tabs
+                    :model-value="active"
+                    @update:model-value="setTab(String($event))"
+                >
                     <TabsList data-testid="fork-settings-tabs">
-                        <TabsTrigger v-for="t in tabs" :key="t.key" :value="t.key" class="gap-1.5">
+                        <TabsTrigger
+                            v-for="t in tabs"
+                            :key="t.key"
+                            :value="t.key"
+                            class="gap-1.5"
+                        >
                             <component :is="t.icon" class="size-4" />
                             {{ t.label }}
                         </TabsTrigger>
@@ -70,7 +91,10 @@ const description = computed(
             </div>
 
             <ChromeSection v-if="active === 'chrome'" v-bind="props.chrome" />
-            <TelegramSection v-else-if="active === 'telegram'" v-bind="props.telegram" />
+            <TelegramSection
+                v-else-if="active === 'telegram'"
+                v-bind="props.telegram"
+            />
             <UpdateSection v-else v-bind="props.update" />
         </div>
     </SettingsLayout>

@@ -15,6 +15,7 @@ use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Scheduling\MissingVideoFile;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PostBuilder;
+use App\Fork\AutoPost\Scheduling\ProductMix;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\VideoLibrary;
@@ -142,8 +143,26 @@ final class RiengBatch
             $rows[] = ['id' => $id, 'status' => 'ok', 'messages' => [], 'at' => null, '_at' => $this->parseAt($item['at'] ?? null)];
         }
 
-        $left = $this->schedule($rows, $auto, $now, $fmt);
         $products = $this->videoProducts(array_column($rows, 'id'), (string) $auto->social_account_id);
+
+        // Sản phẩm của từng dòng giống lúc đăng thật (để giờ xen kẽ ở bước xem trước khớp bước đăng):
+        // chọn riêng trong hộp > sản phẩm chung của lượt > sản phẩm của chính video.
+        $shared = (string) ($in['product_code'] ?? '');
+        $own = [];
+
+        foreach ((array) ($in['items'] ?? []) as $item) {
+            if (is_array($item) && is_string($item['product'] ?? null) && $item['product'] !== '') {
+                $own[(int) ($item['id'] ?? 0)] = explode('|', $item['product'], 2)[0];
+            }
+        }
+
+        foreach ($rows as &$r) {
+            $r['_code'] = $own[$r['id']] ?? ($shared !== '' && $shared !== self::PER_VIDEO ? $shared : ($products[$r['id']]['code'] ?? null));
+        }
+
+        unset($r);
+        $mix = $this->wantsMix($in, $auto);
+        $left = $this->schedule($rows, $auto, $now, $fmt, $mix);
 
         return [
             'ok' => true,
@@ -153,6 +172,8 @@ final class RiengBatch
             'window' => app(RiengSchedule::class)->windowLabel($auto),
             'gap_minutes' => $gapMinutes,
             'daily_cap' => app(RiengSchedule::class)->cap($auto),
+            'mix' => $mix,
+            'mix_default' => ProductMix::enabledFor($auto),
         ];
     }
 
@@ -320,9 +341,11 @@ final class RiengBatch
             $rows[] = $row;
         }
 
-        $left = $this->schedule($rows, $auto, $now, $fmt);
+        $mix = $this->wantsMix($in, $auto);
+        $left = $this->schedule($rows, $auto, $now, $fmt, $mix);
 
         return [
+            'mix' => $mix,
             'ok' => true,
             'error' => null,
             'mode' => $mode,
@@ -587,7 +610,7 @@ final class RiengBatch
      *
      * @param  list<array<string, mixed>>  $rows
      */
-    private function schedule(array &$rows, AutoAccount $auto, CarbonImmutable $now, Closure $fmt): int
+    private function schedule(array &$rows, AutoAccount $auto, CarbonImmutable $now, Closure $fmt, bool $mix = false): int
     {
         $sched = app(RiengSchedule::class);
         $tz = $this->planner->timezoneFor($auto);
@@ -698,11 +721,21 @@ final class RiengBatch
 
         unset($r);
 
-        // 2) Tự đề xuất giờ trống sớm nhất cho các dòng còn lại (theo thứ tự chọn).
-        foreach ($rows as &$r) {
-            if ($r['status'] === 'error' || $r['edited']) {
-                continue;
+        // 2) Tự đề xuất giờ trống sớm nhất cho các dòng còn lại: theo thứ tự chọn, hoặc xen kẽ sản phẩm khi bật "Trộn xen kẽ".
+        $auto2 = array_keys(array_filter($rows, fn (array $r): bool => $r['status'] !== 'error' && ! $r['edited']));
+
+        if ($mix && count($auto2) > 1) {
+            $items = [];
+
+            foreach ($auto2 as $i) {
+                $items[$i] = (string) ($rows[$i]['_code'] ?? '');
             }
+
+            $auto2 = ProductMix::order($items, $this->recentProducts($auto, $minTs), crc32($auto->social_account_id.'|'.implode(',', array_map(fn (int $i): int => (int) $rows[$i]['id'], $auto2))));
+        }
+
+        foreach ($auto2 as $i) {
+            $r = &$rows[$i];
 
             $ts = $used < $room ? $sched->next($auto, $minTs, $maxTs, [...$busy, ...$batch], $gap, $counts) : null;
 
@@ -732,6 +765,28 @@ final class RiengBatch
         return $left;
     }
 
+    /** Lượt này có trộn xen kẽ sản phẩm không: chủ app chọn trong hộp (mix), mặc định theo cài đặt kênh. */
+    private function wantsMix(array $in, AutoAccount $auto): bool
+    {
+        return array_key_exists('mix', $in) && $in['mix'] !== null
+            ? filter_var($in['mix'], FILTER_VALIDATE_BOOLEAN)
+            : ProductMix::enabledFor($auto);
+    }
+
+    /**
+     * Sản phẩm 2 bài gần nhất của kênh trước mốc $beforeTs (cũ → mới), để bài đầu của lượt không trùng bài vừa xếp.
+     *
+     * @return list<string>
+     */
+    private function recentProducts(AutoAccount $auto, int $beforeTs): array
+    {
+        return AutoVideo::query()->where('social_account_id', $auto->social_account_id)
+            ->whereIn('status', [AutoVideo::RESERVED, AutoVideo::SCHEDULED, AutoVideo::POSTED])
+            ->whereNotNull('scheduled_for')->where('scheduled_for', '<', CarbonImmutable::createFromTimestampUTC($beforeTs))
+            ->orderByDesc('scheduled_for')->limit(2)->pluck('product_code')
+            ->reverse()->map(fn (?string $c): string => (string) $c)->values()->all();
+    }
+
     // ------------------------------------------------------------------ Ghi
 
     /**
@@ -758,6 +813,15 @@ final class RiengBatch
             if ($error === null) {
                 $done++;
                 $rows[] = $row + ['result' => 'done'];
+
+                // Giờ chủ app tự sửa trong hộp: trộn xen kẽ về sau không đổi bài này.
+                if ($row['edited'] ?? false) {
+                    $posted = AutoVideo::query()->find((int) $row['id']);
+
+                    if ($posted !== null) {
+                        ProductMix::pin($posted);
+                    }
+                }
             } else {
                 $failed++;
                 $rows[] = $row + ['result' => 'error', 'error' => $error];
@@ -784,7 +848,12 @@ final class RiengBatch
             }
         }
 
-        return ['ok' => true, 'error' => null, 'committed' => true, 'needs_confirm' => false, 'mode' => $plan['mode'], 'channel' => $plan['channel'], 'rows' => $rows, 'left' => $plan['left'], 'done' => $done, 'failed' => $failed];
+        // Kênh bật tự trộn: xếp lại xen kẽ cả các bài cũ chưa gửi lên TikTok (đang trong khoá xếp lịch của kênh).
+        // Anh bỏ chọn "Trộn xen kẽ" trong hộp thì lượt này không trộn gì.
+        $autoAccount = AutoAccount::query()->find((string) $social->id);
+        $mixed = $done > 0 && $autoAccount !== null && $this->wantsMix($in, $autoAccount) ? app(ProductMix::class)->autoMix($autoAccount) : 0;
+
+        return ['ok' => true, 'error' => null, 'committed' => true, 'needs_confirm' => false, 'mode' => $plan['mode'], 'channel' => $plan['channel'], 'rows' => $rows, 'left' => $plan['left'], 'done' => $done, 'failed' => $failed, 'mixed' => $mixed];
     }
 
     /**

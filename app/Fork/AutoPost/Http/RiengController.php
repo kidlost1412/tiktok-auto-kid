@@ -62,6 +62,12 @@ final class RiengController extends Controller
     /** Bộ lọc trạng thái trong danh sách. */
     private const array STATUS = ['chua', 'hen', 'dang', 'loi'];
 
+    /** Cách sắp xếp danh sách: mới nhất (mặc định), cũ nhất, tên A→Z, sắp đăng (giờ hẹn gần nhất trước). */
+    private const array SORTS = ['moi', 'cu', 'ten', 'sap-dang'];
+
+    /** "Chọn tất cả" chọn tối đa ngần này video một lần. */
+    private const int SELECT_ALL_MAX = 1000;
+
     private const string PICK_FAIL = 'Không mở được hộp chọn thư mục, hãy dán đường dẫn.';
 
     public function index(Request $request): Response
@@ -75,13 +81,14 @@ final class RiengController extends Controller
         $day = $request->query('day');
         $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
 
+        $search = $this->searchTerm($request);
+        $sort = $request->query('sort');
+        $sort = is_string($sort) && in_array($sort, self::SORTS, true) ? $sort : 'moi';
+
         $folders = RiengFolder::query()->orderBy('id')->get();
         // Video anh đã xoá nằm ở Thùng rác, không hiện trong kho.
         $base = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at');
-        $filtered = fn (): Builder => $base()
-            ->when($folderId > 0, fn ($q) => $q->where('meta->folder_id', (string) $folderId))
-            ->when($day !== '', fn ($q) => $q->whereDate('batch_date', $day))
-            ->tap(fn ($q) => $this->applyStatus($q, $status));
+        $filtered = fn (): Builder => $this->filteredQuery($folderId, $day, $status, $search);
 
         // Mỗi prop nặng nằm trong closure (Inertia chỉ chạy closure của prop được xin ở partial reload của bàn Thủ kho);
         // danh sách video, video trùng và danh sách chọn dùng chung nên tính một lần (memo).
@@ -96,15 +103,11 @@ final class RiengController extends Controller
 
         $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
         $info = new RiengInfo;
-        $videos = fn () => $once('videos', fn () => $filtered()
-            ->with('socialAccount:id,username,display_name,avatar_url')
-            ->orderByDesc('batch_date')
-            ->orderByDesc('id')
+        $videos = fn () => $once('videos', fn () => $this->applySort($filtered()->with('socialAccount:id,username,display_name,avatar_url'), $sort)
             ->paginate(self::PER_PAGE)
             ->withQueryString());
-        $selectableRows = fn () => $once('selectableRows', fn () => $this->onlySelectable($filtered())
-            ->orderByDesc('batch_date')->orderByDesc('id')->limit(1000)->get(['id', 'file_name', 'duration', 'source', 'meta']));
-        $dups = fn (): array => $once('dups', fn (): array => $info->duplicates($videos()->getCollection()->concat($selectableRows())));
+        // Chỉ video của trang đang xem mới tính cờ "trùng"; danh sách "Chọn tất cả" tính riêng ở selectAll (khi anh bấm).
+        $dups = fn (): array => $once('dups', fn (): array => $info->duplicates($videos()->getCollection()));
 
         return Inertia::render('fork/KhoRieng', [
             'folders' => function () use ($folders, $base): array {
@@ -119,7 +122,7 @@ final class RiengController extends Controller
                     'music' => RiengMusic::settings($f),
                 ])->values()->all();
             },
-            'filters' => ['folder' => $folderId, 'status' => $status, 'day' => $day],
+            'filters' => ['folder' => $folderId, 'status' => $status, 'day' => $day, 'q' => $search, 'sort' => $sort],
             'counts' => function () use ($base): array {
                 $statusCounts = [];
 
@@ -146,8 +149,8 @@ final class RiengController extends Controller
                     'total' => $page->total(),
                 ];
             },
-            'selectable' => fn (): array => $selectableRows()
-                ->map(fn (AutoVideo $v): array => ['id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration, 'duplicate' => $dups()[$v->id]['text'] ?? null])->all(),
+            // Số video chọn được (chưa đăng) theo bộ lọc hiện tại, mọi trang: chỉ một câu đếm, không tải danh sách.
+            'selectable_count' => fn (): int => $this->onlySelectable($filtered())->count(),
             'queue' => fn (): array => $this->queueItems($accountId),
             'scan_sig' => fn (): string => $this->signature(),
             'accounts' => fn (): array => $this->accounts($accountId),
@@ -155,6 +158,78 @@ final class RiengController extends Controller
             'hashtag_suggestions' => fn (): array => HashtagSuggestions::top(),
             'limits' => ['min_lead_minutes' => intdiv(RiengSchedule::MIN_LEAD, 60), 'gap_minutes' => intdiv(app(Planner::class)->gapSeconds(), 60), 'caption_max' => 2200],
             'last_scan_at' => fn (): mixed => Cache::get('fork-rieng:last-scan'),
+        ]);
+    }
+
+    /** Từ khoá tìm theo tên file (tối đa 100 ký tự). */
+    private function searchTerm(Request $request): string
+    {
+        $q = $request->query('q');
+
+        return is_string($q) ? trim(mb_substr($q, 0, 100)) : '';
+    }
+
+    /**
+     * Video riêng theo bộ lọc của trang (thư mục, ngày, trạng thái, từ khoá tên file).
+     *
+     * @return Builder<AutoVideo>
+     */
+    private function filteredQuery(int $folderId, string $day, string $status, string $search): Builder
+    {
+        return AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at')
+            ->when($folderId > 0, fn ($q) => $q->where('meta->folder_id', (string) $folderId))
+            ->when($day !== '', fn ($q) => $q->whereDate('batch_date', $day))
+            ->when($search !== '', fn ($q) => $q->where('file_name', 'ilike', '%'.addcslashes($search, '%_'.chr(92)).'%'))
+            ->tap(fn ($q) => $this->applyStatus($q, $status));
+    }
+
+    /**
+     * @param  Builder<AutoVideo>  $q
+     * @return Builder<AutoVideo>
+     */
+    private function applySort(Builder $q, string $sort): Builder
+    {
+        match ($sort) {
+            'cu' => $q->orderBy('batch_date')->orderBy('id'),
+            'ten' => $q->orderByRaw('lower(file_name) asc')->orderBy('id'),
+            // Giờ hẹn gần nhất trước (kể cả bài đã hẹn sẵn trên TikTok); video chưa có giờ hẹn xếp sau, theo thứ tự mới nhất.
+            'sap-dang' => $q->orderByRaw('coalesce(scheduled_for, case when posted_at > now() then posted_at end) asc nulls last')
+                ->orderByDesc('batch_date')->orderByDesc('id'),
+            default => $q->orderByDesc('batch_date')->orderByDesc('id'),
+        };
+
+        return $q;
+    }
+
+    /**
+     * "Chọn tất cả": video chọn được theo bộ lọc hiện tại (mọi trang), tối đa SELECT_ALL_MAX, kèm cờ trùng.
+     * Chỉ tính khi anh bấm, không tính mỗi lần trang tự cập nhật.
+     */
+    public function selectAll(Request $request): JsonResponse
+    {
+        $this->authorizeOwner($request);
+
+        $folderId = $request->query('folder');
+        $folderId = is_string($folderId) && ctype_digit($folderId) ? (int) $folderId : 0;
+        $status = $request->query('status');
+        $status = is_string($status) && in_array($status, self::STATUS, true) ? $status : '';
+        $day = $request->query('day');
+        $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
+        $search = $this->searchTerm($request);
+
+        $query = fn (): Builder => $this->onlySelectable($this->filteredQuery($folderId, $day, $status, $search));
+        $rows = $query()->orderByDesc('batch_date')->orderByDesc('id')->limit(self::SELECT_ALL_MAX)->get(['id', 'file_name', 'duration', 'source', 'meta']);
+        $dups = (new RiengInfo)->duplicates($rows);
+        $total = $query()->count();
+
+        return response()->json([
+            'ok' => true,
+            'total' => $total,
+            'max' => self::SELECT_ALL_MAX,
+            'capped' => $total > self::SELECT_ALL_MAX,
+            'items' => $rows->map(fn (AutoVideo $v): array => [
+                'id' => $v->id, 'file_name' => $v->file_name, 'duration' => $v->duration, 'duplicate' => $dups[$v->id]['text'] ?? null,
+            ])->values()->all(),
         ]);
     }
 
@@ -760,6 +835,10 @@ final class RiengController extends Controller
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.id' => ['required', 'integer'],
             'items.*.at' => ['nullable', 'string', 'max:40'],
+            // Để giờ xen kẽ sản phẩm ở bước đề xuất khớp lúc đăng: sản phẩm chung / riêng từng video và lựa chọn trộn.
+            'product_code' => ['nullable', 'string', 'max:100'],
+            'items.*.product' => ['nullable', 'string', 'max:220'],
+            'mix' => ['nullable', 'boolean'],
         ]);
         $this->findAccount($accountId, (string) $in['social_account_id']);
 
@@ -789,6 +868,8 @@ final class RiengController extends Controller
             'items.*.cover_token' => ['nullable', 'string', 'max:60'],
             // sản phẩm chọn riêng cho một video: "mã|quy cách"
             'items.*.product' => ['nullable', 'string', 'max:220'],
+            // Trộn xen kẽ sản phẩm khi tự xếp giờ (null = theo cài đặt kênh).
+            'mix' => ['nullable', 'boolean'],
         ]);
 
         $this->findAccount($accountId, (string) $in['social_account_id']);

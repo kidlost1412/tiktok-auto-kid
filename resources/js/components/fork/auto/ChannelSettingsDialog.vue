@@ -2,9 +2,14 @@
 // Hộp "Chỉnh kênh": hạn mức, khung giờ, hẹn trước, chế độ giờ đăng và giờ đề xuất — gom vào một chỗ
 // để thẻ kênh ngoài trang chỉ còn những gì cần nhìn hằng ngày.
 import { router } from '@inertiajs/vue3';
-import { IconCalendarClock, IconSparkles } from '@tabler/icons-vue';
+import {
+    IconArrowsShuffle,
+    IconCalendarClock,
+    IconSparkles,
+} from '@tabler/icons-vue';
 import { computed, reactive, ref, watch } from 'vue';
 
+import MixDialog from '@/components/fork/auto/MixDialog.vue';
 import type { AccountRow } from '@/components/fork/auto/types';
 import { fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
@@ -19,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{ account: AccountRow; inPlace?: boolean }>();
@@ -32,6 +38,7 @@ interface Draft {
     schedule_ahead_days: number;
     mode: 'explore' | 'optimized';
     video_source: 'both' | 'rieng' | 'hub';
+    mix_products: boolean;
 }
 
 const fromAccount = (): Draft => ({
@@ -41,6 +48,7 @@ const fromAccount = (): Draft => ({
     schedule_ahead_days: props.account.schedule_ahead_days ?? 3,
     mode: props.account.mode,
     video_source: props.account.video_source ?? 'both',
+    mix_products: props.account.mix_products ?? false,
 });
 
 const draft = reactive<Draft>(fromAccount());
@@ -71,6 +79,7 @@ const ends = hours.slice(1).concat(24);
 const aheads = Array.from({ length: 9 }, (_, i) => i + 1);
 
 const busy = ref(false);
+const mixOpen = ref(false);
 
 const save = () => {
     if (windowBad.value || capBad.value) {
@@ -243,6 +252,41 @@ const labelCls = 'font-medium text-foreground';
                     }}</span>
                 </label>
 
+                <div
+                    class="grid gap-2 rounded-xl border p-4"
+                    data-testid="fork-auto-mix-setting"
+                >
+                    <label class="flex items-start justify-between gap-3">
+                        <span class="grid gap-0.5">
+                            <span
+                                :class="
+                                    cn(labelCls, 'flex items-center gap-1.5')
+                                "
+                                ><IconArrowsShuffle
+                                    class="size-4 text-muted-foreground"
+                                />Tự trộn xen kẽ sản phẩm</span
+                            >
+                            <span class="text-xs text-muted-foreground">
+                                Bài đã xếp lịch mà chưa gửi lên TikTok được đổi
+                                chỗ giờ cho nhau để hai bài liền nhau khác sản
+                                phẩm (vd. A, B, C, A, B…). Bài anh tự
+                                chỉnh giờ và bài đã lên TikTok giữ nguyên.
+                            </span>
+                        </span>
+                        <Switch
+                            v-model="draft.mix_products"
+                            :data-testid="`fork-auto-mix-${account.id}`"
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        class="justify-self-start text-xs font-medium text-primary underline-offset-4 hover:underline"
+                        @click="mixOpen = true"
+                    >
+                        Xem trước và trộn ngay một lần…
+                    </button>
+                </div>
+
                 <p
                     :class="
                         cn(
@@ -348,4 +392,9 @@ const labelCls = 'font-medium text-foreground';
             </DialogFooter>
         </DialogContent>
     </Dialog>
+    <MixDialog
+        v-model:open="mixOpen"
+        :accounts="[account]"
+        :account-id="account.id"
+    />
 </template>

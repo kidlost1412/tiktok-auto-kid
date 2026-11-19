@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Danh sách bài của MỘT ngày trong Lịch đăng. Dùng cho cả kiểu tab (màn hẹp) và kiểu 3 cột (màn rộng, `compact`).
 // Hôm nay: các bài đã đăng gấp lại thành một dòng để mắt đi thẳng tới bài sắp tới; có vạch "Bây giờ".
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import {
     IconBolt,
     IconCalendarOff,
@@ -20,8 +20,8 @@ import type { DropPoint } from '@/components/fork/auto/dragMove';
 import { dragging, pointAt } from '@/components/fork/auto/dragMove';
 import RemoveDialog from '@/components/fork/auto/RemoveDialog.vue';
 import RescheduleDialog from '@/components/fork/auto/RescheduleDialog.vue';
-import type { ScheduleEntry } from '@/components/fork/auto/types';
-import { moveWithUndo } from '@/components/fork/auto/undo';
+import type { AccountRow, ScheduleEntry } from '@/components/fork/auto/types';
+import { moveWithUndo, pendingIds } from '@/components/fork/auto/undo';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
 import {
@@ -31,6 +31,8 @@ import {
 } from '@/components/fork/shared/status';
 import StatusChip from '@/components/fork/shared/StatusChip.vue';
 import { openVideo } from '@/components/fork/viewer';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +43,8 @@ const props = defineProps<{
     multi: boolean;
     /** Kiểu gọn cho cột hẹp (3 ngày cạnh nhau). */
     compact?: boolean;
+    /** Đang lọc (kênh / nguồn...): ngày trống thì báo "không có bài khớp bộ lọc". ScheduleBoard truyền vào. */
+    filtered?: boolean;
 }>();
 
 const showDone = ref(false);
@@ -77,6 +81,42 @@ const nowIndex = computed(() => {
 });
 
 const videoId = (e: ScheduleEntry) => e.id ?? e.video_id ?? null;
+// Bài đang chờ xoá / đổi giờ (trong 8 giây "Hoàn tác" hoặc đang gửi): mờ đi, không bấm thêm được.
+const pendingLabel = (e: ScheduleEntry) => {
+    const id = videoId(e);
+
+    return id ? pendingIds.get(id) : undefined;
+};
+const rowLabel = (e: ScheduleEntry) =>
+    [
+        dayjs(e.at).format('HH:mm'),
+        e.product_label ?? e.product_code,
+        `@${e.username}`,
+    ]
+        .filter(Boolean)
+        .join(' ');
+
+// Ngày trống: nói rõ vì sao (đang lọc / chưa bật kênh / thường).
+const page = usePage();
+const noChannelOn = computed(() => {
+    const accounts = page.props.accounts as AccountRow[] | undefined;
+
+    return Array.isArray(accounts) && !accounts.some((a) => a.enabled);
+});
+const planning = ref(false);
+const planNow = () => {
+    planning.value = true;
+    router.post(
+        '/auto/plan-now',
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                planning.value = false;
+            },
+        },
+    );
+};
 const isLate = (e: ScheduleEntry) =>
     !['projected', 'posted', 'failed', 'tiktok_scheduled'].includes(e.state) &&
     dayjs(e.at).isBefore(dayjs().subtract(2, 'minute'));
@@ -157,6 +197,11 @@ const onListDrop = (ev: DragEvent) => {
     }
 
     ev.preventDefault();
+
+    // Bài đang chờ xoá / đổi giờ: bỏ qua lần thả thứ hai.
+    if (pendingLabel(d)) {
+        return;
+    }
 
     if (dayjs(p.at).isSame(dayjs(d.at), 'minute')) {
         return;
@@ -245,11 +290,33 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
             "
         >
             <IconCalendarOff class="size-7 text-muted-foreground/60" />
-            <div class="text-[0.9375rem] font-medium">Chưa có giờ đăng nào</div>
-            <p class="max-w-xs text-[0.8438rem] text-muted-foreground">
-                Kênh đang tắt, đã đủ hạn mức hoặc ngoài khung giờ. Nới khung giờ
-                bằng nút “Chỉnh” ở thẻ kênh.
-            </p>
+            <div v-if="filtered" class="text-[0.9375rem] font-medium">
+                Không có bài khớp bộ lọc.
+            </div>
+            <div v-else-if="noChannelOn" class="text-[0.9375rem] font-medium">
+                Chưa bật kênh nào — bật kênh ở cột bên phải.
+            </div>
+            <template v-else>
+                <div class="text-[0.9375rem] font-medium">
+                    Chưa có giờ đăng nào
+                </div>
+                <p class="max-w-xs text-[0.8438rem] text-muted-foreground">
+                    Kênh đang tắt, đã đủ hạn mức hoặc ngoài khung giờ. Nới khung
+                    giờ bằng nút “Chỉnh” ở thẻ kênh.
+                </p>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    class="mt-1 h-8"
+                    :disabled="planning"
+                    data-testid="fork-auto-day-plan-now"
+                    @click="planNow"
+                >
+                    <Spinner v-if="planning" class="size-4" />
+                    <IconBolt v-else class="size-4" />
+                    {{ planning ? 'Đang xếp lịch…' : 'Xếp lịch ngay' }}
+                </Button>
+            </template>
         </div>
 
         <!-- Đã đăng hôm nay (gấp lại) -->
@@ -370,6 +437,8 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                         v-else
                         role="button"
                         tabindex="0"
+                        :aria-label="rowLabel(e)"
+                        :aria-busy="pendingLabel(e) ? 'true' : undefined"
                         :title="
                             compact && e.cart_name
                                 ? `Giỏ: ${e.cart_name}`
@@ -386,9 +455,13 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 compact &&
                                     e.state === 'posted' &&
                                     'opacity-70 hover:opacity-100',
+                                pendingLabel(e) &&
+                                    'pointer-events-none opacity-50',
                             )
                         "
-                        :draggable="canMove(e) && !moving(e)"
+                        :draggable="
+                            canMove(e) && !moving(e) && !pendingLabel(e)
+                        "
                         :data-dragging="
                             dragging && keyOf(dragging) === keyOf(e)
                                 ? 'true'
@@ -413,8 +486,9 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                         />
                         <!-- Bấm giờ để đổi giờ ngay (bài đã xếp mà chưa đăng) -->
                         <button
-                            v-if="canMove(e)"
+                            v-if="canMove(e) && !pendingLabel(e)"
                             type="button"
+                            :aria-label="`Đổi giờ ${dayjs(e.at).format('HH:mm')}`"
                             :class="
                                 cn(
                                     'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
@@ -574,8 +648,14 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 title="Đã quá giờ hẹn mà chưa đăng xong"
                                 >Trễ</span
                             >
+                            <span
+                                v-if="pendingLabel(e)"
+                                class="text-[0.75rem] text-muted-foreground"
+                                aria-live="polite"
+                                >{{ pendingLabel(e) }}</span
+                            >
                             <button
-                                v-if="canMove(e)"
+                                v-if="canMove(e) && !pendingLabel(e)"
                                 type="button"
                                 :class="
                                     cn(
@@ -583,7 +663,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                         compact ? 'size-6' : 'size-7',
                                         compact &&
                                             !moving(e) &&
-                                            'opacity-0 group-hover:opacity-100',
+                                            'opacity-60 group-hover:opacity-100',
                                         moving(e) && 'text-primary-text',
                                     )
                                 "
@@ -615,11 +695,15 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 />
                             </button>
                             <button
-                                v-if="canRemove(e) && !moving(e)"
+                                v-if="
+                                    canRemove(e) &&
+                                    !moving(e) &&
+                                    !pendingLabel(e)
+                                "
                                 type="button"
                                 :class="
                                     cn(
-                                        'flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
+                                        'flex items-center justify-center rounded-md text-muted-foreground opacity-60 group-hover:opacity-100 hover:bg-accent hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
                                         compact ? 'size-6' : 'size-7',
                                     )
                                 "
@@ -636,11 +720,11 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             </button>
                             <template v-if="compact">
                                 <a
-                                    v-if="e.link"
+                                    v-if="e.link && !pendingLabel(e)"
                                     :href="e.link"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
+                                    class="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-60 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
                                     title="Mở trên TikTok"
                                     aria-label="Mở trên TikTok"
                                     @click.stop
@@ -705,7 +789,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                     "
                                 />
                                 <a
-                                    v-if="e.link"
+                                    v-if="e.link && !pendingLabel(e)"
                                     :href="e.link"
                                     target="_blank"
                                     rel="noopener noreferrer"

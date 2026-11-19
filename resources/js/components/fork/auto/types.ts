@@ -36,6 +36,8 @@ export interface AccountRow {
     schedule_ahead_days?: number;
     /** Nguồn video: Xưởng + Kho riêng / chỉ Kho riêng / chỉ Xưởng. */
     video_source?: 'both' | 'rieng' | 'hub';
+    /** Tự trộn xen kẽ sản phẩm cho các bài chưa gửi lên TikTok. */
+    mix_products?: boolean;
     window_start: number;
     window_end: number;
     mode: 'explore' | 'optimized';

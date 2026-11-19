@@ -5,7 +5,7 @@ goi(vai, prompt, anh=[...]) → (text, usage).
   → ghi vào lich-su/tai-khoan.json, app hiển thị. Hub KHÔNG đọc file đăng nhập/token.
 - Chọn tài khoản còn dư nhiều nhất; tài khoản hết hạn mức → đánh dấu tới giờ reset, tự chuyển sang tài khoản khác.
   Chỉ báo HetHanMuc khi MỌI tài khoản đều hết."""
-import csv, datetime, json, os, re, subprocess, threading, time
+import csv, datetime, json, os, queue, re, subprocess, threading, time
 from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
@@ -149,10 +149,119 @@ def _nap_anh(path):
         raise LoiNhungAnh(f"không nạp được ảnh {Path(path).name}: {e}")
 
 
+def _nap_live(tt, line):
+    """1 dòng stream-json của CLI → chữ/suy nghĩ đang về → việc trực tiếp (truc_tiep). Trả True nếu là mảnh chữ. Không bao giờ ném lỗi."""
+    try:
+        if '"stream_event"' not in line:
+            return False
+        ev = json.loads(line)
+        if ev.get("type") != "stream_event":
+            return False
+        d = (ev.get("event") or {}).get("delta") or {}
+        k = d.get("type")
+        if k == "text_delta":
+            tt.chu(d.get("text") or ""); return True
+        if k == "thinking_delta":
+            tt.nghi(d.get("thinking") or "")
+    except Exception:
+        pass
+    return False
+
+
+def _doc_luong(pr, stdin, timeout, vai, model):
+    """Thay pr.communicate(stdin, timeout): gửi stdin + đọc stdout TỪNG DÒNG (luồng riêng) để đẩy chữ Claude đang viết sang trang Khu Tự Trị,
+    luồng khác gom stderr. Cùng ngữ nghĩa hạn chót: quá `timeout` giây (cả lúc chờ tiến trình thoát) → taskkill cả cây, ném đúng lỗi cũ.
+    → (toàn bộ stdout, stderr) y hệt communicate."""
+    import truc_tiep as TT
+    tt = TT.hien_tai()
+    hang, dong, loi = queue.Queue(), [], []
+
+    def doc_out():
+        try:
+            for line in pr.stdout:
+                hang.put(line)
+        except Exception:
+            pass
+        finally:
+            hang.put(None)
+
+    def doc_err():
+        try:
+            loi.append(pr.stderr.read() or "")
+        except Exception:
+            pass
+
+    def ghi_in():
+        try:
+            pr.stdin.write(stdin)
+        except Exception:
+            pass
+        finally:
+            try:
+                pr.stdin.close()
+            except Exception:
+                pass
+    ts = [threading.Thread(target=f, daemon=True) for f in (doc_out, doc_err, ghi_in)]
+    for t in ts:
+        t.start()
+
+    def het_gio():
+        subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)     # tắt CẢ cây tiến trình (node), không để chạy ngầm tốn hạn mức
+        try:
+            pr.wait(10)
+        except Exception:
+            pass
+        for t in ts:
+            t.join(5)
+        if tt is not None:
+            tt.het_chu()
+        raise RuntimeError(f"Claude quá {timeout}s ({vai}) — đã dừng")
+    t0 = time.monotonic(); han = t0 + timeout
+    if tt is not None:
+        tt.reset_chu(); tt.cap(chi_tiet={"model": model})
+    co_chu = False
+    while True:
+        con = han - time.monotonic()
+        if con <= 0:
+            het_gio()
+        try:
+            line = hang.get(timeout=min(1.0, con))
+        except queue.Empty:
+            if tt is not None:
+                tt.nhip(giay=round(time.monotonic() - t0))        # chưa có chữ mới: vẫn báo "còn đang làm" + số giây đã chờ
+            continue
+        if line is None:
+            break
+        dong.append(line)
+        if tt is not None and _nap_live(tt, line):
+            co_chu = True
+    try:
+        pr.wait(timeout=max(1.0, han - time.monotonic()))
+    except subprocess.TimeoutExpired:
+        het_gio()
+    for t in ts[1:]:
+        t.join(5)
+    out = "".join(dong)
+    if tt is not None:
+        if not co_chu:                                           # CLI cũ không có --include-partial-messages: lấy chữ cuối cùng
+            for line in reversed(dong):
+                if '"type":"result"' in line.replace(" ", ""):
+                    try:
+                        tt.chu(str(json.loads(line).get("result") or ""))
+                    except Exception:
+                        pass
+                    break
+        tt.het_chu(); tt.cap(chi_tiet={"giay": round(time.monotonic() - t0)})
+    return out, "".join(loi)
+
+
 def _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung=False):
     """nhung=True: ảnh gửi THẲNG trong 1 tin nhắn (stream-json, không công cụ → đúng 1 lượt). nhung=False: cách cũ (Read)."""
-    claude = cfg()["duong_dan"]["claude"]
-    cmd = [claude, "-p", "--output-format", "stream-json", "--verbose", "--model", model, "--effort", effort,
+    c = cfg()
+    claude = c["duong_dan"]["claude"]
+    live = bool(c.get("truc_tiep", True))           # trang Khu Tự Trị xem chữ Claude đang viết (truc_tiep.py); False → cách cũ, không ghi gì
+    cmd = [claude, "-p", "--output-format", "stream-json", "--verbose"] + (["--include-partial-messages"] if live else []) + \
+          ["--model", model, "--effort", effort,
            "--strict-mcp-config", "--no-chrome", "--no-session-persistence", "--system-prompt", he_thong(vai)]
     stdin = prompt
     if anh and nhung:
@@ -170,12 +279,15 @@ def _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung=False):
         cmd += ["--tools", ""]
     pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
                           errors="replace", cwd=str(HUB), env=env_tk(tk))
-    try:
-        out, err = pr.communicate(stdin, timeout=timeout)
-    except subprocess.TimeoutExpired:                # quá giờ → tắt CẢ cây tiến trình (node), không để chạy ngầm tốn hạn mức
-        subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
-        pr.communicate()
-        raise RuntimeError(f"Claude quá {timeout}s ({vai}) — đã dừng")
+    if live:
+        out, err = _doc_luong(pr, stdin, timeout, vai, model)
+    else:
+        try:
+            out, err = pr.communicate(stdin, timeout=timeout)
+        except subprocess.TimeoutExpired:                # quá giờ → tắt CẢ cây tiến trình (node), không để chạy ngầm tốn hạn mức
+            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
+            pr.communicate()
+            raise RuntimeError(f"Claude quá {timeout}s ({vai}) — đã dừng")
     r = subprocess.CompletedProcess(cmd, pr.returncode, out, err)
     ket, rl = {}, None
     for line in r.stdout.splitlines():
@@ -201,6 +313,16 @@ def _goi_1(tk, vai, prompt, anh, model, effort, timeout, nhung=False):
 
 
 def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
+    """Gọi Claude. Chữ Claude đang viết được đẩy vào "việc trực tiếp" của luồng gọi (ekip/viết lời mở sẵn); chưa có việc nào thì tự mở 1 việc theo vai."""
+    import truc_tiep as TT
+    if TT.hien_tai() is not None or not cfg().get("truc_tiep", True):
+        return _goi(vai, prompt, anh, model, effort, timeout)
+    v, viec = TT.mo_ta_vai(vai)
+    with TT.viec(v, viec, video=getattr(VIEC, "video", "") or None):
+        return _goi(vai, prompt, anh, model, effort, timeout)
+
+
+def _goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
     cl = cfg().get("claude", {})
     model = model or cl.get("model", "opus"); effort = effort or cl.get("effort", "high")
     prompt_goc = prompt

@@ -7,11 +7,22 @@
 import { Link, router } from '@inertiajs/vue3';
 import {
     IconCheck,
+    IconCopy,
     IconPlugConnectedX,
     IconPlus,
     IconRefresh,
+    IconSearch,
+    IconX,
 } from '@tabler/icons-vue';
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import {
+    computed,
+    onBeforeUnmount,
+    onMounted,
+    reactive,
+    ref,
+    watch,
+} from 'vue';
+import { toast } from 'vue-sonner';
 
 import CartRow from '@/components/fork/gio-hang/CartRow.vue';
 import PersonaliseDialog from '@/components/fork/gio-hang/PersonaliseDialog.vue';
@@ -28,6 +39,7 @@ import { usePersonalise } from '@/components/fork/gio-hang/usePersonalise';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import { cardCls, toneClasses } from '@/components/fork/shared/status';
+import { norm } from '@/components/fork/shared/text';
 import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +54,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
+import { confirm } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
@@ -116,8 +130,21 @@ const fmtTime = (iso: string | null | undefined) => {
 const { loading: visiting, callbacks } = useVisitLoading();
 const loading = computed(() => visiting.value || !!props.reloading);
 
-const chooseChannel = (id: string) => {
+// Tên kênh để hiện: @username, không có username thì tên hiển thị (tránh "@null").
+const channelLabel = (c: {
+    username: string | null;
+    display_name: string | null;
+}) => (c.username ? `@${c.username}` : c.display_name || 'Kênh chưa đặt tên');
+
+// Cho phép một lần điều hướng đi qua cửa chặn "chưa lưu" (khi anh đã bấm "Bỏ và đổi kênh").
+let allowLeave = false;
+
+const chooseChannel = async (id: string) => {
     if (id === props.selected) {
+        return;
+    }
+
+    if (!(await confirmDiscard('Bỏ và đổi kênh'))) {
         return;
     }
 
@@ -127,11 +154,17 @@ const chooseChannel = (id: string) => {
         return;
     }
 
-    router.get(
-        '/auto/gio-hang',
-        { kenh: id },
-        { preserveScroll: false, ...callbacks },
-    );
+    allowLeave = true;
+
+    try {
+        router.get(
+            '/auto/gio-hang',
+            { kenh: id },
+            { preserveScroll: false, ...callbacks },
+        );
+    } finally {
+        allowLeave = false;
+    }
 };
 
 // ---- Lấy sản phẩm từ shop ----
@@ -215,7 +248,17 @@ const setHidden = (p: ShopProduct, hidden: boolean) => {
     router.patch(
         `/auto/accounts/${props.selected}/shop-products/${p.product_id}`,
         { hidden },
-        mk('khac'),
+        mk('khac', () => {
+            // Sản phẩm đang được dùng thì máy chủ đã báo riêng (video sẽ được giữ trong kho); còn lại thì báo ở đây kèm "Hiện lại".
+            if (hidden && !p.used_by.length) {
+                toast(`Đã ẩn “${p.title}”`, {
+                    action: {
+                        label: 'Hiện lại',
+                        onClick: () => setHidden(p, false),
+                    },
+                });
+            }
+        }),
     );
 };
 
@@ -257,6 +300,90 @@ const isDirty = (r: Row) =>
 const pickingRow = computed(
     () => props.rows.find((r) => r.key === picking.value) ?? null,
 );
+
+// Các dòng đã chọn giỏ (hoặc sửa tên giỏ) nhưng chưa bấm Lưu.
+const dirtyRows = computed(() =>
+    props.rows.filter((r) => !!draft[r.key] && isDirty(r)),
+);
+
+const discardDrafts = () => {
+    for (const k of Object.keys(draft)) {
+        delete draft[k];
+    }
+};
+
+// Hỏi trước khi bỏ các lựa chọn chưa lưu (đổi kênh...). Không có gì chưa lưu thì đi tiếp luôn.
+const confirmDiscard = async (
+    confirmText: string,
+    leaving = 'Đổi kênh',
+): Promise<boolean> => {
+    const n = dirtyRows.value.length;
+
+    if (n === 0) {
+        return true;
+    }
+
+    return confirm({
+        title: 'Bỏ các thay đổi chưa lưu?',
+        description: `Có ${n} dòng đã chọn giỏ nhưng chưa bấm Lưu. ${leaving} sẽ mất các lựa chọn này.`,
+        confirmText,
+        destructive: true,
+    });
+};
+
+// Rời trang khi còn nháp: chặn điều hướng của Inertia (hỏi rồi mới đi) và việc đóng/tải lại tab.
+let stopBefore: (() => void) | null = null;
+
+const onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (dirtyRows.value.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+};
+
+onMounted(() => {
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    if (props.embedded) {
+        return;
+    }
+
+    stopBefore = router.on('before', (event) => {
+        const visit = event.detail.visit;
+
+        // Chỉ chặn việc ĐI sang trang/kênh khác; lưu, lấy shop, tải lại một phần... không phải rời trang.
+        if (
+            allowLeave ||
+            dirtyRows.value.length === 0 ||
+            visit.method !== 'get' ||
+            visit.only.length > 0 ||
+            visit.url.pathname === window.location.pathname
+        ) {
+            return;
+        }
+
+        const href = visit.url.href;
+
+        void confirmDiscard('Bỏ và rời trang', 'Rời trang').then((ok) => {
+            if (ok) {
+                allowLeave = true;
+
+                try {
+                    router.visit(href);
+                } finally {
+                    allowLeave = false;
+                }
+            }
+        });
+
+        return false;
+    });
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', onBeforeUnload);
+    stopBefore?.();
+});
 
 const pickFor = (p: ShopProduct) => {
     const r = pickingRow.value;
@@ -300,7 +427,7 @@ const saveRow = (r: Row) => {
     );
 };
 
-const clearRow = (r: Row) => {
+const clearRow = async (r: Row) => {
     if (!props.selected) {
         return;
     }
@@ -311,6 +438,20 @@ const clearRow = (r: Row) => {
         return;
     }
 
+    const ok = await confirm({
+        title: `Bỏ giỏ hàng của “${r.label}”?`,
+        description:
+            r.new_videos > 0
+                ? `${r.new_videos} video đang chờ sẽ được giữ trong kho, không đăng cho đến khi anh chọn giỏ lại.`
+                : 'Video mới của sản phẩm này sẽ được giữ trong kho, không đăng cho đến khi anh chọn giỏ lại.',
+        confirmText: 'Bỏ giỏ',
+        destructive: true,
+    });
+
+    if (!ok) {
+        return;
+    }
+
     busy.value = `row-${r.key}`;
     router.delete(`/auto/accounts/${props.selected}/links/${r.code}`, {
         ...mk('luu-gio', () => {
@@ -318,6 +459,42 @@ const clearRow = (r: Row) => {
         }),
         data: { quy_cach: r.quy_cach },
     });
+};
+
+// ---- "Lưu tất cả": một lần lưu mọi dòng đang chờ (cùng luật với lưu từng dòng, máy chủ lưu trong một giao dịch) ----
+const saveAll = () => {
+    if (!props.selected || dirtyRows.value.length === 0) {
+        return;
+    }
+
+    const rows = dirtyRows.value;
+    const noName = rows.filter((r) => !nameOf(r).trim());
+
+    if (noName.length > 0) {
+        toast.error(
+            `Còn ${noName.length} dòng chưa có tên giỏ (${noName[0].label}…). Anh nhập tên rồi lưu lại.`,
+        );
+
+        return;
+    }
+
+    busy.value = 'save-all';
+    router.put(
+        `/auto/accounts/${props.selected}/links`,
+        {
+            items: rows.map((r) => ({
+                code: r.code,
+                quy_cach: r.quy_cach,
+                shop_product_id: pickedId(r),
+                display_name: nameOf(r),
+            })),
+        },
+        mk('luu-gio', () => {
+            for (const r of rows) {
+                delete draft[r.key];
+            }
+        }),
+    );
 };
 
 // ---- "+ Thêm sản phẩm": chọn sản phẩm shop -> app tạo sản phẩm hub tương ứng và gắn giỏ một lần ----
@@ -372,22 +549,21 @@ const saveRename = () => {
     );
 };
 
-const removing = ref<Row | null>(null);
+const removeProduct = async (r: Row) => {
+    const ok = await confirm({
+        title: `Xoá sản phẩm “${r.hub_name}”?`,
+        description:
+            'Hồ sơ sản phẩm được đưa vào Thùng rác của Windows; video gốc và video đã làm không bị xoá. Giỏ hàng đã chọn cho sản phẩm này cũng bị bỏ.',
+        confirmText: 'Xoá sản phẩm',
+        destructive: true,
+    });
 
-const confirmRemove = () => {
-    const r = removing.value;
-
-    if (!r) {
+    if (!ok) {
         return;
     }
 
-    busy.value = `rename-${r.code}`;
-    router.delete(
-        `/auto/hub-products/${r.code}`,
-        mk('khac', () => {
-            removing.value = null;
-        }),
-    );
+    busy.value = `remove-${r.code}`;
+    router.delete(`/auto/hub-products/${r.code}`, mk('khac'));
 };
 
 const onlySample = computed(
@@ -488,25 +664,105 @@ const filters = computed(() => [
     },
 ]);
 
+// ---- Tìm trong bảng: theo tên sản phẩm hub, quy cách, tên giỏ và tên sản phẩm shop (không phân biệt dấu) ----
+const search = ref('');
+const searchText = computed(() => norm(search.value.trim()));
+
+const matchesSearch = (r: Row) => {
+    const q = searchText.value;
+
+    if (q === '') {
+        return true;
+    }
+
+    const hay = [
+        r.label,
+        r.hub_name,
+        r.quy_cach_name ?? '',
+        nameOf(r),
+        cardOf(r)?.title ?? '',
+    ].join(' ');
+
+    return norm(hay).includes(q);
+};
+
 const visibleRows = computed(() => {
     const want = { all: null, need: 0, bad: 1, ok: 2 }[filter.value];
+    const byStatus =
+        want === null
+            ? sortedRows.value
+            : sortedRows.value.filter((r) => rank(r) === want);
 
-    return want === null
-        ? sortedRows.value
-        : sortedRows.value.filter((r) => rank(r) === want);
+    return byStatus.filter(matchesSearch);
 });
 
 watch(
     () => props.selected,
     () => {
         filter.value = 'all';
+        search.value = '';
 
         // Nháp (sản phẩm shop / tên giỏ chưa lưu) thuộc về kênh cũ: bỏ khi đổi kênh.
-        for (const k of Object.keys(draft)) {
-            delete draft[k];
-        }
+        discardDrafts();
     },
 );
+
+// ---- Sao chép giỏ sang kênh khác ----
+const copyOpen = ref(false);
+const copyTo = ref<string[]>([]);
+const copyOverwrite = ref(false);
+const copyTargets = computed(() =>
+    props.channels.filter((c) => c.id !== props.selected),
+);
+const copyRowCount = computed(() => props.rows.filter((r) => r.link).length);
+
+const openCopy = () => {
+    copyTo.value =
+        copyTargets.value.length === 1 ? [copyTargets.value[0].id] : [];
+    copyOverwrite.value = false;
+    copyOpen.value = true;
+};
+
+const toggleCopyTarget = (id: string, on: boolean) => {
+    copyTo.value = on
+        ? [...new Set([...copyTo.value, id])]
+        : copyTo.value.filter((x) => x !== id);
+};
+
+const doCopy = () => {
+    if (!props.selected || copyTo.value.length === 0) {
+        return;
+    }
+
+    busy.value = 'copy';
+    router.post(
+        `/auto/accounts/${props.selected}/links/copy`,
+        { to: copyTo.value, overwrite: copyOverwrite.value },
+        mk('khac', () => {
+            copyOpen.value = false;
+        }),
+    );
+};
+
+// ---- Lỗi lấy sản phẩm: "câu dễ hiểu (mã gốc)" -> câu dễ hiểu to, mã gốc nhỏ và mờ ----
+const syncReason = computed(() => {
+    const raw = (props.sync?.reason ?? '').trim();
+    const m = raw.match(/^(.*) \(([^()]*)\)$/s);
+
+    if (m) {
+        return { text: m[1], raw: m[2] };
+    }
+
+    // Mã kỹ thuật chưa được máy chủ dịch: dịch những kiểu hay gặp, còn lại giữ nguyên.
+    const r = raw.toLowerCase();
+    const known = /time ?out|timed out/.test(r)
+        ? 'Chrome trả lời quá chậm'
+        : /failed to fetch|network|err_/.test(r)
+          ? 'mạng tới TikTok Shop bị lỗi'
+          : null;
+
+    return known ? { text: known, raw } : { text: raw, raw: '' };
+});
 
 const channel = computed(
     () => props.channels.find((c) => c.id === props.selected) ?? null,
@@ -515,7 +771,12 @@ const initial = (c: { username: string | null; display_name: string | null }) =>
     [...(c.display_name || c.username || '?').trim()][0]?.toUpperCase() ?? '?';
 
 // Trang thật nhúng các nút "Hashtag mặc định" / "Thêm sản phẩm" ở đầu trang (qua ref); popup cũng gọi như vậy.
-defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
+defineExpose({
+    openDefault,
+    openAdd: () => (addOpen.value = true),
+    openCopy,
+    canCopy: computed(() => props.channels.length > 1),
+});
 </script>
 
 <template>
@@ -572,7 +833,7 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                                 "
                                 >{{ initial(c) }}</span
                             >
-                            @{{ c.username }}
+                            {{ channelLabel(c) }}
                             <IconCheck
                                 v-if="c.id === selected"
                                 class="size-4 text-primary-text"
@@ -684,13 +945,21 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                     "
                 >
                     <template v-if="syncState === 'error'">
-                        Lấy sản phẩm bị lỗi: {{ sync?.reason }}. Tiện ích có thể
-                        tự thử lại; nếu không được, bấm “Lấy lại từ shop”.
+                        Lấy sản phẩm bị lỗi<template v-if="syncReason.text"
+                            >: {{ syncReason.text }}</template
+                        >. Tiện ích có thể tự thử lại; nếu không được, bấm “Thử
+                        lại”.
+                        <span
+                            v-if="syncReason.raw"
+                            class="mt-0.5 block text-[0.7188rem] break-words text-muted-foreground"
+                            data-testid="fork-gio-hang-sync-raw"
+                            >Mã lỗi: {{ syncReason.raw }}</span
+                        >
                     </template>
                     <template v-else>
                         Yêu cầu đã hết hạn sau {{ sync_ttl_minutes }} phút mà
                         tiện ích chưa lấy được. Kiểm tra Chrome đang mở rồi bấm
-                        lại.
+                        “Thử lại”.
                     </template>
                     <p
                         v-if="sync?.chrome"
@@ -699,6 +968,29 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                     >
                         {{ sync.chrome }}
                     </p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            :disabled="busy === 'sync'"
+                            data-testid="fork-gio-hang-sync-retry"
+                            @click="syncShop"
+                        >
+                            <Spinner v-if="busy === 'sync'" class="size-4" />
+                            <IconRefresh v-else class="size-4" />
+                            Thử lại
+                        </Button>
+                        <Button
+                            as-child
+                            size="sm"
+                            variant="ghost"
+                            data-testid="fork-gio-hang-sync-chrome-link"
+                        >
+                            <Link href="/settings#chrome"
+                                >Mở phần Kết nối Chrome</Link
+                            >
+                        </Button>
+                    </div>
                 </div>
             </section>
 
@@ -767,15 +1059,14 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                 >
                     <div
                         class="flex flex-wrap items-center gap-1"
-                        role="tablist"
+                        role="group"
                         aria-label="Lọc theo trạng thái"
                     >
                         <button
                             v-for="f in filters"
                             :key="f.key"
                             type="button"
-                            role="tab"
-                            :aria-selected="filter === f.key"
+                            :aria-pressed="filter === f.key"
                             :disabled="f.key !== 'all' && !f.count"
                             :class="
                                 cn(
@@ -805,14 +1096,49 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                             >
                         </button>
                     </div>
-                    <span
-                        v-if="channel"
-                        class="text-[0.7812rem] text-muted-foreground"
-                        >Giỏ hàng của
-                        <b class="font-medium text-foreground"
-                            >@{{ channel.username }}</b
-                        ></span
-                    >
+                    <div class="flex min-w-0 flex-wrap items-center gap-3">
+                        <div class="relative w-full sm:w-64">
+                            <IconSearch
+                                class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                                v-model="search"
+                                class="h-8 pr-8 pl-8 text-[0.8125rem]"
+                                placeholder="Tìm sản phẩm hoặc tên giỏ…"
+                                aria-label="Tìm sản phẩm hoặc tên giỏ"
+                                data-testid="fork-gio-hang-table-search"
+                                @keydown.esc="search = ''"
+                            />
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute top-1/2 right-1.5 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                                aria-label="Xoá tìm kiếm"
+                                title="Xoá tìm kiếm"
+                                @click="search = ''"
+                            >
+                                <IconX class="size-3.5" />
+                            </button>
+                        </div>
+                        <Button
+                            v-if="embedded && channels.length > 1"
+                            size="sm"
+                            variant="outline"
+                            data-testid="fork-gio-hang-copy-open"
+                            @click="openCopy"
+                        >
+                            <IconCopy class="size-4" />
+                            Sao chép giỏ sang kênh khác…
+                        </Button>
+                        <span
+                            v-if="channel"
+                            class="text-[0.7812rem] text-muted-foreground"
+                            >Giỏ hàng của
+                            <b class="font-medium text-foreground">{{
+                                channelLabel(channel)
+                            }}</b></span
+                        >
+                    </div>
                 </header>
 
                 <div
@@ -859,7 +1185,7 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                         :compact="embedded"
                         @personalise="openProduct(r.code, r.hub_name)"
                         @rename="openRename(r)"
-                        @remove="removing = r"
+                        @remove="removeProduct(r)"
                         @pick="picking = r.key"
                         @update:name="(v: string) => editName(r, v)"
                         @save="saveRow(r)"
@@ -877,6 +1203,16 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                         Thêm sản phẩm
                     </Button>
                 </EmptyState>
+                <div
+                    v-else-if="search.trim()"
+                    class="flex flex-col items-center gap-3 px-5 py-10 text-center text-[0.8125rem] text-muted-foreground"
+                    data-testid="fork-gio-hang-search-empty"
+                >
+                    <p>Không có sản phẩm nào khớp “{{ search.trim() }}”.</p>
+                    <Button size="sm" variant="outline" @click="search = ''"
+                        >Xoá tìm kiếm</Button
+                    >
+                </div>
                 <p
                     v-else
                     class="px-5 py-10 text-center text-[0.8125rem] text-muted-foreground"
@@ -892,6 +1228,43 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                     Sản phẩm ví dụ đã được ẩn vì đã có sản phẩm thật.
                 </p>
             </section>
+
+            <!-- Thanh "Lưu tất cả": hiện khi còn dòng đã chọn giỏ mà chưa lưu -->
+            <div
+                v-if="dirtyRows.length"
+                :class="
+                    cn(
+                        'sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3 shadow-[0_12px_32px_-8px_rgba(0,0,0,.28)]',
+                        embedded && 'bottom-0',
+                    )
+                "
+                role="region"
+                aria-label="Thay đổi chưa lưu"
+                data-testid="fork-gio-hang-save-bar"
+            >
+                <span class="text-[0.875rem] font-medium"
+                    >{{ dirtyRows.length }} dòng chưa lưu</span
+                >
+                <div class="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        :disabled="busy === 'save-all'"
+                        data-testid="fork-gio-hang-discard-all"
+                        @click="discardDrafts"
+                        >Bỏ thay đổi</Button
+                    >
+                    <Button
+                        size="sm"
+                        :disabled="busy !== null"
+                        data-testid="fork-gio-hang-save-all"
+                        @click="saveAll"
+                    >
+                        <Spinner v-if="busy === 'save-all'" class="size-4" />
+                        Lưu tất cả
+                    </Button>
+                </div>
+            </div>
         </template>
 
         <PersonaliseDialog
@@ -911,9 +1284,11 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
                 busy?.startsWith('hide-') ? busy.slice('hide-'.length) : null
             "
             :adding="adding"
+            :syncing="busy === 'sync' || syncState === 'waiting'"
             @update:open="(v: boolean) => (addOpen = v)"
             @select="addProduct"
             @toggle-hidden="setHidden"
+            @sync="syncShop"
         />
 
         <Dialog
@@ -951,38 +1326,72 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
             </DialogContent>
         </Dialog>
 
-        <Dialog
-            :open="removing !== null"
-            @update:open="(v: boolean) => !v && (removing = null)"
-        >
+        <Dialog :open="copyOpen" @update:open="(v: boolean) => (copyOpen = v)">
             <DialogContent
                 class="sm:max-w-md"
-                data-testid="fork-gio-hang-remove-confirm"
+                data-testid="fork-gio-hang-copy-dialog"
             >
                 <DialogHeader>
-                    <DialogTitle
-                        >Xoá sản phẩm “{{ removing?.hub_name }}”?</DialogTitle
+                    <DialogTitle>Sao chép giỏ sang kênh khác</DialogTitle>
+                    <DialogDescription
+                        >Chép giỏ đã chọn của
+                        <b>{{ channel ? channelLabel(channel) : '' }}</b>
+                        ({{ copyRowCount }} dòng) sang các kênh anh tick dưới
+                        đây.</DialogDescription
                     >
-                    <DialogDescription>
-                        Hồ sơ sản phẩm được đưa vào Thùng rác của Windows; video
-                        gốc và video đã làm không bị xoá. Giỏ hàng đã chọn cho
-                        sản phẩm này cũng bị bỏ.
-                    </DialogDescription>
                 </DialogHeader>
+                <ul class="flex flex-col gap-1.5">
+                    <li v-for="c in copyTargets" :key="c.id">
+                        <label
+                            class="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[0.875rem] hover:bg-accent/50"
+                        >
+                            <input
+                                type="checkbox"
+                                class="size-4 accent-primary"
+                                :checked="copyTo.includes(c.id)"
+                                :data-testid="`fork-gio-hang-copy-to-${c.id}`"
+                                @change="
+                                    toggleCopyTarget(
+                                        c.id,
+                                        ($event.target as HTMLInputElement)
+                                            .checked,
+                                    )
+                                "
+                            />
+                            <span class="font-medium">{{
+                                channelLabel(c)
+                            }}</span>
+                        </label>
+                    </li>
+                </ul>
+                <p class="text-[0.8125rem] text-muted-foreground">
+                    Chỉ sao chép các dòng đã có giỏ. Dòng đã có giỏ ở kênh đích
+                    được giữ nguyên.
+                </p>
+                <label
+                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-[0.875rem]"
+                >
+                    Ghi đè cả những dòng đã có
+                    <Switch
+                        :model-value="copyOverwrite"
+                        aria-label="Ghi đè cả những dòng đã có"
+                        data-testid="fork-gio-hang-copy-overwrite"
+                        @update:model-value="
+                            (v: boolean) => (copyOverwrite = v)
+                        "
+                    />
+                </label>
                 <DialogFooter>
-                    <Button variant="outline" @click="removing = null"
+                    <Button variant="outline" @click="copyOpen = false"
                         >Huỷ</Button
                     >
                     <Button
-                        variant="destructive"
-                        :disabled="busy !== null"
-                        @click="confirmRemove"
+                        :disabled="copyTo.length === 0 || busy !== null"
+                        data-testid="fork-gio-hang-copy-submit"
+                        @click="doCopy"
                     >
-                        <Spinner
-                            v-if="busy?.startsWith('rename-')"
-                            class="size-4"
-                        />
-                        Xoá sản phẩm
+                        <Spinner v-if="busy === 'copy'" class="size-4" />
+                        Sao chép
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -993,12 +1402,15 @@ defineExpose({ openDefault, openAdd: () => (addOpen.value = true) });
             :row-label="pickingRow?.label ?? ''"
             :products="products"
             :current-id="pickingRow ? pickedId(pickingRow) : ''"
+            :search-hint="pickingRow?.hub_name ?? ''"
+            :syncing="busy === 'sync' || syncState === 'waiting'"
             :busy-id="
                 busy?.startsWith('hide-') ? busy.slice('hide-'.length) : null
             "
             @update:open="(v: boolean) => !v && (picking = null)"
             @select="pickFor"
             @toggle-hidden="setHidden"
+            @sync="syncShop"
         />
     </div>
 </template>

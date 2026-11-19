@@ -63,7 +63,7 @@ dataset('trang-ban', [
     'gio-hang' => ['/auto/gio-hang', 'fork/GioHang', ['channels', 'selected'], ['rows', 'products', 'sync', 'personalise', 'personalise_default', 'sample_hidden'], ['channels', 'selected', 'sync', 'products', 'rows', 'sample_hidden', 'name_max', 'personalise', 'personalise_default', 'sync_ttl_minutes']],
     'so-lieu' => ['/auto/so-lieu?range=7d', 'fork/SoLieu', ['filters', 'kpis'], ['daily', 'top', 'comments', 'followers', 'breakdowns', 'videos', 'options', 'extension'], ['filters', 'options', 'kpis', 'daily', 'breakdowns', 'videos', 'top', 'comments', 'extension']],
     'kho' => ['/auto/kho', 'fork/Kho', ['counts'], ['videos', 'matrix', 'products', 'blockers', 'days', 'hub', 'retention'], ['kho', 'retention', 'hub', 'matrix', 'products', 'filters', 'days', 'counts', 'blockers', 'videos']],
-    'kho-rieng' => ['/auto/kho/rieng', 'fork/KhoRieng', ['counts'], ['videos', 'folders', 'selectable', 'queue', 'accounts', 'days'], ['folders', 'filters', 'counts', 'days', 'videos', 'selectable', 'queue', 'scan_sig', 'accounts', 'limits']],
+    'kho-rieng' => ['/auto/kho/rieng', 'fork/KhoRieng', ['counts'], ['videos', 'folders', 'selectable_count', 'queue', 'accounts', 'days'], ['folders', 'filters', 'counts', 'days', 'videos', 'selectable_count', 'queue', 'scan_sig', 'accounts', 'limits']],
 ]);
 
 test('partial reload returns only the requested props', function (string $url, string $component, array $only, array $absent): void {

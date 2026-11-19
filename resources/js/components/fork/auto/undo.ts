@@ -1,11 +1,21 @@
 // "Hoàn tác" cho thao tác trên Lịch đăng (đổi giờ / kéo thả, bỏ xếp lịch, xoá): thao tác chỉ thật sự gửi đi sau vài giây.
 // Trong lúc đó thông báo có nút "Hoàn tác" — bấm là coi như chưa làm gì, không cần gọi lại server.
+import { reactive } from 'vue';
 import { toast } from 'vue-sonner';
 
 import { confirm } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 
 const UNDO_SECONDS = 8;
+
+/**
+ * Video đang chờ thao tác (trong 8 giây "Hoàn tác" hoặc đang gửi): id -> nhãn hiện trên dòng lịch.
+ * Dòng nào nằm trong đây thì mờ đi và không thao tác thêm được.
+ */
+export const pendingIds = reactive(new Map<number, string>());
+
+export const PENDING_REMOVE = 'Đang chờ xoá…';
+export const PENDING_MOVE = 'Đang chờ đổi giờ…';
 
 // Thao tác đang chờ gửi: rời trang thì gửi luôn (không để mất thao tác anh đã chọn).
 const pending = new Set<() => void>();
@@ -21,8 +31,15 @@ if (typeof window !== 'undefined') {
 export function undoable(
     message: string,
     commit: () => void | Promise<void>,
+    /** Video đang bị thao tác + nhãn hiện trên dòng lịch trong lúc chờ. */
+    mark?: { id: number | null | undefined; label: string },
 ): void {
     let settled = false;
+    const id = mark?.id ?? null;
+
+    if (id !== null && mark) {
+        pendingIds.set(id, mark.label);
+    }
 
     const fire = () => {
         if (settled) {
@@ -31,7 +48,11 @@ export function undoable(
 
         settled = true;
         pending.delete(fire);
-        void commit();
+        void Promise.resolve(commit()).finally(() => {
+            if (id !== null) {
+                pendingIds.delete(id);
+            }
+        });
     };
 
     pending.add(fire);
@@ -48,6 +69,11 @@ export function undoable(
 
                 settled = true;
                 pending.delete(fire);
+
+                if (id !== null) {
+                    pendingIds.delete(id);
+                }
+
                 toast.success('Đã hoàn tác, bài giữ nguyên.');
             },
         },
@@ -126,11 +152,18 @@ export async function moveWithUndo(
     at: string,
     onDone?: () => void,
 ): Promise<void> {
-    if (!entry.id) {
+    const id = entry.id;
+
+    // Bài đang chờ một thao tác khác (xoá / đổi giờ): bỏ qua lần thả thứ hai.
+    if (!id || pendingIds.has(id)) {
         return;
     }
 
-    if (!(await okForDay(entry.id, at))) {
+    // Khoá dòng ngay từ lúc hỏi "ngày đã đủ bài", để không thả thêm lần nữa.
+    pendingIds.set(id, PENDING_MOVE);
+
+    if (!(await okForDay(id, at))) {
+        pendingIds.delete(id);
         toast('Đã giữ nguyên giờ cũ.');
         onDone?.();
 
@@ -160,5 +193,6 @@ export async function moveWithUndo(
 
             onDone?.();
         },
+        { id, label: PENDING_MOVE },
     );
 }

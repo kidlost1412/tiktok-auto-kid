@@ -205,15 +205,14 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div
                 class="flex gap-0.5 rounded-lg bg-muted p-1"
-                role="tablist"
+                role="group"
                 aria-label="Khoảng ngày"
             >
                 <button
                     v-for="r in ranges"
                     :key="r.key"
                     type="button"
-                    role="tab"
-                    :aria-selected="range === r.key"
+                    :aria-pressed="range === r.key"
                     :data-testid="`ban-cu-range-${r.key}`"
                     :class="
                         cn(
@@ -245,11 +244,11 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
         </div>
 
         <template v-else-if="!p">
-            <div class="grid grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-[14px]" />
             </div>
             <Skeleton class="h-52 rounded-[14px]" />
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Skeleton class="h-64 rounded-[14px]" />
                 <Skeleton class="h-64 rounded-[14px]" />
             </div>
@@ -257,7 +256,10 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
 
         <template v-else>
             <!-- KPI -->
-            <div class="grid grid-cols-4 gap-3" data-testid="ban-cu-kpi">
+            <div
+                class="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                data-testid="ban-cu-kpi"
+            >
                 <div
                     v-for="t in tiles"
                     :key="t.key"
@@ -343,7 +345,7 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                 />
             </section>
 
-            <div class="grid grid-cols-2 items-start gap-4">
+            <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
                 <!-- Video nổi bật -->
                 <section
                     :class="cn(cardCls, 'flex flex-col overflow-hidden')"
@@ -359,10 +361,15 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                         Chưa có số liệu video trong khoảng này.
                     </p>
                     <ol v-else class="flex flex-col p-1.5">
-                        <li v-for="(v, i) in top" :key="v.id">
+                        <li
+                            v-for="(v, i) in top"
+                            :key="v.id"
+                            class="flex items-center gap-1 rounded-lg pr-2 transition-colors hover:bg-accent/50"
+                        >
                             <button
                                 type="button"
-                                class="grid w-full grid-cols-[18px_30px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                                class="grid min-w-0 flex-1 grid-cols-[18px_30px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2.5 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
+                                :aria-label="`Xem video ${productName(v.product_code)} (${fmtNum(v.views)} lượt xem)`"
                                 @click="
                                     openVideo(
                                         top.map((x) => x.id),
@@ -380,10 +387,14 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                                     class="h-[53px] w-[30px] rounded-md"
                                 />
                                 <span class="min-w-0">
-                                    <span class="flex min-w-0 items-center gap-1.5">
+                                    <span
+                                        class="flex min-w-0 items-center gap-1.5"
+                                    >
                                         <span
                                             class="truncate text-sm font-medium"
-                                            >{{ productName(v.product_code) }}</span
+                                            >{{
+                                                productName(v.product_code)
+                                            }}</span
                                         >
                                         <SourceBadge :source="v.source" />
                                     </span>
@@ -408,24 +419,22 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                                         />
                                     </span>
                                 </span>
-                                <span class="flex items-center gap-2">
-                                    <span
-                                        class="text-sm font-semibold tabular-nums"
-                                        >{{ fmtCompact(v.views) }}</span
-                                    >
-                                    <a
-                                        v-if="v.link"
-                                        :href="v.link"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                                        title="Mở trên TikTok"
-                                        aria-label="Mở trên TikTok"
-                                        @click.stop
-                                        ><IconExternalLink class="size-4"
-                                    /></a>
-                                </span>
+                                <span
+                                    class="text-sm font-semibold tabular-nums"
+                                    >{{ fmtCompact(v.views) }}</span
+                                >
                             </button>
+                            <a
+                                v-if="v.link"
+                                :href="v.link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                                title="Mở trên TikTok"
+                                :aria-label="`Mở video ${productName(v.product_code)} trên TikTok`"
+                                ><IconExternalLink class="size-4"
+                            /></a>
+                            <span v-else class="size-7 shrink-0" />
                         </li>
                     </ol>
                 </section>

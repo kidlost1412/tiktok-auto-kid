@@ -18,8 +18,16 @@ import type {
 } from '@/components/fork/auto/types';
 import { moBan } from '@/components/fork/nha/ban/bus';
 import { useInertiaProps } from '@/components/fork/nha/ban/useInertiaProps';
+import { loiChaoAnh } from '@/components/fork/nha/loi-chao';
 import { recentEvents } from '@/components/fork/nha/su-kien';
-import type { NhaData } from '@/components/fork/nha/types';
+import {
+    daLam,
+    dongHo,
+    nhanVatCua,
+    tenVai,
+} from '@/components/fork/nha/truc-tiep';
+import type { LiveItem, NhaData } from '@/components/fork/nha/types';
+import { useTrucTiepKho } from '@/components/fork/nha/useTrucTiep';
 import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,29 +64,39 @@ const {
     'failed_recent',
 ]);
 
+// Hỏi lại mỗi 30 giây khi tab đang hiện; tab ẩn thì dừng hẳn, hiện lại là hỏi ngay một lần rồi chạy tiếp.
 let poll: ReturnType<typeof setInterval> | undefined;
+const stopPoll = () => {
+    clearInterval(poll);
+    poll = undefined;
+};
+const startPoll = () => {
+    stopPoll();
+    poll = setInterval(() => reload(), 30000);
+};
+const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+        reload();
+        startPoll();
+    } else {
+        stopPoll();
+    }
+};
 onMounted(() => {
     reload();
-    poll = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-            reload();
-        }
-    }, 30000);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    if (document.visibilityState === 'visible') {
+        startPoll();
+    }
 });
-onBeforeUnmount(() => clearInterval(poll));
+onBeforeUnmount(() => {
+    stopPoll();
+    document.removeEventListener('visibilitychange', onVisibility);
+});
 
 // ---- Lời chào
-const greeting = computed(() => {
-    const h = dayjs().hour();
-
-    return h < 11
-        ? 'Chào buổi sáng, anh.'
-        : h < 14
-          ? 'Chào buổi trưa, anh.'
-          : h < 18
-            ? 'Chào buổi chiều, anh.'
-            : 'Chào buổi tối, anh.';
-});
+const greeting = computed(() => loiChaoAnh(dayjs().hour()));
 
 // ---- Số liệu
 const accounts = computed(() => p.value?.accounts ?? []);
@@ -124,6 +142,14 @@ const nextLeft = computed(() => {
 });
 
 const failed = computed(() => p.value?.failed_recent ?? []);
+// Tổng bài lỗi: danh sách chỉ giữ 6 bài gần nhất, còn tổng lấy từ Khu Tự Trị (cùng định nghĩa: lỗi trong 14 ngày qua),
+// để con số ở đây và ở dải "Cần xử lý hôm nay" luôn khớp nhau.
+const failedTotal = computed(() =>
+    Math.max(failed.value.length, props.data?.viec?.buuta?.so ?? 0),
+);
+const failedCut = computed(
+    () => failed.value.length > 0 && failedTotal.value > failed.value.length,
+);
 
 const blockedTotal = computed(() => {
     let best = 0;
@@ -199,10 +225,12 @@ interface Viec {
 const viec = computed<Viec[]>(() => {
     const out: Viec[] = [];
 
-    if (failed.value.length) {
+    if (failedTotal.value) {
         out.push({
             key: 'loi',
-            text: `${failed.value.length} bài đăng bị lỗi`,
+            text: failedCut.value
+                ? `Bài lỗi: ${failedTotal.value} (hiện ${failed.value.length} bài gần nhất)`
+                : `${failedTotal.value} bài đăng bị lỗi`,
             hint: 'Xem lý do và bấm Thử lại ở bàn Bưu tá.',
             ban: 'buuta',
             nut: 'Mở bàn Bưu tá',
@@ -278,6 +306,24 @@ const viec = computed<Viec[]>(() => {
 
 const events = computed(() => recentEvents(props.data?.events, 8));
 
+// ---- Đang chạy trực tiếp: một dòng gọn cho mỗi việc thật đang làm (và việc vừa xong chưa đầy phút)
+const kho = useTrucTiepKho();
+const chay = computed(() =>
+    (kho?.items.value ?? []).slice(0, 6).map((i: LiveItem) => {
+        const d = daLam(i, kho?.nowSec.value ?? Date.now() / 1000);
+        const viec = i.viec || 'đang làm việc';
+
+        return {
+            id: i.id,
+            vai: nhanVatCua(i),
+            xong: !!i.xong,
+            loi: i.xong && i.ket_qua === 'loi',
+            text: [tenVai(i), viec, i.buoc].filter(Boolean).join(' · '),
+            gio: d === null ? '' : dongHo(d),
+        };
+    }),
+);
+
 const labelCls =
     'text-xs font-medium tracking-[0.02em] text-muted-foreground uppercase';
 const tileCls = cn(
@@ -300,6 +346,53 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
             <p class="mt-0.5 text-sm text-muted-foreground">{{ tinhHinh }}</p>
         </div>
 
+        <ul
+            v-if="chay.length"
+            class="flex flex-col gap-1 rounded-xl border bg-card px-3 py-2"
+            data-testid="ban-sanh-truc-tiep"
+        >
+            <li v-for="c in chay" :key="c.id">
+                <button
+                    type="button"
+                    class="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-sm hover:bg-accent/40 disabled:pointer-events-none"
+                    :disabled="!c.vai"
+                    @click="c.vai && moBan(c.vai)"
+                >
+                    <span
+                        :class="
+                            cn(
+                                'size-2 shrink-0 rounded-full',
+                                c.loi
+                                    ? 'bg-red-500'
+                                    : c.xong
+                                      ? 'bg-emerald-500'
+                                      : 'animate-pulse bg-emerald-500',
+                            )
+                        "
+                        aria-hidden="true"
+                    />
+                    <span class="min-w-0 flex-1 truncate">{{ c.text }}</span>
+                    <span
+                        v-if="c.xong"
+                        :class="
+                            cn(
+                                'shrink-0 text-xs font-medium',
+                                c.loi
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-emerald-600 dark:text-emerald-400',
+                            )
+                        "
+                        >{{ c.loi ? 'lỗi' : 'xong' }}</span
+                    >
+                    <span
+                        v-if="c.gio"
+                        class="shrink-0 text-xs text-muted-foreground tabular-nums"
+                        >{{ c.gio }}</span
+                    >
+                </button>
+            </li>
+        </ul>
+
         <div
             v-if="error && !p"
             class="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm"
@@ -312,7 +405,10 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
         </div>
 
         <!-- Lưới tình hình -->
-        <div class="grid grid-cols-3 gap-3" data-testid="ban-sanh-luoi">
+        <div
+            class="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            data-testid="ban-sanh-luoi"
+        >
             <button
                 type="button"
                 :class="[tileCls, 'hover:bg-accent/40']"
@@ -458,19 +554,23 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                     :class="
                         cn(
                             'font-heading text-2xl font-semibold tabular-nums',
-                            failed.length && toneClasses.danger.text,
+                            failedTotal && toneClasses.danger.text,
                         )
                     "
-                    >{{ failed.length }}</span
+                    >{{ failedTotal }}</span
                 >
                 <span class="text-xs text-muted-foreground">{{
-                    failed.length ? 'Cần xem lại' : 'Không có'
+                    failedCut
+                        ? `Hiện ${failed.length} bài gần nhất`
+                        : failedTotal
+                          ? 'Cần xem lại'
+                          : 'Không có'
                 }}</span>
             </button>
         </div>
 
         <div
-            class="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start gap-4"
+            class="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
         >
             <!-- Việc cần anh xử lý -->
             <section

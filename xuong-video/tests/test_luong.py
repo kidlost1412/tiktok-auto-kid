@@ -162,7 +162,8 @@ class SseHttpTest(unittest.TestCase):
             dong = r.fp.readline().decode()
             self.assertEqual(dong.strip(), "event: doi")
             data = json.loads(r.fp.readline().decode()[6:])
-            self.assertEqual(set(data), {"n", "cho_duyet", "chay"})
+            self.assertEqual(set(data), {"n", "cho_duyet", "chay", "tt"})
+            self.assertIsInstance(data["tt"], (int, float))      # cap_nhat lớn nhất của các việc trực tiếp (0 nếu không có)
         finally:
             c.close()
 

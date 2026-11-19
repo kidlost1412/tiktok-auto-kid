@@ -3,11 +3,16 @@
 // (không bao giờ tự xếp lại; file trên ổ đĩa vẫn còn). Bài đã hẹn trên TikTok: app nhờ Chrome xoá bài hẹn và kiểm lại trước.
 import { router } from '@inertiajs/vue3';
 import { IconBrandTiktok, IconCalendarOff, IconTrash } from '@tabler/icons-vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { toast } from 'vue-sonner';
 
 import type { ScheduleEntry } from '@/components/fork/auto/types';
-import { postJson, undoable } from '@/components/fork/auto/undo';
+import {
+    PENDING_REMOVE,
+    pendingIds,
+    postJson,
+    undoable,
+} from '@/components/fork/auto/undo';
 import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,35 +23,19 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{ entry: ScheduleEntry | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-const busy = ref<'unschedule' | 'remove' | null>(null);
-const problem = ref('');
-const done = ref('');
-const changed = ref(false);
-
 const onTikTok = computed(() => props.entry?.state === 'tiktok_scheduled');
-
-watch(open, (v) => {
-    if (v) {
-        problem.value = '';
-        done.value = '';
-        changed.value = false;
-    } else if (changed.value) {
-        router.reload({ only: ['lich', 'stock', 'products'] });
-    }
-});
 
 // Có "Hoàn tác": hộp đóng ngay, vài giây sau mới gửi đi.
 function run(kind: 'unschedule' | 'remove') {
     const e = props.entry;
 
-    if (!e?.id) {
+    if (!e?.id || pendingIds.has(e.id)) {
         return;
     }
 
@@ -73,6 +62,10 @@ function run(kind: 'unschedule' | 'remove') {
 
             router.reload({ only: ['lich', 'stock', 'products'] });
         },
+        {
+            id: e.id,
+            label: kind === 'remove' ? PENDING_REMOVE : 'Đang chờ bỏ xếp lịch…',
+        },
     );
 }
 </script>
@@ -92,7 +85,7 @@ function run(kind: 'unschedule' | 'remove') {
             </DialogHeader>
 
             <div
-                v-if="onTikTok && !done"
+                v-if="onTikTok"
                 :class="
                     cn(
                         'flex items-start gap-2 rounded-lg border p-2.5 text-sm',
@@ -107,44 +100,14 @@ function run(kind: 'unschedule' | 'remove') {
                 >
             </div>
 
-            <div
-                v-if="done"
-                :class="
-                    cn(
-                        'rounded-lg border p-2.5 text-sm',
-                        toneClasses.success.box,
-                    )
-                "
-                data-testid="fork-auto-remove-done"
-            >
-                {{ done }}
-            </div>
-            <div
-                v-if="problem"
-                :class="
-                    cn(
-                        'rounded-lg border p-2.5 text-sm',
-                        toneClasses.danger.box,
-                    )
-                "
-                data-testid="fork-auto-remove-problem"
-            >
-                {{ problem }}
-            </div>
-
-            <div v-if="!done" class="grid gap-2">
+            <div class="grid gap-2">
                 <button
                     type="button"
                     class="flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
-                    :disabled="!!busy"
                     data-testid="fork-auto-remove-unschedule"
                     @click="run('unschedule')"
                 >
-                    <Spinner
-                        v-if="busy === 'unschedule'"
-                        class="mt-0.5 size-4"
-                    />
-                    <IconCalendarOff v-else class="mt-0.5 size-4 shrink-0" />
+                    <IconCalendarOff class="mt-0.5 size-4 shrink-0" />
                     <span class="flex flex-col gap-0.5">
                         <b class="text-sm font-medium">Bỏ xếp lịch</b>
                         <span class="text-[0.8125rem] text-muted-foreground"
@@ -155,13 +118,10 @@ function run(kind: 'unschedule' | 'remove') {
                 <button
                     type="button"
                     class="flex items-start gap-3 rounded-lg border border-red-200 p-3 text-left transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
-                    :disabled="!!busy"
                     data-testid="fork-auto-remove-confirm"
                     @click="run('remove')"
                 >
-                    <Spinner v-if="busy === 'remove'" class="mt-0.5 size-4" />
                     <IconTrash
-                        v-else
                         class="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400"
                     />
                     <span class="flex flex-col gap-0.5">
@@ -178,9 +138,7 @@ function run(kind: 'unschedule' | 'remove') {
             </div>
 
             <DialogFooter>
-                <Button variant="ghost" @click="open = false">{{
-                    done ? 'Đóng' : 'Thôi'
-                }}</Button>
+                <Button variant="ghost" @click="open = false">Thôi</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

@@ -170,6 +170,8 @@ const onClick = (e: MouseEvent) => {
                         toneClasses[status().tone].chip,
                     )
                 "
+                :title="`Trạng thái: ${status().label}`"
+                :aria-label="`Trạng thái: ${status().label}`"
                 >{{ status().label }}</span
             >
 

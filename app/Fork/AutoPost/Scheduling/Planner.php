@@ -91,6 +91,12 @@ final class Planner
 
             try {
                 $report[$id] = $this->planAccount($auto, $now);
+                // Kênh bật "Tự trộn xen kẽ sản phẩm": đổi chỗ giờ các bài chưa gửi lên TikTok (trong cùng khoá xếp lịch).
+                $mixed = app(ProductMix::class)->autoMix($auto);
+
+                if ($mixed > 0) {
+                    $report[$id]['mixed'] = $mixed;
+                }
             } catch (Throwable $e) {
                 report($e);
                 $report[$id] = ['created' => 0, 'failed' => 1, 'skipped' => 'lỗi: '.$e->getMessage()];

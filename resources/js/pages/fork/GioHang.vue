@@ -2,7 +2,7 @@
 // Trang riêng của bản Việt hoá: chọn sản phẩm TikTok Shop cho từng sản phẩm của hub, từng quy cách, trên từng kênh.
 // Phần thân (thanh kênh, lấy sản phẩm shop, tóm tắt, bảng, hộp thoại) nằm ở CartTable — dùng chung với bàn Chủ quầy.
 // Chữ trên trang viết thẳng bằng tiếng Việt (không qua lang/en).
-import { IconHash, IconPlus } from '@tabler/icons-vue';
+import { IconCopy, IconHash, IconPlus } from '@tabler/icons-vue';
 import { ref } from 'vue';
 
 import CartTable from '@/components/fork/gio-hang/CartTable.vue';
@@ -44,6 +44,15 @@ const table = ref<InstanceType<typeof CartTable> | null>(null);
         testid="fork-gio-hang-page"
     >
         <template v-if="channels.length" #actions>
+            <Button
+                v-if="channels.length > 1"
+                variant="outline"
+                data-testid="fork-gio-hang-copy-open"
+                @click="table?.openCopy()"
+            >
+                <IconCopy class="size-4" />
+                Sao chép giỏ sang kênh khác…
+            </Button>
             <Button
                 variant="outline"
                 data-testid="fork-personalise-default"

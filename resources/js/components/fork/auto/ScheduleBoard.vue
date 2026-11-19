@@ -3,6 +3,7 @@
 // Màn hẹp hơn: chọn ngày bằng tab ở đầu thẻ, hiện một ngày. Nét đứt là giờ dự kiến, chưa hẹn lên TikTok.
 import { Link } from '@inertiajs/vue3';
 import {
+    IconArrowsShuffle,
     IconBolt,
     IconClock,
     IconShoppingCartOff,
@@ -14,6 +15,7 @@ import { computed, ref } from 'vue';
 import { channelColor } from '@/components/fork/auto/channelColors';
 import DirectWindowDialog from '@/components/fork/auto/DirectWindowDialog.vue';
 import { dragging } from '@/components/fork/auto/dragMove';
+import MixDialog from '@/components/fork/auto/MixDialog.vue';
 import ScheduleDayList from '@/components/fork/auto/ScheduleDayList.vue';
 import TrashDialog from '@/components/fork/auto/TrashDialog.vue';
 import type {
@@ -46,6 +48,7 @@ const onlyEditable = ref(false);
 // Chỉ hiện bài sắp đăng mà giỏ có vấn đề (hết hàng / không còn trong shop).
 const onlyCart = ref(false);
 const trashOpen = ref(false);
+const mixOpen = ref(false);
 
 const wide = useMediaQuery('(min-width: 1536px)');
 
@@ -53,6 +56,14 @@ const channel = ref<string>('all');
 // Lọc nguồn: video AI (Xưởng Video) / Kho riêng.
 const source = ref<SourceFilterValue>('all');
 const picked = ref<string | null>(null);
+// Có bộ lọc nào đang bật: ngày trống thì nói "không có bài khớp bộ lọc" thay vì lý do khác.
+const filtered = computed(
+    () =>
+        channel.value !== 'all' ||
+        source.value !== 'all' ||
+        onlyEditable.value ||
+        onlyCart.value,
+);
 
 const entries = computed<ScheduleEntry[]>(() => {
     const out: ScheduleEntry[] = [];
@@ -322,6 +333,15 @@ const pct = (n: number, d: Day) =>
                 <button
                     type="button"
                     class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    title="Đổi chỗ giờ các bài chưa gửi lên TikTok để hai bài liền nhau khác sản phẩm (có xem trước và hoàn tác)"
+                    data-testid="fork-auto-mix-open"
+                    @click="mixOpen = true"
+                >
+                    <IconArrowsShuffle class="size-4" /> Trộn sản phẩm
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title="Video anh đã xoá: khôi phục được trong 30 ngày"
                     data-testid="fork-auto-trash-open"
                     @click="trashOpen = true"
@@ -497,6 +517,7 @@ const pct = (n: number, d: Day) =>
                     :list="d.list"
                     :is-today="d.isToday"
                     :multi="multi"
+                    :filtered="filtered"
                     compact
                     class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                 />
@@ -585,11 +606,18 @@ const pct = (n: number, d: Day) =>
                 :list="current.list"
                 :is-today="current.isToday"
                 :multi="multi"
+                :filtered="filtered"
                 class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
             />
         </template>
 
         <TrashDialog v-model:open="trashOpen" />
+        <MixDialog
+            v-model:open="mixOpen"
+            :accounts="accounts.filter((a) => a.enabled)"
+            :account-id="channel !== 'all' ? channel : null"
+            :reload-only="['lich']"
+        />
         <DirectWindowDialog
             v-if="directWindow"
             v-model:open="directOpen"

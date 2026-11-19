@@ -25,6 +25,8 @@ except Exception:                            # pragma: no cover - tuỳ môi tr�
 TOI_DA_KET_NOI = 8
 PING_GIAY = 15
 GOP_GIAY = 0.3              # gộp nhiều thay đổi dồn dập thành 1 lần tính
+PHAT_GIUA_GIAY = 1.0        # hai lần PHÁT liên tiếp cách nhau ≥ 1 s (việc trực tiếp ghi file dồn dập từ nhiều vai — không đẩy nhanh hơn thế)
+TEN_TRUC_TIEP = "truc-tiep"  # lich-su/truc-tiep/*.json: mỗi việc đang chạy một file (engine/truc_tiep.py) — canh cả thư mục này
 NHIP_DU_PHONG = 2.0         # không có watchdog: so mtime mỗi 2 giây
 NHIP_AN_TOAN = 5.0          # có watchdog: vẫn tính lại thưa (bắt việc không ghi file, vd lô tự thoát)
 FILE_THEO_DOI = ("su-kien.jsonl", "danh-gia.json", "dang-chay.lock")
@@ -78,6 +80,7 @@ class Phat:
         self._obs = None
         self._thread = None
         self._mtime = None
+        self._lan_phat = 0.0                 # time.monotonic() của lần phát gần nhất
 
     # ---- kết nối SSE
     def vao(self):
@@ -119,6 +122,7 @@ class Phat:
                 return False
             self.anh = anh
             self.ver += 1
+            self._lan_phat = time.monotonic()
             self.cond.notify_all()
         return True
 
@@ -147,6 +151,10 @@ class Phat:
                 ds.append(("khoa-lo", tuple(sorted((x.name, x.stat().st_mtime_ns) for x in self.ls.glob(MAU_KHOA_LO) if x.name.endswith(".lock")))))
             except OSError:
                 ds.append(("khoa-lo", ()))
+            try:                                  # việc trực tiếp (lich-su/truc-tiep/*.json): file mới / đổi / mất
+                ds.append((TEN_TRUC_TIEP, tuple(sorted((x.name, x.stat().st_mtime_ns, x.stat().st_size) for x in (self.ls / TEN_TRUC_TIEP).glob("*.json")))))
+            except OSError:
+                ds.append((TEN_TRUC_TIEP, ()))
         if self.ra:
             try:
                 ds.append(("ra", tuple(sorted((x.name, x.stat().st_mtime_ns) for x in self.ra.iterdir() if x.is_dir()))))
@@ -164,6 +172,9 @@ class Phat:
                 break
             if co:
                 self._dung.wait(GOP_GIAY)    # gộp các thay đổi dồn dập
+                con = PHAT_GIUA_GIAY - (time.monotonic() - self._lan_phat)
+                if con > 0 and not self._dung.is_set():
+                    self._dung.wait(con)     # vừa phát xong < 1 s trước: đợi cho đủ 1 s (gợi ý đến thêm trong lúc đợi vẫn được gộp)
                 self._ban.clear()
                 self._tinh_va_phat()
                 continue
@@ -193,6 +204,8 @@ class Phat:
                     ds = [os.fsdecode(d) for d in ds if d]
                     if self.loai == "ls":
                         ok = any(la_file_theo_doi(Path(d).name) for d in ds)
+                    elif self.loai == "tt":
+                        ok = any(d.lower().endswith(".json") for d in ds)       # bỏ qua file tạm .json.tmp (ghi nguyên tử)
                     else:
                         ok = ev.is_directory or any(d.lower().endswith(".mp4") and not d.lower().endswith(".part.mp4") for d in ds)
                     if ok:
@@ -204,6 +217,13 @@ class Phat:
         n = 0
         if self.ls and self.ls.exists():
             obs.schedule(Nghe("ls"), str(self.ls), recursive=False); n += 1
+            tt = self.ls / TEN_TRUC_TIEP
+            try:
+                tt.mkdir(exist_ok=True)
+            except OSError:
+                pass
+            if tt.is_dir():
+                obs.schedule(Nghe("tt"), str(tt), recursive=False); n += 1
         if self.ra and self.ra.exists():
             obs.schedule(Nghe("ra"), str(self.ra), recursive=True); n += 1
         if not n:

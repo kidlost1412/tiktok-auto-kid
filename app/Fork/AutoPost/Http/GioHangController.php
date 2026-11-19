@@ -22,8 +22,10 @@ use App\Http\Controllers\Controller;
 use App\Models\SocialAccount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -103,29 +105,178 @@ final class GioHangController extends Controller
         ]);
 
         $quyCach = filled($data['quy_cach'] ?? null) ? (string) $data['quy_cach'] : null;
+        $moved = 0;
+        $error = $this->persistLink($account, $product, $quyCach, $data['shop_product_id'], $data['display_name'], $moved);
 
+        if ($error !== null) {
+            return back()->with('flash.error', $error);
+        }
+
+        $note = $moved > 0 ? ' '.$moved.' bài đã xếp lịch cũng được đổi sang giỏ mới.' : '';
+
+        return back()->with('flash.success', 'Đã chọn sản phẩm giỏ hàng cho '.CartRules::label($product, $product->code, $quyCach).' trên @'.$account->username.'.'.$note);
+    }
+
+    /**
+     * "Lưu tất cả": lưu nhiều dòng giỏ của một kênh trong một giao dịch, cùng luật với lưu từng dòng.
+     * Một dòng sai thì không lưu dòng nào (tránh lưu dở).
+     */
+    public function saveLinks(Request $request, string $socialAccount): RedirectResponse
+    {
+        $account = $this->findAccount($this->authorizeOwner($request), $socialAccount);
+
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.code' => ['required', 'string', 'max:100', 'regex:/^[a-z0-9-]+$/'],
+            'items.*.quy_cach' => ['nullable', 'string', 'max:100'],
+            'items.*.shop_product_id' => ['required', 'string', 'regex:'.ShopSync::ID_PATTERN],
+            'items.*.display_name' => ['required', 'string', 'min:1', 'max:'.CartRules::NAME_MAX],
+        ]);
+
+        $moved = 0;
+        $saved = 0;
+
+        try {
+            DB::transaction(function () use ($data, $account, &$moved, &$saved): void {
+                foreach ($data['items'] as $item) {
+                    $product = AutoProduct::query()->find($item['code']);
+
+                    if ($product === null) {
+                        throw new RuntimeException('Sản phẩm "'.$item['code'].'" không còn trong app.');
+                    }
+
+                    $quyCach = filled($item['quy_cach'] ?? null) ? (string) $item['quy_cach'] : null;
+                    $error = $this->persistLink($account, $product, $quyCach, $item['shop_product_id'], $item['display_name'], $moved);
+
+                    if ($error !== null) {
+                        throw new RuntimeException(CartRules::label($product, $product->code, $quyCach).': '.$error);
+                    }
+
+                    $saved++;
+                }
+            });
+        } catch (RuntimeException $e) {
+            return back()->with('flash.error', 'Chưa lưu dòng nào. '.$e->getMessage());
+        }
+
+        $note = $moved > 0 ? ' '.$moved.' bài đã xếp lịch cũng được đổi sang giỏ mới.' : '';
+
+        return back()->with('flash.success', 'Đã lưu '.$saved.' giỏ hàng.'.$note);
+    }
+
+    /**
+     * "Sao chép giỏ sang kênh khác": chép các dòng đã có giỏ của kênh nguồn sang kênh đích. Khớp dòng theo (mã sản phẩm hub, quy cách);
+     * kênh đích phải có đúng sản phẩm shop đó (cùng mã sản phẩm TikTok) trong danh sách đã lấy của chính nó, không thì bỏ qua dòng.
+     * Dòng đã có giỏ ở kênh đích được giữ nguyên, trừ khi chọn ghi đè.
+     */
+    public function copyLinks(Request $request, string $socialAccount): RedirectResponse
+    {
+        $accountId = $this->authorizeOwner($request);
+        $from = $this->findAccount($accountId, $socialAccount);
+
+        $data = $request->validate([
+            'to' => ['required', 'array', 'min:1', 'max:20'],
+            'to.*' => ['required', 'string'],
+            'overwrite' => ['nullable', 'boolean'],
+        ]);
+
+        $overwrite = (bool) ($data['overwrite'] ?? false);
+        $targets = [];
+
+        foreach (array_values(array_unique($data['to'])) as $id) {
+            // Cùng kiểm tra chủ sở hữu như mọi thao tác khác: kênh không thuộc chủ app là 404, không bỏ qua im lặng.
+            $target = $this->findAccount($accountId, $id);
+
+            if ($target->id === $from->id) {
+                return back()->with('flash.error', 'Không sao chép giỏ vào chính kênh nguồn.');
+            }
+
+            $targets[] = $target;
+        }
+
+        $links = ProductLink::query()->where('social_account_id', $from->id)->get();
+
+        if ($links->isEmpty()) {
+            return back()->with('flash.error', 'Kênh @'.$from->username.' chưa có dòng nào đã chọn giỏ để sao chép.');
+        }
+
+        $products = AutoProduct::query()->whereIn('code', $links->pluck('auto_product_id')->unique())->get()->keyBy('code');
+        $copied = 0;
+        $parts = [];
+
+        DB::transaction(function () use ($targets, $links, $products, $overwrite, &$copied, &$parts): void {
+            foreach ($targets as $target) {
+                $done = 0;
+                $skipped = 0;
+                $kept = 0;
+
+                foreach ($links as $link) {
+                    $product = $products->get($link->auto_product_id);
+
+                    if ($product === null) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $quyCach = filled($link->quy_cach) ? (string) $link->quy_cach : null;
+
+                    if (! $overwrite && ProductLink::slot($target->id, $product->code, $quyCach)->exists()) {
+                        $kept++;
+
+                        continue;
+                    }
+
+                    $moved = 0;
+
+                    if ($this->persistLink($target, $product, $quyCach, (string) $link->shop_product_id, (string) $link->display_name, $moved) !== null) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $done++;
+                }
+
+                $copied += $done;
+                $text = 'Đã sao chép '.$done.' dòng sang @'.$target->username;
+                $text .= $skipped > 0 ? ' · bỏ qua '.$skipped.' dòng (shop kênh đó chưa có sản phẩm)' : '';
+                $text .= $kept > 0 ? ' · giữ nguyên '.$kept.' dòng đã có giỏ' : '';
+                $parts[] = $text;
+            }
+        });
+
+        return back()->with($copied > 0 ? 'flash.success' : 'flash.warning', implode('. ', $parts));
+    }
+
+    /**
+     * Ghi một dòng giỏ (tạo hoặc cập nhật) và đổi các bài đã xếp lịch chưa chạy sang giỏ mới. Dùng chung cho lưu từng dòng,
+     * lưu tất cả và sao chép giỏ. Trả về câu lỗi (tiếng Việt), hoặc null khi đã lưu; `$moved` cộng dồn số bài được đổi giỏ.
+     */
+    private function persistLink(SocialAccount $account, AutoProduct $product, ?string $quyCach, string $shopProductId, string $displayName, int &$moved): ?string
+    {
         if (! in_array($quyCach, CartRules::quyCachCodes($product), true)) {
-            return back()->with('flash.error', 'Quy cách này không có trong sản phẩm '.$product->short_name.'.');
+            return 'Quy cách này không có trong sản phẩm '.$product->short_name.'.';
         }
 
         $shop = ShopProduct::query()
             ->where('social_account_id', $account->id)
-            ->where('product_id', $data['shop_product_id'])
+            ->where('product_id', $shopProductId)
             ->first();
 
         if ($shop === null) {
-            return back()->with('flash.error', 'Sản phẩm này không thuộc shop của kênh @'.$account->username.'.');
+            return 'Sản phẩm này không thuộc shop của kênh @'.$account->username.'.';
         }
 
         if ($shop->missing) {
-            return back()->with('flash.error', 'Sản phẩm này đã không còn trong shop, hãy lấy lại sản phẩm từ shop.');
+            return 'Sản phẩm này đã không còn trong shop, hãy lấy lại sản phẩm từ shop.';
         }
 
         if ($shop->hidden) {
-            return back()->with('flash.error', 'Sản phẩm này đang bị ẩn, hãy hiện lại trước khi chọn.');
+            return 'Sản phẩm này đang bị ẩn, hãy hiện lại trước khi chọn.';
         }
 
-        $values = ['shop_product_id' => $shop->product_id, 'display_name' => $data['display_name'], 'paused_reason' => null];
+        $values = ['shop_product_id' => $shop->product_id, 'display_name' => $displayName, 'paused_reason' => null];
         $existing = ProductLink::slot($account->id, $product->code, $quyCach)->first();
         $oldName = $existing?->display_name;
 
@@ -137,10 +288,9 @@ final class GioHangController extends Controller
         }
 
         // Bài đã xếp lịch (chưa đăng) của sản phẩm này đổi sang giỏ mới luôn.
-        $moved = CartRefresh::apply($account->id, $link, $oldName);
-        $note = $moved > 0 ? ' '.$moved.' bài đã xếp lịch cũng được đổi sang giỏ mới.' : '';
+        $moved += CartRefresh::apply($account->id, $link, $oldName);
 
-        return back()->with('flash.success', 'Đã chọn sản phẩm giỏ hàng cho '.CartRules::label($product, $product->code, $quyCach).' trên @'.$account->username.'.'.$note);
+        return null;
     }
 
     public function clearLink(Request $request, string $socialAccount, string $code): RedirectResponse
@@ -285,7 +435,8 @@ final class GioHangController extends Controller
             return back()->with('flash.error', 'Đã ẩn. Lưu ý sản phẩm này đang được chọn cho video: video đó sẽ được giữ trong kho cho tới khi anh chọn sản phẩm khác.');
         }
 
-        return back()->with('flash.success', $data['hidden'] ? 'Đã ẩn sản phẩm khỏi danh sách chọn.' : 'Đã hiện lại sản phẩm.');
+        // Ẩn thường: trang tự hiện thông báo "Đã ẩn …" kèm nút "Hiện lại", nên không thêm toast thứ hai.
+        return $data['hidden'] ? back() : back()->with('flash.success', 'Đã hiện lại sản phẩm.');
     }
 
     /**

@@ -10,7 +10,7 @@ import {
     IconMessage2,
     IconSend,
 } from '@tabler/icons-vue';
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import SettingsSection from '@/components/settings/SettingsSection.vue';
 import { Button } from '@/components/ui/button';
@@ -135,6 +135,31 @@ watch(
         for (const t of types) form.toggles[t.key] = t.on;
     },
     { immediate: true },
+);
+
+// Giờ tổng kết / giờ yên tĩnh cũng lấy lại từ máy chủ sau mỗi lần lưu (giống các công tắc).
+watch(
+    () => props.summary_time,
+    (v) => {
+        form.summary_time = v;
+    },
+);
+watch(
+    () => props.quiet,
+    (q) => {
+        form.quiet = { ...q };
+    },
+    { deep: true },
+);
+
+// Có chỉnh gì so với bản đã lưu không (để báo "chưa lưu" và khoá nút Lưu khi chưa đổi).
+const prefsDirty = computed(
+    () =>
+        form.summary_time !== props.summary_time ||
+        form.quiet.enabled !== props.quiet.enabled ||
+        form.quiet.start !== props.quiet.start ||
+        form.quiet.end !== props.quiet.end ||
+        props.types.some((t) => !!form.toggles[t.key] !== t.on),
 );
 
 const savePrefs = (): void =>
@@ -307,7 +332,7 @@ const stepDone = {
                         <p class="mt-3 text-sm text-muted-foreground">
                             Bấm “Mở bot”, trong Telegram nhấn nút
                             <b>Start</b> (hoặc gửi một tin bất kỳ) để bot được
-                            phép nhắn cho bạn.
+                            phép nhắn cho anh.
                         </p>
                         <div class="mt-3">
                             <Button v-if="bot" as-child size="sm">
@@ -401,7 +426,7 @@ const stepDone = {
                             <span
                                 >Tìm thấy: <b>{{ candidate.name }}</b> ({{
                                     candidate.id
-                                }}). Đúng là bạn?</span
+                                }}). Đúng là anh?</span
                             >
                             <Button
                                 size="sm"
@@ -533,15 +558,25 @@ const stepDone = {
                     </div>
                 </div>
 
-                <div>
+                <div
+                    class="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border bg-card/95 px-3 py-2.5 shadow-raised backdrop-blur"
+                    data-testid="fork-telegram-save-bar"
+                >
                     <Button
-                        :disabled="busy === 'prefs'"
+                        :disabled="!prefsDirty || busy === 'prefs'"
                         data-testid="fork-telegram-save-prefs"
                         @click="savePrefs"
                     >
                         <Spinner v-if="busy === 'prefs'" class="size-4" />
                         Lưu cài đặt thông báo
                     </Button>
+                    <span
+                        v-if="prefsDirty"
+                        class="text-[0.8125rem] font-medium text-amber-700 dark:text-amber-300"
+                        role="status"
+                        data-testid="fork-telegram-dirty"
+                        >Có thay đổi chưa lưu</span
+                    >
                 </div>
             </SettingsSection>
         </div>

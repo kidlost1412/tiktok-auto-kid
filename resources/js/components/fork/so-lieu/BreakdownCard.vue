@@ -1,20 +1,32 @@
 <script setup lang="ts">
-// So sánh hiệu quả theo sản phẩm / góc / giờ đăng / giọng / nhạc: chọn chiều so sánh và chỉ số (view TB hoặc tương tác).
+// So sánh hiệu quả theo sản phẩm / kênh / góc / giờ đăng / giọng / nhạc: chọn chiều so sánh và chỉ số (view TB hoặc tương tác).
+// Bấm một dòng (sản phẩm, kênh, góc, giọng) là lọc cả trang theo nhóm đó; bấm lần nữa để bỏ lọc.
 import { IconChartBar } from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
 
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import { cardCls, fmtNum } from '@/components/fork/shared/status';
 import BarChart from '@/components/fork/so-lieu/BarChart.vue';
-import type { BarPoint, Group } from '@/components/fork/so-lieu/types';
+import type { BarPoint, Filters, Group } from '@/components/fork/so-lieu/types';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
     breakdowns: Record<string, Group[]>;
+    /** Bộ lọc đang áp dụng, để tô dòng đang lọc. */
+    filters?: Pick<Filters, 'product' | 'channel' | 'goc' | 'giong'>;
 }>();
+
+const FILTERABLE = ['product', 'channel', 'goc', 'giong'] as const;
+type FilterDim = (typeof FILTERABLE)[number];
+
+const emit = defineEmits<{ filter: [dim: FilterDim, key: string] }>();
+
+/** Nhóm có từ chừng này bài mới đủ tin để gọi là "tốt nhất". */
+const MIN_POSTS = 3;
 
 const dims = [
     { key: 'product', label: 'Sản phẩm' },
+    { key: 'channel', label: 'Kênh' },
     { key: 'goc', label: 'Góc nội dung' },
     { key: 'hour', label: 'Giờ đăng' },
     { key: 'giong', label: 'Giọng' },
@@ -23,6 +35,19 @@ const dims = [
 
 const dim = ref('product');
 const metric = ref<'avg_views' | 'engagement'>('avg_views');
+
+const canFilter = computed(() =>
+    (FILTERABLE as readonly string[]).includes(dim.value),
+);
+const isActive = (g: Group) =>
+    canFilter.value &&
+    g.key !== '' &&
+    props.filters?.[dim.value as FilterDim] === g.key;
+const pick = (g: Group) => {
+    if (canFilter.value) {
+        emit('filter', dim.value as FilterDim, isActive(g) ? '' : g.key);
+    }
+};
 
 const rows = computed(() => props.breakdowns[dim.value] ?? []);
 const value = (g: Group) =>
@@ -39,6 +64,10 @@ const sorted = computed(() =>
     [...rows.value].sort((a, b) => value(b) - value(a)),
 );
 const max = computed(() => Math.max(1, ...rows.value.map(value)));
+// Chỉ nhóm có từ 3 bài trở lên mới được gắn ★; nhóm ít bài hiện huy hiệu "ít bài" (chưa đủ tin để so).
+const bestKey = computed(
+    () => sorted.value.find((g) => g.posts >= MIN_POSTS)?.key ?? null,
+);
 
 // Biểu đồ 24 giờ: giờ không có bài vẫn hiện cột rỗng để thấy khoảng trống trong ngày.
 const hourPoints = computed<BarPoint[]>(() =>
@@ -88,7 +117,11 @@ const bestHours = computed(() =>
                     cao hơn thì nên làm nhiều hơn.
                 </p>
             </div>
-            <div class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[0.7812rem]">
+            <div
+                class="flex gap-0.5 rounded-lg bg-muted p-0.5 text-[0.7812rem]"
+                role="group"
+                aria-label="Chỉ số so sánh"
+            >
                 <button
                     v-for="m in [
                         { k: 'avg_views', t: 'View TB / bài' },
@@ -96,6 +129,7 @@ const bestHours = computed(() =>
                     ] as const"
                     :key="m.k"
                     type="button"
+                    :aria-pressed="metric === m.k"
                     :class="
                         cn(
                             'rounded-md px-2.5 py-1 font-medium transition',
@@ -112,14 +146,14 @@ const bestHours = computed(() =>
         </header>
         <div
             class="mt-3 flex gap-1 overflow-x-auto border-b px-4"
-            role="tablist"
+            role="group"
+            aria-label="So sánh theo"
         >
             <button
                 v-for="d in dims"
                 :key="d.key"
                 type="button"
-                role="tab"
-                :aria-selected="dim === d.key"
+                :aria-pressed="dim === d.key"
                 :class="
                     cn(
                         'relative shrink-0 px-2.5 pt-1 pb-2.5 text-[0.8125rem] font-medium transition-colors',
@@ -163,42 +197,87 @@ const bestHours = computed(() =>
                 </p>
             </template>
 
-            <ul v-else class="flex flex-col gap-3">
-                <li
-                    v-for="(g, i) in sorted"
-                    :key="g.key"
-                    class="flex flex-col gap-1"
-                >
-                    <div
-                        class="flex items-baseline justify-between gap-3 text-sm"
-                    >
-                        <span class="min-w-0 truncate font-medium">
-                            <span v-if="i === 0" class="mr-1" title="Tốt nhất"
-                                >★</span
-                            >{{ g.label }}
-                        </span>
-                        <span class="shrink-0 tabular-nums">
-                            <b>{{ fmtValue(value(g)) }}</b>
-                            <span class="ml-2 text-xs text-muted-foreground"
-                                >{{ g.posts }} bài</span
-                            >
-                        </span>
-                    </div>
-                    <div class="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
+            <template v-else>
+                <ul class="flex flex-col gap-1">
+                    <li v-for="g in sorted" :key="g.key">
+                        <component
+                            :is="canFilter ? 'button' : 'div'"
+                            :type="canFilter ? 'button' : undefined"
+                            :aria-pressed="canFilter ? isActive(g) : undefined"
+                            :title="
+                                canFilter
+                                    ? isActive(g)
+                                        ? 'Bấm để bỏ lọc'
+                                        : `Chỉ xem: ${g.label}`
+                                    : undefined
+                            "
                             :class="
                                 cn(
-                                    'h-full rounded-full transition-[width] duration-500',
-                                    i === 0 ? 'bg-primary' : 'bg-primary/45',
+                                    'flex w-full flex-col gap-1 rounded-lg px-2 py-1.5 text-left',
+                                    canFilter &&
+                                        'transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring',
+                                    isActive(g) &&
+                                        'bg-accent/60 ring-1 ring-primary/40',
                                 )
                             "
-                            :style="{
-                                width: `${Math.max(2, (value(g) / max) * 100)}%`,
-                            }"
-                        />
-                    </div>
-                </li>
-            </ul>
+                            @click="pick(g)"
+                        >
+                            <span
+                                class="flex items-baseline justify-between gap-3 text-sm"
+                            >
+                                <span class="flex min-w-0 items-center gap-1.5">
+                                    <span
+                                        v-if="g.key === bestKey"
+                                        class="shrink-0"
+                                        title="Tốt nhất"
+                                        role="img"
+                                        aria-label="Tốt nhất"
+                                        >★</span
+                                    >
+                                    <span class="truncate font-medium">{{
+                                        g.label
+                                    }}</span>
+                                    <span
+                                        v-if="g.posts < MIN_POSTS"
+                                        class="shrink-0 rounded-full bg-muted px-1.5 text-[0.7rem] leading-5 text-muted-foreground"
+                                        title="Dưới 3 bài, chưa đủ tin để so sánh"
+                                        >ít bài</span
+                                    >
+                                </span>
+                                <span class="shrink-0 tabular-nums">
+                                    <b>{{ fmtValue(value(g)) }}</b>
+                                    <span
+                                        class="ml-2 text-xs text-muted-foreground"
+                                        >{{ g.posts }} bài</span
+                                    >
+                                </span>
+                            </span>
+                            <span
+                                class="block h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                            >
+                                <span
+                                    :class="
+                                        cn(
+                                            'block h-full rounded-full transition-[width] duration-500',
+                                            g.key === bestKey
+                                                ? 'bg-primary'
+                                                : g.posts < MIN_POSTS
+                                                  ? 'bg-muted-foreground/30'
+                                                  : 'bg-primary/45',
+                                        )
+                                    "
+                                    :style="{
+                                        width: `${Math.max(2, (value(g) / max) * 100)}%`,
+                                    }"
+                                />
+                            </span>
+                        </component>
+                    </li>
+                </ul>
+                <p v-if="canFilter" class="text-xs text-muted-foreground">
+                    Bấm một dòng để lọc cả trang theo nhóm đó.
+                </p>
+            </template>
         </div>
     </section>
 </template>

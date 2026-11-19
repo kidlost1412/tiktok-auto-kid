@@ -127,7 +127,7 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
         </div>
 
         <template v-else-if="!st">
-            <div class="grid grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-[14px]" />
             </div>
             <Skeleton class="h-72 rounded-[14px]" />
@@ -135,7 +135,10 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
 
         <template v-else>
             <!-- Dải tóm tắt -->
-            <div class="grid grid-cols-4 gap-3" data-testid="ban-meo-tomtat">
+            <div
+                class="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                data-testid="ban-meo-tomtat"
+            >
                 <div :class="tileCls">
                     <span :class="labelCls">Chrome</span>
                     <span
@@ -264,12 +267,13 @@ const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
                     title="Chưa có kênh TikTok nào"
                     description="Ghép nối Chrome ở tab Chrome để có kênh đăng bài."
                 />
-                <div v-else class="grid grid-cols-2 gap-3">
+                <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <ChannelPanel
                         v-for="a in channels"
                         :key="a.id"
                         :account="a"
                         :today="au?.lich?.channels[a.id]?.today"
+                        :lich="au?.lich"
                         :chrome="
                             au?.health?.channels.find((c) => c.id === a.id)
                         "

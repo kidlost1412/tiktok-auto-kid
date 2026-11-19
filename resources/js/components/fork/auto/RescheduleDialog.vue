@@ -41,7 +41,6 @@ const open = defineModel<boolean>('open', { default: false });
 const FORMAT = 'YYYY-MM-DDTHH:mm';
 const info = ref<RescheduleInfo | null>(null);
 const loading = ref(false);
-const busy = ref(false);
 const value = ref('');
 const problem = ref('');
 const success = ref('');
@@ -169,11 +168,25 @@ watch(open, async (v) => {
     problem.value = '';
     success.value = '';
     changed.value = false;
+
+    // Hiện hộp ngay với giờ hiện tại của bài; quy tắc / ghi chú điền sau khi tải xong.
+    const first = props.proposed ?? props.entry?.at;
+    const initial = first ? dayjs(first).format(FORMAT) : '';
+    value.value = initial;
     loading.value = true;
-    info.value = await load();
+    const loaded = await load();
+
+    if (!open.value) {
+        return;
+    }
+
+    info.value = loaded;
     loading.value = false;
-    const cur = props.proposed ?? info.value?.current_at ?? props.entry?.at;
-    value.value = cur ? dayjs(cur).format(FORMAT) : '';
+
+    // Anh chưa chỉnh gì thì lấy giờ chính xác từ server.
+    if (value.value === initial && !props.proposed && loaded?.current_at) {
+        value.value = dayjs(loaded.current_at).format(FORMAT);
+    }
 
     if (waiting.value) {
         pollUntil = Date.now() + 17 * 60 * 1000;
@@ -187,7 +200,7 @@ onBeforeUnmount(() => {
 });
 
 const unchanged = computed(() => {
-    const cur = info.value?.current_at;
+    const cur = info.value?.current_at ?? props.entry?.at;
 
     return !value.value || (!!cur && dayjs(cur).format(FORMAT) === value.value);
 });
@@ -231,14 +244,7 @@ function save() {
                 </DialogDescription>
             </DialogHeader>
 
-            <div
-                v-if="loading"
-                class="flex items-center gap-2 py-6 text-sm text-muted-foreground"
-            >
-                <Spinner class="size-4" />Đang tải…
-            </div>
-
-            <div v-else class="grid gap-4">
+            <div class="grid gap-4">
                 <p
                     v-if="isTikTok"
                     :class="
@@ -270,7 +276,7 @@ function save() {
                 </p>
 
                 <label
-                    v-if="info?.kind && !waiting && !success"
+                    v-if="(loading || info?.kind) && !waiting && !success"
                     class="flex flex-col gap-1.5 text-sm"
                 >
                     <span class="font-medium">Giờ mới</span>
@@ -280,10 +286,17 @@ function save() {
                         testid="fork-auto-reschedule-at"
                         aria-label="Giờ đăng mới"
                     />
-                    <span class="flex gap-1.5 text-xs text-muted-foreground"
-                        ><IconInfoCircle class="mt-px size-3.5 shrink-0" />{{
-                            rulesText
-                        }}</span
+                    <span
+                        v-if="loading || rulesText"
+                        class="flex gap-1.5 text-xs text-muted-foreground"
+                        ><Spinner
+                            v-if="loading"
+                            class="mt-px size-3.5 shrink-0"
+                        />
+                        <IconInfoCircle
+                            v-else
+                            class="mt-px size-3.5 shrink-0"
+                        />{{ loading ? 'Đang tải quy tắc…' : rulesText }}</span
                     >
                     <span
                         v-if="notice"
@@ -369,18 +382,25 @@ function save() {
 
             <DialogFooter class="gap-2">
                 <Button variant="ghost" @click="open = false">{{
-                    success || waiting ? 'Đóng' : 'Huỷ'
+                    success || waiting || (info && !info.kind) ? 'Đóng' : 'Huỷ'
                 }}</Button>
                 <Button
-                    v-if="info?.kind && !waiting && !success"
-                    :disabled="busy || unchanged"
+                    v-if="(loading || info?.kind) && !waiting && !success"
+                    :disabled="loading || unchanged"
                     data-testid="fork-auto-reschedule-save"
                     @click="save"
                 >
-                    <Spinner v-if="busy" class="size-4" />
-                    {{ isTikTok ? 'Xoá bài hẹn cũ và đổi giờ' : 'Đổi giờ' }}
+                    Đổi giờ
                 </Button>
             </DialogFooter>
+            <p
+                v-if="
+                    isTikTok && (loading || info?.kind) && !waiting && !success
+                "
+                class="-mt-2 text-xs text-muted-foreground sm:text-right"
+            >
+                App sẽ xoá bài hẹn cũ trên TikTok rồi hẹn lại.
+            </p>
         </DialogContent>
     </Dialog>
 </template>

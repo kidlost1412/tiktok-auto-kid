@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Biểu đồ cột thuần CSS (không thêm thư viện): rê chuột / chạm để xem số chính xác.
+// Biểu đồ cột thuần CSS (không thêm thư viện): rê chuột / chạm / Tab tới cột để xem số chính xác.
 import { computed, ref } from 'vue';
 
 import { fmtCompact, fmtNum } from '@/components/fork/shared/status';
@@ -62,9 +62,15 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                 <div
                     v-for="p in points"
                     :key="p.key"
-                    class="group relative flex h-full min-w-0 flex-1 items-end justify-center"
+                    class="group relative flex h-full min-w-0 flex-1 items-end justify-center rounded-t-[4px] focus-visible:outline-2 focus-visible:outline-ring"
+                    tabindex="0"
+                    role="img"
+                    :aria-label="`${p.title}: ${fmt(p.value)} ${unit}`"
                     @mouseenter="active = p.key"
                     @mouseleave="active = null"
+                    @focus="active = p.key"
+                    @blur="active = null"
+                    @keydown.esc="active = null"
                     @click="active = active === p.key ? null : p.key"
                 >
                     <div
@@ -86,6 +92,7 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                     />
                     <div
                         v-if="active === p.key"
+                        aria-hidden="true"
                         class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-max max-w-44 -translate-x-1/2 rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
                     >
                         <div class="font-medium">{{ p.title }}</div>

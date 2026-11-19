@@ -187,7 +187,7 @@ final class NhaState
      * Số việc đang chờ chủ app theo vai (chỉ vai có việc). Hàm thuần: số đếm do nơi gọi truy vấn rồi đưa vào.
      *
      * @param  array{chrome_online?: bool|null}  $app
-     * @param  array{loi?: int, gio_tam_dung?: int, chua_gio?: int, kho?: int|null, kho_thap?: bool, cho_duyet?: int|null, cap_nhat?: string|null}  $dem  loi = bài lỗi 24h qua; gio_tam_dung = giỏ bị tạm dừng; chua_gio = sản phẩm có video chờ mà chưa chọn giỏ; kho = số video còn chờ đăng (null = không có kênh bật); cho_duyet = video hub chưa Ưng/Bỏ (null = hub cũ/không biết); cap_nhat = số phiên bản mới (đã có sẵn, không gọi mạng)
+     * @param  array{loi?: int, gio_tam_dung?: int, chua_gio?: int, kho?: int|null, kho_thap?: bool, cho_duyet?: int|null, cap_nhat?: string|null}  $dem  loi = bài lỗi 14 ngày qua (cùng định nghĩa với failed_recent của trang Tự động đăng); gio_tam_dung = giỏ bị tạm dừng; chua_gio = sản phẩm có video chờ mà chưa chọn giỏ; kho = số video còn chờ đăng (null = không có kênh bật); cho_duyet = video hub chưa Ưng/Bỏ (null = hub cũ/không biết); cap_nhat = số phiên bản mới (đã có sẵn, không gọi mạng)
      * @return array<string, array{so: int, tom_tat: string}>
      */
     public static function viec(array $app, array $dem): array

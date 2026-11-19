@@ -557,7 +557,7 @@ const chromeOnlyCandidates = computed(() => {
             <SettingsSection
                 class="h-full"
                 title="Ghép nối tiện ích TikTok Auto Kid"
-                description="TikTok chỉ cho đăng công khai khi đăng qua Chrome đang đăng nhập sẵn tài khoản của bạn. Cài tiện ích, rồi nhập mã 6 số bên dưới vào tiện ích."
+                description="TikTok chỉ cho đăng công khai khi đăng qua Chrome đang đăng nhập sẵn tài khoản của anh. Cài tiện ích, rồi nhập mã 6 số bên dưới vào tiện ích."
                 :icon="IconPlugConnected"
             >
                 <template #actions>
@@ -732,7 +732,7 @@ const chromeOnlyCandidates = computed(() => {
                         <li>
                             Vào <code>chrome://settings/system</code> và bật
                             “Tiếp tục chạy ứng dụng nền khi đóng Google Chrome”,
-                            để tiện ích vẫn nhận việc khi bạn đã đóng cửa sổ
+                            để tiện ích vẫn nhận việc khi anh đã đóng cửa sổ
                             Chrome.
                         </li>
                         <li>
@@ -938,7 +938,7 @@ const chromeOnlyCandidates = computed(() => {
                 </ul>
                 <p v-if="clients.length" class="text-sm text-muted-foreground">
                     Profile Chrome để tự mở khi Chrome đang tắt: chọn profile mà
-                    bạn đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu chỉ
+                    anh đã cài tiện ích và đăng nhập TikTok của kênh đó. Nếu chỉ
                     có một lựa chọn, app tự chọn giúp.
                 </p>
                 <p
@@ -954,7 +954,7 @@ const chromeOnlyCandidates = computed(() => {
                 <SettingsSection
                     v-if="clients.length && clientsNeedBackgroundHint"
                     title="Cho Chrome chạy nền khi đóng cửa sổ"
-                    description="Làm một lần: để tiện ích không tắt theo khi bạn đóng cửa sổ Chrome cuối cùng."
+                    description="Làm một lần: để tiện ích không tắt theo khi anh đóng cửa sổ Chrome cuối cùng."
                     :icon="IconSettings"
                     tone="amber"
                 >
@@ -964,7 +964,7 @@ const chromeOnlyCandidates = computed(() => {
                     >
                         <p v-if="backgroundModeOff">
                             Trợ lý đọc thấy cài đặt này đang <b>TẮT</b> trong
-                            trình duyệt của bạn.
+                            trình duyệt của anh.
                         </p>
                         <p v-else>
                             Chưa xác định được cài đặt này trên máy (trợ lý chưa
@@ -974,7 +974,7 @@ const chromeOnlyCandidates = computed(() => {
                             <li>
                                 Mở một tab mới, dán địa chỉ
                                 <code>{{ settingsUrl }}</code> rồi Enter (trang
-                                web không mở được trang này giúp bạn).
+                                web không mở được trang này giúp anh).
                                 <Button
                                     variant="outline"
                                     size="sm"

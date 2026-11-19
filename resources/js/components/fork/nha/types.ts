@@ -50,6 +50,28 @@ export interface NhaEvent {
     sua?: string;
 }
 
+/** Một việc đang chạy (hoặc vừa xong) với dữ liệu thật đang chảy về: xem hợp đồng "truc_tiep" (hub `/api/truc-tiep` + Laravel). */
+export interface LiveItem {
+    id: string;
+    nguon: 'hub' | 'app';
+    vai: string;
+    viec?: string | null;
+    sp?: string | null;
+    video?: string | null;
+    kenh?: string | null;
+    bat_dau?: number | null;
+    cap_nhat?: number | null;
+    xong?: boolean | null;
+    ket_qua?: 'ok' | 'loi' | null;
+    ky_tu?: number | null;
+    dong?: string[] | null;
+    dang_go?: string | null;
+    suy_nghi?: string | null;
+    tien_do?: number | null;
+    buoc?: string | null;
+    chi_tiet?: Record<string, unknown> | null;
+}
+
 export interface NhaData {
     mode: 'down' | 'working' | 'idle' | 'limit';
     line: string;
@@ -73,6 +95,8 @@ export interface NhaData {
     viec?: Record<string, { so: number; tom_tat: string }>;
     /** Việc thật của các vai lo app (đăng bài, giỏ, AI Kho riêng, bình luận, Chrome), cho tự thoại. */
     hoat_dong?: HoatDong[];
+    /** Việc đang chạy với dữ liệu thật chảy về (hub + app), xem LiveItem. */
+    truc_tiep?: LiveItem[];
     bay_gio_app?: number;
     app: {
         posts_today?: number;

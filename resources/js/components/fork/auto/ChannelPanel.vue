@@ -2,15 +2,29 @@
 // Thẻ kênh gọn cho cột phải: ai, có bật không, hôm nay tới đâu, Chrome có nối không.
 // Mọi chỉnh sửa (hạn mức, khung giờ, hẹn trước, chế độ) nằm trong hộp "Chỉnh".
 import { Link, router } from '@inertiajs/vue3';
-import { IconAdjustmentsHorizontal, IconPlayerPause, IconShoppingCart } from '@tabler/icons-vue';
+import {
+    IconAdjustmentsHorizontal,
+    IconPlayerPause,
+    IconShoppingCart,
+} from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
 
 import ChannelSettingsDialog from '@/components/fork/auto/ChannelSettingsDialog.vue';
-import type { AccountRow, HealthChannel, LichChannel } from '@/components/fork/auto/types';
-import { cardCls, toneClasses, type Tone } from '@/components/fork/shared/status';
+import type {
+    AccountRow,
+    HealthChannel,
+    Lich,
+    LichChannel,
+} from '@/components/fork/auto/types';
+import {
+    cardCls,
+    toneClasses,
+    type Tone,
+} from '@/components/fork/shared/status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { confirm } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 import { atHandle } from '@/lib/handle';
 import { cn } from '@/lib/utils';
@@ -20,6 +34,8 @@ const props = defineProps<{
     today: LichChannel['today'] | undefined;
     chrome?: HealthChannel;
     blockedCount: number;
+    /** Lịch đăng, để đếm bài đã hẹn sẵn trước khi tắt kênh (không có thì tắt luôn như cũ). */
+    lich?: Lich;
     /** Dùng trong popup "Bàn làm việc": giữ nguyên trang đang mở (preserveState) và báo `changed`. */
     inPlace?: boolean;
 }>();
@@ -41,17 +57,61 @@ const opts = {
     },
 };
 
-const toggle = (enabled: boolean) => {
+const name = computed(
+    () => atHandle(props.account.username ?? props.account.display_name) || '—',
+);
+
+// Bài sắp đăng của kênh (đã hẹn sẵn trên TikTok + đang chờ trong app): tắt kênh không huỷ được chúng.
+const UPCOMING = [
+    'tiktok_scheduled',
+    'scheduled',
+    'direct',
+    'reserved',
+    'uploading',
+    'publishing',
+];
+const upcoming = computed(
+    () =>
+        (props.lich?.channels[props.account.id]?.items ?? []).filter(
+            (i) =>
+                !!i.id &&
+                UPCOMING.includes(i.state) &&
+                dayjs(i.at).isAfter(dayjs()),
+        ).length,
+);
+
+// Còn bài đã hẹn thì hỏi lại trước khi tắt: các bài đó vẫn tự đăng.
+const okToTurnOff = async () => {
+    if (upcoming.value === 0) {
+        return true;
+    }
+
+    return confirm({
+        title: `Tắt tự động đăng cho ${name.value}?`,
+        description: `Còn ${upcoming.value} bài đã hẹn sẵn trên TikTok vẫn sẽ tự đăng. Muốn huỷ thì xoá từng bài ở Lịch đăng.`,
+        confirmText: 'Tắt kênh',
+        cancelText: 'Thôi',
+    });
+};
+
+const toggle = async (enabled: boolean) => {
+    if (!enabled && !(await okToTurnOff())) {
+        return;
+    }
+
     busy.value = true;
     router.patch(`/auto/accounts/${props.account.id}`, { enabled }, opts);
 };
 
-const pause = () => {
+const pause = async () => {
+    if (!(await okToTurnOff())) {
+        return;
+    }
+
     busy.value = true;
     router.post(`/auto/accounts/${props.account.id}/pause`, {}, opts);
 };
 
-const name = computed(() => atHandle(props.account.username ?? props.account.display_name) || '—');
 const cap = computed(() => props.today?.cap ?? props.account.daily_cap);
 const planned = computed(() => props.today?.planned ?? 0);
 const posted = computed(() => props.today?.posted ?? 0);
@@ -69,7 +129,9 @@ const chrome = computed<{ text: string; tone: Tone }>(() => {
     }
 
     return {
-        text: c.chrome_last_seen ? `Chrome mất kết nối từ ${dayjs(c.chrome_last_seen).format('HH:mm DD/MM')}` : 'Chưa thấy tiện ích Chrome',
+        text: c.chrome_last_seen
+            ? `Chrome mất kết nối từ ${dayjs(c.chrome_last_seen).format('HH:mm DD/MM')}`
+            : 'Chưa thấy tiện ích Chrome',
         tone: 'warn',
     };
 });
@@ -84,23 +146,46 @@ const summary = computed(() => {
 
 <template>
     <div
-        :class="cn(cardCls, 'flex flex-col gap-4 p-4', !account.enabled && 'bg-muted/30')"
+        :class="
+            cn(
+                cardCls,
+                'flex flex-col gap-4 p-4',
+                !account.enabled && 'bg-muted/30',
+            )
+        "
         :data-testid="`fork-auto-account-${account.id}`"
     >
         <div class="flex items-center gap-3">
             <div class="relative shrink-0">
                 <Avatar class="size-11">
-                    <AvatarImage v-if="account.avatar_url" :src="account.avatar_url" alt="" />
-                    <AvatarFallback class="font-semibold">{{ (account.username ?? '?').slice(0, 1).toUpperCase() }}</AvatarFallback>
+                    <AvatarImage
+                        v-if="account.avatar_url"
+                        :src="account.avatar_url"
+                        alt=""
+                    />
+                    <AvatarFallback class="font-semibold">{{
+                        (account.username ?? '?').slice(0, 1).toUpperCase()
+                    }}</AvatarFallback>
                 </Avatar>
                 <span
-                    :class="cn('absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-card', toneClasses[chrome.tone].dot)"
+                    :class="
+                        cn(
+                            'absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-card',
+                            toneClasses[chrome.tone].dot,
+                        )
+                    "
                     :title="chrome.text"
                 />
             </div>
             <div class="min-w-0 flex-1">
-                <div class="truncate text-[0.9375rem] font-semibold tracking-tight">{{ name }}</div>
-                <div class="truncate text-[0.7812rem] text-muted-foreground">{{ account.display_name ?? summary }}</div>
+                <div
+                    class="truncate text-[0.9375rem] font-semibold tracking-tight"
+                >
+                    {{ name }}
+                </div>
+                <div class="truncate text-[0.7812rem] text-muted-foreground">
+                    {{ account.display_name ?? summary }}
+                </div>
             </div>
             <Switch
                 :model-value="account.enabled"
@@ -111,15 +196,26 @@ const summary = computed(() => {
         </div>
 
         <div>
-            <div class="mb-1.5 flex items-baseline justify-between text-[0.8125rem]">
+            <div
+                class="mb-1.5 flex items-baseline justify-between text-[0.8125rem]"
+            >
                 <span class="text-muted-foreground">Hôm nay</span>
                 <span class="tabular-nums"
-                    ><b class="font-semibold">{{ posted }}</b><span class="text-muted-foreground"> đã đăng · {{ planned }}/{{ cap }} đã hẹn</span></span
+                    ><b class="font-semibold">{{ posted }}</b
+                    ><span class="text-muted-foreground">
+                        đã đăng · {{ planned }}/{{ cap }} đã hẹn</span
+                    ></span
                 >
             </div>
             <div class="relative h-1.5 overflow-hidden rounded-full bg-muted">
-                <span class="absolute inset-y-0 left-0 rounded-full bg-primary/30 transition-[width] duration-500" :style="{ width: pct(planned) }" />
-                <span class="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-500" :style="{ width: pct(posted) }" />
+                <span
+                    class="absolute inset-y-0 left-0 rounded-full bg-primary/30 transition-[width] duration-500"
+                    :style="{ width: pct(planned) }"
+                />
+                <span
+                    class="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-500"
+                    :style="{ width: pct(posted) }"
+                />
             </div>
         </div>
 
@@ -127,26 +223,57 @@ const summary = computed(() => {
             <Link
                 v-if="chrome.tone !== 'success'"
                 href="/settings#chrome"
-                :class="cn('rounded-full px-2.5 py-1 font-medium hover:underline', toneClasses[chrome.tone].chip)"
+                :class="
+                    cn(
+                        'rounded-full px-2.5 py-1 font-medium hover:underline',
+                        toneClasses[chrome.tone].chip,
+                    )
+                "
                 >{{ chrome.text }}</Link
             >
-            <span v-if="account.paused_reason" :class="cn('rounded-full px-2.5 py-1 font-medium', toneClasses.warn.chip)"
+            <span
+                v-if="account.paused_reason"
+                :class="
+                    cn(
+                        'rounded-full px-2.5 py-1 font-medium',
+                        toneClasses.warn.chip,
+                    )
+                "
                 >Tạm dừng: {{ account.paused_reason }}</span
             >
             <Link
                 v-if="blockedCount > 0"
                 :href="`/auto/gio-hang?kenh=${account.id}`"
-                :class="cn('rounded-full px-2.5 py-1 font-medium hover:underline', toneClasses.warn.chip)"
+                :class="
+                    cn(
+                        'rounded-full px-2.5 py-1 font-medium hover:underline',
+                        toneClasses.warn.chip,
+                    )
+                "
                 >{{ blockedCount }} video chờ chọn giỏ</Link
             >
         </div>
 
         <div class="flex items-center gap-1.5 border-t pt-3">
-            <Button size="sm" variant="outline" class="h-8" :data-testid="`fork-auto-edit-${account.id}`" @click="editing = true">
+            <Button
+                size="sm"
+                variant="outline"
+                class="h-8"
+                :data-testid="`fork-auto-edit-${account.id}`"
+                @click="editing = true"
+            >
                 <IconAdjustmentsHorizontal class="size-4" />
                 Chỉnh
             </Button>
-            <Button v-if="account.enabled" size="sm" variant="ghost" class="h-8" :disabled="busy" @click="pause">
+            <Button
+                v-if="account.enabled"
+                size="sm"
+                variant="ghost"
+                class="h-8"
+                title="Tắt tự động đăng; bật lại bằng công tắc"
+                :disabled="busy"
+                @click="pause"
+            >
                 <IconPlayerPause class="size-4" />
                 Tạm dừng
             </Button>
@@ -160,6 +287,11 @@ const summary = computed(() => {
             </Link>
         </div>
 
-        <ChannelSettingsDialog v-model:open="editing" :account="account" :in-place="inPlace" @changed="emit('changed')" />
+        <ChannelSettingsDialog
+            v-model:open="editing"
+            :account="account"
+            :in-place="inPlace"
+            @changed="emit('changed')"
+        />
     </div>
 </template>

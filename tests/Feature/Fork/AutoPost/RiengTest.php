@@ -232,8 +232,10 @@ test('a duplicate is still taken in, flagged with its original, and the unique h
 
     // Trang hiện cờ trùng, và "Chọn tất cả" biết video nào trùng.
     $this->actingAs(ownerUser())->get('/auto/kho/rieng')->assertInertia(fn (AssertableInertia $p) => $p
-        ->where('videos.total', 4)
-        ->where('selectable', fn ($rows) => collect($rows)->whereNotNull('duplicate')->count() === 3));
+        ->where('videos.total', 4)->where('selectable_count', 4)->missing('selectable'));
+    $this->actingAs(ownerUser())->getJson('/auto/kho/rieng/chon-tat-ca')->assertOk()
+        ->assertJsonPath('total', 4)->assertJsonPath('capped', false)
+        ->assertJson(fn ($j) => $j->where('items', fn ($rows) => collect($rows)->whereNotNull('duplicate')->count() === 3)->etc());
 
     // Đã đăng thì ghi "đã đăng" kèm liên kết.
     $hub->forceFill(['status' => 'posted', 'posted_at' => now()->subHour(), 'stats' => ['link' => 'https://www.tiktok.com/@a/video/1']])->save();
@@ -1210,4 +1212,38 @@ test('owner can swap the music of a scheduled private video: remixed from the or
 
     // Bài ngoài thư mục nhạc bị từ chối.
     expect(fn () => $edits->edit($v->refresh(), ['music' => '../goc.mp4']))->toThrow(RuntimeException::class);
+});
+
+test('mix on: a batch of 3 + 3 videos of two products gets times that alternate products; mix off keeps the picked order', function () {
+    AutoProduct::create(['code' => 'dam', 'name' => 'Đạm', 'short_name' => 'Đạm', 'facts' => [], 'enabled' => true]);
+    $account = ($this->account)(['daily_cap' => 20, 'window_start' => 5, 'window_end' => 22]);
+    $now = CarbonImmutable::parse('2026-11-20 10:00', 'Asia/Ho_Chi_Minh')->utc();
+    $v = [];
+
+    foreach (['nano-dong', 'nano-dong', 'nano-dong', 'dam', 'dam', 'dam'] as $i => $code) {
+        $v[] = ($this->rieng)("mix{$i}.mp4", null, ['product_code' => $code]);
+    }
+
+    $items = array_map(fn ($x) => ['id' => $x->id], $v);
+    $codeOf = collect($v)->mapWithKeys(fn ($x) => [$x->id => $x->product_code]);
+    $seq = function (array $r) use ($codeOf): array {
+        $rows = collect($r['rows'])->sortBy('at')->values();
+
+        return $rows->map(fn ($row) => $codeOf[$row['id']])->all();
+    };
+
+    $mixed = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => $items, 'mix' => true], $now);
+    $plain = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => $items, 'mix' => false], $now);
+    $again = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => $items, 'mix' => true], $now);
+
+    $s = $seq($mixed);
+
+    for ($i = 1; $i < count($s); $i++) {
+        expect($s[$i])->not->toBe($s[$i - 1]);
+    }
+
+    expect($mixed['mix'])->toBeTrue()
+        ->and($seq($plain))->toBe(['nano-dong', 'nano-dong', 'nano-dong', 'dam', 'dam', 'dam'])
+        // Cùng lựa chọn thì bước đề xuất và bước đăng cho cùng giờ.
+        ->and(collect($again['rows'])->pluck('at', 'id')->all())->toBe(collect($mixed['rows'])->pluck('at', 'id')->all());
 });

@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Http\KhoController;
 use App\Fork\AutoPost\Http\MediaController;
 use App\Fork\AutoPost\Http\PersonaliseController;
 use App\Fork\AutoPost\Http\PostEditController;
+use App\Fork\AutoPost\Http\ProductMixController;
 use App\Fork\AutoPost\Http\RescheduleController;
 use App\Fork\AutoPost\Http\RiengAutoController;
 use App\Fork\AutoPost\Http\RiengController;
@@ -46,11 +47,18 @@ Route::middleware(['web', 'auth'])->prefix('auto')->name('fork.auto.')->group(fu
     Route::post('videos/{video}/cho-xep-lai', [PostEditController::class, 'release'])->whereNumber('video')->middleware('throttle:30,1')->name('videos.release');
     Route::post('accounts/{socialAccount}/pause', [AutoController::class, 'pause'])->name('accounts.pause');
     Route::post('accounts/{socialAccount}/apply-hours', [AutoController::class, 'applyHours'])->name('accounts.apply-hours');
+    // Trộn xen kẽ sản phẩm cho các bài đã xếp lịch mà chưa gửi lên TikTok: xem trước, áp dụng, hoàn tác.
+    Route::get('accounts/{socialAccount}/tron-san-pham', [ProductMixController::class, 'show'])->name('accounts.mix.show');
+    Route::post('accounts/{socialAccount}/tron-san-pham', [ProductMixController::class, 'store'])->middleware('throttle:20,1')->name('accounts.mix');
+    Route::post('accounts/{socialAccount}/tron-san-pham/hoan-tac', [ProductMixController::class, 'undo'])->middleware('throttle:20,1')->name('accounts.mix.undo');
     // Giỏ hàng TikTok Shop: trang riêng, chọn sản phẩm theo từng kênh và từng quy cách.
     Route::get('gio-hang', [GioHangController::class, 'index'])->name('gio-hang');
     Route::post('accounts/{socialAccount}/shop/sync', [GioHangController::class, 'requestSync'])->name('accounts.shop.sync');
     Route::put('accounts/{socialAccount}/links/{code}', [GioHangController::class, 'saveLink'])->name('accounts.links.save');
     Route::delete('accounts/{socialAccount}/links/{code}', [GioHangController::class, 'clearLink'])->name('accounts.links.clear');
+    // "Lưu tất cả" (nhiều dòng một giao dịch) và "Sao chép giỏ sang kênh khác".
+    Route::put('accounts/{socialAccount}/links', [GioHangController::class, 'saveLinks'])->middleware('throttle:30,1')->name('accounts.links.save-all');
+    Route::post('accounts/{socialAccount}/links/copy', [GioHangController::class, 'copyLinks'])->middleware('throttle:20,1')->name('accounts.links.copy');
     Route::patch('accounts/{socialAccount}/shop-products/{productId}', [GioHangController::class, 'setHidden'])
         ->where('productId', '[0-9]{6,25}')->name('accounts.shop-products.hide');
     // "+ Thêm sản phẩm": tạo sản phẩm hub từ sản phẩm shop (qua API Xưởng Video) và gắn giỏ một lần; đổi tên / xoá sản phẩm hub.
@@ -79,6 +87,8 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
     Route::patch('settings', [KhoController::class, 'settings'])->name('settings');
     Route::post('ping', [KhoController::class, 'ping'])->name('ping');
     Route::post('scan', [KhoController::class, 'scan'])->name('scan');
+    // "Thử lại (N)" nhiều video lỗi một lần (mỗi video vẫn qua RetryFailed, chỉ thử lại khi chắc chắn chưa lên TikTok).
+    Route::post('thu-lai-nhieu', [KhoController::class, 'retryMany'])->middleware('throttle:20,1')->name('retry.many');
     Route::get('video/{video}', [KhoController::class, 'video'])->whereNumber('video')->name('video');
     Route::get('video/{video}/info', [KhoController::class, 'info'])->whereNumber('video')->name('info');
     Route::get('video/{video}/cover', [KhoController::class, 'cover'])->whereNumber('video')->name('cover');
@@ -86,6 +96,8 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
     // Kho riêng: video chủ app tự làm (thư mục, quét, danh sách, đăng hàng loạt).
     Route::prefix('rieng')->name('rieng.')->group(function (): void {
         Route::get('/', [RiengController::class, 'index'])->name('index');
+        // "Chọn tất cả": danh sách video chọn được (mọi trang, tối đa 1000) tính khi anh bấm, không tính mỗi lần tự cập nhật.
+        Route::get('chon-tat-ca', [RiengController::class, 'selectAll'])->middleware('throttle:60,1')->name('select.all');
         Route::post('thu-muc', [RiengController::class, 'addFolder'])->middleware('throttle:30,1')->name('folders.add');
         Route::post('chon-thu-muc', [RiengController::class, 'pickFolder'])->middleware('throttle:20,1')->name('folders.pick');
         Route::post('chon-thu-muc/ket-qua', [RiengController::class, 'pickFolderResult'])->middleware('throttle:120,1')->name('folders.pick.result');

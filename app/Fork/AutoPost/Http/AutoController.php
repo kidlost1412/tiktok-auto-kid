@@ -18,6 +18,7 @@ use App\Fork\AutoPost\Scheduling\FailedPosts;
 use App\Fork\AutoPost\Scheduling\FutureUploads;
 use App\Fork\AutoPost\Scheduling\Planner;
 use App\Fork\AutoPost\Scheduling\PlanPreview;
+use App\Fork\AutoPost\Scheduling\ProductMix;
 use App\Fork\AutoPost\Scheduling\Reschedules;
 use App\Fork\AutoPost\Scheduling\ResultWatcher;
 use App\Fork\AutoPost\Scheduling\RetryFailed;
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 /**
  * Trang "Tự động đăng": kho video, tài khoản, hàng chờ, số liệu và đề xuất giờ đăng.
@@ -105,6 +107,7 @@ final class AutoController extends Controller
                     'window_end' => (int) ($auto?->window_end ?? 23),
                     'mode' => (string) ($auto?->mode ?? AutoAccount::EXPLORE),
                     'video_source' => $auto?->videoSource() ?? AutoAccount::SOURCE_BOTH,
+                    'mix_products' => (bool) ($auto?->mix_products ?? false),
                     'preferred_hours' => array_values((array) ($auto?->preferred_hours ?? [])),
                     'explore_ratio' => (float) ($auto?->explore_ratio ?? 0.2),
                     'paused_reason' => $auto?->paused_reason,
@@ -176,6 +179,7 @@ final class AutoController extends Controller
             'mode' => ['sometimes', 'in:explore,optimized'],
             'explore_ratio' => ['sometimes', 'numeric', 'min:0', 'max:1'],
             'video_source' => ['sometimes', 'in:'.implode(',', AutoAccount::SOURCES)],
+            'mix_products' => ['sometimes', 'boolean'],
         ]);
 
         $auto = AutoAccount::query()->find($account->id);
@@ -195,6 +199,19 @@ final class AutoController extends Controller
 
         if ($wasEnabled && ($data['enabled'] ?? true) === false) {
             FutureUploads::warn((string) $account->id, 'kênh đã tắt tự động đăng');
+        }
+
+        // Vừa bật "Tự trộn xen kẽ sản phẩm": trộn ngay các bài đang chờ gửi lên TikTok.
+        if (($data['mix_products'] ?? null) === true && ! (bool) $auto?->mix_products) {
+            try {
+                $moved = app(ProductMix::class)->apply(AutoAccount::query()->findOrFail($account->id))['moved'];
+
+                if ($moved > 0) {
+                    return back()->with('flash.success', 'Đã lưu. Đã trộn xen kẽ sản phẩm cho '.$moved.' bài chưa gửi lên TikTok.');
+                }
+            } catch (Throwable $e) {
+                return back()->with('flash.success', 'Đã lưu. Chưa trộn được lúc này ('.$e->getMessage().') — app sẽ tự trộn ở lượt xếp lịch sau.');
+            }
         }
 
         return back()->with('flash.success', 'Đã lưu cài đặt tự động đăng.');

@@ -162,6 +162,29 @@ export const dayKey = (v: KhoVideo): string => {
     return iso ? dayjs(iso).format('YYYY-MM-DD') : (v.ngay_lam ?? '');
 };
 
+/** Gom video theo ngày: mỗi ngày đúng một nhóm (kể cả khi danh sách không xếp theo ngày), nhóm theo thứ tự gặp đầu tiên. */
+export const groupByDay = (
+    videos: KhoVideo[],
+): { key: string; label: string; items: KhoVideo[] }[] => {
+    const map = new Map<
+        string,
+        { key: string; label: string; items: KhoVideo[] }
+    >();
+
+    for (const v of videos) {
+        const key = dayKey(v);
+        const group = map.get(key);
+
+        if (group) {
+            group.items.push(v);
+        } else {
+            map.set(key, { key, label: dayLabel(key), items: [v] });
+        }
+    }
+
+    return [...map.values()];
+};
+
 export const dayLabel = (key: string): string => {
     if (!key) {
         return 'Chưa rõ ngày';

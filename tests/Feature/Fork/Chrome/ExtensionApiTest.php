@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 use App\Fork\AutoPost\Models\AnchorTemplate;
 use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeJob;
+use App\Fork\Chrome\Support\ChromeLiveProgress;
 use App\Models\Account;
 use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -143,6 +147,13 @@ test('full cycle: pair, hello, next, progress ready, authorize, result posted', 
 
     $this->postJson('/api/ext/progress', $own + ['phase' => 'upload', 'pct' => 40], extHeaders($token))
         ->assertOk()->assertJsonPath('ok', true)->assertJsonPath('state', 'uploading');
+
+    // Tiến độ thật được nhớ trong bộ đệm cho Khu Tự Trị (pct hợp lệ + lời); rác thì bỏ qua, nhịp tim vẫn chạy.
+    $this->postJson('/api/ext/progress', $own + ['phase' => 'transfer', 'msg' => 'part 2/5', 'pct' => 40], extHeaders($token))->assertOk();
+    $this->postJson('/api/ext/progress', $own + ['phase' => 'transfer', 'msg' => ['x'], 'pct' => 'zz'], extHeaders($token))
+        ->assertOk()->assertJsonPath('state', 'uploading');
+    $live = ChromeLiveProgress::get($job->id);
+    expect($live['pct'])->toBe(40.0)->and($live['msg'])->toBe('Đang tải phần 2/5 của video lên TikTok');
 
     $this->getJson('/api/ext/job_state?id='.$job->id, extHeaders($token))
         ->assertOk()->assertJsonPath('state', 'uploading')->assertJsonPath('authorized', false);
@@ -646,8 +657,8 @@ test('cover is served only to the claiming client for a job that has one', funct
     $other = pairExtension($this, 'Chrome khác');
     helloAs($this, $token);
 
-    $product = \App\Fork\AutoPost\Models\AutoProduct::query()->create(['code' => 'cv-'.Str::random(6), 'name' => 'X', 'short_name' => 'X', 'facts' => [], 'enabled' => true]);
-    $dir = \App\Fork\AutoPost\Persona\CoverStore::dir($product->code);
+    $product = AutoProduct::query()->create(['code' => 'cv-'.Str::random(6), 'name' => 'X', 'short_name' => 'X', 'facts' => [], 'enabled' => true]);
+    $dir = CoverStore::dir($product->code);
     @mkdir($dir, 0775, true);
     file_put_contents($dir.'/a.jpg', 'JPEGDATA');
     $product->update(['cover_images' => [['file' => 'a.jpg', 'name' => 'a', 'w' => 1, 'h' => 1, 'size' => 8, 'sha256' => 'x']]]);
@@ -658,7 +669,7 @@ test('cover is served only to the claiming client for a job that has one', funct
     $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($token))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
     $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($other))->assertStatus(403);
 
-    \Illuminate\Support\Facades\File::deleteDirectory($dir);
+    File::deleteDirectory($dir);
     $this->get('/api/ext/cover?id='.$withCover->id, extHeaders($token))->assertStatus(404);
 });
 
@@ -677,6 +688,6 @@ test('a private-video cover (src rieng) is served from rieng-covers, not from th
 
     $this->get('/api/ext/cover?id='.$job->id, extHeaders($token))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
 
-    \Illuminate\Support\Facades\File::deleteDirectory($tmp);
+    File::deleteDirectory($tmp);
     $this->get('/api/ext/cover?id='.$job->id, extHeaders($token))->assertStatus(404);
 });

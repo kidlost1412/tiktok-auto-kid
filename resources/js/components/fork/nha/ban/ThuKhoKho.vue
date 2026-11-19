@@ -98,7 +98,7 @@ const tiles = computed(() => {
         { key: 'cho', label: 'Chờ đăng', dot: 'bg-primary', n: c.cho ?? 0 },
         {
             key: 'xep',
-            label: 'Đã xếp lịch',
+            label: 'Đã hẹn giờ',
             dot: toneClasses.info.dot,
             n: c.xep ?? 0,
         },
@@ -178,10 +178,10 @@ const tileLabel =
         </div>
 
         <template v-else-if="!p">
-            <div class="grid grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-[14px]" />
             </div>
-            <div class="grid grid-cols-5 gap-3">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                 <Skeleton
                     v-for="i in 5"
                     :key="i"
@@ -213,7 +213,10 @@ const tileLabel =
             </div>
 
             <!-- Tóm tắt theo trạng thái (bấm để lọc) -->
-            <div class="grid grid-cols-4 gap-3" data-testid="ban-thukho-tomtat">
+            <div
+                class="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                data-testid="ban-thukho-tomtat"
+            >
                 <button
                     v-for="t in tiles"
                     :key="t.key"
@@ -285,7 +288,7 @@ const tileLabel =
             <!-- Lưới video -->
             <div
                 v-if="videos.length"
-                class="grid grid-cols-5 gap-3"
+                class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5"
                 data-testid="ban-thukho-luoi"
             >
                 <VideoCard

@@ -4,6 +4,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import {
     IconArchive,
+    IconChecks,
     IconChevronDown,
     IconFolder,
     IconLayoutList,
@@ -15,9 +16,12 @@ import {
 } from '@tabler/icons-vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
-import { dayKey, dayLabel, type KhoVideo } from '@/components/fork/kho/kho';
+import { groupByDay, type KhoVideo } from '@/components/fork/kho/kho';
+import KhoPager from '@/components/fork/kho/KhoPager.vue';
 import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
+import { postJson } from '@/components/fork/kho/rieng';
 import VideoCard from '@/components/fork/kho/VideoCard.vue';
 import AutoShell from '@/components/fork/shared/AutoShell.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
@@ -117,6 +121,7 @@ const props = defineProps<{
 
 const busy = ref('');
 const advancedOpen = ref(false);
+const techOpen = ref(false);
 const { loading, callbacks } = useVisitLoading();
 
 // Mở trang không chỉ định tab mà tab mặc định trống: tự chọn tab đầu tiên có video.
@@ -148,7 +153,7 @@ const autoNote = ref('');
 
 const tabs = [
     { key: 'cho', label: 'Chờ đăng' },
-    { key: 'xep', label: 'Đã xếp lịch' },
+    { key: 'xep', label: 'Đã hẹn giờ' },
     { key: 'dang', label: 'Đã đăng' },
     { key: 'loi', label: 'Lỗi và bỏ qua' },
     { key: 'all', label: 'Tất cả' },
@@ -207,6 +212,17 @@ const pickProduct = (code: string) => {
     go({ product: activeProduct.value === code ? '' : code });
 };
 
+// Đổi trang / tab / bộ lọc: kéo về đầu lưới (mượt) để không bị kẹt ở cuối trang cũ.
+const gridTop = ref<HTMLElement | null>(null);
+
+const scrollToGrid = () => {
+    const el = gridTop.value;
+
+    if (el && el.getBoundingClientRect().top < 0) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+};
+
 const go = (patch: Patch) => {
     if ('product' in patch) {
         pickedProduct.value = patch.product ?? '';
@@ -218,6 +234,13 @@ const go = (patch: Patch) => {
     if ('tab' in patch) {
         autoNote.value = '';
     }
+
+    // Đổi tab hay bộ lọc thì bỏ các video đang chọn (đổi trang hoặc cách sắp xếp thì giữ).
+    if (Object.keys(patch).some((k) => k !== 'page' && k !== 'sort')) {
+        clearPicked();
+    }
+
+    scrollToGrid();
 
     const next = {
         tab: props.filters.tab,
@@ -315,26 +338,12 @@ watch(grouped, (v) => {
     }
 });
 
-const groups = computed(() => {
-    if (!grouped.value) {
-        return [{ key: '', label: '', items: props.videos.data }];
-    }
-
-    const out: { key: string; label: string; items: KhoVideo[] }[] = [];
-
-    for (const v of props.videos.data) {
-        const key = dayKey(v);
-        const last = out[out.length - 1];
-
-        if (last && last.key === key) {
-            last.items.push(v);
-        } else {
-            out.push({ key, label: dayLabel(key), items: [v] });
-        }
-    }
-
-    return out;
-});
+// Mỗi ngày đúng một nhóm (không lặp tiêu đề ngày dù danh sách xếp theo cách khác).
+const groups = computed(() =>
+    grouped.value
+        ? groupByDay(props.videos.data)
+        : [{ key: '', label: '', items: props.videos.data }],
+);
 
 // Bấm thẻ video: mở khung xem dùng chung, ←/→ chuyển trong danh sách đang hiển thị.
 const openVideo = (v: KhoVideo) =>
@@ -344,8 +353,115 @@ const openVideo = (v: KhoVideo) =>
         props.videos.data,
     );
 
+// ----- Chọn nhiều video lỗi để "Thử lại" một lần (chỉ video thử lại được mới chọn được).
+const selectMode = ref(false);
+const picked = ref<Record<number, true>>({});
+const pickedIds = computed(() => Object.keys(picked.value).map(Number));
+const retrying = ref(false);
+let lastIdx = -1;
+
+const clearPicked = () => {
+    picked.value = {};
+    lastIdx = -1;
+};
+
+const toggleSelectMode = () => {
+    selectMode.value = !selectMode.value;
+
+    if (!selectMode.value) {
+        clearPicked();
+    }
+};
+
+// Bấm chọn / bỏ chọn; giữ Shift thì chọn cả đoạn từ video bấm trước đó.
+const togglePick = (v: KhoVideo, shift: boolean) => {
+    const list = props.videos.data;
+    const i = list.findIndex((x) => x.id === v.id);
+    const on = !(v.id in picked.value);
+    const range =
+        shift && lastIdx >= 0 && lastIdx !== i
+            ? list.slice(Math.min(lastIdx, i), Math.max(lastIdx, i) + 1)
+            : [v];
+    const next = { ...picked.value };
+
+    for (const x of range) {
+        if (!x.can_retry) {
+            continue;
+        }
+
+        if (on) {
+            next[x.id] = true;
+        } else {
+            delete next[x.id];
+        }
+    }
+
+    picked.value = next;
+    lastIdx = i;
+};
+
+const retryPicked = async () => {
+    const ids = pickedIds.value;
+
+    if (!ids.length || retrying.value) {
+        return;
+    }
+
+    retrying.value = true;
+
+    const r = await postJson<{
+        retried: number;
+        refused: { id: number; reason: string }[];
+    }>('/auto/kho/thu-lai-nhieu', { ids });
+
+    retrying.value = false;
+
+    if (!r) {
+        toast.error('Chưa thử lại được, anh thử lại sau.');
+
+        return;
+    }
+
+    if (r.retried > 0) {
+        toast.success(
+            `Đã đưa ${r.retried} video về kho. App sẽ xếp lịch đăng lại ở lượt kế tiếp.`,
+        );
+    }
+
+    if (r.refused.length) {
+        toast.warning(
+            `${r.refused.length} video chưa thử lại được: ${r.refused[0].reason}`,
+        );
+    }
+
+    clearPicked();
+    // reload() giữ nguyên bộ lọc, trang đang xem và vị trí cuộn.
+    router.reload();
+};
+
 // Không đọc số cũ: tự làm mới mỗi 30 giây khi tab đang mở (chỉ tải lại dữ liệu, không đặt lại bộ lọc hay hộp thoại).
+// Chỉ xin phần đổi nhanh: bảng số lượng và chuẩn kho chỉ khi khung "Nâng cao" đang mở, lý do chặn chỉ ở tab "Chờ đăng",
+// danh sách ngày và số video cũ đổi chậm nên chỉ tải lại khi anh đổi tab / bộ lọc.
 let timer: ReturnType<typeof setInterval> | undefined;
+
+const pollProps = (): string[] => [
+    'filters',
+    'videos',
+    'counts',
+    'products',
+    'hub',
+    'updated_at',
+    'last_ingest_at',
+    ...(props.filters.tab === 'cho' ? ['blockers'] : []),
+    ...(advancedOpen.value ? ['matrix', 'kho'] : []),
+];
+
+// Mở "Nâng cao" thì lấy số liệu mới ngay (lúc đóng, lần tự làm mới không tải chúng).
+watch(advancedOpen, (open) => {
+    if (open) {
+        router.reload({ only: ['matrix', 'kho'] });
+    }
+});
 
 onMounted(() => {
     if (autoTab) {
@@ -366,8 +482,13 @@ onMounted(() => {
     }
 
     timer = setInterval(() => {
-        // Bỏ qua nếu đang chuyển bộ lọc / đang có lần làm mới khác; luôn tải đúng bộ lọc hiện tại (không dựa vào URL cũ).
-        if (document.visibilityState !== 'visible' || visiting || pollCancel) {
+        // Bỏ qua nếu đang chuyển bộ lọc / đang có lần làm mới khác / đang thử lại hàng loạt; luôn tải đúng bộ lọc hiện tại (không dựa vào URL cũ).
+        if (
+            document.visibilityState !== 'visible' ||
+            visiting ||
+            pollCancel ||
+            retrying.value
+        ) {
             return;
         }
 
@@ -402,20 +523,7 @@ onMounted(() => {
             preserveScroll: true,
             preserveState: true,
             replace: true,
-            only: [
-                'filters',
-                'kho',
-                'matrix',
-                'videos',
-                'counts',
-                'products',
-                'blockers',
-                'legacy_count',
-                'days',
-                'hub',
-                'updated_at',
-                'last_ingest_at',
-            ],
+            only: pollProps(),
             onCancelToken: (t) => (pollCancel = t),
             onFinish: () => (pollCancel = null),
         });
@@ -434,7 +542,7 @@ const description = computed(
 
 <template>
     <AutoShell
-        title="Kho video"
+        title="Kho Xưởng Video"
         :description="description"
         testid="fork-kho-page"
     >
@@ -480,7 +588,7 @@ const description = computed(
 
         <!-- Vấn đề đang chặn video -->
         <Callout
-            v-if="blockers.length"
+            v-if="filters.tab === 'cho' && blockers.length"
             tone="warn"
             data-testid="fork-kho-blockers"
         >
@@ -510,12 +618,12 @@ const description = computed(
             </ul>
         </Callout>
 
-        <!-- Thanh lọc dính trên cùng khi cuộn -->
+        <!-- Thanh lọc dính trên cùng khi cuộn (chỉ từ màn hình lớn; màn nhỏ cuộn theo trang cho đỡ chiếm chỗ) -->
         <section
             :class="
                 cn(
                     cardCls,
-                    'sticky top-2 z-20 flex flex-col gap-2.5 bg-card/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/85',
+                    'z-20 flex flex-col gap-2.5 bg-card/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:sticky lg:top-2',
                 )
             "
             data-testid="fork-kho-filters"
@@ -580,11 +688,25 @@ const description = computed(
                     <Button
                         :variant="grouped ? 'secondary' : 'outline'"
                         :aria-pressed="grouped"
+                        aria-label="Nhóm theo ngày"
                         title="Gom video theo ngày"
                         @click="grouped = !grouped"
                     >
                         <IconLayoutList class="size-4" />
                         <span class="max-2xl:sr-only">Nhóm theo ngày</span>
+                    </Button>
+                    <Button
+                        :variant="selectMode ? 'default' : 'outline'"
+                        :aria-pressed="selectMode"
+                        aria-label="Chọn nhiều video"
+                        title="Bật để chọn nhiều video lỗi rồi thử lại một lần (giữ Shift để chọn một dãy)"
+                        data-testid="fork-kho-select-mode"
+                        @click="toggleSelectMode"
+                    >
+                        <IconChecks class="size-4" />
+                        <span class="max-2xl:sr-only">{{
+                            selectMode ? 'Đang chọn…' : 'Chọn'
+                        }}</span>
                     </Button>
                 </div>
             </div>
@@ -634,13 +756,27 @@ const description = computed(
                             })
                         "
                     />
-                    Hiện {{ legacy_count }} bản ghi cũ
+                    Hiện {{ legacy_count }} video cũ
                 </label>
+                <Button
+                    v-if="filtered"
+                    size="sm"
+                    variant="ghost"
+                    class="h-8 shrink-0 gap-1 rounded-full text-muted-foreground"
+                    data-testid="fork-kho-clear-filters"
+                    @click="clearFilters"
+                >
+                    <IconX class="size-3.5" /> Xoá bộ lọc
+                </Button>
             </div>
         </section>
 
         <!-- Lưới video -->
-        <section aria-live="polite">
+        <section
+            ref="gridTop"
+            aria-live="polite"
+            class="scroll-mt-4 lg:scroll-mt-40"
+        >
             <p
                 v-if="autoNote && !loading"
                 class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-[0.8125rem] text-muted-foreground"
@@ -666,6 +802,12 @@ const description = computed(
                 class="flex flex-col gap-6"
                 data-testid="fork-kho-videos"
             >
+                <KhoPager
+                    :page="videos.current_page"
+                    :last="videos.last_page"
+                    :total="videos.total"
+                    @go="(n: number) => go({ page: n })"
+                />
                 <div
                     v-for="g in groups"
                     :key="g.key"
@@ -687,7 +829,10 @@ const description = computed(
                             v-for="v in g.items"
                             :key="v.id"
                             :video="v"
+                            :select-mode="selectMode"
+                            :selected="v.id in picked"
                             @open="openVideo(v)"
+                            @toggle="(shift: boolean) => togglePick(v, shift)"
                         />
                     </div>
                 </div>
@@ -706,7 +851,7 @@ const description = computed(
                 "
                 :description="
                     filtered
-                        ? 'Thử bỏ bộ lọc sản phẩm, từ khoá tìm kiếm hoặc bản ghi cũ.'
+                        ? 'Thử bỏ bộ lọc sản phẩm, từ khoá tìm kiếm hoặc video cũ.'
                         : filters.tab === 'cho'
                           ? 'Hãy sản xuất video trong Xưởng Video rồi quét kho để lấy video mới về.'
                           : 'Chuyển sang mục khác hoặc xem tất cả video.'
@@ -739,32 +884,62 @@ const description = computed(
                 </Button>
             </EmptyState>
 
-            <div
+            <KhoPager
                 v-if="videos.last_page > 1"
-                class="mt-6 flex items-center justify-center gap-3 text-sm"
-            >
-                <Button
-                    size="sm"
-                    variant="outline"
-                    :disabled="videos.current_page <= 1"
-                    @click="go({ page: videos.current_page - 1 })"
-                >
-                    Trước
-                </Button>
-                <span class="tabular-nums"
-                    >Trang {{ videos.current_page }} /
-                    {{ videos.last_page }}</span
-                >
-                <Button
-                    size="sm"
-                    variant="outline"
-                    :disabled="videos.current_page >= videos.last_page"
-                    @click="go({ page: videos.current_page + 1 })"
-                >
-                    Sau
-                </Button>
-            </div>
+                class="mt-6"
+                :page="videos.current_page"
+                :last="videos.last_page"
+                :total="videos.total"
+                @go="(n: number) => go({ page: n })"
+            />
         </section>
+
+        <!-- Thanh thao tác dính ở đáy: video lỗi đã chọn -->
+        <div
+            v-if="selectMode"
+            class="sticky bottom-3 z-30 flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur"
+            data-testid="fork-kho-bar"
+        >
+            <div class="min-w-0 flex-1 text-sm">
+                <b
+                    v-if="pickedIds.length"
+                    class="tabular-nums"
+                    data-testid="fork-kho-picked-count"
+                    >Đã chọn {{ pickedIds.length }} video</b
+                >
+                <span v-else class="text-muted-foreground"
+                    >Bấm vào video lỗi để chọn, giữ Shift để chọn một dãy. Chỉ
+                    video lỗi chắc chắn chưa lên TikTok mới chọn được.</span
+                >
+            </div>
+            <Button
+                v-if="pickedIds.length"
+                variant="ghost"
+                size="sm"
+                @click="clearPicked"
+            >
+                <IconX class="size-4" /> Bỏ chọn
+            </Button>
+            <Button
+                v-if="!pickedIds.length"
+                variant="outline"
+                size="sm"
+                @click="toggleSelectMode"
+                >Xong</Button
+            >
+            <Button
+                v-if="pickedIds.length"
+                :disabled="retrying"
+                data-testid="fork-kho-retry-many"
+                @click="retryPicked"
+            >
+                <IconRefresh
+                    class="size-4"
+                    :class="{ 'animate-spin': retrying }"
+                />
+                Thử lại ({{ pickedIds.length }})
+            </Button>
+        </div>
 
         <!-- Nâng cao -->
         <Collapsible v-model:open="advancedOpen">
@@ -848,7 +1023,7 @@ const description = computed(
                                         Mới
                                     </th>
                                     <th :class="cn(thCls, 'text-right')">
-                                        Đã xếp
+                                        Đã hẹn giờ
                                     </th>
                                     <th :class="cn(thCls, 'text-right')">
                                         Đã đăng
@@ -900,57 +1075,78 @@ const description = computed(
                     </div>
                 </section>
 
-                <!-- Chuẩn kho (chỉ khi dùng thư mục hub) -->
+                <!-- Chuẩn kho (chỉ khi dùng thư mục hub): chữ kỹ thuật nên gập sẵn -->
                 <section
                     v-if="!hub.enabled"
-                    :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')"
+                    :class="cn(cardCls, 'p-5 sm:p-6')"
                     data-testid="fork-kho-standard"
                 >
-                    <SectionHeading
-                        :icon="IconFolder"
-                        tone="neutral"
-                        title="Chuẩn kho"
-                    />
-                    <div
-                        class="rounded-xl border bg-muted/50 p-4 text-sm leading-relaxed"
-                    >
-                        <p>
-                            Hub bỏ video sẵn sàng đăng vào
-                            <code class="rounded bg-muted px-1">{{
-                                kho.path
-                            }}</code>
-                            (thẳng trong thư mục, hoặc trong thư mục con theo mã
-                            sản phẩm). Mỗi
-                            <code class="rounded bg-muted px-1">X.mp4</code>
-                            phải có
-                            <code class="rounded bg-muted px-1">X.json</code>
-                            cùng tên ghi <em>ma</em>, <em>quy_cach</em>,
-                            <em>goc</em>, <em>giong</em>, <em>loi_thoai</em>,
-                            <em>ngay_lam</em>, <em>phien_ban</em>. App chỉ nhặt
-                            khi có đủ cả hai file, json đúng và mp4 đã ghi xong
-                            (kích thước không đổi).
-                        </p>
-                        <p class="mt-2">
-                            Video lỗi được chuyển vào
-                            <code class="rounded bg-muted px-1">{{
-                                kho.error_path
-                            }}</code>
-                            kèm file <em>.loi.txt</em> ghi lý do. Video đã đăng
-                            chuyển sang
-                            <code class="rounded bg-muted px-1">{{
-                                kho.done_path
-                            }}</code>
-                            cùng file kết quả (<em>.ket-qua.json</em>).
-                        </p>
-                        <p class="mt-2 text-muted-foreground">
-                            Thư mục kho: {{ kho.exists ? 'có' : 'chưa có' }} ·
-                            đang chờ nhặt: {{ kho.waiting }} · trong _loi:
-                            {{ kho.error }}
-                            <template v-if="kho.legacy_ra">
-                                · vẫn nhặt kiểu cũ ra/&lt;ngày&gt;</template
+                    <Collapsible v-model:open="techOpen">
+                        <CollapsibleTrigger as-child>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                class="-ml-2 gap-1.5"
+                                data-testid="fork-kho-standard-toggle"
                             >
-                        </p>
-                    </div>
+                                <IconChevronDown
+                                    class="size-4 transition"
+                                    :class="{ 'rotate-180': techOpen }"
+                                />
+                                <IconFolder class="size-4" />
+                                Dành cho kỹ thuật viên
+                            </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent class="mt-3">
+                            <div
+                                class="rounded-xl border bg-muted/50 p-4 text-sm leading-relaxed"
+                            >
+                                <p>
+                                    Hub bỏ video sẵn sàng đăng vào
+                                    <code class="rounded bg-muted px-1">{{
+                                        kho.path
+                                    }}</code>
+                                    (thẳng trong thư mục, hoặc trong thư mục con
+                                    theo mã sản phẩm). Mỗi
+                                    <code class="rounded bg-muted px-1"
+                                        >X.mp4</code
+                                    >
+                                    phải có
+                                    <code class="rounded bg-muted px-1"
+                                        >X.json</code
+                                    >
+                                    cùng tên ghi <em>ma</em>, <em>quy_cach</em>,
+                                    <em>goc</em>, <em>giong</em>,
+                                    <em>loi_thoai</em>, <em>ngay_lam</em>,
+                                    <em>phien_ban</em>. App chỉ nhặt khi có đủ
+                                    cả hai file, json đúng và mp4 đã ghi xong
+                                    (kích thước không đổi).
+                                </p>
+                                <p class="mt-2">
+                                    Video lỗi được chuyển vào
+                                    <code class="rounded bg-muted px-1">{{
+                                        kho.error_path
+                                    }}</code>
+                                    kèm file <em>.loi.txt</em> ghi lý do. Video
+                                    đã đăng chuyển sang
+                                    <code class="rounded bg-muted px-1">{{
+                                        kho.done_path
+                                    }}</code>
+                                    cùng file kết quả (<em>.ket-qua.json</em>).
+                                </p>
+                                <p class="mt-2 text-muted-foreground">
+                                    Thư mục kho:
+                                    {{ kho.exists ? 'có' : 'chưa có' }} · đang
+                                    chờ nhặt: {{ kho.waiting }} · trong _loi:
+                                    {{ kho.error }}
+                                    <template v-if="kho.legacy_ra">
+                                        · vẫn nhặt kiểu cũ
+                                        ra/&lt;ngày&gt;</template
+                                    >
+                                </p>
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </section>
             </CollapsibleContent>
         </Collapsible>

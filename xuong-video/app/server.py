@@ -12,6 +12,7 @@ import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, kem, kem_ngay, don_kem_cu, glob_kem, ghi_json, KHOA_DANH_GIA, pid_la_lo_sx
 import suc_may
+import truc_tiep      # việc đang chạy của engine (lich-su/truc-tiep/*.json) cho trang Khu Tự Trị: GET /api/truc-tiep + trường `tt` của luồng /api/luong
 WEB = Path(__file__).resolve().parent / "web"
 PORT = int(os.environ.get("XUONG_PORT") or 8765)
 LS = HUB / "lich-su"
@@ -216,8 +217,30 @@ def moc_dem():
     return max(m, hom_nay)
 
 
+_TOKEN_HN = {"k": None, "v": None}
+
+
+def _st_khoa(f):
+    try:
+        st = f.stat()
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
 def token_hom_nay():
+    """Đếm token/video hôm nay — nhớ kết quả theo (mốc đếm, ngày, thư mục ngày, token.csv, giong.csv): không đọc lại CSV mỗi 3 giây, có đổi gì là tính lại."""
     m = moc_dem()
+    hn = ra_dir() / datetime.date.today().isoformat()
+    khoa = (m, datetime.date.today(), _st_khoa(hn), _st_khoa(LS / "token.csv"), _st_khoa(LS / "giong.csv"))
+    if _TOKEN_HN["k"] == khoa and _TOKEN_HN["v"] is not None:
+        return dict(_TOKEN_HN["v"])
+    v = _token_hom_nay_tinh(m)
+    _TOKEN_HN["k"], _TOKEN_HN["v"] = khoa, v
+    return dict(v)
+
+
+def _token_hom_nay_tinh(m):
     video = sum(1 for v in ra_dir().glob(f"{datetime.date.today().isoformat()}/*.mp4")
                 if not v.name.endswith(".part.mp4") and datetime.datetime.fromtimestamp(v.stat().st_mtime) >= m)
     f = LS / "token.csv"
@@ -256,10 +279,38 @@ def dem_canh(f):
     return _DEM[k]
 
 
+_SP_DS = {"k": None, "v": None}
+
+
+def _khoa_san_pham():
+    """Khoá đệm danh sách sản phẩm: thư mục sản phẩm + giờ sửa/cỡ của san-pham.json, canh.json, ảnh từng sản phẩm."""
+    sp = HUB / "san-pham"
+    k = [_st_khoa(sp)]
+    for d in sorted(sp.iterdir()):
+        a = anh_sp.tim_anh(d.name)
+        k.append((d.name, _st_khoa(d / "san-pham.json"), _st_khoa(d / "canh.json"), _st_khoa(a) if a else None))
+    return tuple(k)
+
+
 def san_pham_ds():
+    """Danh sách sản phẩm cho UI — nhớ theo giờ sửa file (không đọc lại mọi hồ sơ mỗi 3 giây); sửa hồ sơ/cảnh/ảnh là tính lại."""
+    import copy
+    anh_sp.dong_bo_nen()                       # nền: thay khung-video bằng ảnh thật TikTok Shop (nếu TikTok Auto đang mở)
+    try:
+        khoa = _khoa_san_pham()
+    except OSError:
+        khoa = None
+    if khoa is not None and _SP_DS["k"] == khoa and _SP_DS["v"] is not None:
+        return copy.deepcopy(_SP_DS["v"])
+    v = _san_pham_ds_tinh()
+    if khoa is not None:
+        _SP_DS["k"], _SP_DS["v"] = khoa, copy.deepcopy(v)
+    return v
+
+
+def _san_pham_ds_tinh():
     sys.path.insert(0, str(CODE / "engine"))
     from kho_chung import la_kho_chung, kho_them_cua, dem_dung_duoc
-    anh_sp.dong_bo_nen()                       # nền: thay khung-video bằng ảnh thật TikTok Shop (nếu TikTok Auto đang mở)
     out = []
     for d in sorted((HUB / "san-pham").iterdir()):
         f = d / "san-pham.json"
@@ -895,12 +946,31 @@ def tai_khoan_bo(ma):
     return {"ok": True}
 
 
+def _doc_duoi(f, n, khoi=65536):
+    """n dòng cuối của file text — chỉ đọc phần đuôi (lo.jsonl lớn dần theo thời gian)."""
+    if n <= 0:
+        return []
+    with open(f, "rb") as fh:
+        fh.seek(0, 2)
+        con = fh.tell()
+        buf = b""
+        while con > 0 and buf.count(b"\n") <= n:
+            doc = min(khoi, con)
+            con -= doc
+            fh.seek(con)
+            buf = fh.read(doc) + buf
+    dong = buf.decode("utf-8", errors="replace").splitlines()
+    if con > 0 and dong:
+        dong = dong[1:]                     # dòng đầu của đoạn đọc có thể bị cắt dở
+    return dong[-n:]
+
+
 def ds_lo(n=30):
     f = LS / "lo.jsonl"
     if not f.exists():
         return []
     out = []
-    for l in f.read_text(encoding="utf-8").splitlines()[-n:]:
+    for l in _doc_duoi(f, n):
         try:
             out.append(json.loads(l))
         except Exception:
@@ -989,20 +1059,45 @@ def so_cho_duyet():
 TAT_CA = "tat-ca"          # giá trị "Tất cả ngày" của ô chọn ngày trong Kho video
 
 
-def video_ngay(ngay):
-    """Video của 1 ngày (YYYY-MM-DD) — hoặc ngay == "tat-ca": mọi ngày, mới nhất trước. Mỗi video mang sẵn ngày + đường dẫn riêng."""
+def _doc_trypost():
+    f = LS / "trypost.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+
+
+def _ds_ngay():
+    d = ra_dir()
+    return sorted([x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x.name)], reverse=True) if d.exists() else []
+
+
+def ngay_dem():
+    """[{ngay, so}] — số video (không tính .part) mỗi ngày, mới nhất trước; để UI chọn ngày mặc định chỉ cần 1 lần gọi."""
+    d = ra_dir()
+    return [{"ngay": n, "so": sum(1 for v in (d / n).glob("*.mp4") if not v.name.endswith(".part.mp4"))} for n in _ds_ngay()]
+
+
+GIOI_HAN_MAC_DINH = 60
+
+
+def video_ngay(ngay, gioi_han=None, offset=0):
+    """Video của 1 ngày (YYYY-MM-DD) — hoặc ngay == "tat-ca": mọi ngày, mới nhất trước. Mỗi video mang sẵn ngày + đường dẫn riêng.
+    gioi_han=None: trả hết (danh sách) như trước. Có gioi_han: trả {"ds": [...], "con_nua": bool} — "tat-ca" chỉ dựng đủ số video cần
+    (dừng đọc các ngày cũ hơn) thay vì quét cả kho. trypost.json chỉ đọc một lần mỗi yêu cầu."""
+    offset = max(0, int(offset or 0))
     if ngay == TAT_CA:
-        d = ra_dir()
-        ngays = sorted([x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x.name)], reverse=True) if d.exists() else []
-        dg = doc_danh_gia()
-        tp = json.loads((LS / "trypost.json").read_text(encoding="utf-8")) if (LS / "trypost.json").exists() else {}
+        dg = doc_danh_gia(); tp = _doc_trypost()
+        cap = None if gioi_han is None else offset + gioi_han + 1
         out = []
-        for n in ngays:
+        for n in _ds_ngay():
             out += _video_mot_ngay(n, dg, tp)
+            if cap is not None and len(out) >= cap:
+                break
+    elif not re.fullmatch(r"\d{4}-\d{2}-\d{2}", ngay or ""):
+        out = []
+    else:
+        out = _video_mot_ngay(ngay, doc_danh_gia(), _doc_trypost())
+    if gioi_han is None:
         return out
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", ngay or ""):
-        return []
-    return _video_mot_ngay(ngay, doc_danh_gia(), json.loads((LS / "trypost.json").read_text(encoding="utf-8")) if (LS / "trypost.json").exists() else {})
+    return {"ds": out[offset:offset + gioi_han], "con_nua": len(out) > offset + gioi_han}
 
 
 def _video_mot_ngay(ngay, dg, tp):
@@ -1101,11 +1196,13 @@ def danh_gia(body):
   with _KHOA_DG:                              # bấm ✅/❌ liên tiếp không làm mất đánh giá (lỗi rà soát #11)
     dg = doc_danh_gia()
     f = body["file"]
-    dg[f] = {"ket_qua": body.get("ket_qua"), "gop_y": body.get("gop_y", "").strip(), "luc": datetime.datetime.now().isoformat(timespec="minutes")}
-    ghi_json(danh_gia_f(), dg, indent=1)
-    gy = body.get("gop_y", "").strip()
+    cu = dg.get(f) or {}
+    gy = (body.get("gop_y") or "").strip()
     kq = body.get("ket_qua")
-    if gy or kq == "kem":      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc. "Không ưng" (kem) luôn ghi, dù không có góp ý
+    y_het = bool(cu) and cu.get("ket_qua") == kq and (cu.get("gop_y") or "") == gy       # bấm lại đúng đánh giá + góp ý cũ → không ghi trùng dòng sổ gu
+    dg[f] = {"ket_qua": kq, "gop_y": gy, "luc": datetime.datetime.now().isoformat(timespec="minutes")}
+    ghi_json(danh_gia_f(), dg, indent=1)
+    if (gy or kq == "kem") and not y_het:      # góp ý → sổ gu: biên kịch, đạo diễn, giám khảo đều đọc. "Không ưng" (kem) luôn ghi, dù không có góp ý
         nhan = "ƯNG" if kq == "dat" else ("KHÔNG ƯNG (vẫn đăng, video yếu)" if kq == "kem" else "KHÔNG ƯNG")
         parts = f.split("_")
         hs = {}
@@ -1135,7 +1232,8 @@ def mo_dang_nhap():
 
 def _luong_tinh():
     import su_kien
-    return {"n": luong.n_cuoi(su_kien._file()), "cho_duyet": so_cho_duyet(), "chay": bool(dang_chay())}
+    return {"n": luong.n_cuoi(su_kien._file()), "cho_duyet": so_cho_duyet(), "chay": bool(dang_chay()),
+            "tt": truc_tiep.cap_nhat_toi_da()}          # cap_nhat lớn nhất của các việc trực tiếp còn sống (0 = không có): trình duyệt đổi số này → tải lại /api/truc-tiep
 
 
 def _luong_bam():
@@ -1165,9 +1263,20 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy", "frame-ancestors 'self' " + " ".join(ds))
         super().end_headers()
 
-    def _json(self, obj, code=200):
+    def _cors_origin(self):
+        """Origin của trình duyệt nếu nằm trong danh sách được phép (cùng danh sách nhúng khung "nhung_tu" của luồng /api/luong); không thì None."""
+        origin = self.headers.get("Origin")
+        try:
+            ds = cfg().get("nhung_tu", NHUNG_MAC_DINH)
+        except Exception:
+            ds = NHUNG_MAC_DINH
+        return origin if origin and origin in ds else None
+
+    def _json(self, obj, code=200, cors=False):
         b = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code); self.send_header("Content-Type", "application/json; charset=utf-8")
+        if cors and self._cors_origin():
+            self.send_header("Access-Control-Allow-Origin", self._cors_origin()); self.send_header("Vary", "Origin")
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
 
     def _luong(self):
@@ -1263,10 +1372,12 @@ class H(BaseHTTPRequestHandler):
                                "bat_dau": (RUN.get(gan) or {}).get("bat_dau") or next((x["bat_dau"] for x in cac_lo if x["ma"] == gan), None), "tien_do": td,
                                "cac_lo": cac_lo, "hang_cho": [dict(x, ten=dieu_phoi.ten_sp(x["ma"])) for x in dieu_phoi.hang_cho()], "suc_may": suc_may.suc_may(),
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
-                               "token": token_hom_nay(),
+                               "token": token_hom_nay(), "cho_duyet": so_cho_duyet(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
         if u.path == "/api/luong":             # SSE: đẩy tin tức thì cho trang Khu Tự Trị (xem luong.py)
             return self._luong()
+        if u.path == "/api/truc-tiep":         # các việc engine đang làm NGAY BÂY GIỜ (chữ Claude đang viết, điểm giám khảo...): chỉ đọc, rẻ; CORS như /api/luong
+            return self._json({"bay_gio": time.time(), "ds": truc_tiep.doc_tat_ca()}, cors=True)
         if u.path == "/api/su-kien":           # trang "Khu Tự Trị": sự kiện sản xuất mới + trạng thái hiện tại (chỉ đọc)
             sys.path.insert(0, str(CODE / "engine"))
             import su_kien
@@ -1295,17 +1406,29 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/tai-khoan":
             return self._json(auth(force="moi" in q))
         if u.path == "/api/ngay":
-            d = ra_dir()
-            ds = sorted([x.name for x in d.iterdir() if x.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x.name)], reverse=True) if d.exists() else []
-            return self._json(ds)
+            if "dem" in q:                      # ?dem=1 → [{ngay, so}] (có số video từng ngày); mặc định vẫn là danh sách ngày như trước
+                return self._json(ngay_dem())
+            return self._json(_ds_ngay())
         if u.path == "/api/video":
-            return self._json(video_ngay(q.get("ngay", [datetime.date.today().isoformat()])[0]))
+            ngay = q.get("ngay", [datetime.date.today().isoformat()])[0]
+            gh = None
+            if "gioi_han" in q or "offset" in q or ngay == TAT_CA:       # có phân trang → {ds, con_nua}; "tat-ca" mặc định 60 video/lần
+                try:
+                    gh = max(1, min(500, int(q.get("gioi_han", [GIOI_HAN_MAC_DINH])[0])))
+                except ValueError:
+                    gh = GIOI_HAN_MAC_DINH
+            try:
+                off = max(0, int(q.get("offset", ["0"])[0]))
+            except ValueError:
+                off = 0
+            return self._json(video_ngay(ngay, gh, off))
         if u.path.startswith("/api/lenh-gemini/"):
             return self._json({"lenh": lenh_gemini(u.path.split("/")[-1])})
         if u.path == "/api/hoc-canh-dang":                       # các sản phẩm đang học cảnh (cho danh sách sản phẩm)
             import hoc_canh
             return self._json({"dang_hoc": [{"ma": k, "cho": int(v.get("cho") or 0), "tong": v.get("tong") or 0, "xong": v.get("xong") or 0, "dang_dung": bool(v.get("dang_dung"))}
-                                            for k, v in hoc_canh.tat_ca_job().items() if v.get("dang_chay")], "toi_da_sp": hoc_canh.doc_toi_da_sp()})
+                                            for k, v in hoc_canh.tat_ca_job().items() if v.get("dang_chay")], "toi_da_sp": hoc_canh.doc_toi_da_sp(),
+                                **({"agy_mo": bool(hoc_canh.trang_thai_agy().get("mo"))} if "agy" in q else {})})      # ?agy=1: kèm Antigravity đã mở chưa (nút "Học cảnh cho tất cả")
         if u.path.startswith("/api/hoc-canh/"):
             try:
                 return self._json(hoc_canh_trang_thai(u.path.split("/")[-1]))

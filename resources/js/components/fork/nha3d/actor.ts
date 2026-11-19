@@ -138,6 +138,8 @@ export class Actor implements Talker {
     seated = false;
     base: VaiState = 'idle';
     bubbleText: string | null = null;
+    /** bubbleText là câu của việc đang chạy thật: nói ngay cả khi còn đang chạy về bàn (việc thật có thể xong trước khi ngồi). */
+    liveTalk = false;
     inScene = false;
     /** Đang chơi/nghỉ (có việc thì bỏ ngay). */
     leisure = false;
@@ -522,10 +524,9 @@ export class Actor implements Talker {
             return this.sayText;
         }
         if (
-            this.base === 'working' &&
             this.bubbleText &&
-            this.atHome &&
-            !this.busy
+            ((this.base === 'working' && this.atHome && !this.busy) ||
+                this.liveTalk) // câu trực tiếp (kể cả câu kết ngay sau khi xong việc) luôn được nói
         ) {
             return this.bubbleText;
         }

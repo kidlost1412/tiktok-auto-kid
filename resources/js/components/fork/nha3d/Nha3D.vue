@@ -5,6 +5,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { onBanBao } from '@/components/fork/nha/ban/bus';
 import type { NhaData } from '@/components/fork/nha/types';
+import { useTrucTiepKho } from '@/components/fork/nha/useTrucTiep';
 
 import './nha3d.css';
 import type { NhaWorld } from './index';
@@ -18,6 +19,8 @@ const props = defineProps<{
 const emit = defineEmits<{ go: [key: string]; fallback: [] }>();
 
 const host = ref<HTMLDivElement | null>(null);
+// Việc chạy trực tiếp: câu bong bóng thật do trang cấp (cùng nguồn với bản 2D)
+const truc = useTrucTiepKho();
 const ready = ref(false);
 let world: NhaWorld | null = null;
 let gone = false;
@@ -60,6 +63,7 @@ onMounted(async () => {
         if (props.data) {
             world.update(props.data);
         }
+        world.setLive(truc?.loi.value ?? {}, truc?.dangLam.value ?? new Set());
         ready.value = true;
     } catch (err) {
         fail(err);
@@ -77,6 +81,13 @@ watch(
         if (d) {
             world?.update(d);
         }
+    },
+);
+
+watch(
+    () => [truc?.loi.value, truc?.dangLam.value] as const,
+    ([say, working]) => {
+        world?.setLive(say ?? {}, working ?? new Set());
     },
 );
 

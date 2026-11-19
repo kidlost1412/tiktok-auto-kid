@@ -18,6 +18,7 @@ import suc_may as SM
 import kiem_may as KM
 from kiem_khung import scan
 import su_kien as SK
+import truc_tiep as TT          # "việc trực tiếp" cho trang Khu Tự Trị (chỉ ghi file nhỏ, nuốt mọi lỗi — xem truc_tiep.py)
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
@@ -170,7 +171,11 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             f"{math.ceil(so_video / per)} lời × {per} đạo diễn")
         SK.ghi("bien-kich", "bat-dau", "Đang viết lời đọc", so=math.ceil(so_video / per))
         try:
-            scripts = viet(ma_sp, math.ceil(so_video / per), log)
+            n_loi = math.ceil(so_video / per)
+            with TT.viec("bien-kich", "Đang viết lời đọc", sp=ten_sp, buoc=f"Bài 0/{n_loi}") as tt_bk:
+                scripts = viet(ma_sp, n_loi, log)
+                tt_bk.cap(buoc=f"Bài {len(scripts)}/{n_loi}", tien_do=min(1.0, len(scripts) / max(1, n_loi)))
+                tt_bk.ket("ok" if scripts else "loi")
         except HetHanMuc as e:
             SK.ghi("he-thong", "het-han-muc", "Hết hạn mức Claude khi viết lời")
             log(f"⛔ HẾT HẠN MỨC CLAUDE khi viết lời: {e}. Đổi tài khoản rồi chạy lại."); return
@@ -202,14 +207,19 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         vname = f"{ma_sp}-{sc['goc']}-{sc['giong']}-{stamp0}-{i:02d}"
         if het_han["v"]:
             return vname, None                       # đã hết hạn mức → không mua thêm giọng
-        try:
-            v = tao_giong(sc["text"], CFG["giong"]["danh_sach"][sc["giong"]], out_dir / "_giong", vname, doc=sp.get("doc_la"))
-            SK.ghi("giong", "nghi", "Thu xong 1 giọng", buoc="xong1", dur=round(float(v.get("dur") or 0), 1), goc=sc.get("goc"), giong=sc.get("giong"))
-            return vname, v
-        except Exception as e:
-            log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__} {str(e)[:120]}")
-            SK.ghi("giong", "nghi", "Thu hỏng 1 giọng", buoc="hong", goc=sc.get("goc"), loi=f"{type(e).__name__} {str(e)[:60]}")
-            return vname, None
+        cau_doc = [x.strip() for x in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", sc["text"]).strip()) if x.strip()]
+        with TT.viec("giong", "Đang thu giọng", sp=ten_sp, video=vname, buoc=f"Giọng {i + 1}/{max(len(scripts), i + 1)}") as tt_g:
+            tt_g.cap(dong=cau_doc, chi_tiet={"ky_tu": len(sc["text"]), "giong": sc.get("giong")})          # chính câu đang được đọc thành tiếng
+            try:
+                v = tao_giong(sc["text"], CFG["giong"]["danh_sach"][sc["giong"]], out_dir / "_giong", vname, doc=sp.get("doc_la"))
+                SK.ghi("giong", "nghi", "Thu xong 1 giọng", buoc="xong1", dur=round(float(v.get("dur") or 0), 1), goc=sc.get("goc"), giong=sc.get("giong"))
+                tt_g.cap(viec="Thu xong giọng", tien_do=1.0, chi_tiet={"giay": round(float(v.get("dur") or 0), 1)})
+                return vname, v
+            except Exception as e:
+                log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__} {str(e)[:120]}")
+                SK.ghi("giong", "nghi", "Thu hỏng 1 giọng", buoc="hong", goc=sc.get("goc"), loi=f"{type(e).__name__} {str(e)[:60]}")
+                tt_g.cap(viec="Thu hỏng giọng"); tt_g.ket("loi")
+                return vname, None
 
     def viec_tu_loi(i0, ds_sc):
         """Thu giọng cho các lời của 1 đợt rồi tạo việc dựng (mỗi lời × per đạo diễn)."""
@@ -277,6 +287,21 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     SK.ghi("he-thong", "ke-hoach", f"{len(lam_lai) if lam_lai else so_video} video cần dựng", so_video=len(lam_lai) if lam_lai else so_video)
 
     def len_bang(t, gop_y=""):
+        """Đạo diễn lên bảng dựng + "việc trực tiếp" cho trang Khu Tự Trị (chữ Claude stream về được gắn vào việc này bởi ai.goi)."""
+        with TT.viec("dao-dien", f"Đạo diễn {t['gu']} lên bảng dựng", sp=ten_sp, video=f'{t["vname"]}-{t["j"]}', buoc=f"Đạo diễn {t['gu']}") as tt_dd:
+            t = _len_bang(t, gop_y)
+            if t.get("hong"):
+                tt_dd.ket("loi"); tt_dd.them_dong("Máy tự dựng cũng không nổi, bỏ video này")
+            else:
+                segs = (t.get("plan") or {}).get("edl_segs") or []
+                ly = str((t.get("edl") or {}).get("ly_do") or "").strip()
+                tt_dd.cap(viec="Đã có bảng dựng", tien_do=1.0, chi_tiet={"so_canh": len(segs), "may_tu_dung": ly.startswith("máy tự dựng")})
+                if ly:
+                    tt_dd.them_dong(f"Ý đồ: {ly}")
+                tt_dd.them_dong(f"{len(segs)} cảnh" + (f" · công thức {t['st']['cong_thuc']}" if (t.get("st") or {}).get("cong_thuc") else ""))
+            return t
+
+    def _len_bang(t, gop_y=""):
         """Đạo diễn → bảng dựng → kế hoạch cho máy dựng."""
         t["work"].mkdir(parents=True, exist_ok=True); t["hong"] = False; may_dung = False
         SK.ghi("dao-dien", "bat-dau", f"Đạo diễn {t['gu']} lên bảng dựng", video=f'{t["vname"]}-{t["j"]}', gu=t["gu"])
@@ -320,6 +345,15 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         return t
 
     def dung_nen(t):
+        with TT.viec("dung", "Đang dựng nền", sp=ten_sp, video=f'{t["vname"]}-{t["j"]}', buoc="Dựng nền") as tt_d:
+            kq = _dung_nen(t)
+            if not kq:
+                tt_d.ket("loi"); tt_d.cap(viec="Dựng nền hỏng")
+            else:
+                tt_d.cap(viec="Dựng nền xong", tien_do=1.0, chi_tiet={"co_nhac": bool(t.get("music")), "so_canh": len((t.get("plan") or {}).get("edl_segs") or [])})
+            return kq
+
+    def _dung_nen(t):
         SK.ghi("dung", "bat-dau", "Đang dựng nền", video=f'{t["vname"]}-{t["j"]}')
         music = music_pick(t["st"].get("nhac"), t["rng"])
         t["music"] = music
@@ -357,7 +391,18 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             SK.ghi("dung", "bat-dau", f"Dựng lớp chữ {len(moi)} video", so=len(moi), buoc="chu")
         if moi:
             with SM.khe_dung(ma_sp, log, "Remotion"):
-                done = set(dung_lo([t["job"] for t in moi], tam / "_public", log))
+                with TT.viec("dung", f"Đang dựng lớp chữ {len(moi)} video", sp=ten_sp, buoc=f"Lớp chữ 0/{len(moi)}", tien_do=0.0) as tt_c:
+                    n_ok = [0]
+
+                    def log_chu(m):                  # dung_remotion báo "lớp chữ: … OK" mỗi khi xong 1 video → đó là tiến độ thật
+                        log(m)
+                        if "lớp chữ:" in str(m) and str(m).rstrip().endswith(" OK"):
+                            n_ok[0] += 1
+                            tt_c.cap(buoc=f"Lớp chữ {n_ok[0]}/{len(moi)}", tien_do=n_ok[0] / len(moi))
+                    done = set(dung_lo([t["job"] for t in moi], tam / "_public", log_chu))
+                    tt_c.cap(buoc=f"Lớp chữ {len(done)}/{len(moi)}", tien_do=len(done) / len(moi))
+                    if len(done) < len(moi):
+                        tt_c.them_dong(f"{len(moi) - len(done)} video chưa ra được lớp chữ")
         else:
             done = set()
         if moi:
@@ -392,7 +437,20 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         try:
             dong_bo_chu_ky(sig_file, used_sigs)        # nạp chữ ký các lô khác vừa dùng (chống trùng trong ngày giữa các lô song song)
             xong = mot_vong(dot)
-            def cham(t):                     # giám khảo lỗi / hết hạn mức → vẫn giữ video, để trống điểm (lỗi rà soát #3)
+            def cham(t):                     # "việc trực tiếp" của giám khảo: lúc có kết luận thì đưa điểm + lý do thật của giám khảo lên trang Khu Tự Trị
+                with TT.viec("giam-khao", "Đang xem và chấm", sp=ten_sp, video=f'{t["vname"]}-{t["j"]}', buoc="Chấm video") as tt_gk:
+                    t_, r = _cham(t)
+                    if r.get("diem") is None:
+                        tt_gk.ket("loi")
+                    ds = [f"Điểm {r['diem']}/10 — " + ("ĐẠT" if r.get("dat") else "CHƯA ĐẠT")] if r.get("diem") is not None else []
+                    ds += [f"Lỗi: {x}" for x in (r.get("loi") or [])[:5]]
+                    if r.get("sua"):
+                        ds.append(f"Nên sửa: {r['sua']}")
+                    tt_gk.cap(viec="Đã chấm xong" if r.get("diem") is not None else "Chưa chấm được", tien_do=1.0, dong=ds,
+                              chi_tiet={"diem": r.get("diem"), "dat": r.get("dat"), "so_loi": len(r.get("loi") or []), "nguon": r.get("nguon")})
+                    return t_, r
+
+            def _cham(t):                    # giám khảo lỗi / hết hạn mức → vẫn giữ video, để trống điểm (lỗi rà soát #3)
                 SK.ghi("giam-khao", "bat-dau", "Đang xem và chấm", video=f'{t["vname"]}-{t["j"]}')
                 try:
                     VIEC.video = f'{t["vname"]}-{t["j"]}'
@@ -475,6 +533,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         except Exception as e:
             log(f"  ⚠ đợt {n_dot} gặp lỗi: {type(e).__name__}: {str(e)[-200:]} → bỏ qua đợt này, làm tiếp")
             SK.ghi("he-thong", "loi", f"Đợt {n_dot} gặp lỗi: {type(e).__name__}")
+        tt_kho = None                     # thủ kho: 1 việc trực tiếp cho cả đợt cất video (không làm "việc hiện tại" của luồng; hết đợt đóng ngay)
+        if any(t.get("job") and Path(t["job"]["out"]).exists() for t in dot):
+            tt_kho = TT.viec("kho", "Đang cất video vào kho", sp=ten_sp, buoc=f"Video {made}/{tong_vd}", tien_do=made / max(1, tong_vd)).mo(hien_tai=False)
         for t in dot:
             if not t.get("job") or not Path(t["job"]["out"]).exists():
                 continue
@@ -518,6 +579,9 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 log(f"  [{made}/{tong_vd}] {t['fname']}  ({gk.get('diem')}/10)")
                 SK.ghi("kho", "luu", f"Đã lưu video {made}/{tong_vd}", video=f'{t["vname"]}-{t["j"]}', so=made, tong=tong_vd, diem=gk.get("diem"),
                        file=t.get("fname"), ngay=day)
+                if tt_kho is not None:
+                    tt_kho.cap(buoc=f"Video {made}/{tong_vd}", tien_do=made / max(1, tong_vd), video=f'{t["vname"]}-{t["j"]}', chi_tiet={"diem": gk.get("diem")})
+                    tt_kho.them_dong(f"Đã cất video {made}/{tong_vd}" + (f" — điểm {gk.get('diem')}/10" if gk.get("diem") is not None else " — chưa có điểm"))
                 if t.get("lam_lai_tu"):                       # bản anh không ưng → cất vào _ban-chua-dat (tự dọn sau 5 ngày)
                     cu = Path(t["lam_lai_tu"]); dich = cu.parent / "_ban-chua-dat"; dich.mkdir(exist_ok=True)
                     for duoi in (".mp4", ".jpg", ".json", ".txt"):
@@ -528,6 +592,10 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             except Exception as e:
                 log(f"  ⚠ lưu hồ sơ {t.get('fname')} lỗi: {type(e).__name__}: {str(e)[-160:]} → bỏ qua video này, làm tiếp")
                 SK.ghi("he-thong", "loi", f"Lưu hồ sơ lỗi: {type(e).__name__}", video=f'{t["vname"]}-{t["j"]}')
+                if tt_kho is not None:
+                    tt_kho.them_dong("Có 1 video lưu hồ sơ lỗi, bỏ qua")
+        if tt_kho is not None:
+            tt_kho.xong()
         dong_bo_chu_ky(sig_file, used_sigs)               # hợp với file trên đĩa (KHÔNG ghi đè: lô khác có thể vừa thêm chữ ký)
         if het_msg:
             log(f"⛔ HẾT HẠN MỨC CLAUDE (mọi tài khoản): {het_msg}. Đã xong {made} video, đã lưu đủ hồ sơ. Đăng nhập/đổi tài khoản rồi chạy tiếp.")

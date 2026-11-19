@@ -10,6 +10,8 @@ export interface HubDoi {
     n: number;
     cho_duyet: number | null;
     chay: boolean;
+    /** Mốc cập nhật mới nhất của các việc đang chạy trực tiếp (0 = không có); tăng lên nghĩa là có chữ mới để lấy. */
+    tt?: number;
 }
 
 const CHO_TOI_DA = 30000;

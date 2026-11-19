@@ -1,6 +1,6 @@
 // /nha?demo=1: phát lại một lô sản xuất GIẢ hoàn toàn trong trình duyệt (không gọi máy chủ, không đụng dữ liệu thật).
 // `?t=giây` để nhảy tới một thời điểm (các sự kiện trước đó coi như lịch sử, không diễn lại).
-import type { NhaData, NhaEvent, VaiInfo } from '../nha/types';
+import type { LiveItem, NhaData, NhaEvent, VaiInfo } from '../nha/types';
 
 type Ev = Omit<NhaEvent, 'n' | 't'>;
 
@@ -339,6 +339,64 @@ const KEYS = [
     'buuta',
 ];
 
+// Chữ chảy trực tiếp GIẢ cho ?demo=1 (đúng hình dạng hợp đồng "truc_tiep"): xem được bong bóng + màn hình mà không cần hub.
+const DEMO_LOI = [
+    'Cà phê nguội lúc nào cũng dở, mà bình này giữ nóng mười hai tiếng',
+    'Sáng pha một lần, chiều uống vẫn bốc khói',
+    'Bỏ vừa túi xách, đổ ngược cũng không rò',
+    'Giá chỉ một trăm chín chục, rẻ hơn ly trà sữa tuần',
+];
+const demoLive = (inLoop: number, now: number): LiveItem[] => {
+    const out: LiveItem[] = [];
+    // Biên kịch viết lời 4 → 12 giây của vòng, mỗi ~2 giây ra một câu
+    if (inLoop >= 4 && inLoop < 18) {
+        const dt = inLoop - 4;
+        const xong = inLoop >= 12;
+        const n = Math.min(DEMO_LOI.length, Math.floor(dt / 2));
+        const go = DEMO_LOI[n] ?? null;
+        out.push({
+            id: 'demo-bien-kich',
+            nguon: 'hub',
+            vai: 'bien-kich',
+            viec: 'Đang viết lời đọc',
+            sp: SP,
+            bat_dau: now - Math.min(dt, 8),
+            cap_nhat: now,
+            xong,
+            ket_qua: xong ? 'ok' : null,
+            ky_tu: 90 + Math.round(Math.min(dt, 8) * 38),
+            dong: DEMO_LOI.slice(0, n),
+            dang_go:
+                !xong && go
+                    ? go.slice(0, Math.floor((dt % 2) * 0.5 * go.length) + 8)
+                    : null,
+            tien_do: xong ? 1 : Math.min(0.95, dt / 8),
+            buoc: `Bài ${Math.min(n + 1, 4)}/4`,
+            chi_tiet: xong ? { diem: 8 } : null,
+        });
+    }
+    // Thu âm 12 → 26: có bước và tiến độ, không có chữ
+    if (inLoop >= 12 && inLoop < 31) {
+        const dt = inLoop - 12;
+        const xong = inLoop >= 26;
+        out.push({
+            id: 'demo-thu-am',
+            nguon: 'hub',
+            vai: 'giong',
+            viec: 'Đang thu giọng',
+            sp: SP,
+            bat_dau: now - Math.min(dt, 14),
+            cap_nhat: now,
+            xong,
+            ket_qua: xong ? 'ok' : null,
+            tien_do: xong ? 1 : Math.min(0.95, dt / 14),
+            buoc: `Giọng ${Math.min(3, Math.floor(dt / 5) + 1)}/3`,
+        });
+    }
+
+    return out;
+};
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const localIso = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -449,6 +507,7 @@ export const createDemo = (startAt = 0) => {
                 events: events.slice(-120),
                 bay_gio: Date.now() / 1000,
                 bay_gio_app: Date.now() / 1000,
+                truc_tiep: demoLive(inLoop, Date.now() / 1000),
                 hoat_dong: APP_BEATS.flatMap((b, i) => {
                     const out = [];
                     for (let L = 0; L <= loop; L++) {

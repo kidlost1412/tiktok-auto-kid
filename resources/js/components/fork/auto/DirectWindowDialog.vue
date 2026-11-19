@@ -63,6 +63,21 @@ const toggleChannel = (id: string) => {
         : form.off_channels.filter((c) => c !== id);
 };
 
+// Chưa đổi gì so với đang lưu thì khỏi bấm Lưu.
+const sameList = (a: unknown[], b: unknown[]) =>
+    JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+const dirty = computed(() => {
+    const p = fromProps();
+
+    return (
+        p.enabled !== form.enabled ||
+        p.start !== form.start ||
+        p.end !== form.end ||
+        !sameList(p.days, form.days) ||
+        !sameList(p.off_channels, form.off_channels)
+    );
+});
+
 const timeBad = computed(
     () => !form.start || !form.end || form.end <= form.start,
 );
@@ -246,7 +261,7 @@ const labelCls = 'text-sm font-medium text-foreground';
                     >Huỷ</Button
                 >
                 <Button
-                    :disabled="busy || timeBad || daysBad"
+                    :disabled="busy || timeBad || daysBad || !dirty"
                     data-testid="fork-direct-save"
                     @click="save"
                 >

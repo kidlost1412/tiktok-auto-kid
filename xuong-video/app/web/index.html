@@ -348,7 +348,7 @@ html.khoa-cuon,html.khoa-cuon body{overflow:hidden}
 
 /* ---------- Kho video */
 .toolbar .tb{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
-.toolbar .tb .fld{width:210px}
+.toolbar .tb .fld{width:min(210px,100%)}
 .vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-top:20px}
 .vid{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm);display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s,border-color .2s}
 .vid:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
@@ -574,6 +574,52 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 .hc-c-b{min-width:0;display:flex;flex-direction:column;gap:3px}
 .hc-c-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .hc-trang{display:flex;gap:10px;align-items:center;justify-content:center}
+/* ---------- cải tiến thao tác: chọn nhiều video, thanh lưu, lọc, menu ⋯ */
+.hdr-chip .dot.bad{background:#EF4444;box-shadow:0 0 0 3px color-mix(in srgb,#EF4444 22%,transparent)}
+.hdr-chip.bad{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.toast .tbtn{margin-left:10px;border:0;background:transparent;color:#C4B5FD;font:600 14px var(--font);cursor:pointer;padding:0;text-decoration:underline;white-space:nowrap}
+:root[data-theme="dark"] .toast .tbtn{color:var(--pri-ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chipb{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font:500 13px var(--font);cursor:pointer;white-space:nowrap}
+.chipb:hover{background:var(--hover)}
+.chipb[aria-pressed="true"]{background:var(--pri-soft);color:var(--pri-ink);border-color:color-mix(in srgb,var(--pri) 35%,var(--line2))}
+.vid{position:relative}
+.vid .vsel{position:absolute;top:10px;right:10px;z-index:3;width:28px;height:28px;margin:0;border-radius:8px;display:grid;place-items:center;background:rgba(12,12,16,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.vid .vsel input{margin:0;width:18px;height:18px;cursor:pointer}
+.vid.chon{outline:2px solid var(--pri);outline-offset:-2px}
+.vid .act button[aria-pressed="true"],.mbox .btn[aria-pressed="true"]{box-shadow:inset 0 0 0 2px currentColor}
+.vids-hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;min-height:32px}
+.vids-hd .note{margin:0}
+.selbar{position:sticky;bottom:16px;z-index:14;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px auto 0;width:fit-content;max-width:100%;padding:10px 14px;border-radius:14px;background:var(--raised);border:1px solid var(--line2);box-shadow:var(--sh-lg)}
+.selbar b{font-weight:600}
+.dirtybar{position:fixed;right:24px;bottom:20px;z-index:60;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:14px;background:var(--raised);border:1px solid color-mix(in srgb,var(--amber) 45%,var(--line2));box-shadow:var(--sh-lg);max-width:calc(100vw - 24px)}
+.dirtybar .dt{font-size:13.5px;font-weight:500;color:var(--y-ink)}
+html:has(#dirtyBar:not(.hidden)) .toast{bottom:86px}
+@media (max-width:900px){.dirtybar{left:12px;right:12px;bottom:12px}}
+a.lnk-thieu{color:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+a.lnk-thieu:hover{color:var(--pri-ink)}
+.sp-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 18px}
+.sp-tools input[type=text]{width:min(280px,100%)}
+.sp-tools select{width:min(210px,100%)}
+.pc-foot{position:relative}
+.pc-pop{position:absolute;right:0;bottom:calc(100% + 6px);z-index:5;padding:6px;border:1px solid var(--line2);border-radius:10px;background:var(--raised);box-shadow:var(--sh-lg)}
+.dd-tim{position:sticky;top:0;z-index:1;margin-bottom:6px;height:36px}
+.dd-it.off .btn{margin-left:auto;flex:none}
+div.dd-it.off{cursor:default}
+.stat.s2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stat.s3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:640px){.stat.s3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+details.kt-tech{margin-top:14px}
+details.kt-tech>summary{font-size:13px;font-weight:500}
+details.kt-tech .stat{margin-top:12px}
+.nho-pill{margin-left:4px}
+.pill.pm-tabn.p{background:var(--pri-soft);color:var(--pri-ink)}
+.nhieu-ds{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;padding:2px}
+.nhieu-it{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.nhieu-it label{display:flex;align-items:center;gap:10px;margin:0;flex:1;min-width:0;cursor:pointer}
+.nhieu-it input[type=number]{width:84px;height:34px}
+.nhieu-box{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-lg);width:min(560px,96vw);padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.soChips{margin-top:8px}
 </style>
 </head>
 <body>
@@ -640,6 +686,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
 </svg>
 <header><div class="hdr">
@@ -647,10 +694,10 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <div class="brand"><h1>Xưởng Video</h1><div class="sub">Sản xuất video tự động</div></div>
   <nav>
     <button data-tab="sx" class="on"><svg class="i"><use href="#i-clap"/></svg>Sản xuất</button>
-    <button data-tab="kho"><svg class="i"><use href="#i-film"/></svg>Kho video</button>
+    <button data-tab="kho"><svg class="i"><use href="#i-film"/></svg>Kho video<span class="pill p pm-tabn hidden" id="khoTabN" title="Video chưa duyệt"></span></button>
     <button data-tab="sp"><svg class="i"><use href="#i-gift"/></svg>Sản phẩm &amp; quà</button>
     <button data-tab="gu"><svg class="i"><use href="#i-spark"/></svg>Gu &amp; bài học</button>
-    <button data-tab="pm"><svg class="i"><use href="#i-bot"/></svg>Prompt AI<span class="pill y pm-tabn hidden" id="pmTabN"></span></button>
+    <button data-tab="pm"><svg class="i"><use href="#i-bot"/></svg>Đề bài AI<span class="pill y pm-tabn hidden" id="pmTabN"></span></button>
     <button data-tab="cd"><svg class="i"><use href="#i-cog"/></svg>Cài đặt</button>
   </nav>
   <div class="hdr-chip"><span class="dot"></span><span id="hdrSub">Ê-kíp AI</span></div>
@@ -667,8 +714,9 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
         <div class="t"><h2>Làm video mới</h2><p class="sub">Biên kịch → Giọng → Đạo diễn → Máy dựng → Giám khảo</p></div></div>
       <div class="fgrid">
         <div><label for="spDd">Sản phẩm</label><select id="spChon" class="hidden" tabindex="-1" aria-hidden="true"></select>
-          <div class="dd" id="dd"><button type="button" class="dd-bt" id="spDd" aria-haspopup="listbox" aria-expanded="false"></button><div class="dd-ls hidden" id="spDdLs" role="listbox"></div></div></div>
-        <div><label for="soVideo">Số video</label><input id="soVideo" type="number" min="1" max="200" value="10"></div>
+          <div class="dd" id="dd"><button type="button" class="dd-bt" id="spDd" aria-haspopup="listbox" aria-expanded="false"></button><div class="dd-ls hidden" id="spDdLs" role="listbox"><input type="text" class="dd-tim" id="spDdTim" placeholder="Gõ để tìm sản phẩm…" aria-label="Tìm sản phẩm" autocomplete="off"><div id="spDdIt"></div></div></div></div>
+        <div><label for="soVideo">Số video</label><input id="soVideo" type="number" min="1" max="200" value="10" inputmode="numeric">
+          <div class="chips soChips" id="soChips" role="group" aria-label="Chọn nhanh số video"><button type="button" class="chipb" data-so="5">5</button><button type="button" class="chipb" data-so="10">10</button><button type="button" class="chipb" data-so="20">20</button><button type="button" class="chipb" data-so="50">50</button></div></div>
         <div class="dur"><label for="durChon">Độ dài video</label>
           <select id="durChon"><option value="10-15">10–15 giây</option><option value="15-20">15–20 giây</option><option value="20-25">20–25 giây (mặc định)</option><option value="25-30">25–30 giây</option><option value="30-40">30–40 giây</option><option value="tuy">Tuỳ chỉnh</option></select>
           <div class="dur-in hidden" id="durTuy">Từ <input type="number" id="durMin" min="10" max="57" step="1" value="20"> đến <input type="number" id="durMax" min="13" max="60" step="1" value="25"> giây <span>(10–60 giây, cách nhau ít nhất 3)</span></div>
@@ -679,8 +727,9 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div class="khothem hidden" id="khoThem"></div>
       <div class="cta-row">
         <button class="btn go big" id="btnChay"><svg class="i f"><use href="#i-play"/></svg>Bắt đầu làm</button>
+        <button class="btn ghost" id="btnNhieuSp" type="button"><svg class="i"><use href="#i-layers"/></svg>Làm cho nhiều sản phẩm…</button>
         <p class="note" id="uocTinh"></p>
-        <button class="btn stop hidden" id="btnDung" style="margin-left:auto"><svg class="i f"><use href="#i-stop"/></svg>Dừng lô</button>
+        <button class="btn stop hidden" id="btnDung" style="margin-left:auto"><svg class="i f"><use href="#i-stop"/></svg>Dừng tất cả</button>
       </div>
       <div class="runbox">
         <div class="run-h"><span class="run-l"><svg class="i"><use href="#i-clock"/></svg>Tiến độ lô</span><span class="note" id="barText">Chưa chạy.</span></div>
@@ -694,20 +743,26 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div class="col">
       <div class="card">
         <div class="ch"><span class="chip b"><svg class="i"><use href="#i-chart"/></svg></span>
-          <div class="t"><h2>Hôm nay <span class="note" id="stMoc"></span></h2><p class="sub" id="stUsd"></p></div>
+          <div class="t"><h2>Hôm nay <span class="note" id="stMoc"></span></h2></div>
           <div class="act"><button class="btn ghost sm" id="btnDemLai"><svg class="i"><use href="#i-undo"/></svg>Đếm lại từ bây giờ</button></div></div>
-        <div class="stat">
+        <div class="stat s2">
           <div style="--acc:#8B5CF6"><i class="si"><svg class="i"><use href="#i-video"/></svg></i><b id="stVideo">–</b><span>video đã làm</span></div>
-          <div style="--acc:#3B82F6"><i class="si"><svg class="i"><use href="#i-zap"/></svg></i><b id="stLuot">–</b><span>lượt gọi AI</span></div>
-          <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-coins"/></svg></i><b id="stToken">–</b><span>token đã dùng</span></div>
-          <div style="--acc:#10B981"><i class="si"><svg class="i"><use href="#i-mic"/></svg></i><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+          <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-eye"/></svg></i><b id="stChoDuyet">–</b><span>video chờ anh duyệt</span></div>
         </div>
+        <details class="kt-tech"><summary>Chi tiết kỹ thuật</summary>
+          <div class="stat s3">
+            <div style="--acc:#3B82F6"><i class="si"><svg class="i"><use href="#i-zap"/></svg></i><b id="stLuot">–</b><span>lượt gọi AI</span></div>
+            <div style="--acc:#F59E0B"><i class="si"><svg class="i"><use href="#i-coins"/></svg></i><b id="stToken">–</b><span>token đã dùng</span></div>
+            <div style="--acc:#10B981"><i class="si"><svg class="i"><use href="#i-mic"/></svg></i><b id="stKyTu">–</b><span>ký tự giọng (ElevenLabs)</span></div>
+          </div>
+          <p class="note" id="stUsd" style="margin:10px 0 0"></p>
+        </details>
         <div id="tkBox"></div>
       </div>
     <div class="card mt">
       <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
         <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
-        <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+        <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở hoặc thu gọn bảng chi phí từng lô" aria-label="Mở hoặc thu gọn bảng chi phí từng lô"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
       <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
     </div>
     </div>
@@ -716,7 +771,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div class="ch"><span class="chip g"><svg class="i"><use href="#i-bot"/></svg></span>
       <div class="t"><h2>Tự động giữ kho video</h2><p class="sub">Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.</p></div>
       <div class="act"><label class="tg"><input type="checkbox" id="tdBat" class="sw" disabled> Bật tự động</label>
-        <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở/thu gọn"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
+        <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở hoặc thu gọn mục tự động giữ kho" aria-label="Mở hoặc thu gọn mục tự động giữ kho"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
     <div class="hidden" id="tdBody">
     <p class="help">App tự đếm video còn <b>tồn</b> (đã ✅ Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
       App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
@@ -726,7 +781,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div class="foot-row">
       <span class="note" id="tdTrangThai"></span>
       <div class="row" style="gap:10px"><span class="inl">Kiểm mỗi <input type="number" id="tdPhut" min="5" disabled> phút</span>
-        <button class="btn go" id="btnLuuTd" disabled><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
+        <span class="pill y hidden" id="tdChuaLuu">Chưa lưu</span><button class="btn go" id="btnLuuTd" disabled><svg class="i"><use href="#i-save"/></svg>Lưu tự động</button></div>
     </div>
     </div>
   </div>
@@ -743,8 +798,11 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <div class="card toolbar">
     <div class="tb">
       <div class="fld"><label for="ngayChon">Ngày</label><select id="ngayChon"></select></div>
+      <div class="fld"><label for="spLoc">Sản phẩm</label><select id="spLoc"><option value="">Tất cả sản phẩm</option></select></div>
       <div class="fld"><label for="locChon">Lọc</label><select id="locChon">
         <option value="">Tất cả</option><option value="chua">Chưa đánh giá</option><option value="dat">Anh ưng</option><option value="kem">Không ưng · vẫn đăng</option><option value="bo">Anh bỏ</option></select></div>
+      <div class="fld"><label for="sapChon">Sắp xếp</label><select id="sapChon">
+        <option value="moi">Mới nhất</option><option value="cao">Điểm giám khảo cao → thấp</option><option value="thap">Điểm thấp → cao</option></select></div>
       <div style="margin-left:auto" class="row">
         <button class="btn ghost" id="btnMoThuMuc"><svg class="i"><use href="#i-fopen"/></svg>Mở thư mục</button>
         <button class="btn ghost" id="btnTaiLai"><svg class="i"><use href="#i-refresh"/></svg>Tải lại</button>
@@ -756,13 +814,19 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <span class="inl">Đạt khi điểm ≥ <input type="number" id="tdyDat" min="0" max="10" step="0.5" disabled></span>
       <span class="inl">Tự bỏ khi điểm &lt; <input type="number" id="tdyBo" min="0" max="10" step="0.5" disabled> <span>(0 = không tự bỏ)</span></span>
       <div class="row" style="gap:8px;margin-left:auto">
-        <button class="btn go" id="btnTdy" disabled><svg class="i"><use href="#i-save"/></svg>Lưu &amp; áp dụng</button>
+        <span class="pill y hidden" id="tdyChuaLuu">Chưa lưu</span><button class="btn go" id="btnTdy" disabled><svg class="i"><use href="#i-save"/></svg>Lưu &amp; áp dụng</button>
         <button class="btn soft" id="btnLamLaiAll"><svg class="i"><use href="#i-repeat"/></svg>Làm lại các video đã bỏ (theo góp ý)</button>
       </div>
     </div>
     <p class="note" style="margin:12px 0 0">Tự duyệt chỉ áp cho video anh CHƯA đánh giá, không đè đánh giá tay. Làm lại: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý anh ghi; bản cũ cất vào _ban-chua-dat.</p>
   </div>
-  <div class="vids" id="vids"></div>
+  <div class="vids-hd" id="vidsHd"><button class="btn ghost sm" id="btnChonHet" type="button">Chọn tất cả đang hiện</button><span class="note" id="vidsDem"></span></div>
+  <div class="vids" id="vids" style="margin-top:12px"></div>
+  <div class="row hidden" id="vidsThem" style="justify-content:center;margin-top:20px"><button class="btn ghost" id="btnXemThem" type="button">Xem thêm 60 video</button></div>
+  <div class="selbar hidden" id="selBar" role="region" aria-label="Video đã chọn"><span>Đã chọn <b id="selN">0</b> video</span>
+    <button class="btn go sm" id="btnSelOk" type="button"><svg class="i"><use href="#i-up"/></svg>Ưng tất cả</button>
+    <button class="btn soft sm" id="btnSelKem" type="button"><svg class="i"><use href="#i-down"/></svg>Không ưng</button>
+    <button class="btn ghost sm" id="btnSelBo" type="button">Bỏ chọn</button></div>
 </section>
 
 <!-- SẢN PHẨM -->
@@ -771,8 +835,14 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <div id="spDs">
     <div class="ph">
       <div><h1>Sản phẩm &amp; quà</h1><p id="tqTom">Đang tải…</p></div>
-      <div class="act"><button class="btn ghost" id="btnTqMoi"><svg class="i"><use href="#i-refresh"/></svg>Đếm lại</button>
+      <div class="act"><button class="btn ghost hidden" id="btnHocHet" type="button"><svg class="i"><use href="#i-cap"/></svg><span id="hocHetNhan"></span></button>
+        <button class="btn ghost" id="btnTqMoi"><svg class="i"><use href="#i-refresh"/></svg>Đếm lại</button>
         <button class="btn go" id="btnMoThem"><svg class="i"><use href="#i-plus"/></svg>Thêm sản phẩm mới</button></div>
+    </div>
+    <div class="sp-tools" id="spTools">
+      <input type="text" id="spTim" placeholder="Tìm sản phẩm…" aria-label="Tìm sản phẩm" autocomplete="off">
+      <select id="spSapXep" aria-label="Sắp xếp sản phẩm"><option value="ten">Tên A→Z</option><option value="xuly">Cần xử lý trước</option><option value="ton">Còn tồn ít nhất</option><option value="lam">Đã làm nhiều nhất</option></select>
+      <div class="chips" id="spLocChips" role="group" aria-label="Lọc sản phẩm"><button type="button" class="chipb" data-sl="" aria-pressed="true">Tất cả</button><button type="button" class="chipb" data-sl="san-sang" aria-pressed="false">Sẵn sàng</button><button type="button" class="chipb" data-sl="thieu" aria-pressed="false">Thiếu hồ sơ</button></div>
     </div>
     <div class="sp-grid" id="tqBang"></div>
     <p class="note" style="margin:18px 0 0;display:flex;gap:8px;align-items:flex-start"><svg class="i" style="margin-top:2px"><use href="#i-info"/></svg><span>Bấm vào một sản phẩm để sửa quà tặng, sự thật, kho cảnh và ảnh. Xoá chỉ bỏ hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được) — video gốc và video đã làm KHÔNG bị xoá.</span></p>
@@ -871,7 +941,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
           <details id="hocLoiBox" class="hc-loi hidden"></details>
           <details class="hc-tuy"><summary>Tuỳ chọn</summary>
             <div class="hc-tuy-b">
-              <div><label for="hsModel">Máy xem video dùng model</label><select id="hsModel" style="max-width:320px"></select></div>
+              <div><label for="hsModel">Máy xem video dùng bản AI</label><select id="hsModel" style="max-width:320px"></select></div>
               <div class="row" style="gap:8px"><button class="btn ghost sm" id="btnKho"><svg class="i"><use href="#i-layers"/></svg>Nạp lại cảnh vào kho</button>
                 <button class="btn ghost sm" id="btnKiem"><svg class="i"><use href="#i-shield"/></svg>Kiểm tra file mô tả</button>
                 <a href="#" id="linkTay" class="note">Làm tay bằng Antigravity</a></div>
@@ -919,7 +989,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
 
 <!-- PROMPT AI -->
 <section id="pm" class="hidden">
-  <div class="ph"><div><h1>Prompt AI</h1><p>Một bộ đề bài dùng chung cho mọi sản phẩm. Chỗ <code class="pm-code">{{...}}</code> máy tự điền dữ liệu của sản phẩm đang làm.</p></div></div>
+  <div class="ph"><div><h1>Đề bài AI</h1><p>Một bộ đề bài dùng chung cho mọi sản phẩm. Chỗ <code class="pm-code">{{...}}</code> máy tự điền dữ liệu của sản phẩm đang làm.</p></div></div>
   <div class="pm-wrap">
     <div class="card pm-list" id="pmDs"></div>
     <div class="card pm-main" id="pmMain">
@@ -964,7 +1034,7 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
       <div id="tkChiTiet" class="note">Đang kiểm…</div>
       <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
         Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
-        tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi cả 3 đều hết.</p>
+        tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi mọi tài khoản đều hết.</p>
     </div>
     <div class="card" style="grid-column:1/-1"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-music"/></svg></span>
       <div class="t"><h2>Nhạc &amp; âm thanh</h2><p class="sub">Kho mặc định + thư mục nhạc / SFX của anh</p></div></div>
@@ -993,13 +1063,13 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
         <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
       </div>
       <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
-        <div class="t"><h2>Chất lượng AI</h2><p class="sub">Model, mức suy nghĩ và số đạo diễn mỗi lời đọc</p></div></div>
+        <div class="t"><h2>Chất lượng AI</h2><p class="sub">Bản AI, độ kỹ và số đạo diễn mỗi lời đọc</p></div></div>
         <div class="grid g2e" style="gap:16px">
-          <div><label for="cdModel">Model</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
-          <div><label for="cdEffort">Mức suy nghĩ</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
+          <div><label for="cdModel">Bản AI</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
+          <div><label for="cdEffort">Độ kỹ của AI (Cao = kỹ hơn, tốn hạn mức hơn)</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
           <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
         </div>
-        <div class="row" style="margin-top:18px"><button class="btn go" id="btnLuuCd" disabled><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
+        <div class="row" style="margin-top:18px"><span class="pill y hidden" id="cdChuaLuu">Chưa lưu</span><button class="btn go" id="btnLuuCd" disabled><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
       </div>
     </div>
     <div class="col">
@@ -1044,8 +1114,8 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
     <div id="mGk"></div>
     <div><h3>Đánh giá của anh</h3>
       <textarea id="mGop" style="min-height:80px" placeholder="Góp ý 1 dòng (không bắt buộc): vd. mở đầu chậm, cảnh rễ đẹp…"></textarea>
-      <div class="row" id="mNut" style="margin-top:10px;gap:8px;position:sticky;bottom:-1px;z-index:2;background:var(--card);padding:10px 0;box-shadow:0 -8px 12px -10px rgba(0,0,0,.25)"><button class="btn go" id="mOk" title="Anh ưng: video được đăng, góp ý (nếu có) báo AI làm theo"><svg class="i"><use href="#i-up"/></svg>Ưng</button><button class="btn soft" id="mNo" title="Không ưng nhưng vẫn đăng: AI được báo đây là video yếu để làm tốt hơn lần sau"><svg class="i"><use href="#i-down"/></svg>Không ưng (vẫn đăng)</button>
-        <button class="btn stop" id="mLamLai" title="Anh thật sự không hài lòng: video bị bỏ, không đăng, và được làm lại theo góp ý"><svg class="i"><use href="#i-repeat"/></svg>Làm lại (không đăng)</button></div></div>
+      <div class="row" id="mNut" style="margin-top:10px;gap:8px;position:sticky;bottom:-1px;z-index:2;background:var(--card);padding:10px 0;box-shadow:0 -8px 12px -10px rgba(0,0,0,.25)"><button class="btn go" id="mOk" aria-pressed="false" title="Ưng (phím U) — video được đăng, góp ý (nếu có) báo AI làm theo"><svg class="i"><use href="#i-up"/></svg>Ưng</button><button class="btn soft" id="mNo" aria-pressed="false" title="Không ưng (phím K) — vẫn đăng, AI được báo đây là video yếu để làm tốt hơn lần sau"><svg class="i"><use href="#i-down"/></svg>Không ưng (vẫn đăng)</button>
+        <button class="btn stop" id="mLamLai" aria-pressed="false" title="Anh thật sự không hài lòng: video bị bỏ, không đăng, và được làm lại theo góp ý"><svg class="i"><use href="#i-repeat"/></svg>Làm lại (không đăng)</button></div></div>
     <details><summary class="note">Lời đọc</summary><div class="note" id="mLoi" style="margin-top:8px"></div></details>
   </div>
 </div></div>
@@ -1066,26 +1136,68 @@ svg.i:has(use[href="#i-loader"]){animation:spin 1s linear infinite}
   <h2 id="hoiTd"></h2><p class="hnd" id="hoiNd"></p><input type="text" id="hoiIn" class="hidden" autocomplete="off">
   <div class="hbtn"><button class="btn ghost" id="hoiKhong"></button><button class="btn go" id="hoiCo"></button></div>
 </div></div>
+<div class="dirtybar hidden" id="dirtyBar" role="region" aria-label="Thay đổi chưa lưu"><span class="dt">Có thay đổi chưa lưu</span>
+  <button class="btn ghost sm" id="dirtyHuy" type="button">Huỷ</button><button class="btn go sm" id="dirtyLuu" type="button"><svg class="i"><use href="#i-save"/></svg>Lưu thay đổi (Ctrl+S)</button></div>
+<div class="modal" id="nhieuModal" role="dialog" aria-modal="true" aria-labelledby="nhieuTd"><div class="nhieu-box">
+  <div class="ch" style="margin:0"><span class="chip"><svg class="i"><use href="#i-layers"/></svg></span><div class="t"><h2 id="nhieuTd" style="margin:0">Làm cho nhiều sản phẩm</h2><p class="sub">Tích sản phẩm, đặt số video — mỗi sản phẩm chạy một lô riêng (hết chỗ thì tự xếp hàng chờ).</p></div></div>
+  <div class="nhieu-ds" id="nhieuDs"></div>
+  <div class="note" id="nhieuTom"></div>
+  <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="nhieuDong" type="button">Đóng</button><button class="btn go" id="nhieuChay" type="button" disabled>Tiếp tục</button></div>
+</div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 const $ = s => document.querySelector(s);
-const api = (u, b) => fetch(u, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)}).then(r => r.json()).then(r => { api.last = r; return r; });
+// Gọi hub. Lỗi mạng / quá thời gian / trả lời không phải JSON → ném ApiLoi (không còn thất bại im lặng); hub trả {ok:false, loi} thì vẫn trả về như cũ.
+class ApiLoi extends Error { constructor(m, mang) { super(m); this.mang = !!mang; } }
+const API_DAI = /\/api\/(doc-nhan|tai-khoan|giong|anh-khung|anh-sp|kiem-dinh|thu-muc|shop|prompt\/xem-thu|nhac-tai|chuan-bi-kho|video)/;   // việc vốn lâu (AI đọc nhãn, kiểm hạn mức…): chờ tới 2 phút
+async function api(u, b, ms) {
+  const ac = new AbortController(), tg = setTimeout(() => ac.abort(), ms || (API_DAI.test(u) ? 120000 : 20000));
+  let res, r;
+  try {
+    res = await fetch(u, b === undefined ? {signal: ac.signal} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b), signal: ac.signal});
+    r = await res.json();
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new ApiLoi('Xưởng trả lời quá lâu', true);
+    if (e && e.name === 'SyntaxError') throw new ApiLoi('Xưởng trả lời không đúng dạng' + (res ? ' (mã ' + res.status + ')' : ''), !res);
+    throw new ApiLoi('Không kết nối được xưởng', true);
+  } finally { clearTimeout(tg); }
+  if (!res.ok && (r === null || typeof r !== 'object' || Array.isArray(r) || (r.loi === undefined && r.ok !== false))) throw new ApiLoi('Xưởng báo lỗi (mã ' + res.status + ')');
+  api.last = r; return r;
+}
+let NET_T = 0;
+window.addEventListener('unhandledrejection', e => {          // mọi lỗi gọi hub không ai bắt: báo 1 lần / 10 giây thay vì im lặng
+  e.preventDefault(); console.error(e.reason);
+  if (Date.now() - NET_T < 10000) return; NET_T = Date.now();
+  const r = e.reason;
+  toast(r instanceof ApiLoi ? (r.mang ? 'Mất kết nối với xưởng — thử lại sau vài giây.' : r.message + ' — thử lại sau vài giây.') : 'Có lỗi xảy ra — thử lại sau vài giây.', 'loi');
+});
+// bộ nhớ nhỏ: sessionStorage (bộ lọc Kho video) và localStorage (sản phẩm / số video lần trước)
+const ssGet = k => { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
+const lsGet = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 // chỉ đụng DOM khi chuỗi thật sự đổi (vòng làm mới 3 giây / 60 giây không còn chớp, mất hover)
 const setH = (e, h) => { if (e._h !== h) { e._h = h; e.innerHTML = h; return true; } return false; };
 const setT = (e, t) => { t = String(t); if (e.textContent !== t) e.textContent = t; };
 // ---------- Thông báo nổi: toast(text, 'ok'|'loi'); không truyền loại thì tự nhận lỗi (lời lỗi của API hoặc câu mở đầu "Không…/Chưa…")
 const TOAST_LOI = /^(Lỗi|Không |Chưa |Hãy |Chọn |Dán |Độ dài)/;
-function toast(t, loai) {
+function toast(t, loai, act) {
   t = String(t ?? '');
   if (!loai) loai = (api.last && api.last.ok === false && api.last.loi === t) || TOAST_LOI.test(t) ? 'loi' : 'ok';
   const e = $('#toast');
   e.className = 'toast' + (loai === 'loi' ? ' loi' : '');
   e.innerHTML = `<span class="ti"><svg class="i"><use href="#i-${loai === 'loi' ? 'x' : 'check'}"/></svg></span><span class="tt"></span>`;
   e.querySelector('.tt').textContent = t;
+  if (act && act.nhan) {                                       // toast(text, loai, {nhan, fn, ms}): nút hành động ngay trong thông báo
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn'; b.textContent = act.nhan;
+    b.onclick = ev => { ev.stopPropagation(); clearTimeout(e._t); e.classList.remove('on'); act.fn(); };
+    e.querySelector('.tt').append(' ', b);
+  }
   e.setAttribute('role', loai === 'loi' ? 'alert' : 'status');
   void e.offsetWidth; e.classList.add('on');
-  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), loai === 'loi' ? 4000 : 2600);
+  const ms = act ? (act.ms || 10000) : loai === 'loi' ? Math.max(5000, t.length * 70) : 2600, bat = m => { clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), m); };
+  bat(ms); e.onmouseenter = () => clearTimeout(e._t); e.onmouseleave = () => bat(Math.min(ms, 2500));
 }
 $('#toast').onclick = () => { const e = $('#toast'); clearTimeout(e._t); e.classList.remove('on'); };
 // ---------- Hộp hỏi trong trang (thay confirm/prompt): hoi({tieuDe, noiDung, nutCo, nutKhong, nguyHiem, oNhap, giaTri, goiY}) → true/false, hoặc chuỗi/null khi có oNhap
@@ -1110,7 +1222,7 @@ $('#hoiModal').addEventListener('mousedown', e => { if (e.target.id === 'hoiModa
 // ---------- Quản lý hộp thoại: Esc đóng hộp trên cùng, khoá cuộn trang, trả focus về nơi đã mở
 let OPENER = null;
 document.addEventListener('focusin', e => { if (!e.target.closest || !e.target.closest('.modal')) OPENER = e.target; });
-const MODAL_DONG = {hoiModal: () => HOI && HOI.khong(), modal: () => $('#mDong').onclick(), tmModal: () => $('#tmDong').onclick(), hcModal: () => hcXemDong()};
+const MODAL_DONG = {hoiModal: () => HOI && HOI.khong(), modal: () => $('#mDong').onclick(), tmModal: () => $('#tmDong').onclick(), hcModal: () => hcXemDong(), nhieuModal: () => $('#nhieuDong').onclick()};
 const modalMo = () => [...document.querySelectorAll('.modal.on')];
 const modalObs = new MutationObserver(ds => {
   for (const r of ds) {
@@ -1148,6 +1260,24 @@ const ic = (n, c = '') => `<svg class="i${c ? ' ' + c : ''}"><use href="#i-${n}"
 const rong = (icon, tieu, mo) => `<div class="empty"><div class="ei">${ic(icon)}</div><b>${tieu}</b>${mo ? `<span>${mo}</span>` : ''}</div>`;
 const anhSp = (u, c = '') => u ? `<img class="sp-anh cho ${c}" src="${esc(u)}" alt="" loading="lazy" decoding="async" onload="this.classList.remove('cho')" onerror="anhLoi(this)">` : `<span class="sp-anh rong ${c}">${ic('pkg')}</span>`;
 function anhLoi(i) { const s = document.createElement('span'); s.className = i.className.replace(/\bcho\b/, '') + ' rong'; s.innerHTML = ic('pkg'); i.replaceWith(s); }
+const THIEU_TEN = {'tên gọi ngắn khi đọc': 'tên đọc trong video quá dài (trên 6 từ)'};
+const thieuTxt = a => (a || []).map(t => THIEU_TEN[t] || t).join(', ');
+const thieuHtml = (ma, a) => (a || []).map(t => `<a href="#" class="lnk-thieu" data-ma="${esc(ma)}" data-thieu="${esc(t)}" title="Mở chỗ cần bổ sung">${esc(THIEU_TEN[t] || t)}</a>`).join(', ');
+async function vaoTab(t) {                                     // chuyển tab (có hỏi lưu nếu đang sửa dở); true = đã sang được
+  const cu = document.querySelector('nav button.on'); if (cu && cu.dataset.tab === t) return true;
+  const b = document.querySelector(`nav button[data-tab="${t}"]`); if (!b) return false;
+  b._bao = false; await b.onclick(); return document.querySelector('nav button.on') === b;
+}
+async function moThieu(ma, t) {                                // "Thiếu: …" bấm được: mở đúng sản phẩm, đúng mục, đúng ô
+  if (!ma || !await vaoTab('sp')) return;
+  const o = TQ.find(x => x.ma === ma) || spLam().find(x => x.ma === ma);
+  moChiTiet(ma, t === 'kho cảnh' ? 'kc' : 'tt', o && o.ten);
+  setTimeout(() => { const id = {'sự thật sản phẩm': '#suThat', 'quà tặng': '#qua', 'tên gọi ngắn khi đọc': '#spTenNgan'}[t]; const el = id && $(id); if (el) { el.scrollIntoView({block: 'center', behavior: 'smooth'}); el.focus(); } }, 300);
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a.lnk-thieu'); if (a) { e.preventDefault(); e.stopPropagation(); moThieu(a.dataset.ma, a.dataset.thieu); return; }
+  const g = e.target.closest && e.target.closest('[data-go]'); if (g) { e.preventDefault(); vaoTab(TAB_MA[g.dataset.go] || g.dataset.go); }
+}, true);
 const urlAnh = ma => ma ? ((((typeof ST !== 'undefined' && ST.san_pham) || []).find(p => p.ma === ma) || {}).anh || '/api/anh-sp/' + ma) : '';
 // ---------- DÙNG THÊM CẢNH TỪ KHO KHÁC (kho phụ)
 const KT = {ma: null};
@@ -1174,20 +1304,27 @@ function veKhoThem() {
 // ---------- Ô CHỌN SẢN PHẨM CÓ ẢNH (hiển thị thay cho <select id="spChon">; select ẩn vẫn giữ giá trị + tuỳ chọn)
 const spLam = () => ((typeof ST !== 'undefined' && ST.san_pham) || []).filter(p => p.loai !== 'kho-chung');
 const ddSub = p => { const ng = (p.ten_ngan || '').trim(); return ng && ng.toLowerCase() !== (p.ten || '').trim().toLowerCase() ? esc(ng) + ' · ' : ''; };
-const ddDong = p => `${anhSp(p.anh)}<span class="dd-t"><b>${esc(p.ten)}</b><small>${ddSub(p)}${p.so_canh} cảnh</small>${p.san_sang ? '' : `<small class="thieu">— thiếu: ${esc(p.thieu.join(', '))}</small>`}</span>`;
+const ddDong = p => `${anhSp(p.anh)}<span class="dd-t"><b>${esc(p.ten)}</b><small>${ddSub(p)}${p.so_canh} cảnh</small>${p.san_sang ? '' : `<small class="thieu">— thiếu: ${esc(thieuTxt(p.thieu))}</small>`}</span>`;
 let DD_K = null;
 function hienAnhChon() {
   const v = $('#spChon').value, p = spLam().find(x => x.ma === v), k = p ? [p.ma, p.ten, p.anh, p.so_canh, p.ten_ngan].join('|') : '';
   if (k === DD_K) return; DD_K = k;
   $('#spDd').innerHTML = p ? ddDong({...p, san_sang: true}) : '<span class="dd-t"><b style="color:var(--mute)">Chọn sản phẩm…</b></span>';
 }
+const boDau = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase();
 function ddVe() {
-  const v = $('#spChon').value;
-  $('#spDdLs').innerHTML = spLam().map(p => `<button type="button" role="option" class="dd-it${p.san_sang ? '' : ' off'}${p.ma === v ? ' on' : ''}" data-ma="${esc(p.ma)}" aria-selected="${p.ma === v}"${p.san_sang ? '' : ' aria-disabled="true" title="Chưa đủ hồ sơ — bổ sung ở tab Sản phẩm"'}>${ddDong(p)}</button>`).join('');
+  const v = $('#spChon').value, k = boDau($('#spDdTim').value.trim()), L = $('#spDdLs');
+  const ds = spLam().filter(p => !k || boDau(p.ten + ' ' + (p.ten_ngan || '') + ' ' + p.ma).includes(k));
+  $('#spDdIt').innerHTML = ds.map(p => p.san_sang
+    ? `<button type="button" role="option" class="dd-it${p.ma === v ? ' on' : ''}" data-ma="${esc(p.ma)}" aria-selected="${p.ma === v}">${ddDong(p)}</button>`
+    : `<div role="option" class="dd-it off" aria-disabled="true" aria-selected="false">${ddDong(p)}<button type="button" class="btn ghost sm" data-fix="${esc(p.ma)}">Bổ sung →</button></div>`).join('')
+    || '<div class="note" style="padding:10px 12px">Không thấy sản phẩm nào khớp.</div>';
+  L.querySelectorAll('.dd-it.cur').forEach(x => x.classList.remove('cur'));
+  const cur = L.querySelector('.dd-it.on') || L.querySelector('.dd-it:not(.off)'); if (cur) { cur.classList.add('cur'); cur.scrollIntoView({block: 'nearest'}); }
 }
 function ddMo(mo) {
   const L = $('#spDdLs'), B = $('#spDd');
-  if (mo) { ddVe(); L.classList.remove('hidden'); const cur = L.querySelector('.on') || L.querySelector('.dd-it:not(.off)'); if (cur) { cur.classList.add('cur'); cur.scrollIntoView({block: 'nearest'}); } }
+  if (mo) { $('#spDdTim').value = ''; L.classList.remove('hidden'); ddVe(); setTimeout(() => { if (!L.classList.contains('hidden')) $('#spDdTim').focus(); }, 0); }
   else L.classList.add('hidden');
   B.setAttribute('aria-expanded', mo); $('#dd').classList.toggle('mo', mo);
 }
@@ -1196,15 +1333,21 @@ function ddChon(ma) {
   $('#spChon').value = ma; ddMo(false); $('#spChon').onchange(); $('#spDd').focus();
 }
 $('#spDd').onclick = () => ddMo($('#spDdLs').classList.contains('hidden'));
-$('#spDdLs').onclick = e => { const b = e.target.closest('.dd-it'); if (b) ddChon(b.dataset.ma); };
+$('#spDdTim').oninput = ddVe;
+$('#spDdLs').onclick = e => {
+  const f = e.target.closest('[data-fix]'); if (f) { const p = spLam().find(x => x.ma === f.dataset.fix); ddMo(false); moThieu(f.dataset.fix, p && p.thieu[0]); return; }
+  const b = e.target.closest('button.dd-it'); if (b) ddChon(b.dataset.ma);
+};
 document.addEventListener('mousedown', e => { if (!$('#spDdLs').classList.contains('hidden') && !e.target.closest('#dd')) ddMo(false); });
 $('#dd').addEventListener('keydown', e => {
-  const L = $('#spDdLs'), mo = !L.classList.contains('hidden');
+  const L = $('#spDdLs'), mo = !L.classList.contains('hidden'), go = e.target.id === 'spDdTim';
   if (e.key === 'Escape' && mo) { e.preventDefault(); ddMo(false); $('#spDd').focus(); return; }
   if (e.key === 'Tab' && mo) { ddMo(false); return; }
   if (!['ArrowDown', 'ArrowUp', 'Enter', ' ', 'Home', 'End'].includes(e.key)) return;
+  if (go && (e.key === ' ' || e.key === 'Home' || e.key === 'End')) return;          // đang gõ trong ô tìm: để yên dấu cách / Home / End
   const its = [...L.querySelectorAll('.dd-it:not(.off)')];
-  if (!mo) { if (e.key !== 'Enter' && e.key !== ' ') { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ddMo(true); } return; } return; }
+  if (!mo) { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); ddMo(true); } return; }
+  if (e.target.closest('[data-fix]') && (e.key === 'Enter' || e.key === ' ')) return;   // nút "Bổ sung →" tự xử lý
   e.preventDefault(); if (!its.length) return;
   let i = its.findIndex(x => x.classList.contains('cur'));
   if (e.key === 'Enter' || e.key === ' ') { if (i >= 0) ddChon(its[i].dataset.ma); return; }
@@ -1341,7 +1484,7 @@ function pmBadge(n) {
   n = n || 0;
   const t = $('#pmTabN'); t.textContent = n; t.classList.toggle('hidden', !n);
   const b = $('#pmThongBao');
-  b.innerHTML = n ? `${ic('info')}Có <b>${n}</b> đề bài AI có bản mặc định mới. Chưa có gì tự đổi — video vẫn làm theo bản của anh. <a href="#" id="pmThongBaoMo">Xem ở Prompt AI</a>` : '';
+  b.innerHTML = n ? `${ic('info')}Có <b>${n}</b> đề bài AI có bản mặc định mới. Chưa có gì tự đổi — video vẫn làm theo bản của anh. <a href="#" id="pmThongBaoMo">Xem ở Đề bài AI</a>` : '';
   b.classList.toggle('hidden', !n);
   const a = $('#pmThongBaoMo'); if (a) a.onclick = e => { e.preventDefault(); moTab('prompt-ai', false); };
 }
@@ -1480,10 +1623,30 @@ const spSnap = () => JSON.stringify(SP_IDS.map(i => { const e = $(i); return e.t
 const guDirty = () => GU_GOC !== null && $('#soGu').value !== GU_GOC;
 const spDirty = () => SP_GOC !== null && spSnap() !== SP_GOC;
 const coDirty = () => guDirty() || spDirty() || pmDirty();
+function banVe() {                          // pill "Chưa lưu" của các form có nút Lưu riêng (Cài đặt AI, tự duyệt, tự động giữ kho)
+  [['#cdChuaLuu', CD_BAN], ['#tdyChuaLuu', TDY_BAN], ['#tdChuaLuu', TD_BAN]].forEach(([i, d]) => $(i).classList.toggle('hidden', !d));
+}
+function dirtyThanh() {                     // thanh "Có thay đổi chưa lưu" cho Chi tiết sản phẩm / Sổ gu / Đề bài AI (chỉ ở đúng tab đó)
+  const t = tabHien(); let d = false;
+  if (t === 'gu') d = guDirty(); else if (t === 'sp') d = SPV.xem === 'ct' && spDirty(); else if (t === 'pm') d = pmDirty();
+  $('#dirtyBar').classList.toggle('hidden', !d);
+}
+const LUU_NUT = {sx: '#btnLuuTd', kho: '#btnTdy', sp: '#btnLuuSp', gu: '#btnLuuGu', pm: '#pmLuu', cd: '#btnLuuCd'};
+function luuTabHien() {                     // bấm nút Lưu đang thấy và dùng được của tab hiện tại
+  const b = $(LUU_NUT[tabHien()] || '#khong-co'); if (b && !b.disabled && b.offsetParent !== null) { b.click(); return true; } return false;
+}
+$('#dirtyLuu').onclick = luuTabHien;
+$('#dirtyHuy').onclick = () => { const t = tabHien(); if (t === 'gu') { $('#soGu').value = GU_GOC; chuaVe(); } else if (t === 'sp') { SP_MA = ''; taiSp(); } else if (t === 'pm') $('#pmHuy').click(); };
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || String(e.key).toLowerCase() !== 's') return;
+  e.preventDefault();                       // không để trình duyệt mở hộp "Lưu trang"
+  if (!modalMo().length) luuTabHien();
+});
 function chuaVe() {
   const g = guDirty(), s = spDirty(), p = pmDirty();
   $('#guChuaLuu').classList.toggle('hidden', !g); $('#spChuaLuu').classList.toggle('hidden', !s);
   [['gu', g], ['sp', s], ['pm', p]].forEach(([t, d]) => { const b = document.querySelector(`nav button[data-tab="${t}"]`); if (b) b.classList.toggle('chua', d); });
+  dirtyThanh(); banVe();
 }
 $('#soGu').addEventListener('input', chuaVe);
 SP_IDS.forEach(i => { $(i).addEventListener('input', chuaVe); $(i).addEventListener('change', chuaVe); });
@@ -1517,6 +1680,8 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = async () => {
   if (b.dataset.tab === 'gu') taiGu();
   if (b.dataset.tab === 'pm') taiPm();
   if (b.dataset.tab === 'cd') taiCd();
+  if (b.dataset.tab === 'sx') { taiLo().catch(() => {}); taiTuDong().catch(() => {}); }
+  cnNgay(); chuaVe();
 });
 
 function mau(l) {
@@ -1548,7 +1713,7 @@ let TDY_BAN = false, CD_BAN = false, ST_FORM = false;
 async function taiTdy(ep) {
   try { await stSan(); } catch (e) { return; }
   if (TDY_BAN && !ep) return;
-  const t = ST.tu_duyet || {}; TDY_BAN = false;
+  const t = ST.tu_duyet || {}; TDY_BAN = false; banVe();
   $('#tdyBat').checked = !!t.bat; $('#tdyDat').value = t.dat_tu ?? 7; $('#tdyBo').value = t.bo_duoi ?? 0;
   ['#tdyBat', '#tdyDat', '#tdyBo', '#btnTdy'].forEach(i => $(i).disabled = false);
 }
@@ -1556,48 +1721,84 @@ function dienTuST() {                    // lần đầu có ST: điền các ô
   if (!ST_FORM) { ST_FORM = true; taiTdy(); }
   if (!$('#tkChuyen')._ok) { $('#tkChuyen')._ok = true; $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; }
 }
-['#tdyBat', '#tdyDat', '#tdyBo'].forEach(i => { $(i).addEventListener('input', () => { TDY_BAN = true; }); $(i).addEventListener('change', () => { TDY_BAN = true; }); });
-['#cdModel', '#cdEffort', '#cdPer'].forEach(i => $(i).addEventListener('change', () => { CD_BAN = true; }));
-async function capNhat() {
-  ST = await api('/api/trang-thai');
+['#tdyBat', '#tdyDat', '#tdyBo'].forEach(i => { $(i).addEventListener('input', () => { TDY_BAN = true; banVe(); }); $(i).addEventListener('change', () => { TDY_BAN = true; banVe(); }); });
+['#cdModel', '#cdEffort', '#cdPer'].forEach(i => $(i).addEventListener('change', () => { CD_BAN = true; banVe(); }));
+let CN_P = null, CN_LAI = false, CN_LOI = false, CN_T = null, LO_TRUOC = null, LO_XONG = {}, KHO_YC = null;
+function mangLoi(loi) {                       // chấm đầu trang đỏ + "Mất kết nối" khi không hỏi được xưởng; hết lỗi thì tự xoá
+  CN_LOI = loi; const c = document.querySelector('.hdr-chip'); c.classList.toggle('bad', loi); c.querySelector('.dot').classList.toggle('bad', loi);
+  if (loi) setT($('#hdrSub'), 'Mất kết nối — đang thử lại…');
+}
+function capNhat() {                          // một lần một: gọi khi đang chờ thì hỏi lại ngay sau khi xong (số mới nhất)
+  if (CN_P) { CN_LAI = true; return CN_P; }
+  CN_P = capNhatThat().finally(() => { CN_P = null; if (CN_LAI) { CN_LAI = false; capNhat().catch(() => {}); } });
+  return CN_P;
+}
+function tabHien() { const b = document.querySelector('nav button.on'); return b ? b.dataset.tab : ''; }
+function cnKhoang() {                         // 3 giây khi tab Sản xuất đang mở và có lô chạy/chờ · 15 giây khi rảnh · 30 giây ở tab khác · 5 giây khi đang mất kết nối
+  if (CN_LOI) return 5000;
+  const ban = ST.dang_chay || (ST.cac_lo || []).some(x => x.dang_chay) || (ST.hang_cho || []).length > 0;
+  return tabHien() === 'sx' ? (ban ? 3000 : 15000) : 30000;
+}
+function cnLich() { clearTimeout(CN_T); CN_T = setTimeout(async () => { if (!document.hidden) { try { await capNhat(); } catch (e) {} } cnLich(); }, cnKhoang()); }
+function cnNgay() { capNhat().catch(() => {}); cnLich(); }       // hỏi ngay (đổi tab / quay lại cửa sổ) rồi tính lại nhịp
+document.addEventListener('visibilitychange', () => { if (!document.hidden) cnNgay(); });
+function uocTinh() {                          // chỉ tính tại chỗ từ số đã có — gõ số video không gọi xưởng
+  const n = +$('#soVideo').value || 0, g = ST.video_moi_giong; if (!g) return;
+  setT($('#uocTinh'), `Ước tính: khoảng ${Math.max(1, Math.round(n * 2.8))} phút · ${Math.ceil(n / g)} lời đọc × ${g} đạo diễn. Có thể tắt màn hình, máy vẫn làm.`);
+}
+function duyetNgay() {                        // "Duyệt ngay →": mở Kho video, ngày hôm nay, lọc "chưa đánh giá"
+  KHO_YC = {loc: 'chua', ngay: new Date().toLocaleDateString('sv')};
+  const dangO = tabHien() === 'kho';
+  vaoTab('kho').then(ok => { if (ok && dangO) taiNgay(); });
+}
+function loXong() {                           // vừa hết lô (đang chạy → không chạy): báo số video + đường tắt duyệt
+  const n = Object.values(LO_XONG).reduce((a, x) => a + x, 0); LO_XONG = {};
+  if (n > 0) toast(`Lô xong: ${n} video.`, 'ok', {nhan: 'Duyệt ngay →', fn: duyetNgay, ms: 12000});
+}
+async function capNhatThat() {
+  let r;
+  try { r = await api('/api/trang-thai'); } catch (e) { mangLoi(true); return; }
+  ST = r; mangLoi(false);
   pmBadge(ST.prompt_moi); dienTuST();
   const sel = $('#spChon');
   if (!sel.options.length) {
-    ST.san_pham.filter(p => p.loai !== 'kho-chung').forEach(p => { const o = new Option(`${p.ten} (${p.so_canh} cảnh)${p.san_sang ? '' : ' — thiếu: ' + p.thieu.join(', ')}`, p.ma); o.disabled = !p.san_sang; sel.add(o); });
-    const tot = ST.san_pham.find(p => p.san_sang && p.ma === 'tc01') || ST.san_pham.find(p => p.san_sang); if (tot) sel.value = tot.ma;
+    ST.san_pham.filter(p => p.loai !== 'kho-chung').forEach(p => { const o = new Option(`${p.ten} (${p.so_canh} cảnh)${p.san_sang ? '' : ' — thiếu: ' + thieuTxt(p.thieu)}`, p.ma); o.disabled = !p.san_sang; sel.add(o); });
+    const nho = lsGet('xv.sx.sp');       // nhớ sản phẩm lần trước (còn sẵn sàng thì chọn lại), không thì sản phẩm sẵn sàng đầu tiên
+    const tot = ST.san_pham.find(p => p.san_sang && p.ma === nho) || ST.san_pham.find(p => p.san_sang); if (tot) sel.value = tot.ma;
     DD_K = null; DUR.ma = null;
   }
   if (!$('#spSua').options.length) { ST.san_pham.forEach(p => $('#spSua').add(new Option(p.ten, p.ma))); hienAnhSua(); }
   hienAnhChon(); veKhoThem(); durVe(sel.value);
   const dangLo = (ST.cac_lo || []).filter(x => x.dang_chay), chay = ST.dang_chay;
   const td = dangLo.length > 1 ? {xong: dangLo.reduce((a, x) => a + x.tien_do.xong, 0), tong: dangLo.reduce((a, x) => a + (x.tien_do.tong || x.so_video || 0), 0), da_xong: false, het_han_muc: null} : ST.tien_do;
-  // Nhiều lô chạy cùng lúc: nút "Bắt đầu làm" LUÔN dùng được (chỉ khoá khi chính sản phẩm đang chọn đã chạy/đang chờ); "Dừng" = dừng tất cả
+  if (chay) { if (dangLo.length) dangLo.forEach(x => { LO_XONG[x.ma] = Math.max(LO_XONG[x.ma] || 0, x.tien_do.xong); }); else LO_XONG._ = Math.max(LO_XONG._ || 0, td.xong || 0); }
+  if (LO_TRUOC === true && !chay) loXong();
+  LO_TRUOC = !!chay;
+  // Nhiều lô chạy cùng lúc: nút "Bắt đầu làm" LUÔN dùng được (chỉ khoá khi chính sản phẩm đang chọn đã chạy/đang chờ); mỗi lô có nút Dừng riêng, "Dừng tất cả" chỉ hiện khi có từ 2 lô
   $('#btnChay').classList.toggle('hidden', chay && !dangLo.length);
   $('#btnChay').disabled = dangLo.some(x => x.ma === sel.value) || (ST.hang_cho || []).some(x => x.ma === sel.value);
-  $('#btnDung').classList.toggle('hidden', !chay || ST.chay_ngoai_app);
+  $('#btnDung').classList.toggle('hidden', !(dangLo.length > 1) || ST.chay_ngoai_app);
   const pct = td.tong ? Math.round(100 * td.xong / td.tong) : 0;
   const bw = (chay ? Math.max(4, pct) : (td.da_xong ? 100 : pct)) + '%'; if ($('#barFill').style.width !== bw) $('#barFill').style.width = bw;
   setT($('#barText'), chay ? `Đang làm${dangLo.length > 1 ? ' ' + dangLo.length + ' lô' : ''}: ${td.xong}/${td.tong} video xong${ST.chay_ngoai_app ? ' (đang chạy từ cửa sổ lệnh)' : ''}…`
     : td.da_xong ? `Lô gần nhất xong: ${td.xong}/${td.tong} video.` : (td.tong ? `Lô gần nhất dừng ở ${td.xong}/${td.tong}.` : 'Chưa chạy.'));
   veCacLo(dangLo);
   setH($('#trangThai'), td.het_han_muc && !chay
-    ? `<div class="errbox">${ic('alert')} Hết hạn mức Claude. Vào ⚙️ Cài đặt → Đăng nhập / Đổi tài khoản, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '');
+    ? `<div class="errbox">${ic('alert')} Hết hạn mức Claude. Vào <a href="#" data-go="cd">Cài đặt → Đăng nhập / Đổi tài khoản</a>, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '');
   const lg = $('#log'), dinh = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
   if (setH(lg, (ST.nhat_ky.length ? ST.nhat_ky : ['(chưa có nhật ký)']).map(l => `<div class="${mau(l)}">${esc(l)}</div>`).join('')) && dinh) lg.scrollTop = lg.scrollHeight;
   setT($('#stLuot'), ST.token.luot); setT($('#stVideo'), ST.token.video);
+  const cd = ST.cho_duyet, kn = $('#khoTabN');                  // video chưa duyệt: chấm số ở tab Kho video + ô "chờ anh duyệt"
+  setT($('#stChoDuyet'), cd == null ? '–' : cd);
+  if (cd) { setT(kn, cd > 99 ? '99+' : cd); kn.classList.remove('hidden'); } else kn.classList.add('hidden');
   setT($('#stKyTu'), (ST.token.ky_tu || 0).toLocaleString('vi-VN'));
   setT($('#stMoc'), ST.token.moc && ST.token.moc !== '00:00' ? '(từ ' + ST.token.moc + ')' : '');
   setT($('#stUsd'), ST.token.luot ? `Quy đổi ≈ ${ST.token.usd} USD (CLI tự tính để so độ hao hạn mức; gói đăng ký không bị trừ tiền)` +
     (ST.token.video ? ` · ≈ ${Math.round(ST.token.token / ST.token.video / 1000)}k token/video` : '') : ''); setT($('#stToken'), ST.token.token > 999999 ? (ST.token.token / 1e6).toFixed(2) + ' tr' : Math.round(ST.token.token / 1000) + ' k');
-  setT($('#hdrSub'), `Ê-kíp AI · ${ST.claude.model === 'opus' ? 'Opus 5.5' : 'Sonnet 5.5'} · suy nghĩ ${({high: 'cao', medium: 'vừa', low: 'thấp'})[ST.claude.effort] || ''}`);
-  const n = +$('#soVideo').value || 0;
-  setT($('#uocTinh'), `Ước tính: khoảng ${Math.max(1, Math.round(n * 2.8))} phút · ${Math.ceil(n / ST.video_moi_giong)} lời đọc × ${ST.video_moi_giong} đạo diễn. Có thể tắt màn hình, máy vẫn làm.`);
+  setT($('#hdrSub'), `Ê-kíp AI · ${ST.claude.model === 'opus' ? 'Opus 5.5' : 'Sonnet 5.5'} · độ kỹ ${({high: 'cao', medium: 'vừa', low: 'thấp'})[ST.claude.effort] || ''}`);
+  uocTinh();
 }
 $('#btnDemLai').onclick = async () => { if (!await hoi({tieuDe: 'Đếm lại từ bây giờ?', noiDung: 'Số "Hôm nay" sẽ về 0 và đếm lại từ lúc này.', nutCo: 'Đếm lại'})) return; await api('/api/dem-lai', {}); toast('Đã đặt lại'); capNhat(); };
-async function demHomNay() { return;
-  const ngay = new Date().toLocaleDateString('sv');
-  const v = await api('/api/video?ngay=' + ngay); $('#stVideo').textContent = v.length;
-}
 function vach(o, nhan) {
   if (!o) return `<div class="note">${nhan}: chưa có số</div>`;
   const qua = o.reset && o.reset * 1000 < Date.now(); const p = qua ? 0 : Math.round((o.pct || 0) * 100);
@@ -1634,7 +1835,7 @@ async function taiTk(moi) {
   if (setH(sel, optH) || !sel._ok || sel.value !== giu) sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
   sel._ok = true; sel.disabled = false;
   if (ST.claude) { $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; $('#tkChuyen')._ok = true; }
-  setH($('#tkChiTiet'), ds.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.'));
+  setH($('#tkChiTiet'), ds.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(min(380px,100%),1fr));gap:14px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.'));
   const mini = (p, nhan) => { const c = p === null ? '' : p >= 90 ? 'var(--red)' : p >= 70 ? '#e0a100' : '';
     return `<div class="lr"><span>${nhan}</span><b style="color:${c}">${p === null ? '—' : p + '%'}</b></div><div class="bar sm"><i style="width:${p || 0}%;${c ? 'background:' + c : ''}"></i></div>`; };
   setH($('#tkBox'), '<div class="sec-h"><h3>Tài khoản Claude</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm">' + ds.map(t => {
@@ -1642,7 +1843,7 @@ async function taiTk(moi) {
     const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
     const het = t.het_den && t.het_den * 1000 > Date.now();
     return `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : t.bi_chan ? '<span class="pill r dot">bị tắt quyền</span>' : het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
-      ${t.dang_nhap ? mini(p, 'Phiên 5 giờ') + mini(w, 'Cả tuần') : '<div class="note" style="font-size:12px">Vào Cài đặt → Đăng nhập</div>'}</div>`; }).join('') + '</div>');
+      ${t.dang_nhap ? mini(p, 'Phiên 5 giờ') + mini(w, 'Cả tuần') : '<div class="note" style="font-size:12px">Vào <a href="#" data-go="cd">Cài đặt → Đăng nhập</a></div>'}</div>`; }).join('') + '</div>');
   document.querySelectorAll('[data-dung]').forEach(b => b.onclick = async () => { await api('/api/cai-dat', {tai_khoan_dung: b.dataset.dung});
     ST.tai_khoan_dung = b.dataset.dung; toast(b.dataset.dung === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản này'); taiTk(); });
   document.querySelectorAll('[data-dn]').forEach(b => b.onclick = async () => { await api('/api/tai-khoan-dang-nhap/' + b.dataset.dn, {});
@@ -1661,72 +1862,213 @@ function theoDoiDangNhap() {        // sau khi mở cửa sổ đăng nhập: ki
 setInterval(() => { if (!document.hidden) taiTk().catch(() => {}); }, 60000);   // tự làm mới số hạn mức mỗi 60 giây
 $('#tkDung').onchange = async () => { await api('/api/cai-dat', {tai_khoan_dung: $('#tkDung').value}); ST.tai_khoan_dung = $('#tkDung').value;
   toast($('#tkDung').value === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản đã chọn'); };
-$('#tkChuyen').onchange = async () => { await api('/api/cai-dat', {tu_chuyen: $('#tkChuyen').checked}); ST.tu_chuyen = $('#tkChuyen').checked; };
+$('#tkChuyen').onchange = async () => {
+  const bat = $('#tkChuyen').checked, r = await api('/api/cai-dat', {tu_chuyen: bat});
+  if (r && r.ok === false) { $('#tkChuyen').checked = !bat; return toast(r.loi || 'Không lưu được', 'loi'); }
+  ST.tu_chuyen = bat; toast(bat ? 'Đã bật tự chuyển tài khoản' : 'Đã tắt tự chuyển tài khoản');
+};
 $('#btnThemTk').onclick = async () => { const ten = await hoi({tieuDe: 'Thêm tài khoản Claude', noiDung: 'Đặt tên để dễ nhận ra (vd. Tài khoản 4).', oNhap: true, goiY: 'Tài khoản 4', nutCo: 'Thêm'}); if (ten === null) return;
   const r = await api('/api/tai-khoan-them', {ten}); if (!r.ok) return toast(r.loi || 'Không thêm được');
   toast('Đã thêm — đang mở cửa sổ đăng nhập cho tài khoản mới'); await taiTk(true);
   await api('/api/tai-khoan-dang-nhap/' + r.ma, {}); theoDoiDangNhap(); };
-$('#soVideo').oninput = capNhat;
+const soChipVe = () => document.querySelectorAll('#soChips [data-so]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.so === String(+$('#soVideo').value))));
+$('#soVideo').oninput = () => { uocTinh(); soChipVe(); const n = Math.round(+$('#soVideo').value); if (n >= 1) lsSet('xv.sx.so', String(Math.min(200, n))); };
+$('#soChips').onclick = e => { const b = e.target.closest('[data-so]'); if (b) { $('#soVideo').value = b.dataset.so; $('#soVideo').oninput(); } };
+$('#soVideo').value = lsGet('xv.sx.so') || 10; soChipVe();
 $('#btnChay').onclick = async () => {
-  const sp = $('#spChon').value, n = +$('#soVideo').value;
+  const sp = $('#spChon').value, o = $('#spChon').selectedOptions[0], n = Math.round(+$('#soVideo').value);
+  if (!sp || !o) return toast('Chọn sản phẩm trước đã anh.');
+  if (o.disabled) return toast('Sản phẩm này chưa đủ hồ sơ — bấm "Bổ sung →" ở ô chọn sản phẩm.', 'loi');
+  if (!(n >= 1) || n > 200) { $('#soVideo').focus(); return toast('Số video phải từ 1 đến 200.', 'loi'); }
+  $('#soVideo').value = n; $('#soVideo').oninput();
   const giay = durLay(); if (!giay) return;
-  if (!await hoi({tieuDe: `Làm ${n} video?`, noiDung: `Sản phẩm: ${$('#spChon').selectedOptions[0].text}\nĐộ dài: ${giay[0]}–${giay[1]} giây`, nutCo: 'Bắt đầu làm'})) return;
+  if (!await hoi({tieuDe: `Làm ${n} video?`, noiDung: `Sản phẩm: ${o.text}\nĐộ dài: ${giay[0]}–${giay[1]} giây`, nutCo: 'Bắt đầu làm'})) return;
   const r = await api('/api/chay', {san_pham: sp, so_video: n, kho_them: khoThemChon(), giay});
   if (r.ok) { const p = spLam().find(x => x.ma === sp); if (p) p.thoi_luong = giay; }
   toast(r.ok ? (r.cho ? `Máy đang bận — đã xếp hàng chờ (thứ ${r.cho}), tự chạy khi có chỗ.` : 'Đã bắt đầu! Theo dõi ở nhật ký bên dưới.') : r.loi); if (r.ok) baoViec('thodung', 'bat-dau'); capNhat();
 };
+// ---- Làm cho nhiều sản phẩm: mỗi sản phẩm một lô riêng
+const NH = {dang: false};
+function nhieuTom() {
+  const ds = [...document.querySelectorAll('#nhieuDs .nhieu-it')].filter(r => r.querySelector('input[type=checkbox]').checked);
+  const so = ds.map(r => Math.round(+r.querySelector('input[type=number]').value)), hop = so.every(x => x >= 1 && x <= 200), tong = hop ? so.reduce((a, x) => a + x, 0) : 0;
+  setT($('#nhieuTom'), !ds.length ? 'Chưa tích sản phẩm nào.' : !hop ? 'Mỗi sản phẩm cần từ 1 đến 200 video.' : `${ds.length} sản phẩm · tổng ${tong} video.`);
+  $('#nhieuChay').disabled = NH.dang || !ds.length || !hop; $('#nhieuChay').textContent = ds.length && hop ? `Bắt đầu ${ds.length} lô (tổng ${tong} video)` : 'Tiếp tục';
+}
+function nhieuMo() {
+  const bat = new Set([...(ST.cac_lo || []).filter(x => x.dang_chay).map(x => x.ma), ...(ST.hang_cho || []).map(x => x.ma)]);
+  const sn = Math.min(200, Math.max(1, Math.round(+$('#soVideo').value) || 10)), ds = spLam().filter(p => p.san_sang);
+  $('#nhieuDs').innerHTML = ds.length ? ds.map(p => `<div class="nhieu-it" data-ma="${esc(p.ma)}"><label>${anhSp(p.anh)}<input type="checkbox" ${bat.has(p.ma) ? 'disabled' : ''} aria-label="Làm video cho ${esc(p.ten)}"><span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.ten)}</b>
+      <small class="note">${bat.has(p.ma) ? 'đang có lô chạy / chờ' : p.so_canh + ' cảnh'}</small></span></label><input type="number" min="1" max="200" value="${sn}" aria-label="Số video của ${esc(p.ten)}"></div>`).join('')
+    : '<div class="note">Chưa có sản phẩm nào đủ hồ sơ để làm video.</div>';
+  nhieuTom(); $('#nhieuModal').classList.add('on');
+}
+$('#btnNhieuSp').onclick = nhieuMo;
+$('#nhieuDong').onclick = () => $('#nhieuModal').classList.remove('on');
+$('#nhieuModal').addEventListener('mousedown', e => { if (e.target.id === 'nhieuModal') $('#nhieuDong').onclick(); });
+$('#nhieuDs').addEventListener('input', nhieuTom); $('#nhieuDs').addEventListener('change', nhieuTom);
+$('#nhieuChay').onclick = async () => {
+  const ds = [...document.querySelectorAll('#nhieuDs .nhieu-it')].filter(r => r.querySelector('input[type=checkbox]').checked).map(r => ({ma: r.dataset.ma, so: Math.round(+r.querySelector('input[type=number]').value)}));
+  const tong = ds.reduce((a, x) => a + x.so, 0); if (!ds.length) return;
+  if (!await hoi({tieuDe: `Bắt đầu ${ds.length} lô (tổng ${tong} video)?`, noiDung: ds.map(x => `• ${(spLam().find(p => p.ma === x.ma) || {}).ten || x.ma}: ${x.so} video`).join('\n') + '\nMáy bận thì lô tự xếp hàng chờ.', nutCo: 'Bắt đầu'})) return;
+  NH.dang = true; nhieuTom(); let ok = 0, cho = 0, video = 0; const loi = [];
+  for (const x of ds) {
+    try { const r = await api('/api/chay', {san_pham: x.ma, so_video: x.so}); if (r.ok) { ok++; video += x.so; if (r.cho) cho++; } else loi.push(`${(spLam().find(p => p.ma === x.ma) || {}).ten || x.ma}: ${r.loi || 'không chạy được'}`); }
+    catch (e) { loi.push(`${(spLam().find(p => p.ma === x.ma) || {}).ten || x.ma}: mất kết nối`); if (e instanceof ApiLoi && e.mang) break; }
+  }
+  NH.dang = false; $('#nhieuModal').classList.remove('on'); capNhat(); if (ok) baoViec('thodung', 'bat-dau');
+  toast(`Đã bắt đầu ${ok}/${ds.length} lô (${video} video)` + (cho ? ` — ${cho} lô xếp hàng chờ` : '') + (loi.length ? '. Chưa chạy: ' + loi.join('; ') : '.'), loi.length ? 'loi' : 'ok');
+};
 $('#btnDung').onclick = async () => { if (await hoi({tieuDe: 'Dừng tất cả lô đang làm?', noiDung: 'Hàng chờ cũng bị xoá. Video đã xong vẫn giữ.', nutCo: 'Dừng tất cả', nutKhong: 'Cứ để chạy', nguyHiem: true})) { await api('/api/dung', {}); toast('Đã dừng.'); capNhat(); } };
 
 // ---------- KHO VIDEO
-let NGAY_XONG = false;
-const ssGet = k => { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } };
-const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
+let NGAY_XONG = false, VMAP = new Map(), SEL = new Set(), VID_CON = false, VID_OFF = 0, VID_TK = 0, VID_BAY = false, SP_LOC = ssGet('xv.sp');
+const VID_TRANG = 60;                       // "Tất cả ngày": mỗi lần lấy 60 video, bấm "Xem thêm" để lấy tiếp
+{ const l = ssGet('xv.loc'), sap = ssGet('xv.sap');            // nhớ bộ lọc trong phiên (sessionStorage)
+  if (l && [...$('#locChon').options].some(o => o.value === l)) $('#locChon').value = l;
+  if (sap && [...$('#sapChon').options].some(o => o.value === sap)) $('#sapChon').value = sap; }
 async function taiNgay() {
-  const ds = await api('/api/ngay'); const s = $('#ngayChon'); const cu = s.value; s.innerHTML = '';
+  let ds = await api('/api/ngay?dem=1');         // [{ngay, so}]: có sẵn số video từng ngày → chọn ngày mặc định không cần gọi thêm
+  ds = (Array.isArray(ds) ? ds : []).map(d => typeof d === 'string' ? {ngay: d, so: null} : d);
+  const s = $('#ngayChon'), cu = s.value, co = k => ds.some(d => d.ngay === k); s.innerHTML = '';
   s.add(new Option('Tất cả ngày', 'tat-ca'));
-  ds.forEach(d => s.add(new Option(d.split('-').reverse().join('/'), d)));
+  ds.forEach(d => s.add(new Option(d.ngay.split('-').reverse().join('/') + (d.so != null ? ` (${d.so})` : ''), d.ngay)));
   let pick = cu;
-  if (!NGAY_XONG) {                      // lần đầu: ngày anh chọn tay (nhớ trong phiên) → không có thì ngày mới nhất CÓ video (hôm nay trống thì lùi dần)
+  if (KHO_YC) {                                  // từ "Lô xong … Duyệt ngay →": ngày hôm nay + chưa đánh giá
+    const y = KHO_YC; KHO_YC = null; NGAY_XONG = true;
+    pick = co(y.ngay) ? y.ngay : (ds[0] || {ngay: 'tat-ca'}).ngay;
+    $('#locChon').value = y.loc; ssSet('xv.loc', y.loc); SP_LOC = ''; ssSet('xv.sp', ''); ssSet('xv.ngay', pick); SEL.clear();
+  } else if (!NGAY_XONG) {                       // lần đầu: ngày anh chọn tay (nhớ trong phiên) → không có thì ngày mới nhất CÓ video
     NGAY_XONG = true; const nho = ssGet('xv.ngay');
-    if (nho && (nho === 'tat-ca' || ds.includes(nho))) pick = nho;
-    else {
-      pick = ds[0] || 'tat-ca';
-      for (const d of ds.slice(0, 10)) { try { const v = await api('/api/video?ngay=' + encodeURIComponent(d)); if (Array.isArray(v) && v.length) { pick = d; break; } } catch (e) { break; } }
-    }
+    pick = nho && (nho === 'tat-ca' || co(nho)) ? nho : (ds.find(d => d.so > 0) || ds[0] || {ngay: 'tat-ca'}).ngay;
   }
-  s.value = [...s.options].some(o => o.value === pick) ? pick : (ds[0] || 'tat-ca'); taiVideo();
+  s.value = [...s.options].some(o => o.value === pick) ? pick : ((ds[0] || {}).ngay || 'tat-ca'); taiVideo();
 }
-async function taiVideo() {
-  if (!VIDS.length) $('#vids').innerHTML = '<div class="vskel"><div class="skel"></div><div style="padding:14px;display:grid;gap:8px"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:12px;width:45%"></div></div></div>'.repeat(5);
-  VIDS = await api('/api/video?ngay=' + $('#ngayChon').value); veVideo();
+async function taiVideo(them) {
+  const tk = ++VID_TK, ngay = $('#ngayChon').value;
+  if (!them && !VIDS.length) $('#vids').innerHTML = '<div class="vskel"><div class="skel"></div><div style="padding:14px;display:grid;gap:8px"><div class="skel" style="height:14px;width:70%"></div><div class="skel" style="height:12px;width:45%"></div></div></div>'.repeat(5);
+  let r;
+  try { r = await api('/api/video?ngay=' + encodeURIComponent(ngay) + (ngay === 'tat-ca' ? `&gioi_han=${VID_TRANG}&offset=${them ? VID_OFF : 0}` : '')); }
+  catch (e) {
+    if (tk === VID_TK && !them) { VIDS = []; VMAP = new Map(); LOC_DS = []; $('#vids').innerHTML = rong('alert', 'Không tải được video', 'Xưởng chưa trả lời — bấm "Tải lại" sau vài giây.'); veChon(); }
+    toast('Không tải được video — thử lại.', 'loi'); return;
+  }
+  if (tk !== VID_TK) return;
+  const ds = Array.isArray(r) ? r : (r.ds || []); VID_CON = !Array.isArray(r) && !!r.con_nua;
+  if (them) { const co = new Set(VIDS.map(v => v.file)); VIDS = VIDS.concat(ds.filter(v => !co.has(v.file))); VID_OFF += ds.length; }
+  else { VIDS = ds; VID_OFF = ds.length; }
+  VMAP = new Map(VIDS.map(v => [v.file, v]));         // tra theo tên file (không còn indexOf từng thẻ)
+  SEL = new Set([...SEL].filter(f => VMAP.has(f)));
+  veVideo();
 }
-let LOC_DS = [];                          // danh sách đang hiện trên lưới (đã lọc) — nút ‹ › trong cửa sổ xem đi theo danh sách này
-function veVideo() {
-  const loc = $('#locChon').value;
-  const ds = LOC_DS = VIDS.filter(v => !loc || (loc === 'chua' ? !v.danh_gia.ket_qua : v.danh_gia.ket_qua === loc));
-  $('#vids').innerHTML = ds.length ? ds.map((v, i) => {
-    const dg = v.danh_gia.ket_qua; const diem = v.diem ? `<span class="pill score">${ic('star', 'f')} ${v.diem}/10</span>` : '';
-    return `<div class="vid ${dg || ''}" data-f="${esc(v.file)}">
-      <div class="thumb cho" data-i="${VIDS.indexOf(v)}" tabindex="0" role="button" aria-label="Xem video ${esc(v.file)}">${v.bia ? `<img src="${v.bia}" alt="" loading="lazy" decoding="async"${i >= 6 ? ' fetchpriority="low"' : ''} onload="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')">` : `<video src="${v.url}#t=1.2" preload="metadata" muted onloadeddata="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')"></video>`}<div class="play"><span>${ic('play', 'f')}</span></div>${diem}</div>
-      <div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
+async function xemThem() {
+  if (!VID_CON || VID_BAY) return; VID_BAY = true; $('#btnXemThem').disabled = true;
+  try { await taiVideo(true); } finally { VID_BAY = false; $('#btnXemThem').disabled = false; }
+}
+let LOC_DS = [];                          // danh sách đang hiện trên lưới (đã lọc, đã sắp xếp) — nút ‹ › trong cửa sổ xem đi theo danh sách này
+const tenSp = c => ((ST.san_pham || []).find(p => p.ma === c) || {}).ten || String(c).toUpperCase();
+function veBoLoc() {                      // ô Sản phẩm (từ video đã tải) + số lượng ở từng mục lọc
+  const dem = {}; VIDS.forEach(v => { dem[v.san_pham] = (dem[v.san_pham] || 0) + 1; });
+  const ma = Object.keys(dem); if (SP_LOC && !ma.includes(SP_LOC)) ma.push(SP_LOC);
+  ma.sort((a, b) => tenSp(a).localeCompare(tenSp(b), 'vi')); const plus = VID_CON ? '+' : '';
+  setH($('#spLoc'), `<option value="">Tất cả sản phẩm (${VIDS.length}${plus})</option>` + ma.map(c => `<option value="${esc(c)}">${esc(tenSp(c))} (${dem[c] || 0}${plus})</option>`).join(''));
+  $('#spLoc').value = SP_LOC;
+  const goc = VIDS.filter(v => !SP_LOC || v.san_pham === SP_LOC), d = k => goc.filter(v => (v.danh_gia.ket_qua || '') === k).length;
+  const n = {'': goc.length, chua: d(''), dat: d('dat'), kem: d('kem'), bo: d('bo')}, T = {'': 'Tất cả', chua: 'Chưa đánh giá', dat: 'Anh ưng', kem: 'Không ưng · vẫn đăng', bo: 'Anh bỏ'};
+  [...$('#locChon').options].forEach(o => { const t = `${T[o.value]} (${n[o.value]}${plus})`; if (o.textContent !== t) o.textContent = t; });
+}
+function locDs() {
+  const loc = $('#locChon').value, sap = $('#sapChon').value;
+  let ds = VIDS.filter(v => (!SP_LOC || v.san_pham === SP_LOC) && (!loc || (loc === 'chua' ? !v.danh_gia.ket_qua : v.danh_gia.ket_qua === loc)));
+  if (sap !== 'moi') {
+    const d = v => { const x = parseFloat(String(v.diem).replace(',', '.')); return isNaN(x) ? null : x; };
+    ds = ds.slice().sort((a, b) => { const x = d(a), y = d(b); if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1; return sap === 'cao' ? y - x : x - y; });
+  }
+  return ds;
+}
+function infoHtml(v) {
+  const dg = v.danh_gia.ket_qua;
+  return `<div class="info"><div class="t">${esc(v.san_pham.toUpperCase())} · ${esc(v.goc)}</div>
         <div class="m">${esc(v.gu ? 'Đạo diễn: ' + v.gu.replaceAll('_', ' ') : '')} ${v.luc ? '· ' + ($('#ngayChon').value === 'tat-ca' && v.ngay ? v.ngay.split('-').reverse().slice(0, 2).join('/') + ' ' : '') + v.luc : ''}</div>
         ${dg ? `<span class="pill ${dg === 'dat' ? 'g' : dg === 'kem' ? 'y' : 'r'}">${v.danh_gia.tu_dong ? ic('bot') : ic(dg === 'dat' ? 'check' : dg === 'kem' ? 'down' : 'x')}${dg === 'dat' ? (v.danh_gia.tu_dong ? 'Tự duyệt' : 'Anh ưng') : dg === 'kem' ? 'Không ưng · vẫn đăng' : (v.danh_gia.tu_dong ? 'Tự bỏ' : 'Anh bỏ')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'da_dang' ? `<span class="pill b">${ic('send')} Đã đăng ${esc(v.dang.kenh || '')}</span>` : ''}
         ${v.dang && v.dang.trang_thai === 'loi' ? `<span class="pill r" title="${esc(v.dang.ly_do || '')}">${ic('alert')} Lỗi đăng: ${esc((v.dang.ly_do || '').slice(0, 40))}</span>` : ''}
-        <div class="act"><button class="b-ok" data-dg="dat" title="Anh ưng: video được đăng">${ic('up')}Ưng</button><button class="b-kem" data-dg="kem" title="Không ưng nhưng vẫn đăng, báo AI đây là video yếu">${ic('down')}Không ưng</button></div></div></div>`;
-  }).join('') : rong('film', 'Chưa có video ngày này', 'Video làm xong sẽ hiện ở đây để anh duyệt.');
-  document.querySelectorAll('.thumb').forEach(t => { t.onclick = () => { OPENER = t; moVideo(VIDS[+t.dataset.i]); };
-    t.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.onclick(); } }; });
-  document.querySelectorAll('.vid').forEach(c => {
-    const v = VIDS.find(x => x.file === c.dataset.f);
-    c.querySelectorAll('[data-dg]').forEach(b => b.onclick = () => danhGia(v, b.dataset.dg, ''));
-  });
+        <div class="act"><button class="b-ok" data-dg="dat" aria-pressed="${dg === 'dat'}" title="Anh ưng: video được đăng">${ic('up')}Ưng</button><button class="b-kem" data-dg="kem" aria-pressed="${dg === 'kem'}" title="Không ưng nhưng vẫn đăng, báo AI đây là video yếu">${ic('down')}Không ưng</button></div></div>`;
 }
-$('#ngayChon').onchange = () => { ssSet('xv.ngay', $('#ngayChon').value); taiVideo(); }; $('#locChon').onchange = veVideo; $('#btnTaiLai').onclick = taiVideo;
+function theHtml(v, i) {
+  const dg = v.danh_gia.ket_qua, diem = v.diem ? `<span class="pill score">${ic('star', 'f')} ${v.diem}/10</span>` : '', chon = SEL.has(v.file);
+  return `<div class="vid ${dg || ''}${chon ? ' chon' : ''}" data-f="${esc(v.file)}">
+      <label class="vsel" title="Chọn video này"><input type="checkbox" data-sel aria-label="Chọn video ${esc(v.file)}"${chon ? ' checked' : ''}></label>
+      <div class="thumb cho" tabindex="0" role="button" aria-label="Xem video ${esc(v.file)}">${v.bia ? `<img src="${v.bia}" alt="" loading="lazy" decoding="async"${i >= 6 ? ' fetchpriority="low"' : ''} onload="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')">` : `<video src="${v.url}#t=1.2" preload="metadata" muted onloadeddata="this.parentNode.classList.remove('cho')" onerror="this.parentNode.classList.remove('cho')"></video>`}<div class="play"><span>${ic('play', 'f')}</span></div>${diem}</div>
+      ${infoHtml(v)}</div>`;
+}
+function veVideo() {
+  veBoLoc();
+  const ds = LOC_DS = locDs();
+  $('#vids').innerHTML = ds.length ? ds.map(theHtml).join('') : (VIDS.length ? rong('film', 'Không có video khớp bộ lọc', 'Đổi Sản phẩm hoặc Lọc ở phía trên.') : rong('film', 'Chưa có video ngày này', 'Video làm xong sẽ hiện ở đây để anh duyệt.'));
+  veChon();
+}
+function suaThe(v) {                      // đánh giá xong: chỉ sửa đúng thẻ đó (video không nhấp nháy, không mất chỗ cuộn); lọc đang bật loại nó ra thì gỡ thẻ
+  const c = [...document.querySelectorAll('#vids .vid')].find(x => x.dataset.f === v.file), ds = LOC_DS = locDs();
+  veBoLoc();
+  if (!ds.includes(v)) { SEL.delete(v.file); if (c) c.remove(); if (!ds.length) return veVideo(); }
+  else if (c) { c.className = 'vid ' + (v.danh_gia.ket_qua || '') + (SEL.has(v.file) ? ' chon' : ''); c.querySelector('.info').outerHTML = infoHtml(v); }
+  veChon();
+}
+function veChon() {                       // thanh "Đã chọn N video" + đếm + nút xem thêm
+  const n = SEL.size;
+  $('#selBar').classList.toggle('hidden', !n); setT($('#selN'), n);
+  setT($('#vidsDem'), LOC_DS.length ? `Đang hiện ${LOC_DS.length} video` : '');
+  const het = LOC_DS.length > 0 && LOC_DS.every(v => SEL.has(v.file));
+  setT($('#btnChonHet'), het ? 'Bỏ chọn tất cả đang hiện' : 'Chọn tất cả đang hiện'); $('#btnChonHet').disabled = !LOC_DS.length;
+  $('#vidsThem').classList.toggle('hidden', !VID_CON);
+  document.querySelectorAll('#vids .vid').forEach(c => { const on = SEL.has(c.dataset.f); c.classList.toggle('chon', on); const i = c.querySelector('[data-sel]'); if (i && i.checked !== on) i.checked = on; });
+}
+$('#vids').addEventListener('click', e => {
+  const c = e.target.closest('.vid'); if (!c) return; const v = VMAP.get(c.dataset.f); if (!v) return;
+  const b = e.target.closest('[data-dg]'); if (b) { danhGia(v, b.dataset.dg, v.danh_gia.gop_y || ''); return; }      // giữ nguyên góp ý đã có (không xoá)
+  if (e.target.closest('.vsel')) return;
+  const t = e.target.closest('.thumb'); if (t) { OPENER = t; moVideo(v); }
+});
+$('#vids').addEventListener('change', e => {
+  const i = e.target.closest('[data-sel]'); if (!i) return; const f = i.closest('.vid').dataset.f;
+  if (i.checked) SEL.add(f); else SEL.delete(f); veChon();
+});
+$('#vids').addEventListener('keydown', e => { const t = e.target.closest && e.target.closest('.thumb'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); } });
+$('#btnChonHet').onclick = () => { const het = LOC_DS.every(v => SEL.has(v.file)); LOC_DS.forEach(v => het ? SEL.delete(v.file) : SEL.add(v.file)); veChon(); };
+$('#btnSelBo').onclick = () => { SEL.clear(); veChon(); };
+$('#btnXemThem').onclick = xemThem;
+async function chonDanhGia(kq) {          // Ưng / Không ưng cho mọi video đang chọn (gọi /api/danh-gia từng video, giữ góp ý cũ)
+  const ds = [...SEL].map(f => VMAP.get(f)).filter(Boolean); if (!ds.length) return;
+  const ung = kq === 'dat';
+  if (!await hoi({tieuDe: ung ? `Ưng ${ds.length} video?` : `Không ưng ${ds.length} video?`, noiDung: ung ? 'Video sẽ được đăng.' : 'Video vẫn được đăng; AI được báo đây là video yếu.', nutCo: ung ? 'Ưng tất cả' : 'Không ưng tất cả'})) return;
+  const nut = ['#btnSelOk', '#btnSelKem', '#btnSelBo'].map(x => $(x)); nut.forEach(b => b.disabled = true);
+  let ok = 0, loi = 0;
+  try {
+    for (const v of ds) {
+      try {
+        const gy = v.danh_gia.gop_y || '', r = await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy, loi_gk: kq === 'kem' ? (v.loi_gk || '') : ''});
+        if (r && r.ok === false) { loi++; continue; }
+        v.danh_gia = {ket_qua: kq, gop_y: gy}; SEL.delete(v.file); ok++;
+      } catch (e) { loi++; if (e instanceof ApiLoi && e.mang) break; }       // mất kết nối: dừng, phần còn lại vẫn đang được chọn
+    }
+  } finally { nut.forEach(b => b.disabled = false); }
+  veVideo(); if (ok) baoViec('giamkhao', ung ? 'ung' : 'kem');
+  toast(`${ung ? 'Đã ưng' : 'Đã ghi không ưng'} ${ok} video` + (loi ? ` — ${loi} video chưa ghi được, vẫn đang chọn` : '.'), loi ? 'loi' : 'ok');
+}
+$('#btnSelOk').onclick = () => chonDanhGia('dat'); $('#btnSelKem').onclick = () => chonDanhGia('kem');
+$('#ngayChon').onchange = () => { ssSet('xv.ngay', $('#ngayChon').value); taiVideo(); };
+$('#locChon').onchange = () => { ssSet('xv.loc', $('#locChon').value); veVideo(); };
+$('#spLoc').onchange = () => { SP_LOC = $('#spLoc').value; ssSet('xv.sp', SP_LOC); veVideo(); };
+$('#sapChon').onchange = () => { ssSet('xv.sap', $('#sapChon').value); veVideo(); };
+$('#btnTaiLai').onclick = () => taiVideo();
 $('#btnMoThuMuc').onclick = () => api('/api/mo-thu-muc', {ngay: $('#ngayChon').value});
 async function danhGia(v, kq, gy) {
-  await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy, loi_gk: kq === 'kem' ? (v.loi_gk || '') : ''}); v.danh_gia = {ket_qua: kq, gop_y: gy};
-  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : kq === 'kem' ? 'Đã ghi: không ưng — vẫn đăng, đã báo AI' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : kq === 'kem' ? 'kem' : 'bo'); veVideo();
+  const r = await api('/api/danh-gia', {file: v.file, ket_qua: kq, gop_y: gy, loi_gk: kq === 'kem' ? (v.loi_gk || '') : ''});
+  if (r && r.ok === false) { toast(r.loi || 'Không ghi được đánh giá', 'loi'); return false; }
+  v.danh_gia = {ket_qua: kq, gop_y: gy};
+  toast(kq === 'dat' ? 'Đã ghi: anh ưng ✅' : kq === 'kem' ? 'Đã ghi: không ưng — vẫn đăng, đã báo AI' : 'Đã ghi: anh bỏ ❌'); baoViec('giamkhao', kq === 'dat' ? 'ung' : kq === 'kem' ? 'kem' : 'bo'); suaThe(v);
+  return true;
 }
 // Tách góp ý giám khảo thành từng dòng; mốc thời gian (13.2s, 17–22.5s) thành chip bấm để tua video.
 const GK_TIME_RE = /(\d+(?:[.,]\d+)?)(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?\s*s(?![\p{L}\d])/giu;
@@ -1767,14 +2109,18 @@ function moVideo(v) {
     v.dang_bai && `<span class="pill y">${ic('file')} ${esc(v.dang_bai)}</span>`,
     v.lam_lai_tu && `<span class="pill r">${ic('repeat')} làm lại</span>`].filter(Boolean).join('');
   $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<div class="gk-box" style="margin-top:10px"><b>Giám khảo góp ý</b>${gkDanhSach(v.loi_gk)}</div>` : ''}` : '';
-  const i = LOC_DS.findIndex(x => x.file === v.file);
-  setT($('#mVt'), i >= 0 ? `${i + 1} / ${LOC_DS.length}` : '');
-  $('#mTruoc').disabled = i <= 0; $('#mSau').disabled = i < 0 || i >= LOC_DS.length - 1;
+  const i = LOC_DS.findIndex(x => x.file === v.file), kq = v.danh_gia.ket_qua;
+  setT($('#mVt'), i >= 0 ? `${i + 1} / ${LOC_DS.length}${VID_CON ? '+' : ''}` : '');
+  $('#mTruoc').disabled = i <= 0; $('#mSau').disabled = i < 0 || (i >= LOC_DS.length - 1 && !VID_CON);
+  $('#mOk').setAttribute('aria-pressed', String(kq === 'dat')); $('#mNo').setAttribute('aria-pressed', String(kq === 'kem')); $('#mLamLai').setAttribute('aria-pressed', String(kq === 'bo'));
   $('#modal').classList.add('on'); $('#mVideo').play().catch(() => {});
 }
 async function mDi(d) {                    // đi tới video trước/sau trong danh sách đang lọc
   if (!CUR) return;
-  const i = LOC_DS.findIndex(x => x.file === CUR.file), v = LOC_DS[i + d]; if (i < 0 || !v) return;
+  const i = LOC_DS.findIndex(x => x.file === CUR.file); if (i < 0) return;
+  let v = LOC_DS[i + d];
+  if (!v && d > 0 && VID_CON) { await xemThem(); const j = LOC_DS.findIndex(x => x.file === CUR.file); v = LOC_DS[j + d]; }      // hết video đã tải mà còn nữa → tải thêm rồi đi tiếp
+  if (!v) return;
   if ($('#mGop').value.trim() !== (CUR.danh_gia.gop_y || '').trim() && !await hoi({tieuDe: 'Góp ý chưa ghi', noiDung: 'Anh đã gõ góp ý nhưng chưa bấm Ưng / Không ưng. Chuyển video sẽ mất dòng này.', nutCo: 'Bỏ góp ý và chuyển', nutKhong: 'Ở lại', nguyHiem: true})) return;
   moVideo(v);
 }
@@ -1787,13 +2133,21 @@ document.addEventListener('keydown', e => {
 });
 $('#mDong').onclick = () => { $('#mVideo').pause(); $('#modal').classList.remove('on'); };
 $('#modal').onclick = e => { if (e.target.id === 'modal') $('#mDong').onclick(); };
-$('#mCopy').onclick = () => { navigator.clipboard.writeText(CUR.caption); toast('Đã chép caption'); };
+$('#mCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(CUR.caption); toast('Đã chép caption'); }
+  catch (e) {
+    try { const r = document.createRange(); r.selectNodeContents($('#mCap')); const g = getSelection(); g.removeAllRanges(); g.addRange(r); } catch (x) {}       // bôi đen sẵn để anh Ctrl+C
+    toast('Không chép được — bôi đen rồi Ctrl+C', 'loi');
+  }
+};
 $('#mLamLai').onclick = async () => {
   const gy = $('#mGop').value.trim();
   if (!gy && !await hoi({tieuDe: 'Làm lại không có góp ý?', noiDung: 'Chưa ghi góp ý — đạo diễn sẽ tự dựng khác đi.', nutCo: 'Vẫn làm lại', nutKhong: 'Quay lại ghi góp ý'})) return;
-  await api('/api/danh-gia', {file: CUR.file, ket_qua: 'bo', gop_y: gy});
-  const r = await api('/api/lam-lai', {ds: [{file: CUR.duong_dan, gop_y: gy}]});
-  toast(r.ok ? 'Đang làm lại — xem nhật ký ở màn Sản xuất' : r.loi); if (r.ok) $('#mDong').onclick();
+  const v = CUR, r = await api('/api/lam-lai', {ds: [{file: v.duong_dan, gop_y: gy}]});        // làm lại TRƯỚC: chỉ khi nhận việc mới đánh dấu "bỏ"
+  if (!r.ok) return toast(r.loi || 'Chưa làm lại được', 'loi');
+  const d = await api('/api/danh-gia', {file: v.file, ket_qua: 'bo', gop_y: gy});
+  if (d && d.ok !== false) { v.danh_gia = {ket_qua: 'bo', gop_y: gy}; suaThe(v); }
+  toast('Đang làm lại — xem nhật ký ở màn Sản xuất'); $('#mDong').onclick();
 };
 $('#btnLamLaiAll').onclick = async () => {
   const ds = VIDS.filter(v => v.danh_gia.ket_qua === 'bo' && !v.danh_gia.tu_dong).map(v => ({file: v.duong_dan, gop_y: v.danh_gia.gop_y || ''}));
@@ -1805,10 +2159,27 @@ $('#btnTdy').onclick = async () => {
   if ($('#btnTdy').disabled) return;
   const r = await api('/api/tu-duyet', {bat: $('#tdyBat').checked, dat_tu: +$('#tdyDat').value, bo_duoi: +$('#tdyBo').value, ap_dung: true});
   if (!r.ok) { toast(r.loi || 'Lỗi: chưa lưu được tự duyệt', 'loi'); return; }
-  toast(r.tu_duyet.bat ? `Đã lưu — vừa tự duyệt ${r.da_duyet} video` : 'Đã tắt tự duyệt'); ST.tu_duyet = r.tu_duyet; TDY_BAN = false; taiVideo();
+  toast(r.tu_duyet.bat ? `Đã lưu — vừa tự duyệt ${r.da_duyet} video` : 'Đã tắt tự duyệt'); ST.tu_duyet = r.tu_duyet; TDY_BAN = false; banVe(); taiVideo();
 };
-$('#mOk').onclick = () => { danhGia(CUR, 'dat', $('#mGop').value); $('#mDong').onclick(); };
-$('#mNo').onclick = () => { danhGia(CUR, 'kem', $('#mGop').value); $('#mDong').onclick(); };
+let M_BAY = false;
+async function mDanhGia(kq) {             // Ưng / Không ưng trong cửa sổ xem: ghi xong sang luôn video kế tiếp trong danh sách (hết thì đóng)
+  if (M_BAY || !CUR) return; M_BAY = true;
+  try {
+    const i = LOC_DS.findIndex(x => x.file === CUR.file), truoc = new Set(LOC_DS.map(x => x.file));
+    let next = i >= 0 ? LOC_DS[i + 1] : null;                  // tính TRƯỚC khi vẽ lại (lọc "chưa đánh giá" sẽ bỏ video này khỏi danh sách)
+    if (!await danhGia(CUR, kq, $('#mGop').value)) return;
+    if (!next && VID_CON) { await xemThem(); next = LOC_DS.find(x => !truoc.has(x.file)); }
+    if (next) moVideo(next); else { $('#mDong').onclick(); toast('Hết video để duyệt'); }
+  } finally { M_BAY = false; }
+}
+$('#mOk').onclick = () => mDanhGia('dat'); $('#mNo').onclick = () => mDanhGia('kem');
+document.addEventListener('keydown', e => {              // phím tắt: U = Ưng, K = Không ưng (không bắt khi đang gõ chữ)
+  if (e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const k = String(e.key).toLowerCase(); if (k !== 'u' && k !== 'k') return;
+  const ds = modalMo(); if (!ds.length || ds[ds.length - 1].id !== 'modal') return;
+  const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  e.preventDefault(); mDanhGia(k === 'u' ? 'dat' : 'kem');
+});
 
 // ---------- SẢN PHẨM
 $('#btnDocNhan').onclick = async () => {
@@ -1825,7 +2196,7 @@ $('#btnDocNhan').onclick = async () => {
 const SPV = {xem: 'ds', ct: 'tt'};
 let TQ = [];                          // số liệu tổng quan (dùng cho dòng trạng thái ở trang chi tiết)
 function spXem(v) {
-  SPV.xem = v;
+  SPV.xem = v; chuaVe();
   $('#spDs').classList.toggle('hidden', v !== 'ds'); $('#spThem').classList.toggle('hidden', v !== 'them'); $('#spCt').classList.toggle('hidden', v !== 'ct');
   window.scrollTo(0, 0);
 }
@@ -1857,7 +2228,7 @@ function moChiTiet(ma, k, ten) {
 function veDauCt() {
   const ma = $('#spSua').value, p = TQ.find(x => x.ma === ma), o = $('#spSua').selectedOptions[0];
   $('#spTenCt').textContent = (p && p.ten) || (o && o.text) || ma || '';
-  $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng làm video</span>' : `<span class="pill y dot">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`) +
+  $('#spTtCt').innerHTML = !p ? '' : (p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng làm video</span>' : `<span class="pill y dot">Thiếu: ${thieuHtml(p.ma, p.thieu)}</span>`) +
     hcNhan(p.ma) + `<span class="pill">${ic('film')} ${p.video_kho} video gốc</span><span class="pill">${ic('layers')} ${p.so_dung_duoc ?? p.so_canh} cảnh dùng được</span><span class="pill">${ic('video')} ${p.da_lam} video đã làm</span>` +
     (p.ma ? `<span class="pc-code" style="margin:0">${esc(p.ma)}</span>` : '');
 }
@@ -1866,17 +2237,22 @@ document.querySelectorAll('#sp [data-ve]').forEach(b => b.onclick = async () => 
   spXem(b.dataset.ve); if (b.dataset.ve === 'ds') taiTongQuan(); });
 document.querySelectorAll('#spTabs [data-ct]').forEach(b => b.onclick = () => ctMo(b.dataset.ct));
 $('#btnMoThem').onclick = () => spXem('them');
-async function taiTongQuan(moi) {
-  if (!TQ.length && !$('#tqBang').children.length)
-    $('#tqBang').innerHTML = '<div class="pc-skel"><div class="skel" style="aspect-ratio:16/10;border-radius:0"></div><div style="padding:16px;display:grid;gap:10px"><div class="skel" style="height:16px;width:70%"></div><div class="skel" style="height:12px;width:30%"></div><div class="skel" style="height:48px"></div></div></div>'.repeat(4);
-  const ds = await api('/api/tong-quan' + (moi ? '?moi=1' : ''));
-  TQ = ds; if (SPV.xem === 'ct') veDauCt();
-  const sx = ds.filter(p => p.loai !== 'kho-chung');
+const TQF = {tim: '', sx: ssGet('xv.sp.sx') || 'ten', loc: ssGet('xv.sp.loc')};
+const spBanDuoc = p => p.loai !== 'kho-chung';
+function tqXuLy(p) { return (spBanDuoc(p) && !p.san_sang ? 100 + (p.thieu || []).length * 10 : 0) + (p.video_kho > p.mo_ta ? 5 : 0); }
+function veTq() {                          // vẽ lưới sản phẩm theo ô tìm, bộ lọc, cách sắp xếp
+  const ds = TQ, sx = ds.filter(spBanDuoc), k = boDau(TQF.tim.trim());
   $('#tqTom').textContent = `${sx.length} sản phẩm · ${sx.filter(p => p.san_sang).length} sẵn sàng làm video · ${ds.reduce((a, p) => a + p.da_lam, 0)} video đã làm`;
+  let ls = ds.filter(p => (!TQF.loc || (spBanDuoc(p) && (TQF.loc === 'san-sang' ? p.san_sang : !p.san_sang))) && (!k || boDau(p.ten + ' ' + (p.ten_ngan || '') + ' ' + p.ma).includes(k)));
+  const ten = (a, b) => a.ten.localeCompare(b.ten, 'vi');
+  const cmp = {ten, xuly: (a, b) => tqXuLy(b) - tqXuLy(a) || ten(a, b), ton: (a, b) => (spBanDuoc(a) ? a.ton : 1e9) - (spBanDuoc(b) ? b.ton : 1e9) || ten(a, b), lam: (a, b) => b.da_lam - a.da_lam || ten(a, b)}[TQF.sx] || ten;
+  ls = ls.slice().sort(cmp);
+  $('#spSapXep').value = TQF.sx; $('#spTim').value !== TQF.tim && ($('#spTim').value = TQF.tim);
+  document.querySelectorAll('#spLocChips [data-sl]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sl === (TQF.loc || ''))));
   const tt = p => p.loai === 'kho-chung' ? '<span class="pill b dot">Kho cảnh chung</span>' : p.san_sang ? '<span class="pill g dot">Sẵn sàng</span>'
-    : `<span class="pill y dot" title="Thiếu: ${esc((p.thieu || []).join(', '))}">Thiếu: ${esc((p.thieu || []).join(', '))}</span>`;
-  $('#tqBang').innerHTML = !ds.length ? rong('pkg', 'Chưa có sản phẩm nào', 'Bấm "Thêm sản phẩm mới" để bắt đầu.') :
-    ds.map(p => { const pm = p.video_kho ? Math.min(100, Math.round(100 * p.mo_ta / p.video_kho)) : 0, thieu = p.video_kho > p.mo_ta;
+    : `<span class="pill y dot" title="Thiếu: ${esc(thieuTxt(p.thieu))}">Thiếu: ${thieuHtml(p.ma, p.thieu)}</span>`;
+  $('#tqBang').innerHTML = !ds.length ? rong('pkg', 'Chưa có sản phẩm nào', 'Bấm "Thêm sản phẩm mới" để bắt đầu.') : !ls.length ? rong('search', 'Không thấy sản phẩm nào khớp', 'Đổi từ khoá hoặc bộ lọc ở phía trên.') :
+    ls.map(p => { const pm = p.video_kho ? Math.min(100, Math.round(100 * p.mo_ta / p.video_kho)) : 0, thieu = p.video_kho > p.mo_ta;
       return `<div class="pc" data-ma="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Mở ${esc(p.ten)}" role="button" tabindex="0">
       <div class="pc-media">${anhSp(p.anh)}<div class="pc-st">${tt(p)}${hcNhan(p.ma)}</div></div>
       <div class="pc-body">
@@ -1890,14 +2266,24 @@ async function taiTongQuan(moi) {
         <div class="pc-pr"><div class="lr"><span>Đã mô tả cảnh${thieu ? ` · <span style="color:var(--y-ink)">thiếu ${p.video_kho - p.mo_ta}</span>` : ''}</span><b>${p.mo_ta}/${p.video_kho}</b></div>
           <div class="bar sm${thieu ? ' thieu' : ''}"><i style="width:${pm}%"></i></div></div>
         <div class="pc-foot"><button class="btn soft sm" data-sua="${esc(p.ma)}">Mở${ic('right')}</button>
-          <button class="btn ghost sm dz" data-xoa="${esc(p.ma)}" data-ten="${esc(p.ten)}" title="Xoá sản phẩm">${ic('trash')}Xoá</button></div>
+          ${thieu && p.video_kho > 0 ? `<button class="btn ghost sm${HOC_DANG[p.ma] ? ' hidden' : ''}" data-hoc="${esc(p.ma)}" title="Cho máy xem video trong kho và ghi lại từng cảnh">${ic('cap')}Học cảnh</button>` : ''}
+          <button class="btn ghost sm ic-only" data-menu aria-haspopup="menu" aria-expanded="false" aria-label="Thêm thao tác cho ${esc(p.ten)}" title="Thêm">${ic('more')}</button>
+          <div class="pc-pop hidden" role="menu"><button class="btn ghost sm dz" role="menuitem" data-xoa="${esc(p.ma)}" data-ten="${esc(p.ten)}">${ic('trash')}Xoá sản phẩm</button></div></div>
       </div></div>`; }).join('');
   document.querySelectorAll('#tqBang [data-ma]').forEach(r => {
-    r.onclick = e => { if (!e.target.closest('button')) moChiTiet(r.dataset.ma, '', r.dataset.ten); };
+    r.onclick = e => { if (!e.target.closest('button, a')) moChiTiet(r.dataset.ma, '', r.dataset.ten); };
     r.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === r) { e.preventDefault(); moChiTiet(r.dataset.ma, '', r.dataset.ten); } };
   });
-  document.querySelectorAll('[data-sua]').forEach(b => b.onclick = () => moChiTiet(b.dataset.sua, '', b.closest('[data-ma]').dataset.ten));
-  document.querySelectorAll('[data-xoa]').forEach(b => b.onclick = async () => {
+  document.querySelectorAll('#tqBang [data-sua]').forEach(b => b.onclick = () => moChiTiet(b.dataset.sua, '', b.closest('[data-ma]').dataset.ten));
+  document.querySelectorAll('#tqBang [data-menu]').forEach(b => b.onclick = e => {
+    e.stopPropagation(); const pop = b.parentNode.querySelector('.pc-pop'), mo = pop.classList.contains('hidden'); dongMenuSp();
+    if (mo) { pop.classList.remove('hidden'); b.setAttribute('aria-expanded', 'true'); const f = pop.querySelector('button'); if (f) f.focus(); }
+  });
+  document.querySelectorAll('#tqBang [data-hoc]').forEach(b => b.onclick = async () => {
+    b.disabled = true; try { const r = await api('/api/hoc-canh/' + b.dataset.hoc, {}); toast(r.ok ? 'Bắt đầu học cảnh…' : (r.loi || 'Không bắt đầu được'), r.ok ? 'ok' : 'loi'); hcTaiDang(true).catch(() => {}); } finally { b.disabled = false; }
+  });
+  document.querySelectorAll('#tqBang [data-xoa]').forEach(b => b.onclick = async () => {
+    dongMenuSp();
     if (!await hoi({tieuDe: `Xoá sản phẩm "${b.dataset.ten}"?`, noiDung: 'Hồ sơ + kho cảnh đã nạp vào Thùng rác (khôi phục được). Video gốc và video đã làm vẫn giữ.', nutCo: 'Xoá sản phẩm', nguyHiem: true})) return;
     const r = await api('/api/xoa-san-pham/' + b.dataset.xoa, {});
     if (!r.ok) return toast(r.loi);
@@ -1905,6 +2291,19 @@ async function taiTongQuan(moi) {
     [...$('#spSua').options].filter(o => o.value === b.dataset.xoa).forEach(o => o.remove()); $('#spChon').innerHTML = ''; KT.ma = null;
     taiTongQuan(true); capNhat();
   });
+}
+function dongMenuSp() { document.querySelectorAll('#tqBang .pc-pop:not(.hidden)').forEach(p => { p.classList.add('hidden'); const b = p.parentNode.querySelector('[data-menu]'); if (b) b.setAttribute('aria-expanded', 'false'); }); }
+document.addEventListener('click', e => { if (!e.target.closest('.pc-foot')) dongMenuSp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('#tqBang .pc-pop:not(.hidden)')) { const b = document.querySelector('#tqBang .pc-pop:not(.hidden)').parentNode.querySelector('[data-menu]'); dongMenuSp(); if (b) b.focus(); } });
+$('#spTim').oninput = () => { TQF.tim = $('#spTim').value; veTq(); };
+$('#spSapXep').onchange = () => { TQF.sx = $('#spSapXep').value; ssSet('xv.sp.sx', TQF.sx); veTq(); };
+$('#spLocChips').onclick = e => { const b = e.target.closest('[data-sl]'); if (b) { TQF.loc = b.dataset.sl; ssSet('xv.sp.loc', TQF.loc); veTq(); } };
+async function taiTongQuan(moi) {
+  if (!TQ.length && !$('#tqBang').children.length)
+    $('#tqBang').innerHTML = '<div class="pc-skel"><div class="skel" style="aspect-ratio:16/10;border-radius:0"></div><div style="padding:16px;display:grid;gap:10px"><div class="skel" style="height:16px;width:70%"></div><div class="skel" style="height:12px;width:30%"></div><div class="skel" style="height:48px"></div></div></div>'.repeat(4);
+  const ds = await api('/api/tong-quan' + (moi ? '?moi=1' : ''));
+  TQ = ds; if (SPV.xem === 'ct') veDauCt();
+  veTq(); veHocHet();
 }
 $('#btnTqMoi').onclick = () => taiTongQuan(true);
 const spCtHien = () => SPV.xem === 'ct' && !$('#sp').classList.contains('hidden');
@@ -1914,17 +2313,43 @@ const HOC = {t: null, ma: '', h: null, k: null, s: null, chay: false, nap: false
 let HOC_DANG = {};
 const hcNhan = ma => { const d = HOC_DANG[ma]; if (!d) return '';
   return `<span class="pill b dot hc-nhan" title="Đang học cảnh bằng Antigravity">${d.cho > 0 ? `Chờ tới lượt học cảnh (${d.cho})` : d.dang_dung ? 'Đang dừng học cảnh…' : `Đang học cảnh${d.tong ? ' ' + d.xong + '/' + d.tong : ''}`}</span>`; };
-async function hcTaiDang() {
-  if ($('#sp').classList.contains('hidden') || document.hidden) return;
-  let r; try { r = await api('/api/hoc-canh-dang'); } catch (e) { return; }
+const HOC_AGY = {mo: null};
+function veHocHet() {                       // nút đầu trang Sản phẩm: học cảnh cho mọi sản phẩm còn thiếu mô tả (cần Antigravity đang mở)
+  const b = $('#btnHocHet'), ds = TQ.filter(p => p.video_kho > p.mo_ta && !HOC_DANG[p.ma]);
+  b.classList.toggle('hidden', !ds.length); if (!ds.length) return;
+  setT($('#hocHetNhan'), HOC_AGY.mo ? `Học cảnh cho tất cả sản phẩm còn thiếu (${ds.length})` : 'Mở Antigravity trước');
+}
+$('#btnHocHet').onclick = async () => {
+  if (!HOC_AGY.mo) {
+    const r = await api('/api/agy-mo', {}); toast(r.ok ? 'Đang mở Antigravity — mở xong bấm lại nút này.' : (r.loi || 'Không mở được Antigravity'), r.ok ? 'ok' : 'loi'); hcTaiDang(true).catch(() => {}); return;
+  }
+  const ds = TQ.filter(p => p.video_kho > p.mo_ta && !HOC_DANG[p.ma]); if (!ds.length) return;
+  if (!await hoi({tieuDe: `Học cảnh cho ${ds.length} sản phẩm?`, noiDung: ds.map(p => '• ' + p.ten).join('\n') + '\nMáy học vài sản phẩm cùng lúc, phần còn lại tự xếp hàng chờ.', nutCo: 'Bắt đầu học'})) return;
+  const b = $('#btnHocHet'); b.disabled = true; let ok = 0; const loi = [];
+  try {
+    for (const p of ds) {
+      try { const r = await api('/api/hoc-canh/' + p.ma, {}); if (r.ok) ok++; else loi.push(`${p.ten}: ${r.loi || 'không bắt đầu được'}`); }
+      catch (e) { loi.push(`${p.ten}: mất kết nối`); if (e instanceof ApiLoi && e.mang) break; }
+    }
+  } finally { b.disabled = false; }
+  toast(`Đã cho ${ok}/${ds.length} sản phẩm học cảnh` + (loi.length ? '. Chưa được: ' + loi.join('; ') : '.'), loi.length ? 'loi' : 'ok'); hcTaiDang(true).catch(() => {});
+};
+async function hcTaiDang(ep) {
+  if (!ep && ($('#sp').classList.contains('hidden') || document.hidden)) return;
+  const r = await api('/api/hoc-canh-dang' + (SPV.xem === 'ds' ? '?agy=1' : ''));
   const m = {}; ((r && r.dang_hoc) || []).forEach(x => { m[x.ma] = x; });
-  if (JSON.stringify(m) === JSON.stringify(HOC_DANG)) return;
-  HOC_DANG = m;
+  const agy = r && r.agy_mo !== undefined ? !!r.agy_mo : HOC_AGY.mo, doi = JSON.stringify(m) !== JSON.stringify(HOC_DANG);
+  if (!doi && agy === HOC_AGY.mo) return;
+  HOC_DANG = m; HOC_AGY.mo = agy;
   document.querySelectorAll('#tqBang .pc[data-ma]').forEach(c => { const st = c.querySelector('.pc-st'); if (!st) return;
-    st.querySelectorAll('.hc-nhan').forEach(x => x.remove()); st.insertAdjacentHTML('beforeend', hcNhan(c.dataset.ma)); });
+    st.querySelectorAll('.hc-nhan').forEach(x => x.remove()); st.insertAdjacentHTML('beforeend', hcNhan(c.dataset.ma));
+    const h = c.querySelector('[data-hoc]'); if (h) h.classList.toggle('hidden', !!HOC_DANG[c.dataset.ma]); });
+  veHocHet();
   if (SPV.xem === 'ct') veDauCt();
 }
-setInterval(() => hcTaiDang().catch(() => {}), 4000);
+let HC_T = null;                            // hỏi mỗi 10 giây; đang có sản phẩm học cảnh thì 4 giây để số tiến độ chạy mượt
+function hcLich() { clearTimeout(HC_T); HC_T = setTimeout(async () => { try { await hcTaiDang(); } catch (e) {} hcLich(); }, Object.keys(HOC_DANG).length ? 4000 : 10000); }
+hcLich();
 const HC_LOAI = {chai_ro: 'Chai rõ nhãn', nhan_sau: 'Mặt sau nhãn', pha_rot: 'Pha, rót', phun_tuoi: 'Phun, tưới', re_goc: 'Rễ, gốc', cay_benh: 'Cây bệnh',
   ket_qua: 'Cây khoẻ, kết quả', vuon_rong: 'Toàn cảnh vườn', nguoi_lam: 'Người làm vườn', nguoi_noi: 'Người nói vào máy', kho_hang: 'Kho hàng', khac: 'Khác'};
 const HC_CO = {toan: 'Toàn cảnh', toan_canh: 'Toàn cảnh', trung: 'Trung cảnh', trung_canh: 'Trung cảnh', can: 'Cận cảnh', can_canh: 'Cận cảnh'};
@@ -2304,7 +2729,7 @@ VE_SHOP.push(() => {                 // dòng "đang gắn với sản phẩm Sh
 });
 luoiShop($('#sShopLuoi'), () => SUA_SHOP, async x => { if (x && await hoi({tieuDe: 'Đổi ảnh sản phẩm?', noiDung: 'Dùng ảnh của "' + tenGon(x.tieu_de) + '" trên TikTok Shop. Có hiệu lực ngay.', nutCo: 'Đổi ảnh'})) { SUA_SHOP = x.id; datAnhSua({tu_shop: x.id}, $('#btnSAnhShop')); veShopTatCa(); } });
 $('#btnSAnhShop').onclick = () => $('#sShopBox').classList.toggle('hidden');
-$('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); durVe($('#spChon').value); };
+$('#spChon').onchange = () => { hienAnhChon(); veKhoThem(); durVe($('#spChon').value); if ($('#spChon').value) lsSet('xv.sx.sp', $('#spChon').value); };
 $('#btnLuuSp').onclick = async () => {
   const L = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
   const chung = !$('#spChungNote').classList.contains('hidden');       // kho chung: chỉ lưu thư mục kho + cờ trộn mặc định, không đụng ô bán hàng
@@ -2461,7 +2886,7 @@ $('#btnLuuCd').onclick = async () => {
   if ($('#btnLuuCd').disabled) return;
   const r = await api('/api/cai-dat', {model: $('#cdModel').value, effort: $('#cdEffort').value, video_moi_giong: +$('#cdPer').value});
   if (r && r.ok === false) return toast(r.loi || 'Không lưu được', 'loi');
-  CD_BAN = false; toast('Đã lưu cài đặt'); capNhat();
+  CD_BAN = false; banVe(); toast('Đã lưu cài đặt'); capNhat();
 };
 $('#btnKiemTk').onclick = () => taiTk(true);
 
@@ -2484,26 +2909,20 @@ async function taiTuDong(epBuoc) {
   const tr = t.trang_thai || {};
   setT($('#tdTrangThai'), (tr.ghi || '') + (tr.lan_kiem_toi && t.bat ? ` · lần kiểm tới ${tr.lan_kiem_toi}` : ''));
   if (TD_BAN && !epBuoc) return;
-  TD_BAN = false;
+  TD_BAN = false; banVe();
   $('#tdBat').checked = t.bat; $('#tdPhut').value = t.kiem_moi_phut;
   ['#tdBat', '#tdPhut', '#btnLuuTd'].forEach(i => $(i).disabled = false);
   const ds = Object.entries(t.san_pham || {});
   if (epBuoc) $('#tdBang')._h = null;
-  setH($('#tdBang'), '<thead><tr>' + [['Sản phẩm'], ['Đã làm', 1], ['Còn tồn', 1], ['Hôm nay', 1], ['Tự làm'], ['Giữ tồn ít nhất'], ['Tối đa / ngày'], ['Mỗi lần làm'], ['']].map(([x, n]) => `<th${n ? ' class="num"' : ''}>${x}</th>`).join('') + '</tr></thead><tbody>' +
-    (ds.length ? '' : `<tr><td colspan="9" class="empty-td">${rong('bot', 'Chưa có sản phẩm nào', 'Thêm sản phẩm ở tab Sản phẩm & quà.')}</td></tr>`) +
+  setH($('#tdBang'), '<thead><tr>' + [['Sản phẩm'], ['Đã làm', 1], ['Còn tồn', 1], ['Hôm nay', 1], ['Tự làm'], ['Giữ tồn ít nhất'], ['Tối đa / ngày'], ['Mỗi lần làm']].map(([x, n]) => `<th${n ? ' class="num"' : ''}>${x}</th>`).join('') + '</tr></thead><tbody>' +
+    (ds.length ? '' : `<tr><td colspan="8" class="empty-td">${rong('bot', 'Chưa có sản phẩm nào', 'Thêm sản phẩm ở tab Sản phẩm & quà.')}</td></tr>`) +
     ds.map(([ma, v]) => `<tr data-ma="${ma}">
       <td><div class="sp-ten">${anhSp(urlAnh(ma))}<span>${esc(v.ten || ma)}</span></div></td>
       <td class="num">${v.da_lam}</td><td class="num"><span class="pill ${v.ton < v.ton_toi_thieu ? 'r' : 'g'}">${v.ton}</span></td><td class="num">${v.lam_hom_nay}</td>
       <td><input type="checkbox" class="tdOn sw" ${v.bat ? 'checked' : ''}></td>
       <td><input type="number" class="tdMin" min="0" value="${v.ton_toi_thieu}"></td>
       <td><input type="number" class="tdMax" min="0" value="${v.toi_da_ngay}"></td>
-      <td><input type="number" class="tdLo" min="1" max="50" value="${v.lo}"></td>
-      <td style="text-align:right"><button class="btn ghost sm dz" data-xoatd="${ma}" data-ten="${esc(v.ten || ma)}">${ic('trash')}Xoá</button></td></tr>`).join('') + '</tbody>');
-  document.querySelectorAll('[data-xoatd]').forEach(b => b.onclick = async () => {
-    if (!await hoi({tieuDe: `Xoá sản phẩm "${b.dataset.ten}"?`, noiDung: 'Hồ sơ + kho cảnh vào Thùng rác (khôi phục được); video gốc và video đã làm vẫn giữ.', nutCo: 'Xoá sản phẩm', nguyHiem: true})) return;
-    const r = await api('/api/xoa-san-pham/' + b.dataset.xoatd, {});
-    toast(r.ok ? 'Đã xoá sản phẩm' : r.loi); $('#spChon').innerHTML = ''; KT.ma = null; capNhat(); taiTuDong();
-  });
+      <td><input type="number" class="tdLo" min="1" max="50" value="${v.lo}"></td></tr>`).join('') + '</tbody>');
 }
 async function luuTuDong() {
   if ($('#btnLuuTd').disabled) { $('#tdBat').checked = !$('#tdBat').checked; return; }   // chưa nạp xong dữ liệu thật: không lưu số giả
@@ -2514,11 +2933,16 @@ async function luuTuDong() {
   toast($('#tdBat').checked ? 'Đã bật tự động' : 'Đã lưu (tự động đang tắt)'); taiTuDong(true);
 }
 $('#btnLuuTd').onclick = luuTuDong;
-$('#tdBat').addEventListener('change', luuTuDong);   // công tắc chính: bấm là có hiệu lực, không cần bấm Lưu
-['#tdPhut', '#tdBang'].forEach(s => { const el = $(s); el.addEventListener('input', () => { TD_BAN = true; }); el.addEventListener('change', () => { TD_BAN = true; }); });
+$('#tdBat').addEventListener('change', async () => {      // công tắc chính: bấm là có hiệu lực, CHỈ lưu công tắc (số liệu đang sửa dở trong bảng vẫn chờ nút Lưu)
+  if ($('#btnLuuTd').disabled) { $('#tdBat').checked = !$('#tdBat').checked; return; }          // chưa nạp xong dữ liệu thật
+  const bat = $('#tdBat').checked, r = await api('/api/tu-dong', {bat});
+  if (r && r.ok === false) { $('#tdBat').checked = !bat; return toast(r.loi || 'Chưa lưu được, thử lại', 'loi'); }
+  toast(bat ? 'Đã bật tự động' : 'Đã tắt tự động'); taiTuDong();
+});
+['#tdPhut', '#tdBang'].forEach(s => { const el = $(s); el.addEventListener('input', () => { TD_BAN = true; banVe(); }); el.addEventListener('change', () => { TD_BAN = true; banVe(); }); });
 // Vòng làm mới: bỏ qua khi tab ẩn; lỗi mạng thoáng qua không làm vỡ vòng.
 const lap = (fn, ms) => setInterval(() => { if (!document.hidden) Promise.resolve().then(fn).catch(() => {}); }, ms);
-capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); lap(taiLo, 60000); lap(() => taiTuDong(), 60000); lap(capNhat, 3000);
+capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); lap(() => { if (tabHien() === 'sx') taiLo(); }, 60000); lap(() => { if (tabHien() === 'sx') taiTuDong(); }, 60000); cnLich();
 
 // mở thẳng tab: ?tab=kho  hoặc  #tab=kho  hoặc  #kho
 (() => {

@@ -17,6 +17,7 @@ import ThoDung from './ThoDung.vue';
 import ThuAm from './ThuAm.vue';
 import ThuKho from './ThuKho.vue';
 import { DICH, type NhaData, type VaiState } from './types';
+import { useTrucTiepKho } from './useTrucTiep';
 
 const props = defineProps<{ data: NhaData | null }>();
 const emit = defineEmits<{ go: [key: string] }>();
@@ -28,7 +29,9 @@ const OX = 60; // dịch cả ngôi nhà sang phải để chừa sân trái cho
 const down = computed(() => !props.data || props.data.mode === 'down');
 const dim = computed(() => down.value);
 const stateOf = (k: string): VaiState => (down.value ? 'sleep' : (props.data?.vai[k]?.state ?? 'idle'));
-const bubbleOf = (k: string) => (down.value ? null : (props.data?.vai[k]?.bubble ?? null));
+// Có việc chạy trực tiếp thì bong bóng là câu của "đạo diễn lời thoại" (dữ liệu thật đang chảy về), không thì lời thoại cũ.
+const truc = useTrucTiepKho();
+const bubbleOf = (k: string) => (down.value ? null : (truc?.loi.value[k] ?? props.data?.vai[k]?.bubble ?? null));
 
 // Vị trí các phòng (toạ độ trong nhóm nhà) + chỗ gắn đuôi bong bóng (toạ độ tuyệt đối).
 const rooms: Record<string, { x: number; y: number; w: number; h: number; tip: [number, number] }> = {

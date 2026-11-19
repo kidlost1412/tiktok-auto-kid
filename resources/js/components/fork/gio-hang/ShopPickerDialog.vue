@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue';
 
 import type { ShopProduct } from '@/components/fork/gio-hang/types';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
+import { norm } from '@/components/fork/shared/text';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
@@ -26,16 +28,18 @@ const props = defineProps<{
     /** 'add' = thêm sản phẩm mới vào hub từ sản phẩm shop (không có sản phẩm đang chọn). */
     mode?: 'pick' | 'add';
     adding?: boolean;
+    /** Gợi ý ô tìm lúc mở (tên sản phẩm hub của dòng đang chọn giỏ); bỏ qua khi dòng đã có sản phẩm đang chọn. */
+    searchHint?: string;
+    /** Đang chờ lấy sản phẩm từ shop (nút "Lấy từ shop ngay" tạm khoá). */
+    syncing?: boolean;
 }>();
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
     select: [product: ShopProduct];
     'toggle-hidden': [product: ShopProduct, hidden: boolean];
+    sync: [];
 }>();
-
-const norm = (s: string) =>
-    s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
 const search = ref('');
 const showHidden = ref(false);
@@ -44,7 +48,10 @@ watch(
     () => props.open,
     (open) => {
         if (open) {
-            search.value = '';
+            search.value =
+                props.mode !== 'add' && !props.currentId
+                    ? (props.searchHint ?? '')
+                    : '';
             showHidden.value = false;
         }
     },
@@ -86,13 +93,13 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                 }}</DialogTitle>
                 <DialogDescription>
                     <template v-if="mode === 'add'">
-                        Chọn sản phẩm TikTok Shop. App sẽ tạo sản phẩm tương
-                        ứng trong Xưởng Video (tên lấy từ sản phẩm shop, anh
-                        đổi tên được sau) và gắn luôn giỏ hàng cho kênh này.
+                        Chọn sản phẩm TikTok Shop. App sẽ tạo sản phẩm tương ứng
+                        trong Xưởng Video (tên lấy từ sản phẩm shop, anh đổi tên
+                        được sau) và gắn luôn giỏ hàng cho kênh này.
                     </template>
                     <template v-else>
-                        Chọn đúng sản phẩm TikTok Shop sẽ gắn vào video của
-                        dòng này.
+                        Chọn đúng sản phẩm TikTok Shop sẽ gắn vào video của dòng
+                        này.
                     </template>
                 </DialogDescription>
             </DialogHeader>
@@ -203,13 +210,35 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                 </li>
                 <li
                     v-if="!shown.length"
-                    class="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
+                    class="flex flex-col items-center gap-3 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground"
+                    data-testid="fork-gio-hang-picker-empty"
                 >
-                    {{
-                        products.length
-                            ? 'Không có sản phẩm nào khớp.'
-                            : 'Chưa có sản phẩm nào. Đóng hộp này và bấm "Lấy sản phẩm từ shop".'
-                    }}
+                    <template v-if="products.length">
+                        <span>Không có sản phẩm nào khớp.</span>
+                        <Button
+                            v-if="search.trim() !== ''"
+                            size="sm"
+                            variant="outline"
+                            @click="search = ''"
+                            >Xoá tìm kiếm</Button
+                        >
+                    </template>
+                    <template v-else>
+                        <span
+                            >Chưa có sản phẩm nào. Đóng hộp này và bấm “Lấy lại
+                            từ shop”.</span
+                        >
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            :disabled="syncing"
+                            data-testid="fork-gio-hang-picker-sync"
+                            @click="emit('sync')"
+                        >
+                            <Spinner v-if="syncing" class="size-4" />
+                            Lấy từ shop ngay
+                        </Button>
+                    </template>
                 </li>
             </ul>
 

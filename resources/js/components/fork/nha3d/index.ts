@@ -54,6 +54,11 @@ export interface NhaWorldOptions {
 
 export interface NhaWorld {
     update(data: NhaData): void;
+    /** Câu bong bóng trực tiếp (khoá nhân vật → câu) và các nhân vật đang có việc chạy thật; xem nha/useTrucTiep.ts. */
+    setLive(
+        say: Record<string, string | null>,
+        working: ReadonlySet<string>,
+    ): void;
     /** "Gọi về gấp": nhân vật của `vai` chạy tới chỗ Kid đứng và báo cáo. */
     call(vai: string): void;
     /** Nhân vật của `vai` phản ứng với một việc vừa làm trong popup (xem ban/bus.ts). */
@@ -1218,6 +1223,16 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
     if (o.debug) {
         (window as unknown as Record<string, unknown>).__nha3d = {
             fps: () => fps.value,
+            /** Bong bóng + trạng thái từng nhân vật (xem lời thoại trực tiếp có tới nơi không). */
+            bubbles: () =>
+                actorList.map((a) => ({
+                    key: a.key,
+                    base: a.base,
+                    text: a.bubbleText,
+                    atHome: a.atHome,
+                    busy: a.busy,
+                    shown: a.bubble(),
+                })),
             grid,
             coll: () => ({
                 ...coll,
@@ -1403,6 +1418,14 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
                     counts[vai === 'daodien' ? 'daodienA' : vai] = v.so;
                 }
                 overlay.setCounts(counts);
+            }
+        },
+        setLive(
+            say: Record<string, string | null>,
+            working: ReadonlySet<string>,
+        ) {
+            if (!failed) {
+                director.setLive(say, working);
             }
         },
         call(vai: string) {

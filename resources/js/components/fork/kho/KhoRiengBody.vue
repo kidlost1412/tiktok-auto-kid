@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Kho riêng: video bạn tự làm. Thêm thư mục, chọn video (bấm, kéo, Shift) rồi đăng / hẹn giờ, hoặc cất vào "Giỏ chờ đăng".
+// Kho riêng: video anh tự làm. Thêm thư mục, chọn video (bấm, kéo, Shift) rồi đăng / hẹn giờ, hoặc cất vào "Giỏ chờ đăng".
 // Trang tự cập nhật: video mới bỏ vào thư mục xuất hiện trong ~10 giây, không cần bấm gì.
 import { router } from '@inertiajs/vue3';
 import {
@@ -14,17 +14,22 @@ import {
     IconPlus,
     IconPlaylistAdd,
     IconRefresh,
+    IconSearch,
     IconSend,
     IconSparkles,
+    IconArrowsShuffle,
     IconTrash,
     IconUpload,
     IconVideoOff,
     IconX,
 } from '@tabler/icons-vue';
+import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
+import MixDialog from '@/components/fork/auto/MixDialog.vue';
 import BatchDialog from '@/components/fork/kho/BatchDialog.vue';
+import KhoPager from '@/components/fork/kho/KhoPager.vue';
 import KhoSwitch from '@/components/fork/kho/KhoSwitch.vue';
 import {
     type AutoPayload,
@@ -36,6 +41,7 @@ import {
     type RiengAuto,
     type RiengPageProps,
     type RiengVideo,
+    type SelectAllResult,
     xsrf,
 } from '@/components/fork/kho/rieng';
 import RiengAiStatus from '@/components/fork/kho/RiengAiStatus.vue';
@@ -49,6 +55,7 @@ import RiengUploadDialog from '@/components/fork/kho/RiengUploadDialog.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
 import { cardCls } from '@/components/fork/shared/status';
+import { useVisitLoading } from '@/components/fork/shared/useVisitLoading';
 import {
     openVideo as openViewer,
     viewerActions,
@@ -69,6 +76,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { confirm as confirmDialog } from '@/composables/useConfirm';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -76,7 +84,16 @@ import { cn } from '@/lib/utils';
 const props = defineProps<RiengPageProps & { embedded?: boolean }>();
 
 const emit = defineEmits<{
-    filter: [q: { folder: number; status: string; day: string; page?: number }];
+    filter: [
+        q: {
+            folder: number;
+            status: string;
+            day: string;
+            page?: number;
+            q?: string;
+            sort?: string;
+        },
+    ];
     refresh: [only: string[]];
     changed: [viec: 'quet' | 'xem'];
 }>();
@@ -84,7 +101,7 @@ const emit = defineEmits<{
 const RELOAD_ONLY = [
     'videos',
     'counts',
-    'selectable',
+    'selectable_count',
     'days',
     'folders',
     'queue',
@@ -92,6 +109,11 @@ const RELOAD_ONLY = [
     'last_scan_at',
 ];
 const FORMATS = '.mp4, .mov, .m4v, .webm';
+const SELECT_MAX = 1000;
+const { loading, callbacks } = useVisitLoading();
+// Điểm neo đầu lưới: đổi trang / bộ lọc thì kéo về đây (mượt).
+const gridTop = ref<HTMLElement | null>(null);
+const rootEl = ref<HTMLElement | null>(null);
 
 const busy = ref('');
 const folderPath = ref('');
@@ -126,10 +148,13 @@ const picked = defineModel<
 >('picked', { default: () => ({}) });
 const selectMode = ref(false);
 
-// Thời lượng (giây) của video đã chọn, để hộp thoại đăng hiện trên hình nhỏ.
+// Thời lượng (giây) của video đã chọn, để hộp thoại đăng hiện trên hình nhỏ: lấy từ trang đang xem,
+// từ danh sách "Chọn tất cả" đã tải, hoặc từ giỏ chờ đăng.
+const knownDurations = new Map<number, number | null>();
 const durationOf = (id: number): number | null =>
-    props.selectable.find((x) => x.id === id)?.duration ??
     props.videos.data.find((x) => x.id === id)?.duration ??
+    knownDurations.get(id) ??
+    queue.value.find((q) => q.id === id)?.duration ??
     null;
 
 const pickedItems = computed<BatchItem[]>(() =>
@@ -144,13 +169,31 @@ const pickedDupCount = computed(
     () => pickedItems.value.filter((i) => i.duplicate).length,
 );
 
-// "Chọn tất cả" chỉ chọn video không trùng; video trùng phải tự chọn.
-const plain = computed(() => props.selectable.filter((s) => !s.duplicate));
-const dupCount = computed(() => props.selectable.length - plain.value.length);
+// "Chọn tất cả" chọn mọi video chưa đăng theo bộ lọc hiện tại (mọi trang, tối đa 1000); video trùng phải tự chọn.
+// Danh sách chi tiết chỉ tải khi anh bấm (máy chủ tính cờ "trùng" cho từng video, khá nặng nên không tính mỗi lần tự cập nhật).
+const selectableCount = computed(() => props.selectable_count ?? 0);
+const capped = computed(() => selectableCount.value > SELECT_MAX);
+const selectAllIds = ref<number[]>([]);
+const selectAllSkipped = ref(0);
+const selectingAll = ref(false);
 const allSelected = computed(
     () =>
-        plain.value.length > 0 &&
-        plain.value.every((s) => s.id in picked.value),
+        selectAllIds.value.length > 0 &&
+        selectAllIds.value.every((id) => id in picked.value),
+);
+
+// Video chọn được và không trùng ngay trên trang đang xem.
+const pagePlain = computed(() =>
+    props.videos.data.filter((v) => v.selectable && !v.duplicate),
+);
+
+// Đổi bộ lọc hoặc số lượng thì danh sách "Chọn tất cả" đã tải không còn đúng nữa.
+watch(
+    () => JSON.stringify([props.filters, props.selectable_count]),
+    () => {
+        selectAllIds.value = [];
+        selectAllSkipped.value = 0;
+    },
 );
 
 const dupOf = (v: RiengVideo): string | null => v.duplicate?.text ?? null;
@@ -199,16 +242,100 @@ const toggle = (v: RiengVideo, shift = false) => {
     lastIdx = i;
 };
 
-const toggleAll = () => {
-    const off = allSelected.value;
+const selectAllQuery = (): string => {
+    const f = props.filters;
+    const q = new URLSearchParams();
 
-    setPicked((next) => {
-        for (const s of plain.value) {
-            if (off) {
-                delete next[s.id];
-            } else {
+    if (f.folder) {
+        q.set('folder', String(f.folder));
+    }
+
+    if (f.status) {
+        q.set('status', f.status);
+    }
+
+    if (f.day) {
+        q.set('day', f.day);
+    }
+
+    if (f.q) {
+        q.set('q', f.q);
+    }
+
+    return q.toString();
+};
+
+// Ô "Chọn tất cả": để trình duyệt tự đổi dấu tick rồi đặt lại theo trạng thái thật sau khi chọn/bỏ chọn xong.
+// (Dùng click.prevent thì trình duyệt trả dấu tick về như cũ SAU khi Vue đã cập nhật → bỏ chọn rồi mà ô vẫn tick.)
+const onSelectAllChange = (e: Event) => {
+    const el = e.target as HTMLInputElement;
+    void toggleAll().finally(() => {
+        el.checked = allSelected.value;
+    });
+};
+
+const toggleAll = async () => {
+    if (selectingAll.value) {
+        return;
+    }
+
+    if (allSelected.value) {
+        const ids = selectAllIds.value;
+
+        setPicked((next) => {
+            for (const id of ids) {
+                delete next[id];
+            }
+        });
+
+        return;
+    }
+
+    selectingAll.value = true;
+
+    try {
+        const r = await callJson<SelectAllResult>(
+            'GET',
+            `/auto/kho/rieng/chon-tat-ca?${selectAllQuery()}`,
+        );
+
+        if (!r.ok || !r.data) {
+            toast.error('Chưa chọn được, anh thử lại.');
+
+            return;
+        }
+
+        const plain = r.data.items.filter((s) => !s.duplicate);
+        selectAllIds.value = plain.map((s) => s.id);
+        selectAllSkipped.value = r.data.items.length - plain.length;
+
+        for (const s of r.data.items) {
+            knownDurations.set(s.id, s.duration ?? null);
+        }
+
+        setPicked((next) => {
+            for (const s of plain) {
                 next[s.id] = { file_name: s.file_name, duplicate: null };
             }
+        });
+
+        if (!plain.length) {
+            toast.info('Không có video nào để chọn.');
+        } else if (r.data.capped) {
+            toast.info(
+                `Chỉ chọn tối đa ${r.data.max} video một lần (còn ${r.data.total - r.data.items.length} video nữa, đăng xong anh chọn tiếp).`,
+            );
+        }
+    } finally {
+        selectingAll.value = false;
+    }
+};
+
+// Chỉ chọn các video chưa đăng (không trùng) ngay trên trang đang xem.
+const selectPage = () => {
+    setPicked((next) => {
+        for (const v of pagePlain.value) {
+            next[v.id] = { file_name: v.file_name, duplicate: null };
         }
     });
 };
@@ -217,9 +344,44 @@ const clearPicked = () => {
     picked.value = {};
     lastIdx = -1;
 };
+const hasPicked = () => Object.keys(picked.value).length > 0;
 
 const toggleSelectMode = () => {
     selectMode.value = !selectMode.value;
+};
+
+// Phím tắt khi đang chọn: Ctrl/Cmd+A chọn tất cả, Esc bỏ chọn. Không chạy khi đang gõ chữ hoặc có hộp thoại mở.
+const otherDialogOpen = () =>
+    [
+        ...document.querySelectorAll('[role="dialog"], [role="alertdialog"]'),
+    ].some((d) => !rootEl.value || !d.contains(rootEl.value));
+
+const onShortcut = (e: KeyboardEvent) => {
+    if (drag || e.defaultPrevented || (!selectMode.value && !hasPicked())) {
+        return;
+    }
+
+    const t = e.target as HTMLElement | null;
+
+    if (
+        t?.closest?.(
+            'input, textarea, select, [contenteditable="true"], [contenteditable=""]',
+        ) ||
+        otherDialogOpen()
+    ) {
+        return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        void toggleAll();
+    } else if (e.key === 'Escape') {
+        if (hasPicked()) {
+            clearPicked();
+        } else {
+            selectMode.value = false;
+        }
+    }
 };
 
 // ---- Kéo để chọn (khung chọn): nhấn chuột rồi kéo quét qua các thẻ, không cần Shift hay chế độ "Chọn".
@@ -612,8 +774,22 @@ const addToQueue = async (ids: number[]) => {
     }
 };
 
-const removeFromQueue = (ids: number[]) =>
-    queueCall('/auto/kho/rieng/gio-cho/bo', { ids });
+// Bỏ khỏi giỏ có "Hoàn tác" (đưa lại vào giỏ, nằm cuối giỏ).
+const removeFromQueue = async (ids: number[]) => {
+    const ok = await queueCall('/auto/kho/rieng/gio-cho/bo', { ids });
+
+    if (ok) {
+        toast('Đã bỏ khỏi giỏ chờ đăng', {
+            action: {
+                label: 'Hoàn tác',
+                onClick: () =>
+                    void queueCall('/auto/kho/rieng/gio-cho/them', { ids }),
+            },
+        });
+    }
+
+    return ok;
+};
 
 const toggleQueue = async (id: number) => {
     if (queuedIds.value.has(id)) {
@@ -669,14 +845,18 @@ const postQueue = () => {
 
 const postOne = (id: number) => {
     const v = props.videos.data.find((x) => x.id === id);
-    const s = props.selectable.find((x) => x.id === id);
+    // Video mở từ khung xem nhưng không nằm trên trang này: lấy tên / cờ trùng từ giỏ chờ đăng hoặc danh sách đã chọn.
+    const q = queue.value.find((x) => x.id === id);
+    const chosen = picked.value[id];
 
     openBatch([
         {
             id,
-            file_name: v?.file_name ?? s?.file_name ?? `#${id}`,
-            duration: v?.duration ?? s?.duration ?? null,
-            duplicate: v?.duplicate?.text ?? s?.duplicate ?? null,
+            file_name:
+                v?.file_name ?? q?.file_name ?? chosen?.file_name ?? `#${id}`,
+            duration: v?.duration ?? durationOf(id),
+            duplicate:
+                v?.duplicate?.text ?? q?.duplicate ?? chosen?.duplicate ?? null,
         },
     ]);
 };
@@ -709,15 +889,28 @@ const currentStep = computed<1 | 2 | 3>(() => {
 });
 
 // ---------------------------------------------------------------- Lọc, thư mục, quét
-const go = (
-    patch: Partial<{
-        folder: number;
-        status: string;
-        day: string;
-        page: number;
-    }>,
-) => {
+type Patch = Partial<{
+    folder: number;
+    status: string;
+    day: string;
+    page: number;
+    q: string;
+    sort: string;
+}>;
+
+// Đổi trang / bộ lọc: kéo về đầu lưới (mượt) để không bị kẹt ở cuối trang cũ.
+const scrollToGrid = () => {
+    const el = gridTop.value;
+
+    if (el && el.getBoundingClientRect().top < 0) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+};
+
+const go = (patch: Patch) => {
     const next = { ...props.filters, ...patch };
+
+    scrollToGrid();
 
     if (props.embedded) {
         lastIdx = -1;
@@ -726,6 +919,8 @@ const go = (
             status: next.status,
             day: next.day,
             page: patch.page,
+            q: next.q,
+            sort: next.sort,
         });
 
         return;
@@ -745,6 +940,14 @@ const go = (
         query.day = next.day;
     }
 
+    if (next.q) {
+        query.q = next.q;
+    }
+
+    if (next.sort && next.sort !== 'moi') {
+        query.sort = next.sort;
+    }
+
     if (patch.page) {
         query.page = patch.page;
     }
@@ -753,7 +956,40 @@ const go = (
     router.get('/auto/kho/rieng', query, {
         preserveScroll: true,
         preserveState: true,
+        onStart: callbacks.onStart,
+        onFinish: callbacks.onFinish,
     });
+};
+
+// ----- Tìm theo tên file (chờ anh gõ xong mới tải) và sắp xếp. Bàn Thủ kho (embedded) chưa mang được hai bộ lọc này nên ẩn.
+const search = ref(props.filters.q ?? '');
+const runSearch = useDebounceFn((v: string) => go({ q: v.trim() }), 350);
+
+watch(search, (v) => {
+    if (v.trim() !== (props.filters.q ?? '')) {
+        runSearch(v);
+    }
+});
+
+const sort = computed(() => props.filters.sort ?? 'moi');
+const sorts = [
+    { key: 'moi', label: 'Mới nhất' },
+    { key: 'cu', label: 'Cũ nhất' },
+    { key: 'ten', label: 'Tên A→Z' },
+    { key: 'sap-dang', label: 'Sắp đăng' },
+];
+
+const hasFilter = computed(
+    () =>
+        !!props.filters.folder ||
+        !!props.filters.status ||
+        !!props.filters.day ||
+        !!(props.filters.q ?? ''),
+);
+
+const clearFilters = () => {
+    search.value = '';
+    go({ folder: 0, status: '', day: '', q: '' });
 };
 
 // Tuỳ chọn chung của mọi thao tác ghi. Embedded (bàn Thủ kho): ở yên trang đang mở và báo cho bàn sau khi xong.
@@ -960,6 +1196,7 @@ const removeFolder = async (f: Folder) => {
 
 // ---- Tự đăng theo khung (Kho riêng): hộp cài đặt + hộp chỉnh từng video.
 const autoOpen = ref(false);
+const mixOpen = ref(false);
 const autoEditOpen = ref(false);
 const autoVideo = ref<RiengVideo | null>(null);
 const autoPayload = ref<AutoPayload | null>(null);
@@ -981,11 +1218,7 @@ const reloadVideos = () => {
     if (props.embedded) {
         emit('refresh', RELOAD_ONLY);
     } else {
-        router.reload({
-            only: RELOAD_ONLY,
-            preserveScroll: true,
-            preserveState: true,
-        });
+        router.reload({ only: RELOAD_ONLY });
     }
 };
 
@@ -1014,8 +1247,20 @@ const onAutoSaved = (id: number, a: RiengAuto) => {
     reloadVideos();
 };
 
-// Thẻ "Mất file" (ổ rời chưa cắm...): anh bỏ hẳn video khỏi danh sách. File không bị đụng tới.
-const forgetVideo = (v: RiengVideo) => {
+// Thẻ "Mất file" (ổ rời chưa cắm...): anh bỏ hẳn video khỏi danh sách (sau khi xác nhận). File không bị đụng tới.
+const forgetVideo = async (v: RiengVideo) => {
+    if (
+        !(await confirmDialog({
+            title: 'Bỏ video này khỏi danh sách?',
+            description:
+                'Chỉ bỏ khỏi app, file trên ổ đĩa không bị xoá. Nếu file xuất hiện lại trong thư mục, app sẽ nhận lại như một video mới.',
+            confirmText: 'Bỏ khỏi danh sách',
+            destructive: true,
+        }))
+    ) {
+        return;
+    }
+
     busy.value = 'quet';
     router.delete(`/auto/kho/rieng/video/${v.id}`, mk('quet'));
 };
@@ -1094,11 +1339,7 @@ const poll = async () => {
             if (props.embedded) {
                 emit('refresh', RELOAD_ONLY);
             } else {
-                router.reload({
-                    only: RELOAD_ONLY,
-                    preserveScroll: true,
-                    preserveState: true,
-                });
+                router.reload({ only: RELOAD_ONLY });
             }
 
             if (added > 0) {
@@ -1122,7 +1363,7 @@ onMounted(() => {
     // 20 giây: mỗi lượt có thể quét cả thư mục (nặng); tab ẩn thì bỏ qua, hiện lại thì quét ngay.
     pollTimer = setInterval(() => void poll(), 20000);
     document.addEventListener('visibilitychange', onVisible);
-    grid.value?.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('keydown', onShortcut);
     // Quét chọn bắt đầu được cả ở lề ngoài lưới (khi thẻ phủ kín màn hình vẫn kéo được).
     document.addEventListener('pointerdown', onPointerDown);
 
@@ -1132,8 +1373,19 @@ onMounted(() => {
     viewerActions.isQueued = (id) => queuedIds.value.has(id);
 });
 
+// Lưới được dựng lại khi chuyển giữa khung xương / video / trang trống: gắn lại bộ bắt cảm ứng mỗi lần.
+watch(
+    grid,
+    (el, old) => {
+        old?.removeEventListener('touchmove', onTouchMove);
+        el?.addEventListener('touchmove', onTouchMove, { passive: false });
+    },
+    { flush: 'post' },
+);
+
 onBeforeUnmount(() => {
     alive = false;
+    document.removeEventListener('keydown', onShortcut);
     clearInterval(pollTimer);
     document.removeEventListener('visibilitychange', onVisible);
     grid.value?.removeEventListener('touchmove', onTouchMove);
@@ -1154,10 +1406,10 @@ defineExpose({ scan, busy });
 
 <template>
     <!-- Trang thật: "contents" để các khối nằm thẳng trong khung của trang; popup: cột dọc. -->
-    <div :class="embedded ? 'flex flex-col gap-4' : 'contents'">
+    <div ref="rootEl" :class="embedded ? 'flex flex-col gap-4' : 'contents'">
         <div v-if="embedded" class="flex items-center justify-between gap-3">
             <p class="min-w-0 truncate text-sm text-muted-foreground">
-                Video bạn tự làm. Quét lần cuối {{ fmt(last_scan_at) }}. Video
+                Video anh tự làm. Quét lần cuối {{ fmt(last_scan_at) }}. Video
                 mới bỏ vào thư mục tự hiện sau khoảng 10 giây.
             </p>
             <Button
@@ -1184,125 +1436,161 @@ defineExpose({ scan, busy });
         >
             <span
                 class="flex items-center gap-1.5 pr-1 text-[0.8125rem] font-semibold text-muted-foreground"
-                :title="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của bạn.`"
+                :title="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của anh.`"
             >
                 <IconFolder class="size-4" /> Thư mục
             </span>
-            <Popover
+            <!-- Bấm vào tên thư mục = lọc theo thư mục đó (bấm lần nữa để bỏ lọc); chỉ nút ba chấm mới mở tuỳ chọn. -->
+            <button
+                v-if="folders.length"
+                type="button"
+                :aria-pressed="!filters.folder"
+                :class="
+                    cn(
+                        'flex items-center gap-1.5 rounded-lg border bg-background/60 px-2.5 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
+                        !filters.folder &&
+                            'border-violet-600 bg-violet-50 dark:border-primary dark:bg-primary/15',
+                    )
+                "
+                data-testid="fork-rieng-folder-all"
+                @click="go({ folder: 0 })"
+            >
+                <span class="font-medium">Tất cả</span>
+                <span class="text-xs text-muted-foreground tabular-nums"
+                    >{{ counts.all ?? 0 }} video</span
+                >
+            </button>
+            <div
                 v-for="f in folders"
                 :key="f.id"
-                :open="openMenu === f.id"
-                @update:open="(o: boolean) => (openMenu = o ? f.id : null)"
+                :class="
+                    cn(
+                        'flex max-w-72 items-center rounded-lg border bg-background/60 transition hover:border-foreground/40',
+                        filters.folder === f.id &&
+                            'border-violet-600 bg-violet-50 dark:border-primary dark:bg-primary/15',
+                    )
+                "
             >
-                <PopoverTrigger as-child>
-                    <button
-                        type="button"
-                        :class="
-                            cn(
-                                'flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 py-1 pr-1.5 pl-2.5 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
-                                openMenu === f.id &&
-                                    'border-violet-600 dark:border-primary',
-                            )
-                        "
-                        :title="f.path"
-                        :aria-label="`Tuỳ chọn thư mục ${f.name}`"
-                        :data-testid="`fork-rieng-folder-${f.id}`"
-                    >
-                        <span
-                            v-if="!f.exists"
-                            class="size-2 shrink-0 rounded-full bg-red-500"
-                            title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
-                        />
-                        <span class="truncate font-medium">{{ f.name }}</span>
-                        <IconMusic
-                            v-if="f.music?.enabled"
-                            class="size-3.5 shrink-0 text-violet-600 dark:text-primary"
-                            aria-label="Đang ghép nhạc"
-                        />
-                        <span
-                            class="shrink-0 text-xs text-muted-foreground tabular-nums"
-                            >{{ f.count }} video</span
-                        >
-                        <IconDots class="size-4 shrink-0 text-foreground/60" />
-                    </button>
-                </PopoverTrigger>
-                <PopoverContent class="w-72 p-3" align="end">
-                    <div class="mb-2 text-xs break-all text-muted-foreground">
-                        {{ f.path }}
-                    </div>
-                    <div
+                <button
+                    type="button"
+                    class="flex min-w-0 items-center gap-1.5 rounded-l-lg py-1 pr-1 pl-2.5 text-sm hover:bg-muted/60"
+                    :aria-pressed="filters.folder === f.id"
+                    :title="f.path"
+                    :data-testid="`fork-rieng-folder-${f.id}`"
+                    @click="go({ folder: filters.folder === f.id ? 0 : f.id })"
+                >
+                    <span
                         v-if="!f.exists"
-                        class="mb-2 text-xs text-red-600 dark:text-red-400"
+                        class="size-2 shrink-0 rounded-full bg-red-500"
+                        title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
+                    />
+                    <span class="truncate font-medium">{{ f.name }}</span>
+                    <IconMusic
+                        v-if="f.music?.enabled"
+                        class="size-3.5 shrink-0 text-violet-600 dark:text-primary"
+                        aria-label="Đang ghép nhạc"
+                    />
+                    <span
+                        class="shrink-0 text-xs text-muted-foreground tabular-nums"
+                        >{{ f.count }} video</span
                     >
-                        Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi
-                        tên?).
-                    </div>
-                    <form
-                        class="mb-2 flex gap-1.5"
-                        @submit.prevent="renameFolder(f)"
-                    >
-                        <Input
-                            v-model="renameVal"
-                            class="h-8"
-                            maxlength="80"
-                            aria-label="Tên thư mục"
-                            placeholder="Tên hiện trong app"
-                        />
+                </button>
+                <Popover
+                    :open="openMenu === f.id"
+                    @update:open="(o: boolean) => (openMenu = o ? f.id : null)"
+                >
+                    <PopoverTrigger as-child>
+                        <button
+                            type="button"
+                            class="flex items-center self-stretch rounded-r-lg px-1.5 text-foreground/60 hover:bg-muted/60 hover:text-foreground"
+                            :aria-label="`Tuỳ chọn thư mục ${f.name}`"
+                            :title="`Tuỳ chọn thư mục ${f.name}`"
+                            :data-testid="`fork-rieng-folder-menu-${f.id}`"
+                        >
+                            <IconDots class="size-4 shrink-0" />
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-72 p-3" align="end">
+                        <div
+                            class="mb-2 text-xs break-all text-muted-foreground"
+                        >
+                            {{ f.path }}
+                        </div>
+                        <div
+                            v-if="!f.exists"
+                            class="mb-2 text-xs text-red-600 dark:text-red-400"
+                        >
+                            Không mở được thư mục này (ổ đĩa đang tắt hoặc đã
+                            đổi tên?).
+                        </div>
+                        <form
+                            class="mb-2 flex gap-1.5"
+                            @submit.prevent="renameFolder(f)"
+                        >
+                            <Input
+                                v-model="renameVal"
+                                class="h-8"
+                                maxlength="80"
+                                aria-label="Tên thư mục"
+                                placeholder="Tên hiện trong app"
+                            />
+                            <Button
+                                type="submit"
+                                size="sm"
+                                class="h-8 shrink-0"
+                                :disabled="renameVal.trim() === f.name"
+                            >
+                                <IconPencil class="size-4" /> Đổi tên
+                            </Button>
+                        </form>
                         <Button
-                            type="submit"
                             size="sm"
-                            class="h-8 shrink-0"
-                            :disabled="renameVal.trim() === f.name"
+                            variant="ghost"
+                            class="w-full justify-start"
+                            :disabled="!f.exists"
+                            @click="openUpload(f.id)"
                         >
-                            <IconPencil class="size-4" /> Đổi tên
+                            <IconUpload class="size-4" /> Thêm video vào thư mục
+                            này
                         </Button>
-                    </form>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        class="w-full justify-start"
-                        :disabled="!f.exists"
-                        @click="openUpload(f.id)"
-                    >
-                        <IconUpload class="size-4" /> Thêm video vào thư mục này
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        class="w-full justify-start"
-                        :disabled="!f.exists"
-                        @click="openFolderOnDisk(f)"
-                    >
-                        <IconFolderOpen class="size-4" /> Mở thư mục
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        class="w-full justify-start"
-                        :data-testid="`fork-rieng-folder-music-${f.id}`"
-                        @click="openMusic(f)"
-                    >
-                        <IconMusic class="size-4" /> Ghép nhạc
-                        <span
-                            v-if="f.music?.enabled"
-                            class="ml-auto text-xs text-emerald-600 dark:text-emerald-400"
-                            >{{
-                                f.music.mode === 'replace'
-                                    ? 'Thay hẳn'
-                                    : `Trộn ${f.music.gain_db} dB`
-                            }}</span
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            class="w-full justify-start"
+                            :disabled="!f.exists"
+                            @click="openFolderOnDisk(f)"
                         >
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        class="w-full justify-start"
-                        @click="removeFolder(f)"
-                    >
-                        <IconTrash class="size-4" /> Bỏ khỏi danh sách
-                    </Button>
-                </PopoverContent>
-            </Popover>
+                            <IconFolderOpen class="size-4" /> Mở thư mục
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            class="w-full justify-start"
+                            :data-testid="`fork-rieng-folder-music-${f.id}`"
+                            @click="openMusic(f)"
+                        >
+                            <IconMusic class="size-4" /> Ghép nhạc
+                            <span
+                                v-if="f.music?.enabled"
+                                class="ml-auto text-xs text-emerald-600 dark:text-emerald-400"
+                                >{{
+                                    f.music.mode === 'replace'
+                                        ? 'Thay hẳn'
+                                        : `Trộn ${f.music.gain_db} dB`
+                                }}</span
+                            >
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            class="w-full justify-start"
+                            @click="removeFolder(f)"
+                        >
+                            <IconTrash class="size-4" /> Bỏ khỏi danh sách
+                        </Button>
+                    </PopoverContent>
+                </Popover>
+            </div>
             <Button
                 size="sm"
                 variant="outline"
@@ -1320,18 +1608,34 @@ defineExpose({ scan, busy });
             >
                 <IconUpload class="size-4" /> Thêm video
             </Button>
-            <Button
-                size="sm"
-                :variant="autoEnabled ? 'default' : 'outline'"
-                class="ml-auto"
-                data-testid="fork-rieng-auto-open"
-                @click="autoOpen = true"
+            <!-- Cụm nút bên phải của dải thư mục. -->
+            <div
+                class="ml-auto flex flex-wrap items-center gap-2"
+                data-testid="fork-rieng-header-actions"
             >
-                <IconSparkles class="size-4" />
-                Tự đăng theo khung: {{ autoEnabled ? 'Bật' : 'Tắt' }}
-            </Button>
+                <Button
+                    v-if="accounts.some((a) => a.usable)"
+                    size="sm"
+                    variant="outline"
+                    title="Đổi chỗ giờ các bài đã hẹn mà chưa gửi lên TikTok để hai bài liền nhau khác sản phẩm (có xem trước và hoàn tác)"
+                    data-testid="fork-rieng-mix-open"
+                    @click="mixOpen = true"
+                >
+                    <IconArrowsShuffle class="size-4" />
+                    Trộn sản phẩm
+                </Button>
+                <Button
+                    size="sm"
+                    :variant="autoEnabled ? 'default' : 'outline'"
+                    data-testid="fork-rieng-auto-open"
+                    @click="autoOpen = true"
+                >
+                    <IconSparkles class="size-4" />
+                    Tự đăng theo khung: {{ autoEnabled ? 'Bật' : 'Tắt' }}
+                </Button>
+            </div>
             <span v-if="!folders.length" class="text-sm text-muted-foreground"
-                >Chưa có thư mục nào: thêm thư mục chứa video của bạn.</span
+                >Chưa có thư mục nào: thêm thư mục chứa video của anh.</span
             >
         </section>
 
@@ -1361,7 +1665,7 @@ defineExpose({ scan, busy });
                     <DialogDescription>
                         App chỉ đọc video trong thư mục ({{ FORMATS }}; kể cả
                         thư mục con, trừ thư mục bắt đầu bằng _). App không bao
-                        giờ dời hay xoá file của bạn.
+                        giờ dời hay xoá file của anh.
                     </DialogDescription>
                 </DialogHeader>
                 <div class="flex flex-col gap-3">
@@ -1425,11 +1729,13 @@ defineExpose({ scan, busy });
         </Dialog>
 
         <!-- Các bước + bộ lọc + chọn: gộp một thanh -->
+        <!-- Dính trên cùng khi cuộn: chỉ từ màn hình lớn (màn nhỏ để cuộn theo trang cho đỡ chiếm chỗ). -->
         <section
             :class="
                 cn(
                     cardCls,
-                    'sticky top-2 z-20 flex flex-wrap items-center gap-x-4 gap-y-2 bg-card/95 p-3 backdrop-blur',
+                    'z-20 flex flex-wrap items-center gap-x-4 gap-y-2 bg-card/95 p-3 backdrop-blur',
+                    embedded ? 'sticky top-2' : 'lg:sticky lg:top-2',
                 )
             "
             data-testid="fork-rieng-filters"
@@ -1437,14 +1743,28 @@ defineExpose({ scan, busy });
         >
             <RiengSteps v-if="folders.length" :current="currentStep" />
             <div class="ml-auto flex flex-wrap items-center gap-2">
+                <div v-if="!embedded" class="relative">
+                    <IconSearch
+                        class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                        v-model="search"
+                        type="search"
+                        placeholder="Tìm theo tên file…"
+                        class="h-9 w-52 pl-9"
+                        aria-label="Tìm video theo tên file"
+                        data-testid="fork-rieng-search"
+                    />
+                </div>
                 <NativeSelect
-                    :model-value="filters.folder || ''"
-                    aria-label="Lọc theo thư mục"
-                    @update:model-value="go({ folder: Number($event) || 0 })"
+                    v-if="!embedded"
+                    :model-value="sort"
+                    aria-label="Sắp xếp"
+                    data-testid="fork-rieng-sort"
+                    @update:model-value="go({ sort: String($event) })"
                 >
-                    <option value="">Tất cả thư mục</option>
-                    <option v-for="f in folders" :key="f.id" :value="f.id">
-                        {{ f.name }}
+                    <option v-for="o in sorts" :key="o.key" :value="o.key">
+                        {{ o.label }}
                     </option>
                 </NativeSelect>
                 <NativeSelect
@@ -1484,24 +1804,63 @@ defineExpose({ scan, busy });
                     <IconChecks class="size-4" />
                     {{ selectMode ? 'Đang chọn…' : 'Chọn' }}
                 </Button>
-                <label class="flex cursor-pointer items-center gap-2 text-sm">
+                <Button
+                    v-if="hasFilter"
+                    size="sm"
+                    variant="ghost"
+                    class="gap-1 text-muted-foreground"
+                    data-testid="fork-rieng-clear-filters"
+                    @click="clearFilters"
+                >
+                    <IconX class="size-3.5" /> Xoá bộ lọc
+                </Button>
+            </div>
+            <div
+                class="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+            >
+                <label class="flex cursor-pointer items-center gap-2">
                     <input
                         type="checkbox"
                         class="size-5 cursor-pointer accent-[var(--primary)]"
                         :checked="allSelected"
-                        :disabled="!plain.length"
+                        :disabled="!selectableCount || selectingAll"
                         data-testid="fork-rieng-select-all"
-                        @change="toggleAll"
+                        @change="onSelectAllChange"
                     />
-                    Chọn tất cả ({{ plain.length }})
-                    <span
-                        v-if="dupCount"
-                        class="text-xs text-muted-foreground"
-                        data-testid="fork-rieng-select-all-note"
-                        >· bỏ qua {{ dupCount }} video trùng</span
-                    >
+                    Chọn tất cả {{ selectableCount }} video chưa đăng (mọi
+                    trang)
                 </label>
+                <button
+                    v-if="pagePlain.length"
+                    type="button"
+                    class="text-primary underline-offset-2 hover:underline"
+                    data-testid="fork-rieng-select-page"
+                    @click="selectPage"
+                >
+                    Chọn {{ pagePlain.length }} video trong trang này
+                </button>
+                <span
+                    v-if="selectAllSkipped"
+                    class="text-xs text-muted-foreground"
+                    data-testid="fork-rieng-select-all-note"
+                    >· bỏ qua {{ selectAllSkipped }} video trùng (tự chọn nếu
+                    muốn)</span
+                >
+                <span
+                    v-if="capped"
+                    class="text-xs text-amber-700 dark:text-amber-300"
+                    data-testid="fork-rieng-select-cap"
+                    >Chỉ chọn tối đa {{ SELECT_MAX }} video một lần</span
+                >
             </div>
+            <p
+                v-if="selectMode"
+                class="w-full text-xs text-muted-foreground"
+                data-testid="fork-rieng-hint"
+            >
+                Mẹo: giữ Shift để chọn một dãy, kéo chuột để quét chọn, Ctrl+A
+                chọn tất cả, Esc bỏ chọn.
+            </p>
         </section>
 
         <!-- Khung chọn khi kéo -->
@@ -1517,9 +1876,37 @@ defineExpose({ scan, busy });
             data-testid="fork-rieng-band"
         />
 
+        <!-- Điểm neo đầu lưới + dòng "Trang X / Y · N video" -->
+        <div
+            v-if="videos.data.length || loading"
+            ref="gridTop"
+            class="scroll-mt-4 lg:scroll-mt-40"
+        >
+            <KhoPager
+                v-if="videos.data.length"
+                :page="videos.current_page"
+                :last="videos.last_page"
+                :total="videos.total"
+                @go="(n: number) => go({ page: n })"
+            />
+        </div>
+
+        <!-- Khung xương trong lúc tải trang / bộ lọc mới -->
+        <div
+            v-if="loading"
+            class="grid grid-cols-2 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(232px,1fr))]"
+            data-testid="fork-rieng-skeleton"
+        >
+            <div v-for="i in 10" :key="i" class="flex flex-col gap-2">
+                <Skeleton class="aspect-[9/16] w-full rounded-xl" />
+                <Skeleton class="h-4 w-2/3" />
+                <Skeleton class="h-3 w-full" />
+            </div>
+        </div>
+
         <!-- Lưới video: bấm để mở, nhấn giữ chuột và kéo (hoặc nhấn giữ trên điện thoại) để quét chọn -->
         <section
-            v-if="videos.data.length"
+            v-else-if="videos.data.length"
             ref="grid"
             class="grid grid-cols-2 gap-4 select-none [-webkit-touch-callout:none] sm:grid-cols-[repeat(auto-fill,minmax(232px,1fr))]"
             :class="[
@@ -1552,9 +1939,18 @@ defineExpose({ scan, busy });
             class="gap-2 py-6"
             :icon="IconVideoOff"
             title="Chưa có video nào trong thư mục này"
-            :description="`App nhận video ${FORMATS} (kể cả thư mục con, trừ thư mục bắt đầu bằng _). Bỏ video vào thư mục, nó sẽ tự hiện ở đây trong khoảng 10 giây khi ghi xong, bạn không cần bấm gì.`"
+            :description="`App nhận video ${FORMATS} (kể cả thư mục con, trừ thư mục bắt đầu bằng _). Bỏ video vào thư mục, nó sẽ tự hiện ở đây trong khoảng 10 giây khi ghi xong, anh không cần bấm gì.`"
             data-testid="fork-rieng-empty"
-        />
+        >
+            <Button
+                v-if="hasFilter"
+                size="sm"
+                variant="outline"
+                @click="clearFilters"
+            >
+                <IconX class="size-4" /> Xoá bộ lọc
+            </Button>
+        </EmptyState>
         <EmptyState
             v-else
             class="gap-2 py-6"
@@ -1567,9 +1963,30 @@ defineExpose({ scan, busy });
             :description="
                 folders.length
                     ? 'Thử đổi bộ lọc, hoặc bấm Quét lại nếu vừa bỏ video mới vào thư mục.'
-                    : `Bấm Thêm thư mục ở trên rồi dán đường dẫn thư mục chứa video của bạn, app sẽ tự tìm các file ${FORMATS}.`
+                    : `Bấm Thêm thư mục rồi dán đường dẫn thư mục chứa video của anh, app sẽ tự tìm các file ${FORMATS}.`
             "
-        />
+            :data-testid="
+                folders.length ? 'fork-rieng-no-match' : 'fork-rieng-no-folder'
+            "
+        >
+            <Button
+                v-if="!folders.length"
+                size="sm"
+                data-testid="fork-rieng-empty-add"
+                @click="folderDialog = true"
+            >
+                <IconFolderPlus class="size-4" /> Thêm thư mục
+            </Button>
+            <Button
+                v-else-if="hasFilter"
+                size="sm"
+                variant="outline"
+                data-testid="fork-rieng-empty-clear"
+                @click="clearFilters"
+            >
+                <IconX class="size-4" /> Xoá bộ lọc
+            </Button>
+        </EmptyState>
 
         <Callout
             v-if="accounts.length && !accounts.some((a) => a.usable)"
@@ -1583,28 +2000,13 @@ defineExpose({ scan, busy });
             }}.
         </Callout>
 
-        <div
-            v-if="videos.last_page > 1"
-            class="flex items-center justify-center gap-3 text-sm"
-        >
-            <Button
-                size="sm"
-                variant="outline"
-                :disabled="videos.current_page <= 1"
-                @click="go({ page: videos.current_page - 1 })"
-                >Trước</Button
-            >
-            <span class="tabular-nums"
-                >Trang {{ videos.current_page }} / {{ videos.last_page }}</span
-            >
-            <Button
-                size="sm"
-                variant="outline"
-                :disabled="videos.current_page >= videos.last_page"
-                @click="go({ page: videos.current_page + 1 })"
-                >Sau</Button
-            >
-        </div>
+        <KhoPager
+            v-if="videos.last_page > 1 && !loading"
+            :page="videos.current_page"
+            :last="videos.last_page"
+            :total="videos.total"
+            @go="(n: number) => go({ page: n })"
+        />
 
         <!-- Nút nổi: Giỏ chờ đăng (không phải giỏ hàng TikTok Shop) -->
         <button
@@ -1624,7 +2026,7 @@ defineExpose({ scan, busy });
                 )
             "
             data-testid="fork-rieng-queue-btn"
-            title="Giỏ chờ đăng: các video bạn để dành đăng sau"
+            title="Giỏ chờ đăng: các video anh để dành đăng sau"
             @click="queueOpen = true"
         >
             <IconClipboardList class="size-5" />
@@ -1718,6 +2120,14 @@ defineExpose({ scan, busy });
             @saved="onAutoSaved"
         />
 
+        <MixDialog
+            v-model:open="mixOpen"
+            :accounts="
+                accounts
+                    .filter((a) => a.usable)
+                    .map((a) => ({ id: a.id, display_name: a.name }))
+            "
+        />
         <BatchDialog
             v-model:open="dialogOpen"
             :items="batchItems"

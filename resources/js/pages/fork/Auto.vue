@@ -3,16 +3,23 @@
 // hai bên cao bằng nhau và cuộn bên trong; dưới cùng là Kho theo sản phẩm trải ngang.
 // Chữ trên trang viết thẳng bằng tiếng Việt.
 import { Link, router } from '@inertiajs/vue3';
-import { IconBolt, IconBrandTiktok, IconChevronRight } from '@tabler/icons-vue';
+import {
+    IconBolt,
+    IconBrandTiktok,
+    IconChevronRight,
+    IconRefresh,
+} from '@tabler/icons-vue';
 import { useMediaQuery } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import ChannelPanel from '@/components/fork/auto/ChannelPanel.vue';
+import { dragging } from '@/components/fork/auto/dragMove';
 import FailedPostsBlock from '@/components/fork/auto/FailedPostsBlock.vue';
 import OnboardingCard from '@/components/fork/auto/OnboardingCard.vue';
 import RecentList from '@/components/fork/auto/RecentList.vue';
 import ScheduleBoard from '@/components/fork/auto/ScheduleBoard.vue';
 import TodayHero from '@/components/fork/auto/TodayHero.vue';
+import TrashDialog from '@/components/fork/auto/TrashDialog.vue';
 import type {
     AccountRow,
     DirectWindow,
@@ -33,6 +40,7 @@ import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
 import { cardCls, fmtNum } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
 
 const props = defineProps<{
@@ -167,31 +175,96 @@ const stockShown = computed(() =>
 const sideBySide = useMediaQuery('(min-width: 1280px)');
 
 // Số liệu đọc từ DB lúc tải trang; tự làm mới (chỉ khi đang xem trang) để không hiện số cũ.
-let refreshTimer: ReturnType<typeof setInterval> | undefined;
+// Nhóm nhanh (30 giây): lịch, vừa đăng, bài lỗi, sức khoẻ kênh. Nhóm chậm (5 phút): kho, số liệu, kênh, cài đặt.
+const FAST_ONLY = ['lich', 'recent', 'failed_posts', 'failed_recent', 'health'];
+const SLOW_ONLY = [
+    'products',
+    'stock',
+    'trend',
+    'accounts',
+    'direct_window',
+    'onboarding',
+    'insights',
+];
+let fastTimer: ReturnType<typeof setInterval> | undefined;
+let slowTimer: ReturnType<typeof setInterval> | undefined;
+
+const trashOpen = ref(false);
+const updatedAt = ref(Date.now());
+const inflight = ref(0);
+const reloading = computed(() => inflight.value > 0);
+
+// Đang kéo thả hoặc đang mở hộp thoại thì khoan làm mới, kẻo làm mất thao tác của anh.
+const busyUi = () =>
+    dragging.value !== null || !!document.querySelector('[role="dialog"]');
+
+const reloadOnly = (only: string[]) => {
+    inflight.value++;
+    router.reload({
+        only,
+        onFinish: () => {
+            inflight.value--;
+            updatedAt.value = Date.now();
+        },
+    });
+};
+
+const tick = (only: string[]) => {
+    if (document.visibilityState === 'visible' && !busyUi()) {
+        reloadOnly(only);
+    }
+};
+
+// Nút "Làm mới ngay" / phím R: làm mới cả hai nhóm.
+const refreshNow = () => reloadOnly([...FAST_ONLY, ...SLOW_ONLY]);
+
+const onVisible = () => {
+    if (document.visibilityState === 'visible' && !busyUi()) {
+        reloadOnly(FAST_ONLY);
+    }
+};
+
+// Phím tắt: R = làm mới, T = mở Thùng rác. Bỏ qua khi đang gõ chữ hoặc đang mở hộp thoại.
+const onKey = (ev: KeyboardEvent) => {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) {
+        return;
+    }
+
+    const el = ev.target as HTMLElement | null;
+
+    if (
+        el?.closest(
+            'input, textarea, select, [contenteditable=""], [contenteditable="true"]',
+        ) ||
+        document.querySelector('[role="dialog"]')
+    ) {
+        return;
+    }
+
+    const k = ev.key.toLowerCase();
+
+    if (k === 'r') {
+        ev.preventDefault();
+        refreshNow();
+    } else if (k === 't') {
+        ev.preventDefault();
+        trashOpen.value = true;
+    }
+};
 
 onMounted(() => {
-    refreshTimer = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-            router.reload({
-                only: [
-                    'products',
-                    'stock',
-                    'recent',
-                    'failed_recent',
-                    'failed_posts',
-                    'trend',
-                    'onboarding',
-                    'lich',
-                    'direct_window',
-                    'health',
-                    'accounts',
-                ],
-            });
-        }
-    }, 30000);
+    fastTimer = setInterval(() => tick(FAST_ONLY), 30000);
+    slowTimer = setInterval(() => tick(SLOW_ONLY), 300000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('keydown', onKey);
 });
 
-onBeforeUnmount(() => clearInterval(refreshTimer));
+onBeforeUnmount(() => {
+    clearInterval(fastTimer);
+    clearInterval(slowTimer);
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('keydown', onKey);
+});
 </script>
 
 <template>
@@ -201,15 +274,40 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
         testid="fork-auto-page"
     >
         <template #actions>
-            <Button
-                :disabled="planning || !channelsOn.length"
-                data-testid="fork-auto-plan-now"
-                @click="planNow"
+            <span
+                class="mr-1 hidden text-[0.75rem] text-muted-foreground tabular-nums sm:inline"
+                data-testid="fork-auto-updated-at"
+                >Cập nhật {{ dayjs(updatedAt).format('HH:mm') }}</span
             >
-                <Spinner v-if="planning" class="size-4" />
-                <IconBolt v-else class="size-4" />
-                {{ planning ? 'Đang xếp lịch…' : 'Xếp lịch ngay' }}
+            <Button
+                size="icon-sm"
+                variant="ghost"
+                title="Làm mới ngay (phím R; phím T mở Thùng rác)"
+                aria-label="Làm mới ngay"
+                :disabled="reloading"
+                data-testid="fork-auto-refresh"
+                @click="refreshNow"
+            >
+                <Spinner v-if="reloading" class="size-4" />
+                <IconRefresh v-else class="size-4" />
             </Button>
+            <span
+                :title="
+                    !channelsOn.length
+                        ? 'Bật ít nhất một kênh để xếp lịch'
+                        : undefined
+                "
+            >
+                <Button
+                    :disabled="planning || !channelsOn.length"
+                    data-testid="fork-auto-plan-now"
+                    @click="planNow"
+                >
+                    <Spinner v-if="planning" class="size-4" />
+                    <IconBolt v-else class="size-4" />
+                    {{ planning ? 'Đang xếp lịch…' : 'Xếp lịch ngay' }}
+                </Button>
+            </span>
         </template>
 
         <OnboardingCard v-if="onboarding" :onboarding="onboarding" />
@@ -316,6 +414,7 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                             :today="lich.channels[a.id]?.today"
                             :chrome="health.channels.find((c) => c.id === a.id)"
                             :blocked-count="blockedOf(a.id)"
+                            :lich="lich"
                         />
                     </section>
 
@@ -466,5 +565,8 @@ onBeforeUnmount(() => clearInterval(refreshTimer));
                 </div>
             </section>
         </template>
+
+        <!-- Phím T: mở Thùng rác (cùng hộp với nút Thùng rác ở Lịch đăng) -->
+        <TrashDialog v-model:open="trashOpen" />
     </AutoShell>
 </template>

@@ -55,6 +55,7 @@ class AutoAccount extends Model
     {
         return [
             'enabled' => 'boolean',
+            'mix_products' => 'boolean',
             'daily_cap' => 'integer',
             'schedule_ahead_days' => 'integer',
             'window_start' => 'integer',

@@ -2,6 +2,7 @@
 // Thẻ video trong kho: rê chuột để xem trước (tự phát, tắt tiếng), có thao tác nhanh mở TikTok.
 import { router } from '@inertiajs/vue3';
 import {
+    IconCheck,
     IconExternalLink,
     IconMovie,
     IconPlayerPlayFilled,
@@ -25,8 +26,33 @@ const props = defineProps<{
     video: KhoVideo;
     /** Dùng trong popup "Bàn làm việc": "Thử lại" giữ nguyên trang đang mở và báo `retried`. */
     inPlace?: boolean;
+    /** Đang ở chế độ "Chọn" (Kho Xưởng Video): thẻ thử lại được hiện ô chọn, bấm vào thẻ là chọn / bỏ chọn. */
+    selectMode?: boolean;
+    selected?: boolean;
 }>();
-const emit = defineEmits<{ open: []; retried: [] }>();
+const emit = defineEmits<{
+    open: [];
+    retried: [];
+    toggle: [shift: boolean];
+}>();
+
+// Chỉ video lỗi chắc chắn chưa lên TikTok mới chọn được (để "Thử lại" hàng loạt).
+const selectable = computed(
+    () => !!props.selectMode && !!props.video.can_retry,
+);
+
+const onCardClick = (e: MouseEvent) => {
+    if (selectable.value) {
+        emit('toggle', e.shiftKey);
+
+        return;
+    }
+
+    emit('open');
+};
+
+const onCardKey = () =>
+    selectable.value ? emit('toggle', false) : emit('open');
 
 const coverFailed = ref(false);
 const coverLoaded = ref(false);
@@ -81,11 +107,16 @@ const retry = () => {
     <div
         role="button"
         tabindex="0"
-        class="group flex cursor-pointer flex-col overflow-hidden rounded-[14px] border bg-card text-left shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
+        :class="
+            cn(
+                'group flex cursor-pointer flex-col overflow-hidden rounded-[14px] border bg-card text-left shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]',
+                selected && 'ring-2 ring-primary',
+            )
+        "
         :data-testid="`fork-kho-card-${video.id}`"
-        @click="$emit('open')"
-        @keydown.enter.self.prevent="$emit('open')"
-        @keydown.space.self.prevent="$emit('open')"
+        @click="onCardClick"
+        @keydown.enter.self.prevent="onCardKey"
+        @keydown.space.self.prevent="onCardKey"
         @mouseenter="enter"
         @mouseleave="leave"
     >
@@ -93,7 +124,10 @@ const retry = () => {
             :class="
                 cn(
                     'relative aspect-[9/16] w-full overflow-hidden bg-muted',
-                    video.has_cover && !coverFailed && !coverLoaded && 'animate-pulse',
+                    video.has_cover &&
+                        !coverFailed &&
+                        !coverLoaded &&
+                        'animate-pulse',
                 )
             "
         >
@@ -156,8 +190,32 @@ const retry = () => {
                 <IconPlayerPlayFilled class="size-10 text-white drop-shadow" />
             </span>
 
+            <!-- Ô chọn (chế độ "Chọn", chỉ video thử lại được) -->
+            <button
+                v-if="selectable"
+                type="button"
+                role="checkbox"
+                :aria-checked="!!selected"
+                :aria-label="`Chọn video ${video.file_name}`"
+                :data-testid="`fork-kho-check-${video.id}`"
+                :class="
+                    cn(
+                        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border-2 shadow-sm backdrop-blur transition',
+                        selected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-white/90 bg-black/35 text-transparent hover:bg-black/55',
+                    )
+                "
+                @click.stop="emit('toggle', $event.shiftKey)"
+                @keydown.enter.stop
+                @keydown.space.stop
+            >
+                <IconCheck class="size-5" stroke-width="3" />
+            </button>
+
             <!-- Thao tác nhanh -->
             <div
+                v-if="!selectable"
                 class="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
             >
                 <a

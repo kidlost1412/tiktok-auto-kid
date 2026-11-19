@@ -47,6 +47,8 @@ use Throwable;
  */
 final class KhoController extends Controller
 {
+    use ScopesToOwner;
+
     private const int PER_PAGE = 30;
 
     /** Tab trạng thái → các trạng thái video. */
@@ -283,6 +285,43 @@ final class KhoController extends Controller
         }
 
         return back()->with('flash.success', "Đã quét kho: {$r['new']} video mới, {$library->khoReport['error']} lỗi, {$library->khoReport['waiting']} đang chờ.");
+    }
+
+    /**
+     * "Thử lại (N)": đưa nhiều video lỗi về kho một lần. Mỗi video đi qua RetryFailed như nút "Thử lại" của từng video
+     * (chỉ khi chắc chắn chưa có gì lên TikTok); video không phải của chủ app hoặc không tìm thấy thì bỏ qua.
+     */
+    public function retryMany(Request $request): JsonResponse
+    {
+        $accounts = $this->tiktokAccounts($this->authorizeOwner($request));
+        $in = $request->validate(['ids' => ['required', 'array', 'min:1', 'max:200'], 'ids.*' => ['integer']]);
+        $ids = array_values(array_unique(array_map('intval', $in['ids'])));
+
+        $videos = AutoVideo::query()->notRieng()->whereNull('trashed_at')->whereIn('id', $ids)->get()->keyBy('id');
+        $retry = app(RetryFailed::class);
+        $done = 0;
+        $refused = [];
+
+        foreach ($ids as $id) {
+            $video = $videos[$id] ?? null;
+
+            // Không phải video của chủ app (kênh khác tài khoản) thì coi như không có.
+            if ($video === null || ($video->social_account_id !== null && ! $accounts->contains('id', $video->social_account_id))) {
+                $refused[] = ['id' => $id, 'reason' => 'Không tìm thấy video này.'];
+
+                continue;
+            }
+
+            $reason = $retry->retry($video);
+
+            if ($reason === null) {
+                $done++;
+            } else {
+                $refused[] = ['id' => $id, 'reason' => $reason];
+            }
+        }
+
+        return response()->json(['ok' => true, 'retried' => $done, 'refused' => $refused]);
     }
 
     /** Phát video cho khung xem trước. Chỉ phục vụ file nằm dưới thư mục hub, tra bằng id trong DB. */
@@ -605,13 +644,5 @@ final class KhoController extends Controller
             'rieng_product' => $info->product($v, $products, $images),
             'folder' => RiengFolder::query()->find((int) data_get($v->meta, 'folder_id'))?->displayName(),
         ];
-    }
-
-    private function authorizeOwner(Request $request): void
-    {
-        abort_unless(
-            $request->user()?->isAccountOwner(),
-            SymfonyResponse::HTTP_FORBIDDEN,
-        );
     }
 }

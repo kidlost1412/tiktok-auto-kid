@@ -19,9 +19,11 @@ import {
 import { computed, watch } from 'vue';
 
 import { banBao } from '@/components/fork/nha/ban/bus';
+import LiveManHinh from '@/components/fork/nha/ban/LiveManHinh.vue';
 import { BAN, BAN_THU_TU } from '@/components/fork/nha/ban/registry';
 import SoTuThoai from '@/components/fork/nha/ban/SoTuThoai.vue';
 import type { NhaData } from '@/components/fork/nha/types';
+import { useTrucTiepKho } from '@/components/fork/nha/useTrucTiep';
 import { cn } from '@/lib/utils';
 
 const vai = defineModel<string | null>('vai', { required: true });
@@ -50,18 +52,27 @@ const open = computed({
     },
 });
 
+// Việc đang chạy trực tiếp của vai này (màn hình chữ thật ở đầu bàn). Sảnh có bảng tin riêng nên không hiện ở đây.
+const kho = useTrucTiepKho();
+const nhanVat = computed(() => def.value?.vai ?? vai.value ?? '');
+const truc = computed(() =>
+    vai.value === 'sanh' || !kho ? [] : kho.cua(nhanVat.value).slice(0, 3),
+);
+
 const trangThai = computed(() => {
-    const k = def.value?.vai ?? vai.value ?? '';
+    const k = nhanVat.value;
     const v = props.data?.vai?.[k];
     const down = !props.data || props.data.mode === 'down';
-    const st = down ? 'sleep' : (v?.state ?? 'idle');
+    const dangLam = !down && !!kho?.dangLam.value.has(k);
+    const st = down ? 'sleep' : dangLam ? 'working' : (v?.state ?? 'idle');
 
     return {
         st,
         text:
             st === 'sleep'
                 ? 'Đang nghỉ'
-                : (v?.bubble ??
+                : ((dangLam ? kho?.loi.value[k] : null) ??
+                  v?.bubble ??
                   (st === 'working' ? 'Đang làm việc' : 'Đang rảnh')),
     };
 });
@@ -95,7 +106,7 @@ watch(vai, (now, before) => {
                 @open-auto-focus.prevent
             >
                 <header
-                    class="flex shrink-0 items-center gap-4 border-b bg-card/60 px-6 py-4"
+                    class="flex shrink-0 items-center gap-4 border-b bg-card/60 px-4 py-4 sm:px-6"
                 >
                     <span
                         :class="
@@ -185,10 +196,17 @@ watch(vai, (now, before) => {
                 </header>
 
                 <div
-                    class="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5"
+                    class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5"
                 >
+                    <LiveManHinh
+                        v-for="it in truc"
+                        :key="it.id"
+                        :item="it"
+                        class="mb-4 shrink-0"
+                    />
                     <SoTuThoai
                         v-if="TU_THOAI.has(vai ?? '')"
+                        :dang-lam="truc.length > 0"
                         :data="data"
                         :who="def.vai ?? vai ?? ''"
                     />
