@@ -783,7 +783,11 @@ _JOB_RONG = _job_rong()          # job khi chưa có sản phẩm nào học
 _LOCK = threading.Lock()         # bảo vệ kiểm tra "sản phẩm này đang học chưa" + tạo job/run
 _LUU_LOCK = threading.Lock()
 FILE_JOB = "hoc-canh-job.json"
-MSG_KHOI_PHUC = "Xưởng vừa khởi động lại giữa lúc học — đã dừng gọn việc dở. Bấm Học cảnh để làm tiếp (video đã học được giữ)."
+MSG_KHOI_PHUC = "Xưởng vừa khởi động lại giữa lúc học — sẽ tự học tiếp khi Antigravity sẵn sàng (video đã học được giữ)."
+MSG_KHOI_PHUC_TAY = "Xưởng vừa khởi động lại giữa lúc học — chưa tự học tiếp được ({ly_do}). Bấm Học cảnh để làm tiếp (video đã học được giữ)."
+TIEP_CHO_S = 15                  # bật lại hub: chờ chừng này giây cho app ổn định rồi mới tự học tiếp
+TIEP_HAN_S = 30 * 60             # chờ Antigravity mở tối đa chừng này; quá thì thôi, để anh bấm tay
+CAN_TIEP = []                    # [(mã sản phẩm, {"lai", "chi"})] khoi_phuc() tìm thấy đang học dở → tu_hoc_tiep_nen() học tiếp
 TOI_DA_SP_MAC_DINH = 3           # số sản phẩm học cùng lúc tối đa (hoc_canh.toi_da_sp); dư thì xếp hàng
 _SLOT = threading.Condition()
 _HANG = []                       # khoá các sản phẩm đang chờ lượt (FIFO)
@@ -842,7 +846,8 @@ def _luu():
                 jobs = {}
                 for k, j in _JOBS.items():
                     r = _RUNS.get(k) or {}
-                    jobs[k] = {"job": dict(j, loi=list(j.get("loi") or [])), "conv": sorted(r.get("conv") or ()), "kho": str(r.get("kho") or "")}
+                    jobs[k] = {"job": dict(j, loi=list(j.get("loi") or [])), "conv": sorted(r.get("conv") or ()), "kho": str(r.get("kho") or ""),
+                               "tiep": r.get("tiep")}
             f = LS / FILE_JOB
             f.parent.mkdir(parents=True, exist_ok=True)
             tmp = f.with_name(f.name + f".{os.getpid()}.{threading.get_ident()}.tmp")
@@ -886,10 +891,73 @@ def khoi_phuc():
         nj.update(dang_chay=False, dung=True, dang_dung=False, trang_thai="dung", thong_bao=MSG_KHOI_PHUC, hien_tai="", giai_doan="", cho=0)
         with _RUN_LOCK:
             _JOBS[khoa] = nj; _ULTIMA[0] = khoa
+        tiep = e.get("tiep") if isinstance(e.get("tiep"), dict) else {}
+        if jb.get("ma") or k:
+            CAN_TIEP.append((str(jb.get("ma") or k), {"lai": bool(tiep.get("lai")), "chi": tiep.get("chi") or None}))
     if not co:
         return None
     _luu()
     return tong
+
+
+def tu_hoc_tiep(bat_dau, ngu=time.sleep, kiem_mo=None, cho_s=None, han_s=None):
+    """Học tiếp các sản phẩm khoi_phuc() thấy đang học dở (hub bị tắt giữa chừng: cập nhật app, tắt máy…). Video đã học được giữ nên chỉ làm phần còn lại.
+    Chờ Antigravity mở (tối đa han_s); sản phẩm anh đã tự bấm học/dừng trong lúc chờ thì thôi không đụng. bat_dau(ma, lai, chi) → {"ok", "loi", "can"}.
+    Tắt bằng hoc_canh.tu_hoc_tiep = false trong config. → [mã đã học tiếp]."""
+    if doc_cau_hinh().get("tu_hoc_tiep") is False:
+        for ma, _ in CAN_TIEP:
+            job(ma).update(thong_bao=MSG_KHOI_PHUC_TAY.format(ly_do="đang tắt tự học tiếp"))
+        CAN_TIEP.clear(); _luu()
+        return []
+    kiem_mo = kiem_mo or (lambda: trang_thai_agy()["mo"])
+    cho_s = TIEP_CHO_S if cho_s is None else cho_s
+    han_s = TIEP_HAN_S if han_s is None else han_s
+    ngu(cho_s)
+    con = list(CAN_TIEP); CAN_TIEP.clear(); da = []; t = 0
+    while con:
+        if kiem_mo():
+            sau, moi = [], []
+            for ma, tiep in con:
+                j = job(ma)
+                if j.get("dang_chay") or j.get("thong_bao") != MSG_KHOI_PHUC:      # anh đã tự bấm học / việc khác đã ghi đè → để yên
+                    continue
+                kq = bat_dau(ma, tiep.get("lai"), tiep.get("chi")) or {}
+                if kq.get("ok"):
+                    da.append(ma); moi.append(ma); print(f"Học cảnh: tự học tiếp {ma} sau khi Xưởng khởi động lại.")
+                elif kq.get("can") == "mo":
+                    sau.append((ma, tiep))
+                else:
+                    job(ma).update(thong_bao=MSG_KHOI_PHUC_TAY.format(ly_do=str(kq.get("loi") or "lỗi lạ")[:120])); _luu()
+            con = sau
+            if moi:
+                ngu(3)
+                for ma in moi:                                                     # luồng học chết ngay (vd. hồ sơ sản phẩm hỏng) → đừng để câu "sẽ tự học tiếp" treo mãi
+                    j = job(ma)
+                    if not j.get("dang_chay") and j.get("thong_bao") == MSG_KHOI_PHUC:
+                        j.update(thong_bao=MSG_KHOI_PHUC_TAY.format(ly_do="không bắt đầu được")); _luu()
+            if not con:
+                break
+        if t >= han_s:
+            for ma, _ in con:
+                if job(ma).get("thong_bao") == MSG_KHOI_PHUC:
+                    job(ma).update(thong_bao=MSG_KHOI_PHUC_TAY.format(ly_do="Antigravity chưa mở"))
+            _luu()
+            break
+        ngu(10); t += 10
+    return da
+
+
+def tu_hoc_tiep_nen(bat_dau):
+    """Chạy tu_hoc_tiep ở luồng nền (lúc hub khởi động). Không có gì dở thì thôi."""
+    if not CAN_TIEP:
+        return False
+    def chay():
+        try:
+            tu_hoc_tiep(bat_dau)
+        except Exception as e:
+            print("Tự học tiếp học cảnh bị lỗi:", e)
+    threading.Thread(target=chay, daemon=True, name="hoc-canh-tiep").start()
+    return True
 
 
 def doc_cau_hinh():
@@ -1110,6 +1178,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             return {"ok": False, "loi": "Đang học rồi."}
         job = dict(_job_rong(), ma=khoa, dang_chay=True, trang_thai="dang_chay", thong_bao="Đang kiểm kho…", bat_dau=time.time(), giai_doan="cat", model=model)
         run = _run_moi(khoa, kho, job); huy = run["huy"]
+        run["tiep"] = {"lai": bool(lai), "chi": [str(x) for x in chi] if chi else None} if ma else None     # hub tắt giữa chừng → bật lại tự học tiếp đúng kiểu này
         with _RUN_LOCK:
             _RUNS[khoa] = run; _JOBS[khoa] = job; _ULTIMA[0] = khoa
     tok = _CUR.set(run)                                   # luồng này (và các luồng con được sao ngữ cảnh) thuộc việc học của sản phẩm này

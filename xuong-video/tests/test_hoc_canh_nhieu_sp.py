@@ -186,6 +186,50 @@ class NhieuSanPhamTest(unittest.TestCase):
         with mock.patch.object(hc, "huy_cuoc_tro_chuyen", lambda c: self.fail("chỉ khôi phục 1 lần")):
             self.assertIsNone(hc.khoi_phuc())
 
+    def _dang_do(self, *ds):
+        hc.LS.mkdir(parents=True, exist_ok=True); hc.CAN_TIEP.clear(); self.addCleanup(hc.CAN_TIEP.clear)
+        jb = lambda ma: dict(hc._job_rong(), ma=ma, dang_chay=True, trang_thai="dang_chay", giai_doan="hoc")
+        (hc.LS / "hoc-canh-job.json").write_text(json.dumps({"jobs": {ma: dict({"job": jb(ma), "conv": [], "kho": ""}, **({"tiep": t} if t else {}))
+                                                                      for ma, t in ds}, "luc": 1}), encoding="utf-8")
+        with mock.patch.object(hc, "huy_cuoc_tro_chuyen", lambda c: None):
+            hc.khoi_phuc()
+
+    def test_tu_hoc_tiep_sau_khoi_dong_lai(self):
+        self._dang_do(("nano", {"lai": True, "chi": ["a.mp4"]}), ("cu", None))       # "cu": file trạng thái bản cũ (không có tiep)
+        self.assertEqual(sorted(m for m, _ in hc.CAN_TIEP), ["cu", "nano"])
+        goi = []
+        da = hc.tu_hoc_tiep(lambda ma, lai, chi: goi.append((ma, lai, chi)) or {"ok": True}, ngu=lambda s: None, kiem_mo=lambda: True)
+        self.assertEqual((sorted(da), sorted(goi)), (["cu", "nano"], [("cu", False, None), ("nano", True, ["a.mp4"])]))
+        self.assertEqual(hc.CAN_TIEP, [])
+
+    def test_tu_hoc_tiep_cho_antigravity_roi_bo_cuoc(self):
+        self._dang_do(("nano", None))
+        mo = iter([False, False, True]); goi = []
+        hc.tu_hoc_tiep(lambda ma, lai, chi: goi.append(ma) or {"ok": True}, ngu=lambda s: None, kiem_mo=lambda: next(mo), han_s=100)
+        self.assertEqual(goi, ["nano"])                                                    # chờ Antigravity mở rồi mới học tiếp
+        self._dang_do(("nano", None))
+        hc.tu_hoc_tiep(lambda *a: self.fail("Antigravity chưa mở thì không gọi"), ngu=lambda s: None, kiem_mo=lambda: False, han_s=20)
+        self.assertIn("Antigravity chưa mở", hc.job("nano")["thong_bao"]); self.assertIn("Bấm Học cảnh", hc.job("nano")["thong_bao"])
+
+    def test_tu_hoc_tiep_khong_de_len_viec_anh_tu_bam(self):
+        self._dang_do(("nano", None), ("dam", None))
+        hc.job("dam").update(thong_bao="Đã dừng.")                                         # anh tự bấm Dừng/học trong lúc chờ
+        goi = []
+        hc.tu_hoc_tiep(lambda ma, lai, chi: goi.append(ma) or {"ok": False, "loi": "Kho trống"}, ngu=lambda s: None, kiem_mo=lambda: True)
+        self.assertEqual(goi, ["nano"]); self.assertIn("Kho trống", hc.job("nano")["thong_bao"])
+
+    def test_tu_hoc_tiep_tat_trong_config(self):
+        self._dang_do(("nano", None)); self.cfg["tu_hoc_tiep"] = False
+        self.assertEqual(hc.tu_hoc_tiep(lambda *a: self.fail("đã tắt"), ngu=lambda s: None, kiem_mo=lambda: True), [])
+        self.assertIn("Bấm Học cảnh", hc.job("nano")["thong_bao"])
+
+    def test_luu_ghi_kieu_hoc_de_hoc_tiep(self):
+        k = _kho("T")
+        run = hc._run_moi("nano", k, dict(hc._job_rong(), ma="nano", dang_chay=True)); run["tiep"] = {"lai": True, "chi": None}
+        hc._RUNS["nano"] = run; hc._JOBS["nano"] = run["job"]; hc.LS.mkdir(parents=True, exist_ok=True); hc._luu()
+        d = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))
+        self.assertEqual(d["jobs"]["nano"]["tiep"], {"lai": True, "chi": None})
+
 
 if __name__ == "__main__":
     unittest.main()

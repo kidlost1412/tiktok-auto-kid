@@ -1765,6 +1765,7 @@ def main():
         print("Không ghim được bản gốc prompt:", e)
     try:                                         # lần trước tắt giữa lúc học cảnh → huỷ gọn cuộc trò chuyện Antigravity còn mở, dọn file tạm
         import hoc_canh; hoc_canh.khoi_phuc()
+        hoc_canh.tu_hoc_tiep_nen(lambda ma, lai, chi: hoc_canh_bat_dau(ma, lai=bool(lai), chi=chi))     # đang học dở → tự học tiếp (chờ Antigravity mở)
         hoc_canh.don_chat_sot_nen(cach_s=0)      # dọn bù chat cũ của app còn sót trong Antigravity (nền; Antigravity đóng thì để lần sau)
     except Exception as e:
         print("Không khôi phục được trạng thái học cảnh:", e)

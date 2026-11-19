@@ -493,7 +493,7 @@ class KhoiPhucTest(unittest.TestCase):
         self.assertEqual((n, huy), (1, ["cid-dang-chay"]))
         self.assertFalse((kho / "_tam" / "hoc-canh").exists())
         self.assertEqual((hc.JOB["trang_thai"], hc.JOB["dang_chay"], hc.JOB["dung"]), ("dung", False, True))
-        self.assertEqual(hc.JOB["thong_bao"], "Xưởng vừa khởi động lại giữa lúc học — đã dừng gọn việc dở. Bấm Học cảnh để làm tiếp (video đã học được giữ).")
+        self.assertEqual(hc.JOB["thong_bao"], hc.MSG_KHOI_PHUC)
         self.assertTrue(snap["job"]["ma"] == hc.JOB["ma"])
         now = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))["jobs"][str(kho)]
         self.assertFalse(now["job"]["dang_chay"]); self.assertEqual(now["conv"], [])
