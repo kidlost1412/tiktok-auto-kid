@@ -38,6 +38,8 @@ const props = defineProps<{
     code: string;
     label: string;
     state: Persona;
+    /** Kênh đang chọn: ảnh bìa lưu riêng cho từng kênh (kênh khác cùng sản phẩm có bộ riêng). */
+    kenh?: string | null;
     /** Dùng trong popup "Bàn làm việc": giữ nguyên trang đang mở (preserveState) và báo `saved` sau mỗi thay đổi. */
     inPlace?: boolean;
 }>();
@@ -187,7 +189,7 @@ function uploadFiles(files: File[]) {
     busy.value = true;
     router.post(
         `${base.value}/covers`,
-        { images },
+        { images, kenh: props.kenh ?? '' },
         {
             forceFormData: true,
             preserveScroll: true,
@@ -227,6 +229,7 @@ async function removeCover(file: string) {
 
     busy.value = true;
     router.delete(`${base.value}/covers/${file}`, {
+        data: { kenh: props.kenh ?? '' },
         preserveScroll: true,
         ...inPlaceOpts(),
         only: ['personalise', 'flash'],
@@ -255,6 +258,7 @@ function save() {
         router.put(
             `${base.value}/personalise`,
             {
+                kenh: props.kenh ?? '',
                 cover_mode: coverMode.value,
                 cover_fixed: effectiveFixed.value,
                 hashtags: tags.value,
@@ -332,8 +336,8 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                 <DialogDescription>
                     <template v-if="isProduct">
                         <b class="font-medium text-foreground">{{ label }}</b>
-                        · áp cho mọi bài của sản phẩm này (mọi quy cách, mọi
-                        kênh).
+                        · ảnh bìa chỉ cho kênh đang chọn; hashtag áp cho mọi
+                        kênh của sản phẩm này.
                     </template>
                     <template v-else>
                         Dùng cho sản phẩm không có hashtag riêng.
@@ -362,6 +366,8 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                             </h3>
                             <p class="text-sm text-muted-foreground">
                                 Ảnh hiện ở ô bài đăng trên trang cá nhân TikTok.
+                                Chỉ áp dụng cho kênh đang chọn — kênh khác cùng
+                                sản phẩm cài bìa riêng.
                             </p>
                         </div>
                     </div>

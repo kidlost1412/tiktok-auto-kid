@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Fork\AutoPost\Persona;
 
-use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Models\Post;
 use Illuminate\Http\UploadedFile;
@@ -15,7 +15,7 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * Ảnh bìa riêng của sản phẩm hub: lưu ở storage/app/covers/<mã sản phẩm>/<uuid>.jpg, luôn là JPEG (png/webp được đổi sang jpg).
+ * Ảnh bìa riêng của sản phẩm hub THEO KÊNH (ProductCover: mỗi kênh một bộ, kênh khác cùng sản phẩm không dùng chung): lưu ở storage/app/covers/<mã sản phẩm>/<uuid>.jpg, luôn là JPEG (png/webp được đổi sang jpg).
  * Chọn ảnh cho từng bài ở PostBuilder; đưa cho tiện ích qua /api/ext/cover (xem ChromeJobs, ExtensionController).
  */
 final class CoverStore
@@ -64,7 +64,7 @@ final class CoverStore
     }
 
     /** Đường dẫn file của ảnh có trong danh sách của sản phẩm, null nếu tên lạ hoặc file mất. */
-    public static function pathFor(AutoProduct $p, string $file): ?string
+    public static function pathFor(ProductCover $p, string $file): ?string
     {
         if (! collect($p->cover_images ?? [])->contains(fn ($i): bool => ($i['file'] ?? null) === $file)) {
             return null;
@@ -80,7 +80,7 @@ final class CoverStore
      *
      * @return array{entry: array<string, mixed>, warning: ?string}
      */
-    public function add(AutoProduct $p, UploadedFile $upload): array
+    public function add(ProductCover $p, UploadedFile $upload): array
     {
         if (count($p->cover_images ?? []) >= self::MAX_IMAGES) {
             throw new InvalidArgumentException('Mỗi sản phẩm tối đa '.self::MAX_IMAGES.' ảnh bìa.');
@@ -179,7 +179,7 @@ final class CoverStore
         return ['bytes' => $out, 'w' => $cw, 'h' => $ch, 'orig_w' => $w, 'orig_h' => $h];
     }
 
-    public function remove(AutoProduct $p, string $file): bool
+    public function remove(ProductCover $p, string $file): bool
     {
         $images = collect($p->cover_images ?? []);
 
@@ -206,14 +206,14 @@ final class CoverStore
      * Chọn ảnh bìa cho một bài mới theo chế độ của sản phẩm; null = dùng bìa mặc định của TikTok.
      * Ngẫu nhiên = xoay vòng đều: ưu tiên ảnh đã dùng ít nhất, không lặp ảnh vừa dùng (khi có từ 2 ảnh trở lên).
      */
-    public function pick(AutoProduct $p): ?string
+    public function pick(ProductCover $p): ?string
     {
         if (self::normalizeMode($p->cover_mode) === self::DEFAULT) {
             return null;
         }
 
         return DB::transaction(function () use ($p): ?string {
-            $fresh = AutoProduct::query()->whereKey($p->code)->lockForUpdate()->first() ?? $p;
+            $fresh = $p->exists ? (ProductCover::query()->whereKey($p->getKey())->lockForUpdate()->first() ?? $p) : $p;
             $files = collect($fresh->cover_images ?? [])
                 ->pluck('file')
                 ->filter(fn ($f): bool => is_string($f) && self::pathFor($fresh, $f) !== null)
@@ -270,7 +270,8 @@ final class CoverStore
 
         try {
             $code = AutoVideo::query()->whereKey($videoId)->value('product_code');
-            $product = $code ? AutoProduct::query()->find($code) : null;
+            $account = (string) $post->social_account_id;
+            $product = $code && $account !== '' ? ProductCover::for($account, (string) $code) : null;
 
             if ($product === null || self::normalizeMode($product->cover_mode) === self::DEFAULT) {
                 return null;
@@ -285,6 +286,7 @@ final class CoverStore
 
             return [
                 'code' => (string) $product->code,
+                'account' => $account,
                 'file' => $file,
                 'name' => 'cover.jpg',
                 'mime' => 'image/jpeg',
@@ -304,7 +306,7 @@ final class CoverStore
      *
      * @return list<array{file: string, name: string, w: int, h: int, orig_w: int|null, orig_h: int|null, size: int, url: string}>
      */
-    public function describe(AutoProduct $p): array
+    public function describe(ProductCover $p): array
     {
         return collect($p->cover_images ?? [])
             ->filter(fn ($i): bool => is_array($i) && is_string($i['file'] ?? null))

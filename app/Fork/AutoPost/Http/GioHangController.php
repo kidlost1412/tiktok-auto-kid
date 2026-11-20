@@ -65,8 +65,8 @@ final class GioHangController extends Controller
             'sample_hidden' => fn (): bool => $channel()['sample_hidden'] ?? false,
             'name_short_max' => ProductNaming::SHORT_MAX,
             'name_max' => CartRules::NAME_MAX,
-            // Cá nhân hoá (ảnh bìa, hashtag) theo mã sản phẩm hub, và hashtag mặc định chung.
-            'personalise' => fn (): array => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p)])->all(),
+            // Cá nhân hoá theo mã sản phẩm hub: ảnh bìa của KÊNH đang chọn (mỗi kênh một bộ), hashtag riêng của sản phẩm; và hashtag mặc định chung.
+            'personalise' => fn (): array => AutoProduct::query()->get()->mapWithKeys(fn (AutoProduct $p): array => [$p->code => PersonaliseController::stateFor($p, $selected?->id)])->all(),
             'personalise_default' => fn (): array => Hashtags::defaults(),
             'sync_ttl_minutes' => intdiv(ShopSync::REQUEST_TTL, 60),
         ]);

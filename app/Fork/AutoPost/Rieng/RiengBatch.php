@@ -10,6 +10,7 @@ use App\Fork\AutoPost\Media\ProductImages;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
 use App\Fork\AutoPost\Scheduling\MissingVideoFile;
@@ -93,7 +94,7 @@ final class RiengBatch
                     // Ảnh sản phẩm TikTok Shop đã gắn giỏ trên kênh này (ảnh có sẵn của app, không tải thêm).
                     'image' => $images->forSlot($socialAccountId, (string) $code, $qc),
                     'tags' => app(Hashtags::class)->configFor($product)['tags'],
-                    'cover_count' => $this->productCoverInfo($product)['count'],
+                    'cover_count' => $this->productCoverInfo($product, (string) $socialAccountId)['count'],
                 ];
             }
         }
@@ -335,7 +336,7 @@ final class RiengBatch
             }
 
             $ownToken = filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : null;
-            $coverInfo[$pick['code'] ?? ''] ??= $this->productCoverInfo($product);
+            $coverInfo[$pick['code'] ?? ''] ??= $this->productCoverInfo($product, (string) $social->id);
             $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, $coverInfo[$pick['code'] ?? ''], $row);
             $row['_at'] = $this->parseAt($item['at'] ?? null);
             $rows[] = $row;
@@ -362,8 +363,11 @@ final class RiengBatch
      *
      * @return array{active: bool, count: int, url: ?string}
      */
-    private function productCoverInfo(?AutoProduct $product): array
+    private function productCoverInfo(?AutoProduct $product, string $accountId): array
     {
+        // Bộ ảnh bìa của sản phẩm trên đúng kênh đang đăng (kênh khác cùng sản phẩm có bộ riêng).
+        $product = $product === null || $accountId === '' ? null : ProductCover::for($accountId, (string) $product->code);
+
         if ($product === null || CoverStore::normalizeMode($product->cover_mode) === CoverStore::DEFAULT) {
             return ['active' => false, 'count' => 0, 'url' => null];
         }

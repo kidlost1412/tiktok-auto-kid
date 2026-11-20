@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Hub\HubFiles;
 use App\Fork\AutoPost\Models\AutoAccount;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Persona\CoverStore;
@@ -135,8 +136,9 @@ afterEach(function (): void {
 
 test('default mode keeps the product cover rotation and says so in the preview', function () {
     $account = ($this->account)();
-    $res = app(CoverStore::class)->add($this->product, rcImage());
-    $this->product->forceFill(['cover_images' => [$res['entry']], 'cover_mode' => 'fixed', 'cover_fixed' => $res['entry']['file']])->save();
+    $cv = ProductCover::for((string) $account->id, $this->code);
+    $res = app(CoverStore::class)->add($cv, rcImage());
+    $cv->forceFill(['cover_images' => [$res['entry']], 'cover_mode' => 'fixed', 'cover_fixed' => $res['entry']['file']])->save();
     $a = ($this->rieng)('a.mp4');
 
     $options = app(RiengBatch::class)->productOptions((string) $account->id);
@@ -344,8 +346,9 @@ test('covers of a posted private video are kept exactly as long as its post medi
 
 test('a hub video built without an override never gets a rieng cover source', function () {
     $account = ($this->account)();
-    $res = app(CoverStore::class)->add($this->product, rcImage());
-    $this->product->forceFill(['cover_images' => [$res['entry']], 'cover_mode' => 'fixed', 'cover_fixed' => $res['entry']['file']])->save();
+    $cv = ProductCover::for((string) $account->id, $this->code);
+    $res = app(CoverStore::class)->add($cv, rcImage());
+    $cv->forceFill(['cover_images' => [$res['entry']], 'cover_mode' => 'fixed', 'cover_fixed' => $res['entry']['file']])->save();
     $path = $this->own.'/hub.mp4';
     file_put_contents($path, 'hub-bytes');
     $video = AutoVideo::create(['hash' => 'hubv', 'path' => $path, 'source' => 'hub', 'batch_date' => '2026-11-09', 'file_name' => 'hub.mp4', 'product_code' => $this->code, 'status' => 'new', 'caption' => 'Cap hub', 'hashtags' => []]);

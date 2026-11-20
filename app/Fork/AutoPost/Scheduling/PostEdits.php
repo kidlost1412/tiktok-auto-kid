@@ -9,6 +9,7 @@ use App\Fork\AutoPost\Hub\HubReporter;
 use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
@@ -323,7 +324,8 @@ final class PostEdits
             app(RiengCovers::class)->forget((int) $video->id);
             unset($meta['fork_cover'], $meta['fork_cover_src'], $videoMeta['cover']);
             $product = filled($video->product_code) ? AutoProduct::query()->find($video->product_code) : null;
-            $pick = $product !== null ? app(CoverStore::class)->pick($product) : null;
+            $acc = (string) ($postFill['social_account_id'] ?? $post->social_account_id ?? '');
+            $pick = $product !== null && $acc !== '' ? app(CoverStore::class)->pick(ProductCover::for($acc, (string) $product->code)) : null;
 
             if ($pick !== null) {
                 $meta['fork_cover'] = $pick;

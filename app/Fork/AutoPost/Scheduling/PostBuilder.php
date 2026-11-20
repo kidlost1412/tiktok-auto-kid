@@ -15,6 +15,7 @@ use App\Fork\AutoPost\Hub\HubFiles;
 use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
@@ -61,7 +62,7 @@ final class PostBuilder
         // $ownCover: ảnh bìa riêng của video (Kho riêng: tải lên / chọn khung), thay cho xoay vòng bìa sản phẩm.
         $coverFile = $ownCover !== null && $ownCover !== ''
             ? $ownCover
-            : ($product !== null ? app(CoverStore::class)->pick($product) : null);
+            : ($product !== null ? app(CoverStore::class)->pick(ProductCover::for((string) $social->id, (string) $product->code)) : null);
         $content = HubText::compose($final['caption'], $final['hashtags']);
 
         // Kho riêng: TikTok cho hẹn giờ không caption, nên bài này được phép rỗng (cờ fork_caption_optional trong meta).

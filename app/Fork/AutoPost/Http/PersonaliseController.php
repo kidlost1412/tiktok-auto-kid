@@ -6,6 +6,7 @@ namespace App\Fork\AutoPost\Http;
 
 use App\Fork\AutoPost\HubText;
 use App\Fork\AutoPost\Models\AutoProduct;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
 use Illuminate\Http\JsonResponse;
@@ -15,18 +16,23 @@ use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
-/** "Cá nhân hoá" theo sản phẩm hub: ảnh bìa riêng và hashtag riêng (cùng mặc định chung cho sản phẩm không có hashtag riêng). */
+/**
+ * "Cá nhân hoá" theo sản phẩm hub: ảnh bìa riêng THEO KÊNH (mỗi kênh một bộ, tham số "kenh") và hashtag riêng của sản phẩm
+ * (dùng chung mọi kênh; cùng mặc định chung cho sản phẩm không có hashtag riêng).
+ */
 final class PersonaliseController
 {
     use ScopesToOwner;
 
     /** @return array<string, mixed> dữ liệu cho giao diện */
-    public static function stateFor(AutoProduct $p): array
+    public static function stateFor(AutoProduct $p, ?string $socialAccountId = null): array
     {
+        $c = filled($socialAccountId) ? ProductCover::for((string) $socialAccountId, (string) $p->code) : null;
+
         return [
-            'cover_mode' => CoverStore::normalizeMode($p->cover_mode),
-            'cover_fixed' => $p->cover_fixed,
-            'covers' => app(CoverStore::class)->describe($p),
+            'cover_mode' => CoverStore::normalizeMode($c?->cover_mode),
+            'cover_fixed' => $c?->cover_fixed,
+            'covers' => $c === null ? [] : app(CoverStore::class)->describe($c),
             'hashtags' => Hashtags::normalize($p->hashtags),
             'hashtag_mode' => Hashtags::normalizeMode($p->hashtag_mode),
             'hashtag_pick' => max(0, (int) $p->hashtag_pick),
@@ -46,7 +52,7 @@ final class PersonaliseController
 
     public function update(Request $request, string $code): RedirectResponse
     {
-        $this->authorizeOwner($request);
+        $owner = $this->authorizeOwner($request);
         $product = AutoProduct::query()->findOrFail($code);
 
         $data = $request->validate([
@@ -58,14 +64,21 @@ final class PersonaliseController
         ]);
 
         $fill = [];
+        $coverFill = [];
 
         if (array_key_exists('cover_mode', $data)) {
-            $fill['cover_mode'] = $data['cover_mode'];
+            $coverFill['cover_mode'] = $data['cover_mode'];
         }
 
-        if (array_key_exists('cover_fixed', $data)) {
-            $fixed = $data['cover_fixed'];
-            $fill['cover_fixed'] = $fixed !== null && CoverStore::pathFor($product, $fixed) !== null ? $fixed : null;
+        if ($coverFill !== [] || array_key_exists('cover_fixed', $data)) {
+            $cover = $this->coverOf($request, $owner, $product);
+
+            if (array_key_exists('cover_fixed', $data)) {
+                $fixed = $data['cover_fixed'];
+                $coverFill['cover_fixed'] = $fixed !== null && CoverStore::pathFor($cover, $fixed) !== null ? $fixed : null;
+            }
+
+            $cover->forceFill($coverFill)->save();
         }
 
         if (array_key_exists('hashtags', $data)) {
@@ -78,15 +91,17 @@ final class PersonaliseController
             }
         }
 
-        $product->forceFill($fill)->save();
+        if ($fill !== []) {
+            $product->forceFill($fill)->save();
+        }
 
         return back()->with('flash.success', 'Đã lưu cá nhân hoá cho '.$product->short_name.'.');
     }
 
     public function upload(Request $request, string $code): RedirectResponse
     {
-        $this->authorizeOwner($request);
-        $product = AutoProduct::query()->findOrFail($code);
+        $owner = $this->authorizeOwner($request);
+        $product = $this->coverOf($request, $owner, AutoProduct::query()->findOrFail($code));
 
         $request->validate([
             'images' => ['required', 'array', 'min:1', 'max:'.CoverStore::MAX_IMAGES],
@@ -104,7 +119,10 @@ final class PersonaliseController
 
         foreach ($request->file('images', []) as $file) {
             try {
-                $product->refresh();
+                if ($product->exists) {
+                    $product->refresh();
+                }
+
                 $res = $store->add($product, $file);
                 $product->forceFill(['cover_images' => [...($product->cover_images ?? []), $res['entry']]])->save();
                 $ok++;
@@ -126,8 +144,8 @@ final class PersonaliseController
 
     public function destroy(Request $request, string $code, string $file): RedirectResponse
     {
-        $this->authorizeOwner($request);
-        $product = AutoProduct::query()->findOrFail($code);
+        $owner = $this->authorizeOwner($request);
+        $product = $this->coverOf($request, $owner, AutoProduct::query()->findOrFail($code));
 
         abort_unless(app(CoverStore::class)->remove($product, $file), SymfonyResponse::HTTP_NOT_FOUND);
 
@@ -137,12 +155,23 @@ final class PersonaliseController
     public function image(Request $request, string $code, string $file): BinaryFileResponse
     {
         $this->authorizeOwner($request);
-        $product = AutoProduct::query()->findOrFail($code);
-        $path = CoverStore::pathFor($product, $file);
+        // Tên file là uuid riêng từng ảnh: tìm bộ ảnh (của kênh nào cũng được) đang chứa nó.
+        $path = ProductCover::query()->where('auto_product_id', $code)->get()
+            ->map(fn (ProductCover $c): ?string => CoverStore::pathFor($c, $file))
+            ->first(fn (?string $p): bool => $p !== null);
 
         abort_if($path === null, SymfonyResponse::HTTP_NOT_FOUND);
 
         return response()->file($path, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=86400']);
+    }
+
+    /** Bộ ảnh bìa của sản phẩm trên kênh "kenh" (bắt buộc, phải là kênh TikTok của chủ app). */
+    private function coverOf(Request $request, string $owner, AutoProduct $product): ProductCover
+    {
+        $kenh = (string) $request->input('kenh', $request->query('kenh', ''));
+        abort_if($kenh === '', SymfonyResponse::HTTP_UNPROCESSABLE_ENTITY, 'Thiếu kênh cho ảnh bìa.');
+
+        return ProductCover::for($this->findAccount($owner, $kenh)->id, (string) $product->code);
     }
 
     /** Xem trước caption cuối cùng với một caption mẫu, theo cấu hình đang nhập (chưa cần lưu). */

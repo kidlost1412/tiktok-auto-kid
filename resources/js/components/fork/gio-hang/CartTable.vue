@@ -1269,6 +1269,7 @@ defineExpose({
 
         <PersonaliseDialog
             v-bind="dialogProps"
+            :kenh="selected"
             :in-place="embedded"
             @update:open="closePersonalise"
             @saved="onPersonaSaved"

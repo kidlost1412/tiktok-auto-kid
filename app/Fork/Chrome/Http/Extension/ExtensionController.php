@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Fork\Chrome\Http\Extension;
 
 use App\Fork\AutoPost\Media\ChannelAvatars;
-use App\Fork\AutoPost\Models\AutoProduct;
+use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Paths;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Rieng\RiengCovers;
@@ -377,7 +377,9 @@ final class ExtensionController
         if ($cv !== null && ($cv['src'] ?? null) === RiengCovers::SOURCE) {
             $path = app(RiengCovers::class)->path((int) ($cv['video'] ?? 0), (string) ($cv['file'] ?? ''));
         } else {
-            $product = $cv === null ? null : AutoProduct::query()->find((string) ($cv['code'] ?? ''));
+            // Bộ ảnh bìa theo kênh của bài (job cũ chưa ghi kênh thì lấy kênh của bài).
+            $acc = (string) ($cv['account'] ?? $job->post?->social_account_id ?? '');
+            $product = $cv === null || $acc === '' ? null : ProductCover::query()->where('social_account_id', $acc)->where('auto_product_id', (string) ($cv['code'] ?? ''))->first();
             $path = $product === null ? null : CoverStore::pathFor($product, (string) ($cv['file'] ?? ''));
         }
 
