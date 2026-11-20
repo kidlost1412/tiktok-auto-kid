@@ -149,9 +149,7 @@ THAN = {   # kiểu thân bài (cũng là DANG_BAI: trường `dang` của kịc
     'phep_tinh': 'Một phép tính tiện/đỡ công bằng con số thật (một chai pha bao nhiêu, phun được bao nhiêu, tính ra mỗi bình bao nhiêu tiền nếu hồ sơ có giá).',
     'tung_buoc': 'Hai hoặc ba bước làm, bước nào cũng thấy được bằng hình.',
     'khach_hoi': 'Một câu bà con hay hỏi về món này → trả lời gọn, chắc, như người rành hàng (không dựng chuyện người hỏi).',
-    'soi_nhan': 'Chỉ các bác cách nhận đúng hàng (tên, logo, chữ trên can/chai) như người bán chỉ khách quen; không đọc thông số.',
     'dau_hieu': 'Hai ba dấu hiệu nhìn thấy ngoài vườn → cùng một chai xử lý.',
-    'khang_dinh': 'Lời khẳng định thương hiệu gọn, chắc, nói thường như người bán quen.',
     'vi_sao': 'Giải thích MỘT cơ chế (vì sao nó làm được) lấy từ KIẾN THỨC thực tế của sản phẩm, bằng một ví von đời thường dễ hình dung.',
 }
 DANG_BAI = THAN
@@ -577,10 +575,38 @@ def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, h
     return prompt_mau.dien("bien-kich", **ctx_bien_kich(sp, n, angles, used, styles, dang, mo_dau, qc, hieu_qua, truc, loi_truoc, sp_day))
 
 
+# Góc "thương hiệu / nhận dạng chai" (tả nhãn trắng chữ đỏ, dạy nhận chai…) bỏ hẳn theo quyết định của chủ app: content kém.
+# Lọc ở đây nên hồ sơ còn ghi các góc này cũng không bao giờ được giao (đề bài chỉ gửi mô tả góc được giao).
+GOC_BO = {"thuong-hieu", "nhan-dien-chai", "nhan-dien", "nhan-dang"}
+GOC_MAC_DINH = ["cong-dung", "cach-dung", "so-sanh", "qua-tang"]   # sản phẩm mới chưa có góc bán
+
+
+# Máy kiểm loại câu tả màu bao bì ("nhãn trắng chữ đỏ", "nắp đỏ") hay dạy nhận chai ("coi đúng nhãn", "tem chính hãng").
+_RE_NHAN_DANG = re.compile(
+    r"(?<!\w)(?:nhãn|chai|can|nắp|vỏ chai|bao bì|chữ|logo|tem)\s+(?:màu\s+)?(?:trắng|đỏ|xanh|vàng|đen|tím|cam|hồng|nâu|bạc)(?!\w)"
+    r"|(?<!\w)(?:nhận|coi|xem|nhìn|soi)\s+(?:cho\s+)?(?:đúng|kỹ|kĩ)\s+(?:chai|can|nhãn|tem|logo)(?!\w)"   # không bắt "coi đúng hàng rồi mới trả tiền"
+    r"|(?<!\w)tem\s+chính\s+hãng(?!\w)", re.I)
+
+
+def sp_cho_bien_kich(sp):
+    """Hồ sơ gửi biên kịch: bỏ khoá nội bộ, bỏ mô tả nhận dạng bao bì (nhan_dien_chai — đạo diễn vẫn dùng để nhận chai trong cảnh)
+    và các sự thật chỉ để dạy nhận chai/tả màu nhãn (góc nhận dạng thương hiệu đã bỏ)."""
+    bo = ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them", "shop_product_id", "nhan_dien_chai")
+    out = {k: v for k, v in sp.items() if k not in bo}
+    if isinstance(out.get("su_that_duoc_noi"), list):
+        out["su_that_duoc_noi"] = [x for x in out["su_that_duoc_noi"]
+                                   if not (isinstance(x, str) and (_RE_NHAN_DANG.search(x) or re.search(r"nhận đúng (?:hàng|chai)", x, re.I)))]
+    return out
+
+
+def goc_ban(sp):
+    return [g["ma"] for g in sp.get("goc_ban") or [] if g.get("ma") not in GOC_BO] or list(GOC_MAC_DINH)
+
+
 def ctx_xem_thu(ma, sp, n=3):
     """Dữ liệu thật của sản phẩm cho nút "Xem thử" (chọn góc/kiểu đầu danh sách, không ngẫu nhiên, không ghi sổ trục)."""
-    sp_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them", "shop_product_id")}
-    goc = [g["ma"] for g in sp.get("goc_ban") or []] or ["cong-dung", "cach-dung", "thuong-hieu", "qua-tang"]
+    sp_ai = sp_cho_bien_kich(sp)
+    goc = goc_ban(sp)
     truc = gan_truc(sp, goc, n, moi_dem(), None, lo_moi(), n, rng=None)
     qcs = [q["ten"] for q in sp.get("quy_cach") or []]
     qc = [qcs[i % len(qcs)] for i in range(n)] if qcs else None
@@ -688,6 +714,9 @@ def check(item, sp, used_norm, log=None):
     low = " " + plain.lower() + " "
     errs += [f"từ cấm '{b.strip()}'" for b in BANNED
              if re.search(r"(?<!\w)" + re.escape(b.strip()) + r"(?!\w)", low)]   # khớp nguyên từ, không bắt "nha" trong "nhanh"
+    m = _RE_NHAN_DANG.search(low)
+    if m:
+        errs.append(f"tả/dạy nhận dạng bao bì '{m.group(0).strip()}' (góc nhận dạng thương hiệu đã bỏ)")
     sents = [s for s in re.split(r"(?<=[.!?])\s+", plain.strip()) if s.strip()]
     # tên sản phẩm: trong 2 câu đầu (3 câu nếu mở bằng kết quả/khoảnh khắc đang diễn ra hoặc kể chuyện)
     ten = [_chuan(nm) for nm in ten_phai_nhac(sp)]
@@ -735,10 +764,10 @@ def gon_chu_mo(c, n=30):
 
 def viet(ma_sp, so_ban, log=print):
     sp = json.loads((HUB / "san-pham" / ma_sp / "san-pham.json").read_text(encoding="utf-8"))
-    sp_for_ai = {k: v for k, v in sp.items() if k not in ("kho_video", "loai_tru", "vai_tro_rieng", "cat_khung", "doc_la", "mau_thuong_hieu", "kho_them", "shop_product_id")}
+    sp_for_ai = sp_cho_bien_kich(sp)
     used_norm = {norm(s) for s in history_sentences()}      # máy chống trùng: câu của mọi sản phẩm
     used = cau_cua_sp(ma_sp)                                 # chỉ để máy biết; đề bài mặc định không gửi 150 câu này nữa
-    goc = [g["ma"] for g in sp.get("goc_ban") or []] or ["cong-dung", "cach-dung", "thuong-hieu", "qua-tang"]   # sản phẩm mới chưa có góc bán
+    goc = goc_ban(sp)
     out, tries, loi_truoc = [], 0, []
     dem, lo = moi_dem(ma_sp), lo_moi()
     dem_q = Counter(dem_lich_su(f"qc-{ma_sp}.txt"))
