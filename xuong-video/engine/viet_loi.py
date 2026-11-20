@@ -436,6 +436,20 @@ def kho_canh(ma):
 
 
 # ---------------------------------------------------------------- đề bài
+# Bài học giám khảo nghiêng về cảnh/dựng; biên kịch chỉ cần dòng dính tới lời, chữ, quà, chốt
+_RE_BAI_HOC_LOI = re.compile(r"lời|câu|nói|nhắc|viết|ghi\b|chốt|quà|giá|liều|tên", re.I)
+
+
+def bai_hoc_cho_loi(ma, toi_da=10):
+    """Bài học giám khảo (chung + riêng sản phẩm, dùng lại bai_hoc_cho của đạo diễn) → tối đa toi_da dòng mới nhất liên quan tới lời; không có → ''."""
+    try:
+        from dao_dien import bai_hoc_cho
+        dong = [l.strip() for l in bai_hoc_cho(ma).splitlines() if l.startswith("- ") and _RE_BAI_HOC_LOI.search(l)]
+    except Exception:
+        return ""
+    return "\n".join(dong[-toi_da:])
+
+
 def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua="", truc=None, loi_truoc=None, sp_day=None):
     """Dữ liệu điền vào mẫu prompt/bien-kich.md (chỗ nào cần logic/khối tuỳ chọn thì tính ở đây; khối rỗng → "").
     truc: [{goc, mo, than, chot, vai}] từng bản (None → chỉ có góc + dạng bài như đề bài cũ). sp_day: hồ sơ đầy đủ (có kho_video) cho khối giọng thật."""
@@ -444,6 +458,10 @@ def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, 
     so_gu_f = HUB / "lich-su" / "so-gu.md"
     so_gu = so_gu_f.read_text(encoding="utf-8")[-3000:].strip() if so_gu_f.exists() else ""
     so_gu = ("=== SỔ GU CỦA CHỦ HÀNG ===" + chr(10) + so_gu + chr(10)) if so_gu else ""
+    # gắn vào khối so_gu (mẫu nào cũng có {{so_gu}}) nên đề bài người dùng đã sửa vẫn nhận bài học, không cần chỗ trống mới trong mẫu
+    bh = bai_hoc_cho_loi(sp.get("ma")) if sp.get("ma") else ""
+    if bh:
+        so_gu += "=== BÀI HỌC GIÁM KHẢO ĐÃ BẮT Ở VIDEO TRƯỚC (viết lời để khỏi lặp lại; đừng viết câu đòi thứ kho không có) ===" + chr(10) + bh + chr(10)
     kg, kat = khung_giay(sp), khung_am_tiet(sp)
     sp_day = sp_day or sp
     dang = list(dang or [])

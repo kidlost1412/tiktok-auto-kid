@@ -982,8 +982,8 @@ details.kt-tech .stat{margin-top:12px}
       <div class="act"><span class="pill y hidden" id="guChuaLuu">Chưa lưu</span><button class="btn go" id="btnLuuGu"><svg class="i"><use href="#i-save"/></svg>Lưu</button></div></div>
       <textarea id="soGu" style="min-height:max(440px,calc(100vh - 280px))" placeholder="- Thích mở đầu bằng cảnh rễ trắng&#10;- Không thích chữ chạy che nhãn chai"></textarea></div>
     <div class="card"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-book"/></svg></span>
-      <div class="t"><h2>Bài học giám khảo tự ghi</h2><p class="sub">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn tránh lặp lại.</p></div></div>
-      <div class="cap" id="baiHoc" style="min-height:max(440px,calc(100vh - 280px));max-height:calc(100vh - 200px);overflow:auto"></div></div>
+      <div class="t"><h2>Bài học giám khảo tự ghi</h2><p class="sub">Lỗi giám khảo AI bắt được ở các lô trước — đạo diễn và biên kịch tránh lặp lại. Chia theo từng sản phẩm, dòng mới nhất ở trên.</p></div></div>
+      <div class="cap" id="baiHoc" style="white-space:normal;min-height:max(440px,calc(100vh - 280px));max-height:calc(100vh - 200px);overflow:auto"></div></div>
   </div>
 </section>
 
@@ -2744,10 +2744,24 @@ $('#btnLuuSp').onclick = async () => {
 };
 // ---------- GU
 $('#soGu').disabled = true; $('#btnLuuGu').disabled = true;           // mở khoá khi đã nạp sổ gu thật
+// Bài học: luật chung + từng sản phẩm (mới ghi lên trước) + lỗi máy (chỉ xem, máy tự sửa)
+function htmlBaiHoc(g) {
+  const dong = l => `<div style="margin:3px 0">${esc(l)}</div>`;
+  const tieuDe = (t, ph) => `<h3 style="margin:14px 0 4px;font-size:14px">${esc(t)}${ph ? ` <span class="note">${esc(ph)}</span>` : ''}</h3>`;
+  const chung = String(g.bai_hoc || '').split(/\r?\n/).filter(l => l.trim());
+  let h = tieuDe('Luật chung (mọi sản phẩm)', `${chung.length} dòng`) + (chung.map(dong).join('') || '<div class="note">(chưa có)</div>');
+  const sp = g.bai_hoc_sp || [];
+  h += tieuDe('Theo từng sản phẩm', sp.length ? '' : '(chưa có)');
+  h += sp.map((x, i) => `<details${i === 0 ? ' open' : ''} style="margin:6px 0"><summary><b>${esc(x.ten)}</b> <span class="note">· ${x.dong.length} dòng · sửa lần cuối ${esc(x.sua_luc)}</span></summary>${x.dong.map(dong).join('')}</details>`).join('');
+  const lm = g.loi_may || {tong: 0, nhom: []};
+  h += tieuDe('Lỗi máy (máy tự sửa, không dạy AI)', `${lm.tong} lần`);
+  h += lm.nhom.map(n => `<details style="margin:6px 0"><summary><b>${esc(n.ten)}</b> <span class="note">· ${n.so} lần</span></summary>${n.gan_day.map(e => `<div style="margin:3px 0"><span class="note">${esc(String(e.luc).slice(0, 16).replace('T', ' '))} · ${esc(e.video)}</span><br>${esc(e.chi_tiet)}</div>`).join('')}</details>`).join('');
+  return h;
+}
 async function taiGu() {
   const truoc = $('#soGu').value; let g;
   try { g = await api('/api/so-gu'); } catch (e) { toast('Không tải được sổ gu — thử lại', 'loi'); return; }
-  setT($('#baiHoc'), g.bai_hoc || '(chưa có)');
+  setH($('#baiHoc'), htmlBaiHoc(g));
   if (typeof g.so_gu !== 'string') return;
   if (GU_GOC !== null && (guDirty() || $('#soGu').value !== truoc)) return;      // đang gõ dở: không ghi đè
   $('#soGu').value = g.so_gu; GU_GOC = g.so_gu; $('#soGu').disabled = false; $('#btnLuuGu').disabled = false; chuaVe();

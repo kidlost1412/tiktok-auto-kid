@@ -1,6 +1,6 @@
 """Ê-kíp AI: ĐẠO DIỄN (lên bảng dựng từng câu, NHÌN ảnh cảnh) + GIÁM KHẢO (xem bản dựng, chấm, yêu cầu sửa).
 Máy dựng (dung.py / dung_remotion.py) chỉ làm theo bảng dựng; mọi lựa chọn AI đều được máy kiểm lại."""
-import datetime, json, re, subprocess, threading
+import datetime, json, math, re, subprocess, threading
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -46,6 +46,11 @@ TOI_DA_MOI_CAU = 6        # ứng viên mỗi câu (gồm cả cảnh kho chung)
 TRAN_KHO_NHO = 0.60       # kho nhỏ: tổng ứng viên riêng của 1 video ≤ 60% kho
 TY_BO_MET = 0.35          # bỏ tối đa 35% cảnh MỆT NHẤT khỏi ứng viên (miễn mọi vai trò của cảnh còn đủ cảnh thay)
 W_MET = 1.5               # 1 đơn vị mệt = trừ 1,5 điểm liên quan
+MU_DUNG_TRON_DOI = 0.7    # phạt theo TỔNG số lần đã dùng (mọi thời điểm) tăng chậm dần: n ** 0,7 (15 lần ≈ 6,7; 4 lần ≈ 2,6)
+W_DUNG_TRON_DOI = 2.0     # 1 lần-quy-đổi = 2 đơn vị mệt (×W_MET = 3 điểm): cảnh dùng 15 lần thua cảnh chưa dùng ~30 điểm, 3 lần ~12 điểm → chỉ cảnh hơn hẳn mới thắng nổi
+POOL_TOP = 10             # top-5 mỗi câu bốc ngẫu nhiên có trọng số từ 10 cảnh điểm cao nhất (không còn gần như cố định)
+NHIET_TOP = 1.5           # trọng số bốc = exp((điểm − điểm cao nhất)/1,5): cảnh hơn 1,5 điểm chỉ còn ~37% cơ hội
+SAN_TOP = 6.0             # cảnh thua điểm cao nhất quá 6 điểm không vào pool (chặn cảnh quá yếu)
 PHAT_ANH_EM = 6.0         # video anh em (cùng lời) đã dùng cảnh này
 PHAT_MO_CHOT = 30.0       # cảnh trùng cảnh mở/chốt của 6 video gần nhất
 SO_VIDEO_MO_CHOT = 6
@@ -119,6 +124,15 @@ def tinh_met(ls, today=None, tranh=(), anh_em=(), hom_nay=()):
     return met
 
 
+def dem_dung_tron_doi(ls):
+    """Tổng số lần mỗi cảnh (chính + ô phụ) từng được dùng trong TOÀN BỘ sổ của sản phẩm → {id: n}. Id không còn trong kho thì bị bỏ qua khi tra."""
+    dem = {}
+    for r in ls:
+        for i in list(r["ids"]) + list(r["phu"]):
+            dem[i] = dem.get(i, 0) + 1
+    return dem
+
+
 def mo_chot_gan(ls, n=SO_VIDEO_MO_CHOT):
     """(tập cảnh mở, tập cảnh chốt) của n video gần nhất."""
     g = [r for r in ls if r["ids"]][-n:]
@@ -135,7 +149,10 @@ def boi_canh(ma, tranh=(), anh_em=None, hub=None, today=None):
     if isinstance(anh_em, (list, tuple)) and anh:
         mo.add(anh[0]); chot.add(anh[-1])
     soft, lo = (tranh, []) if isinstance(tranh, (set, frozenset)) else ((), list(tranh or []))
-    return {"met": tinh_met(ls, today, soft, anh, lo), "mo": sorted(mo), "chot": sorted(chot), "anh_em": anh}
+    met = tinh_met(ls, today, soft, anh, lo)
+    for i, n in dem_dung_tron_doi(ls).items():      # cộng phạt dùng-tron-đời vào độ mệt: cảnh quen mặt (vd. 15/28 video) lùi sau cảnh ít dùng → kho nhỏ xoay vòng đều
+        met[i] = met.get(i, 0) + W_DUNG_TRON_DOI * n ** MU_DUNG_TRON_DOI
+    return {"met": met, "mo": sorted(mo), "chot": sorted(chot), "anh_em": anh}
 
 
 def loc_met(ds, met, ty_bo=TY_BO_MET, toi_thieu=6):
@@ -177,6 +194,19 @@ def _diem_lien_quan(shot, sent, y_canh):
     return s + ((shot.get("soat") or {}).get("dep") or 3) * 0.5
 
 
+def _boc_top(xep, d, k, rng):
+    """Bốc k cảnh từ pool (POOL_TOP cảnh đầu của xep) có trọng số exp(điểm/NHIET_TOP), bỏ cảnh thua đầu bảng > SAN_TOP → top-k đổi giữa các video nhưng không lọt cảnh quá yếu.
+    d: {id: điểm} của pool. Giữ thứ tự điểm giảm dần."""
+    pool = [s for s in xep[:POOL_TOP] if d[s["id"]] >= d[xep[0]["id"]] - SAN_TOP] or xep[:k]
+    chon = []
+    while pool and len(chon) < k:
+        top_d = max(d[s["id"]] for s in pool)
+        w = [math.exp((d[s["id"]] - top_d) / NHIET_TOP) for s in pool]
+        x = rng.choices(pool, weights=w)[0]
+        chon.append(x); pool.remove(x)
+    return sorted(chon, key=lambda s: -d[s["id"]])
+
+
 def ung_vien(sents, y_canh, shots, rng, n_moi_cau=TOI_DA_MOI_CAU, tranh=(), dem_dung=None, met=None, mo_gan=(), chot_gan=()):
     """Ứng viên cho từng câu, xếp theo (liên quan − mệt). KHÔNG còn lọc cứng "đã dùng": cảnh mệt nhất bị loại khỏi danh sách đưa đạo diễn miễn là
     còn đủ cảnh cùng vai trò; mỗi câu ≤ n_moi_cau (n−1 hợp nhất + 1 bất ngờ); kho nhỏ (<80 cảnh) cả video chỉ thấy ≤ 60% kho;
@@ -212,8 +242,8 @@ def ung_vien(sents, y_canh, shots, rng, n_moi_cau=TOI_DA_MOI_CAU, tranh=(), dem_
                 d -= 1.0
             return d - (PHAT_MO_CHOT if (k == 0 and i in mo_gan) or (k == n - 1 and i in chot_gan) else 0)
         xep = sorted(ok, key=lambda s: -diem(s))
-        top = xep[:max(1, n_moi_cau - 1)]
-        con = [s for s in xep[len(top):] if met.get(s["id"], 0) <= 1 and not ((k == 0 and s["id"] in mo_gan) or (k == n - 1 and s["id"] in chot_gan))]
+        top = _boc_top(xep, {s["id"]: diem(s) for s in xep[:POOL_TOP]}, max(1, n_moi_cau - 1), rng)
+        con = [s for s in xep if s not in top if met.get(s["id"], 0) <= 1 and not ((k == 0 and s["id"] in mo_gan) or (k == n - 1 and s["id"] in chot_gan))]
         ids = []
         for s in top + rng.sample(con, k=min(1, len(con))):      # 1 cảnh bất ngờ; kho nhỏ có thể không còn gì để thêm
             if s["id"] not in ids:

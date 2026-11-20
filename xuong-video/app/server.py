@@ -282,6 +282,57 @@ def dem_canh(f):
 _SP_DS = {"k": None, "v": None}
 
 
+def _ten_sp(ma):
+    """Tên hiển thị của sản phẩm (ten_goi trong hồ sơ); không có hồ sơ → trả lại mã."""
+    try:
+        return json.loads((HUB / "san-pham" / ma / "san-pham.json").read_text(encoding="utf-8")).get("ten_goi") or ma
+    except Exception:
+        return ma
+
+
+def bai_hoc_theo_sp():
+    """Bài học riêng từng sản phẩm (lich-su/bai-hoc-<ma>.txt; bỏ .bak và bai-hoc-cu.txt): mới ghi gần đây lên trước, dòng mới nhất lên đầu."""
+    out = []
+    for f in LS.glob("bai-hoc-*.txt"):
+        ma = f.stem[len("bai-hoc-"):]
+        if ma == "cu":
+            continue
+        try:
+            dong = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
+            luc = f.stat().st_mtime
+        except OSError:
+            continue
+        if dong:
+            out.append({"ma": ma, "ten": _ten_sp(ma), "sua_luc": time.strftime("%Y-%m-%d %H:%M", time.localtime(luc)), "_t": luc, "dong": dong[::-1]})
+    out.sort(key=lambda x: -x["_t"])
+    for x in out:
+        del x["_t"]
+    return out
+
+
+def loi_may_tom_tat(gan_day=3):
+    """loi-may.jsonl (lỗi máy/dữ liệu: máy tự sửa, không dạy AI) → nhóm theo loại lỗi, nhiều nhất trước, kèm vài ví dụ mới nhất."""
+    sys.path.insert(0, str(CODE / "engine"))
+    from kiem_may import TEN_NGAN
+    f = LS / "loi-may.jsonl"
+    nhom = {}
+    if f.exists():
+        for l in f.read_text(encoding="utf-8").splitlines():
+            try:
+                x = json.loads(l)
+            except ValueError:
+                continue
+            if isinstance(x, dict):
+                nhom.setdefault(str(x.get("muc") or "khác"), []).append(x)
+    ds = []
+    for muc, xs in nhom.items():
+        xs.sort(key=lambda x: str(x.get("luc") or ""))
+        ds.append({"muc": muc, "ten": TEN_NGAN.get(muc, muc), "so": len(xs),
+                   "gan_day": [{"luc": x.get("luc") or "", "video": x.get("video") or "", "chi_tiet": x.get("chi_tiet") or ""} for x in xs[-gan_day:][::-1]]})
+    ds.sort(key=lambda g: -g["so"])
+    return {"tong": sum(g["so"] for g in ds), "nhom": ds}
+
+
 def _khoa_san_pham():
     """Khoá đệm danh sách sản phẩm: thư mục sản phẩm + giờ sửa/cỡ của san-pham.json, canh.json, ảnh từng sản phẩm."""
     sp = HUB / "san-pham"
@@ -1522,7 +1573,8 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/so-gu":
             f = LS / "so-gu.md"; bh = LS / "bai-hoc.txt"
             return self._json({"so_gu": f.read_text(encoding="utf-8") if f.exists() else "",
-                               "bai_hoc": bh.read_text(encoding="utf-8") if bh.exists() else ""})
+                               "bai_hoc": bh.read_text(encoding="utf-8") if bh.exists() else "",
+                               "bai_hoc_sp": bai_hoc_theo_sp(), "loi_may": loi_may_tom_tat()})
         self.send_error(404)
 
     def _hop_le(self):
