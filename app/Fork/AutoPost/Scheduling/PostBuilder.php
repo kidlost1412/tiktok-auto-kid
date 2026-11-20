@@ -46,7 +46,7 @@ final class PostBuilder
     /**
      * @param  array{caption: string, hashtags: list<string>, source: string, product_name?: ?string}  $caption
      */
-    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot, ?string $ownCover = null, ?string $productCover = null): Post
+    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot, ?string $ownCover = null, ?string $productCover = null, array|false|null $musicChoice = null): Post
     {
         // Ưu tiên file trên đĩa; không có thì tải từ hub qua HTTP vào cache (MissingVideoFile nếu file mất/sai sha256,
         // lỗi thường nếu hub tắt: video về kho, thử lại sau).
@@ -93,7 +93,7 @@ final class PostBuilder
 
         $storedPath = null;
         // Kho riêng: thư mục bật "Ghép nhạc" thì đăng bản đã ghép (file tạm, xoá sau khi chép). Lỗi ghép = không đăng.
-        $music = app(RiengMusic::class)->apply($video, $path);
+        $music = app(RiengMusic::class)->apply($video, $path, $musicChoice);
         // Video Kho riêng luôn đăng bản đã xoá metadata (bản ghép nhạc đã sạch sẵn). Lỗi làm sạch = không đăng.
         $tmp = $music['path'] ?? ($video->isRieng() ? app(RiengClean::class)->file((int) $video->id, $path) : null);
 

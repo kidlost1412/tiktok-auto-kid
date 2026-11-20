@@ -5,6 +5,7 @@ import { IconFolderOpen, IconMusic } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
+import { pickMusicDir } from '@/components/fork/kho/music';
 import {
     callJson,
     type Folder,
@@ -71,8 +72,6 @@ watch(open, (o) => {
     void countTracks();
 });
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 const pickDir = async () => {
     if (picking.value) {
         return;
@@ -82,42 +81,14 @@ const pickDir = async () => {
     error.value = '';
 
     try {
-        let r = await callJson<{
-            ok?: boolean;
-            pending?: boolean;
-            id?: string;
-            path?: string;
-            cancelled?: boolean;
-            error?: string;
-        }>('POST', '/auto/kho/rieng/chon-thu-muc', { muc_dich: 'nhac' });
-        const started = Date.now();
+        const r = await pickMusicDir(() => alive);
 
-        while (alive && r.data?.pending && Date.now() - started < 11 * 60_000) {
-            const id = r.data.id;
-            await sleep(1000);
-
-            if (id) {
-                const next = await callJson<typeof r.data>(
-                    'POST',
-                    '/auto/kho/rieng/chon-thu-muc/ket-qua',
-                    { id },
-                );
-
-                if (next.data === null) {
-                    break;
-                }
-
-                r = { ok: next.ok, data: { ...next.data, id } };
-            }
-        }
-
-        if (r.data?.ok && r.data.path) {
-            form.value.dir = r.data.path;
+        if (r.path) {
+            form.value.dir = r.path;
             form.value.enabled = true;
             await countTracks();
-        } else if (!r.data?.cancelled) {
-            error.value =
-                r.data?.error ?? 'Chưa mở được hộp chọn thư mục, anh thử lại.';
+        } else if (r.error) {
+            error.value = r.error;
         }
     } finally {
         picking.value = false;

@@ -76,6 +76,7 @@ final class RiengController extends Controller
 
         $folderId = $request->query('folder');
         $folderId = is_string($folderId) && ctype_digit($folderId) ? (int) $folderId : 0;
+        $sub = $this->subTerm($request, $folderId);
         $status = $request->query('status');
         $status = is_string($status) && in_array($status, self::STATUS, true) ? $status : '';
         $day = $request->query('day');
@@ -88,7 +89,7 @@ final class RiengController extends Controller
         $folders = RiengFolder::query()->orderBy('id')->get();
         // Video anh đã xoá nằm ở Thùng rác, không hiện trong kho.
         $base = fn (): Builder => AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at');
-        $filtered = fn (): Builder => $this->filteredQuery($folderId, $day, $status, $search);
+        $filtered = fn (): Builder => $this->filteredQuery($folderId, $day, $status, $search, $sub);
 
         // Mỗi prop nặng nằm trong closure (Inertia chỉ chạy closure của prop được xin ở partial reload của bàn Thủ kho);
         // danh sách video, video trùng và danh sách chọn dùng chung nên tính một lần (memo).
@@ -122,7 +123,19 @@ final class RiengController extends Controller
                     'music' => RiengMusic::settings($f),
                 ])->values()->all();
             },
-            'filters' => ['folder' => $folderId, 'status' => $status, 'day' => $day, 'q' => $search, 'sort' => $sort],
+            'filters' => ['folder' => $folderId, 'sub' => $sub, 'status' => $status, 'day' => $day, 'q' => $search, 'sort' => $sort],
+            // Thư mục con của thư mục đang xem (kèm số video): '' = video nằm ngay thư mục gốc.
+            'subfolders' => function () use ($folderId, $base): array {
+                if ($folderId <= 0) {
+                    return [];
+                }
+
+                $dir = "case when meta->>'rel_path' like '%/%' then regexp_replace(meta->>'rel_path', '/[^/]*$', '') else '' end";
+
+                return $base()->where('meta->folder_id', (string) $folderId)
+                    ->selectRaw("{$dir} as dir, count(*) as total")->groupByRaw($dir)->orderByRaw($dir)->get()
+                    ->map(fn ($r): array => ['dir' => (string) $r->dir, 'count' => (int) $r->total])->all();
+            },
             'counts' => function () use ($base): array {
                 $statusCounts = [];
 
@@ -162,6 +175,18 @@ final class RiengController extends Controller
     }
 
     /** Từ khoá tìm theo tên file (tối đa 100 ký tự). */
+    /** Thư mục con đang lọc (chỉ khi đang xem một thư mục): '' = tất cả, ':' = ngay thư mục gốc (tên thư mục Windows không có ':'), còn lại = đường dẫn thư mục con. */
+    private function subTerm(Request $request, int $folderId): string
+    {
+        $sub = $request->query('sub');
+
+        if ($folderId <= 0 || ! is_string($sub) || mb_strlen($sub) > 500) {
+            return '';
+        }
+
+        return $sub === ':' ? ':' : trim(str_replace(chr(92), '/', $sub), '/');
+    }
+
     private function searchTerm(Request $request): string
     {
         $q = $request->query('q');
@@ -174,10 +199,13 @@ final class RiengController extends Controller
      *
      * @return Builder<AutoVideo>
      */
-    private function filteredQuery(int $folderId, string $day, string $status, string $search): Builder
+    private function filteredQuery(int $folderId, string $day, string $status, string $search, string $sub = ''): Builder
     {
         return AutoVideo::query()->where('source', AutoVideo::SOURCE_RIENG)->whereNull('trashed_at')
             ->when($folderId > 0, fn ($q) => $q->where('meta->folder_id', (string) $folderId))
+            // Thư mục con: ':' = chỉ video nằm ngay thư mục gốc; tên thư mục con = video trong nó (kể cả con của nó).
+            ->when($sub === ':', fn ($q) => $q->whereRaw("meta->>'rel_path' not like '%/%'"))
+            ->when($sub !== '' && $sub !== ':', fn ($q) => $q->whereRaw("meta->>'rel_path' like ?", [addcslashes($sub, '%_'.chr(92)).'/%']))
             ->when($day !== '', fn ($q) => $q->whereDate('batch_date', $day))
             ->when($search !== '', fn ($q) => $q->where('file_name', 'ilike', '%'.addcslashes($search, '%_'.chr(92)).'%'))
             ->tap(fn ($q) => $this->applyStatus($q, $status));
@@ -211,13 +239,14 @@ final class RiengController extends Controller
 
         $folderId = $request->query('folder');
         $folderId = is_string($folderId) && ctype_digit($folderId) ? (int) $folderId : 0;
+        $sub = $this->subTerm($request, $folderId);
         $status = $request->query('status');
         $status = is_string($status) && in_array($status, self::STATUS, true) ? $status : '';
         $day = $request->query('day');
         $day = is_string($day) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) === 1 ? $day : '';
         $search = $this->searchTerm($request);
 
-        $query = fn (): Builder => $this->onlySelectable($this->filteredQuery($folderId, $day, $status, $search));
+        $query = fn (): Builder => $this->onlySelectable($this->filteredQuery($folderId, $day, $status, $search, $sub));
         $rows = $query()->orderByDesc('batch_date')->orderByDesc('id')->limit(self::SELECT_ALL_MAX)->get(['id', 'file_name', 'duration', 'source', 'meta']);
         $dups = (new RiengInfo)->duplicates($rows);
         $total = $query()->count();
@@ -877,6 +906,14 @@ final class RiengController extends Controller
             'items.*.product' => ['nullable', 'string', 'max:220'],
             // Trộn xen kẽ sản phẩm khi tự xếp giờ (null = theo cài đặt kênh).
             'mix' => ['nullable', 'boolean'],
+            // Nhạc: không gửi = theo thư mục; none = không ghép; random = bốc từ thư mục nhạc (items.*.music = bài chọn riêng, đường dẫn tương đối).
+            'music' => ['nullable', 'array'],
+            'music.kind' => ['required_with:music', 'in:none,random'],
+            'music.dir' => ['nullable', 'string', 'max:500'],
+            'music.mode' => ['nullable', 'in:replace,mix'],
+            'music.gain_db' => ['nullable', 'integer', 'between:-40,0'],
+            'music.seed' => ['nullable', 'integer'],
+            'items.*.music' => ['nullable', 'string', 'max:500'],
         ]);
 
         $this->findAccount($accountId, (string) $in['social_account_id']);

@@ -270,6 +270,28 @@ final class RiengBatch
             return $fail('Chưa chọn video nào.');
         }
 
+        // Nhạc: không gửi `music` = theo cài đặt từng thư mục (như tự đăng); kind none = không ghép; kind random = bốc từ thư mục nhạc đã chọn.
+        $musicIn = is_array($in['music'] ?? null) ? $in['music'] : null;
+        $musicCfg = null;
+        $musicPlan = [];
+        $musicI = 0;
+
+        if (($musicIn['kind'] ?? null) === 'random') {
+            $musicDir = trim((string) ($musicIn['dir'] ?? ''));
+            $tracks = $musicDir !== '' ? app(RiengMusic::class)->list($musicDir) : [];
+
+            if ($tracks === []) {
+                return $fail($musicDir === '' ? 'Chưa chọn thư mục nhạc (hoặc chọn "Không ghép nhạc").' : 'Thư mục nhạc "'.$musicDir.'" không có bài nhạc nào (hoặc ổ đĩa đang tắt), hãy chọn thư mục khác hoặc "Không ghép nhạc".');
+            }
+
+            $musicCfg = [
+                'dir' => $musicDir,
+                'mode' => ($musicIn['mode'] ?? null) === RiengMusic::MODE_REPLACE ? RiengMusic::MODE_REPLACE : RiengMusic::MODE_MIX,
+                'gain_db' => max(-40, min(0, (int) ($musicIn['gain_db'] ?? RiengMusic::DEFAULT_GAIN_DB))),
+            ];
+            $musicPlan = RiengMusic::plan(array_column($tracks, 'rel'), (int) ($musicIn['seed'] ?? 0));
+        }
+
         $tz = $this->planner->timezoneFor($auto);
         $fmt = fn (int $ts): string => CarbonImmutable::createFromTimestampUTC($ts)->setTimezone($tz)->format('H:i d/m');
 
@@ -344,6 +366,7 @@ final class RiengBatch
             // Bìa sản phẩm: mỗi dòng nhận ảnh kế tiếp của vòng xoay theo thứ tự danh sách (giống giao diện), lúc đăng dùng đúng ảnh đó.
             $planned = $coverMode === self::COVER_PRODUCT && $ownToken === null ? ($coverInfo[$ck]['plan'][$coverInfo[$ck]['i']++] ?? null) : null;
             $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, ['planned' => $planned] + $coverInfo[$ck], $row);
+            $row['music'] = $this->musicFor($musicIn, $musicCfg, $musicPlan, $musicI, $item, $row);
             $row['_at'] = $this->parseAt($item['at'] ?? null);
             $rows[] = $row;
         }
@@ -352,6 +375,7 @@ final class RiengBatch
         $left = $this->schedule($rows, $auto, $now, $fmt, $mix);
 
         return [
+            'music_cfg' => $musicCfg,
             'mix' => $mix,
             'ok' => true,
             'error' => null,
@@ -362,6 +386,55 @@ final class RiengBatch
             'needs_confirm' => collect($rows)->contains(fn (array $r): bool => $r['status'] === 'warn'),
             'channel' => '@'.($social->username ?: $social->display_name),
         ];
+    }
+
+    /**
+     * Bài nhạc của một dòng: bài chủ app chọn riêng cho video (items.*.music), không thì bài kế tiếp của thứ tự bốc cố định
+     * (giống giao diện). null = không gửi cách chọn nhạc (theo cài đặt thư mục).
+     *
+     * @param  array<string, mixed>|null  $in
+     * @param  array{dir: string, mode: string, gain_db: int}|null  $cfg
+     * @param  list<string>  $plan
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $row
+     * @return array{kind: string, rel: ?string, name: ?string}|null
+     */
+    private function musicFor(?array $in, ?array $cfg, array $plan, int &$i, array $item, array &$row): ?array
+    {
+        if ($in === null) {
+            return null;
+        }
+
+        if ($cfg === null) {
+            return ['kind' => 'none', 'rel' => null, 'name' => null];
+        }
+
+        // Mỗi dòng giữ chỗ của mình trong thứ tự bốc (kể cả khi chọn riêng), nên đổi bài một video không làm đổi bài video khác.
+        $planned = $plan[$i++ % count($plan)];
+        $rel = is_string($item['music'] ?? null) && $item['music'] !== '' ? $item['music'] : $planned;
+
+        if (app(RiengMusic::class)->resolveIn($cfg['dir'], $rel) === null) {
+            $row['status'] = 'error';
+            $row['messages'][] = 'Bài nhạc đã chọn không còn trong thư mục nhạc, hãy chọn lại.';
+        }
+
+        return ['kind' => 'random', 'rel' => $rel, 'name' => pathinfo($rel, PATHINFO_FILENAME)];
+    }
+
+    /**
+     * Lựa chọn nhạc đưa cho PostBuilder: null = theo thư mục; false = không ghép; mảng = đúng bài đã hiện cho video.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array{dir: string, mode: string, gain_db: int}|null  $cfg
+     * @return array{dir: string, mode: string, gain_db: int, rel: string}|false|null
+     */
+    private function musicChoice(array $row, ?array $cfg): array|false|null
+    {
+        return match ($row['music']['kind'] ?? null) {
+            'none' => false,
+            'random' => $cfg + ['rel' => (string) $row['music']['rel']],
+            default => null,
+        };
     }
 
     /**
@@ -824,7 +897,7 @@ final class RiengBatch
                 continue;
             }
 
-            $error = $this->postOne($social, (int) $row['id'], (string) $row['_code'], $row['_qc'] ?? null, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null, $row['cover']['file'] ?? null);
+            $error = $this->postOne($social, (int) $row['id'], (string) $row['_code'], $row['_qc'] ?? null, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null, $row['cover']['file'] ?? null, $this->musicChoice($row, $plan['music_cfg'] ?? null));
 
             if ($error === null) {
                 $done++;
@@ -877,7 +950,7 @@ final class RiengBatch
      *
      * @return string|null lỗi (tiếng Việt) hoặc null khi đã hẹn xong
      */
-    public function postOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null, ?string $productCover = null): ?string
+    public function postOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null, ?string $productCover = null, array|false|null $music = null): ?string
     {
         $video = AutoVideo::query()->whereKey($id)->where('source', AutoVideo::SOURCE_RIENG)->first();
 
@@ -934,7 +1007,7 @@ final class RiengBatch
         }
 
         try {
-            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover, $productCover);
+            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover, $productCover, $music);
             // Đã hẹn giờ thì không còn nằm trong "Giỏ chờ đăng".
             RiengQueueItem::forget((int) $video->id);
 

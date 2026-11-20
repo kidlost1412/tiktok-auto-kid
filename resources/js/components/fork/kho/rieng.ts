@@ -52,12 +52,16 @@ export type RiengPageProps = {
     folders: Folder[];
     filters: {
         folder: number;
+        /** Thư mục con đang lọc: '' = tất cả, ':' = ngay thư mục gốc. */
+        sub?: string;
         status: string;
         day: string;
         q?: string;
         sort?: string;
     };
     counts: Record<string, number>;
+    /** Thư mục con của thư mục đang xem ('' = ngay thư mục gốc). */
+    subfolders?: { dir: string; count: number }[];
     days: string[];
     videos: {
         data: RiengVideo[];

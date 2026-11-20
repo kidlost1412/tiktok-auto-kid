@@ -104,6 +104,7 @@ const RELOAD_ONLY = [
     'selectable_count',
     'days',
     'folders',
+    'subfolders',
     'queue',
     'scan_sig',
     'last_scan_at',
@@ -248,6 +249,10 @@ const selectAllQuery = (): string => {
 
     if (f.folder) {
         q.set('folder', String(f.folder));
+    }
+
+    if (f.folder && f.sub) {
+        q.set('sub', f.sub);
     }
 
     if (f.status) {
@@ -891,6 +896,7 @@ const currentStep = computed<1 | 2 | 3>(() => {
 // ---------------------------------------------------------------- Lọc, thư mục, quét
 type Patch = Partial<{
     folder: number;
+    sub: string;
     status: string;
     day: string;
     page: number;
@@ -909,6 +915,11 @@ const scrollToGrid = () => {
 
 const go = (patch: Patch) => {
     const next = { ...props.filters, ...patch };
+
+    // Đổi thư mục thì bỏ lọc thư mục con cũ.
+    if (patch.folder !== undefined && patch.sub === undefined) {
+        next.sub = '';
+    }
 
     scrollToGrid();
 
@@ -930,6 +941,10 @@ const go = (patch: Patch) => {
 
     if (next.folder) {
         query.folder = next.folder;
+    }
+
+    if (next.folder && next.sub) {
+        query.sub = next.sub;
     }
 
     if (next.status) {
@@ -982,6 +997,7 @@ const sorts = [
 const hasFilter = computed(
     () =>
         !!props.filters.folder ||
+        !!props.filters.sub ||
         !!props.filters.status ||
         !!props.filters.day ||
         !!(props.filters.q ?? ''),
@@ -989,7 +1005,7 @@ const hasFilter = computed(
 
 const clearFilters = () => {
     search.value = '';
-    go({ folder: 0, status: '', day: '', q: '' });
+    go({ folder: 0, sub: '', status: '', day: '', q: '' });
 };
 
 // Tuỳ chọn chung của mọi thao tác ghi. Embedded (bàn Thủ kho): ở yên trang đang mở và báo cho bàn sau khi xong.
@@ -1637,6 +1653,65 @@ defineExpose({ scan, busy });
             <span v-if="!folders.length" class="text-sm text-muted-foreground"
                 >Chưa có thư mục nào: thêm thư mục chứa video của anh.</span
             >
+        </section>
+
+        <!-- Thư mục con của thư mục đang xem: lọc riêng từng thư mục con (chỉ hiện khi thư mục có thư mục con). -->
+        <section
+            v-if="
+                !embedded &&
+                filters.folder &&
+                (subfolders ?? []).some((s) => s.dir !== '')
+            "
+            :class="cn(cardCls, 'flex flex-wrap items-center gap-2 p-3')"
+            data-testid="fork-rieng-subfolders"
+        >
+            <span
+                class="flex items-center gap-1.5 pr-1 text-[0.8125rem] font-semibold text-muted-foreground"
+            >
+                <IconFolder class="size-4" /> Thư mục con
+            </span>
+            <button
+                v-for="s in [
+                    {
+                        key: '',
+                        label: 'Tất cả',
+                        count: (subfolders ?? []).reduce(
+                            (n, x) => n + x.count,
+                            0,
+                        ),
+                    },
+                    ...(subfolders ?? []).map((x) => ({
+                        key: x.dir === '' ? ':' : x.dir,
+                        label:
+                            x.dir === ''
+                                ? 'Ngay thư mục gốc'
+                                : x.dir.replaceAll('/', ' › '),
+                        count: x.count,
+                    })),
+                ]"
+                :key="s.key"
+                type="button"
+                :aria-pressed="(filters.sub ?? '') === s.key"
+                :class="
+                    cn(
+                        'flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 px-2.5 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
+                        (filters.sub ?? '') === s.key &&
+                            'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30',
+                    )
+                "
+                :data-testid="`fork-rieng-sub-${s.key || 'all'}`"
+                @click="go({ sub: s.key })"
+            >
+                <IconFolder
+                    v-if="s.key && s.key !== ':'"
+                    class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                />
+                <span class="truncate font-medium">{{ s.label }}</span>
+                <span
+                    class="shrink-0 text-xs text-muted-foreground tabular-nums"
+                    >{{ s.count }} video</span
+                >
+            </button>
         </section>
 
         <RiengAiStatus

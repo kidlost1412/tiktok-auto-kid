@@ -12,6 +12,7 @@ use App\Fork\AutoPost\Http\ProductMixController;
 use App\Fork\AutoPost\Http\RescheduleController;
 use App\Fork\AutoPost\Http\RiengAutoController;
 use App\Fork\AutoPost\Http\RiengController;
+use App\Fork\AutoPost\Http\RiengMusicController;
 use App\Fork\AutoPost\Http\StatsController;
 use App\Fork\AutoPost\Http\SyncStatusController;
 use App\Fork\AutoPost\Http\TrashController;
@@ -106,6 +107,10 @@ Route::middleware(['web', 'auth'])->prefix('auto/kho')->name('fork.auto.kho.')->
         Route::patch('thu-muc/{folder}', [RiengController::class, 'renameFolder'])->whereNumber('folder')->name('folders.rename');
         Route::patch('thu-muc/{folder}/nhac', [RiengController::class, 'saveMusic'])->whereNumber('folder')->middleware('throttle:60,1')->name('folders.music');
         Route::post('nhac/dem', [RiengController::class, 'countMusic'])->middleware('throttle:60,1')->name('folders.music.count');
+        // Nhạc trong hộp Đăng hàng loạt: mặc định theo thư mục video, danh sách bài, nghe thử.
+        Route::post('nhac/mac-dinh', [RiengMusicController::class, 'defaults'])->middleware('throttle:60,1')->name('music.defaults');
+        Route::post('nhac/bai', [RiengMusicController::class, 'tracks'])->middleware('throttle:60,1')->name('music.tracks');
+        Route::get('nhac/nghe', [RiengMusicController::class, 'listen'])->middleware('throttle:240,1')->name('music.listen');
         Route::post('thu-muc/{folder}/mo', [RiengController::class, 'openFolder'])->whereNumber('folder')->middleware('throttle:30,1')->name('folders.open');
         Route::post('thu-muc/{folder}/video', [RiengController::class, 'uploadToFolder'])->whereNumber('folder')->middleware('throttle:120,1')->name('folders.upload');
         Route::post('quet', [RiengController::class, 'scan'])->middleware('throttle:20,1')->name('scan');

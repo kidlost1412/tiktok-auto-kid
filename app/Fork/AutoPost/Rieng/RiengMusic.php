@@ -112,26 +112,33 @@ final class RiengMusic
      *
      * @return array{path: string, track: string, mode: string}|null
      */
-    public function apply(AutoVideo $video, string $source): ?array
+    public function apply(AutoVideo $video, string $source, array|false|null $choice = null): ?array
     {
-        if (! $video->isRieng()) {
+        // $choice (Đăng hàng loạt): null = theo cài đặt của thư mục; false = không ghép nhạc; mảng = đúng bài đã chọn trong hộp.
+        if (! $video->isRieng() || $choice === false) {
             return null;
         }
 
-        $folder = RiengFolder::query()->find((int) data_get($video->meta, 'folder_id'));
-        $s = self::settings($folder);
+        if ($choice === null) {
+            $folder = RiengFolder::query()->find((int) data_get($video->meta, 'folder_id'));
+            $s = self::settings($folder);
 
-        if (! $s['enabled']) {
-            return null;
+            if (! $s['enabled']) {
+                return null;
+            }
+
+            $tracks = $this->tracks($s['dir']);
+
+            if ($tracks === []) {
+                throw new RuntimeException('Thư mục nhạc "'.$s['dir'].'" không có bài nhạc nào (hoặc ổ đĩa đang tắt).');
+            }
+
+            $track = (string) $this->pick((int) $folder->id, $tracks);
+        } else {
+            $s = $choice;
+            $track = $this->resolveIn($s['dir'], $s['rel']) ?? throw new RuntimeException('Bài nhạc đã chọn không còn trong thư mục nhạc "'.$s['dir'].'".');
         }
 
-        $tracks = $this->tracks($s['dir']);
-
-        if ($tracks === []) {
-            throw new RuntimeException('Thư mục nhạc "'.$s['dir'].'" không có bài nhạc nào (hoặc ổ đĩa đang tắt).');
-        }
-
-        $track = (string) $this->pick((int) $folder->id, $tracks);
         $dir = storage_path('app/rieng-music');
         @mkdir($dir, 0775, true);
         $out = $dir.DIRECTORY_SEPARATOR.$video->id.'-'.Str::lower(Str::random(8)).'.mp4';
@@ -158,17 +165,54 @@ final class RiengMusic
             return null;
         }
 
-        $base = rtrim(str_replace('\\', '/', $s['dir']), '/').'/';
-        $tracks = array_map(fn (string $t): array => [
-            'name' => pathinfo($t, PATHINFO_FILENAME),
-            'rel' => ltrim(substr(str_replace('\\', '/', $t), strlen($base)), '/'),
-        ], $this->tracks($s['dir']));
-
         return [
             'dir' => $s['dir'], 'mode' => $s['mode'], 'gain_db' => $s['gain_db'],
             'current' => $post !== null ? (data_get($post->meta, 'fork_music') ?: null) : null,
-            'tracks' => $tracks,
+            'tracks' => $this->list($s['dir']),
         ];
+    }
+
+    /**
+     * Bài nhạc của một thư mục: tên + đường dẫn tương đối.
+     *
+     * @return list<array{name: string, rel: string}>
+     */
+    public function list(string $dir): array
+    {
+        $base = rtrim(str_replace('\\', '/', $dir), '/').'/';
+
+        return array_map(fn (string $t): array => [
+            'name' => pathinfo($t, PATHINFO_FILENAME),
+            'rel' => ltrim(substr(str_replace('\\', '/', $t), strlen($base)), '/'),
+        ], $this->tracks($dir));
+    }
+
+    /**
+     * Thứ tự bốc nhạc của một lượt đăng: xáo trộn theo $seed nhưng cố định (cùng seed = cùng thứ tự), nên giao diện và máy chủ
+     * chia y hệt nhau; video thứ k nhận bài thứ k (hết bài mới quay vòng, không lặp trong lượt khi đủ bài).
+     *
+     * @param  list<string>  $rels
+     * @return list<string>
+     */
+    public static function plan(array $rels, int $seed): array
+    {
+        usort($rels, fn (string $a, string $b): int => crc32($seed.'|'.$a) <=> crc32($seed.'|'.$b) ?: strcmp($a, $b));
+
+        return $rels;
+    }
+
+    /** Đường dẫn thật của bài nhạc trong thư mục nhạc $dir. null = không có / không phải file nhạc / ra ngoài thư mục. */
+    public function resolveIn(string $dir, string $rel): ?string
+    {
+        $rel = str_replace('\\', '/', $rel);
+        $root = realpath($dir);
+        $file = $root === false || $rel === '' || str_contains($rel, '..') ? false : realpath($root.DIRECTORY_SEPARATOR.$rel);
+
+        if ($file === false || ! is_file($file) || ! in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), self::EXT, true)) {
+            return null;
+        }
+
+        return str_starts_with($file, rtrim($root, '/\\').DIRECTORY_SEPARATOR) ? $file : null;
     }
 
     /** Đường dẫn thật của một bài nhạc (theo đường tương đối trong thư mục nhạc của video). null = không có / ra ngoài thư mục. */

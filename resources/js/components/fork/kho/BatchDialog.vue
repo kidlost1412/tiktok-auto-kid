@@ -2,12 +2,25 @@
 // Đăng hàng loạt video riêng: chọn kênh + sản phẩm giỏ hàng + caption; giờ đăng luôn được tự đề xuất (sửa thẳng từng giờ được), xem trước lịch và xác nhận.
 // Ảnh bìa đã chọn được nhớ (theo video, theo kênh + sản phẩm, theo kênh) để lần sau tự dùng lại.
 import { router } from '@inertiajs/vue3';
+import { IconMusic } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+import BatchMusicSection from '@/components/fork/kho/BatchMusicSection.vue';
 import ChannelPicker from '@/components/fork/kho/ChannelPicker.vue';
 import ClipThumb from '@/components/fork/kho/ClipThumb.vue';
+import {
+    stopTrack,
+    type BatchMusicCfg,
+    type MusicTrack,
+} from '@/components/fork/kho/music';
 import ProductPicker from '@/components/fork/kho/ProductPicker.vue';
-import { postJson, type BatchItem } from '@/components/fork/kho/rieng';
+import {
+    callJson,
+    postJson,
+    type BatchItem,
+    type FolderMusic,
+} from '@/components/fork/kho/rieng';
+import TrackPlayButton from '@/components/fork/kho/TrackPlayButton.vue';
 import Callout from '@/components/fork/shared/Callout.vue';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
 import HashtagChips from '@/components/fork/shared/HashtagChips.vue';
@@ -105,6 +118,11 @@ interface PlanRow {
         label: string;
         from: 'video' | 'chosen' | 'shared';
     } | null;
+    music?: {
+        kind: 'none' | 'random';
+        rel: string | null;
+        name: string | null;
+    };
     caption?: string | null;
     caption_from?: 'ai' | 'kid';
     result?: 'done' | 'error' | 'skip';
@@ -280,6 +298,85 @@ const frameOpen = ref<Record<number, boolean>>({});
 const frameT = ref<Record<number, number>>({});
 const frameDur = ref<Record<number, number>>({});
 
+// Nhạc: mặc định theo thư mục của video (đang bật ghép nhạc thì bốc từ thư mục nhạc đó), không thì không ghép.
+// Thứ tự bốc cố định theo seed: video thứ n nhận bài thứ n của `musicPlan` (máy chủ chia y hệt), bài chọn riêng thì thay đúng video đó.
+const music = ref<BatchMusicCfg>({
+    kind: 'none',
+    dir: '',
+    mode: 'mix',
+    gain_db: -12,
+    seed: 0,
+});
+const tracks = ref<MusicTrack[] | null>(null);
+const musicPlan = ref<string[]>([]);
+const rowMusic = ref<Record<number, string>>({});
+
+async function loadTracks() {
+    tracks.value = null;
+    musicPlan.value = [];
+    rowMusic.value = {};
+    const dir = music.value.dir;
+
+    if (!dir) {
+        return;
+    }
+
+    const r = await callJson<{ tracks: MusicTrack[]; plan: string[] }>(
+        'POST',
+        '/auto/kho/rieng/nhac/bai',
+        { dir, seed: music.value.seed },
+    );
+
+    if (dir === music.value.dir) {
+        tracks.value = r.ok ? (r.data?.tracks ?? []) : [];
+        musicPlan.value = r.ok ? (r.data?.plan ?? []) : [];
+    }
+}
+
+async function initMusic() {
+    music.value = {
+        kind: 'none',
+        dir: '',
+        mode: 'mix',
+        gain_db: -12,
+        seed: Math.floor(Math.random() * 1_000_000_000),
+    };
+    void loadTracks();
+    const r = await callJson<{ music: FolderMusic | null }>(
+        'POST',
+        '/auto/kho/rieng/nhac/mac-dinh',
+        { ids: props.items.map((i) => i.id) },
+    );
+    const m = r.data?.music;
+
+    if (m?.dir && music.value.dir === '' && music.value.kind === 'none') {
+        music.value = {
+            ...music.value,
+            kind: 'random',
+            dir: m.dir,
+            mode: m.mode,
+            gain_db: m.gain_db,
+        };
+        await loadTracks();
+    }
+}
+
+const plannedMusic = computed<Record<number, string>>(() => {
+    const out: Record<number, string> = {};
+
+    if (music.value.kind === 'random' && musicPlan.value.length) {
+        ordered.value.forEach((it, n) => {
+            out[it.id] =
+                rowMusic.value[it.id] ??
+                musicPlan.value[n % musicPlan.value.length];
+        });
+    }
+
+    return out;
+});
+watch(step, stopTrack);
+onBeforeUnmount(stopTrack);
+
 // Xem phóng to video / ảnh bìa (lightbox).
 const lightbox = ref<{
     kind: 'image' | 'video';
@@ -387,6 +484,8 @@ watch(
     () => props.open,
     (open) => {
         if (!open) {
+            stopTrack();
+
             return;
         }
 
@@ -424,6 +523,7 @@ watch(
         void Promise.resolve().then(() => {
             void propose();
             void recallCovers(true);
+            void initMusic();
         });
     },
     { immediate: true },
@@ -645,6 +745,10 @@ const payload = (acceptWarnings: boolean) => ({
     cover_mode: coverMode.value,
     cover_token:
         coverMode.value === 'upload' ? (batchCover.value?.token ?? null) : null,
+    music:
+        music.value.kind === 'random'
+            ? { ...music.value }
+            : { kind: 'none', seed: music.value.seed },
     items: ordered.value.map((it) => {
         const o = overrides.value[it.id];
         const at = times.value[it.id];
@@ -656,6 +760,9 @@ const payload = (acceptWarnings: boolean) => ({
                 ? { product: rowProduct.value[it.id] }
                 : {}),
             ...(c ? { cover_token: c.token } : {}),
+            ...(music.value.kind === 'random' && rowMusic.value[it.id]
+                ? { music: rowMusic.value[it.id] }
+                : {}),
             ...(edited.value[it.id] && at
                 ? { at: dayjs(at).toISOString() }
                 : {}),
@@ -721,6 +828,10 @@ const checkForm = (): string => {
         props.items.some((it) => !rowCover.value[it.id])
     ) {
         return 'Hãy tải một ảnh bìa lên (hoặc chọn ảnh cho từng video).';
+    }
+
+    if (music.value.kind === 'random' && !tracks.value?.length) {
+        return 'Thư mục nhạc chưa có bài nào: hãy chọn thư mục nhạc khác, hoặc chọn "Không ghép nhạc".';
     }
 
     return '';
@@ -1289,6 +1400,12 @@ const areaCls =
                             </p>
                         </div>
 
+                        <BatchMusicSection
+                            v-model="music"
+                            :count="tracks?.length ?? null"
+                            @dir="loadTracks"
+                        />
+
                         <div
                             class="flex flex-col gap-1 rounded-lg border bg-muted/40 p-3 text-sm"
                             data-testid="fork-rieng-time-rules"
@@ -1658,6 +1775,40 @@ const areaCls =
                                                 {{ m }}
                                             </p>
                                             <div
+                                                v-if="plannedMusic[it.id]"
+                                                class="flex min-w-0 items-center gap-1.5 text-sm"
+                                                :data-testid="`fork-rieng-row-music-${it.id}`"
+                                            >
+                                                <IconMusic
+                                                    class="size-4 shrink-0 text-muted-foreground"
+                                                />
+                                                <TrackPlayButton
+                                                    :dir="music.dir"
+                                                    :rel="plannedMusic[it.id]"
+                                                    :data-testid="`fork-rieng-row-music-play-${it.id}`"
+                                                />
+                                                <select
+                                                    :value="plannedMusic[it.id]"
+                                                    class="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
+                                                    aria-label="Bài nhạc của video này"
+                                                    :data-testid="`fork-rieng-row-music-select-${it.id}`"
+                                                    @change="
+                                                        rowMusic[it.id] = (
+                                                            $event.target as HTMLSelectElement
+                                                        ).value
+                                                    "
+                                                >
+                                                    <option
+                                                        v-for="t in tracks ??
+                                                        []"
+                                                        :key="t.rel"
+                                                        :value="t.rel"
+                                                    >
+                                                        {{ t.name }}
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div
                                                 class="flex flex-wrap items-center gap-1.5"
                                             >
                                                 <label
@@ -1939,6 +2090,31 @@ const areaCls =
                                         v-if="r.cover"
                                         class="block text-xs font-normal text-muted-foreground"
                                         >Bìa: {{ r.cover.note }}</span
+                                    >
+                                    <span
+                                        v-if="r.music?.rel"
+                                        class="mt-0.5 flex items-center gap-1.5 text-xs font-normal text-muted-foreground"
+                                        :data-testid="`fork-rieng-preview-music-${r.id}`"
+                                    >
+                                        <TrackPlayButton
+                                            :dir="music.dir"
+                                            :rel="r.music.rel"
+                                        />
+                                        Nhạc:
+                                        <b class="truncate text-foreground">{{
+                                            r.music.name
+                                        }}</b>
+                                        ({{
+                                            music.mode === 'replace'
+                                                ? 'thay tiếng gốc'
+                                                : `trộn, nhỏ hơn ${-music.gain_db} dB`
+                                        }})
+                                    </span>
+                                    <span
+                                        v-else-if="r.music?.kind === 'none'"
+                                        class="block text-xs font-normal text-muted-foreground"
+                                        :data-testid="`fork-rieng-preview-music-${r.id}`"
+                                        >Nhạc: không ghép</span
                                     >
                                 </span>
                                 <span class="tabular-nums">{{

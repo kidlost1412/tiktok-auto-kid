@@ -1102,6 +1102,95 @@ test('a folder with music on but an empty music folder never posts the video wit
     expect($done['done'])->toBe(0)->and(Post::query()->count())->toBe(0)->and($v->fresh()->status)->toBe('new');
 });
 
+test('batch music: the plan is deterministic and has no repeats, the preview shows the exact posted track and a per-video choice wins', function () {
+    $ffmpeg = app(RiengThumbs::class)->ffmpegPath();
+
+    if ($ffmpeg === null) {
+        $this->markTestSkipped('ffmpeg not installed');
+    }
+
+    $run = function (array $args) use ($ffmpeg): void {
+        $p = new Process([$ffmpeg, '-hide_banner', '-y', '-v', 'error', ...$args]);
+        $p->setTimeout(60);
+        $p->run();
+    };
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music);
+
+    foreach ([1, 2, 3, 4] as $n) {
+        $run(['-f', 'lavfi', '-i', 'sine=frequency='.(300 + $n * 100).':duration=10', $music.'/nhac-'.$n.'.mp3']);
+    }
+
+    $folder = RiengFolder::create(['path' => $this->own]);
+    $videos = array_map(function (string $name) use ($folder, $run): AutoVideo {
+        $v = ($this->rieng)($name, null, ['meta' => ['folder_id' => $folder->id, 'rel_path' => $name]]);
+        $run(['-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=25:duration=3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $v->path]);
+
+        return $v;
+    }, ['a.mp4', 'b.mp4', 'c.mp4']);
+
+    $account = ($this->account)();
+    $cfg = ['kind' => 'random', 'dir' => $music, 'mode' => 'replace', 'gain_db' => 0, 'seed' => 42];
+    $plan = RiengMusic::plan(array_column(app(RiengMusic::class)->list($music), 'rel'), 42);
+    $input = ($this->input)($account, [$videos[0], $videos[1], ['id' => $videos[2]->id, 'music' => $plan[3]]], ['music' => $cfg]);
+
+    $names = fn (array $r): array => array_map(fn (array $row): ?string => $row['music']['name'], $r['rows']);
+    $preview = ($this->batch)()->preview($input, $this->now);
+    $again = ($this->batch)()->preview($input, $this->now);
+
+    expect($names($preview))->toBe($names($again))
+        ->and(array_slice($names($preview), 0, 2))->toBe(array_map(fn (string $r): string => pathinfo($r, PATHINFO_FILENAME), array_slice($plan, 0, 2)))
+        ->and($names($preview)[2])->toBe(pathinfo($plan[3], PATHINFO_FILENAME))
+        ->and(array_unique($names($preview)))->toHaveCount(3);
+
+    $done = ($this->batch)()->commit($input, false, $this->now);
+    $posted = collect(Post::query()->get())->mapWithKeys(fn (Post $p): array => [$p->meta['fork_auto_video_id'] => $p->meta['fork_music']]);
+
+    expect($done['done'])->toBe(3)
+        ->and(array_map(fn (AutoVideo $v): string => pathinfo($posted[$v->id], PATHINFO_FILENAME), $videos))->toBe($names($preview))
+        ->and(Post::query()->first()->meta['fork_music_mode'])->toBe('replace');
+});
+
+test('batch music: "no music" posts without music even if the folder has music on; a music folder with no tracks fails clearly', function () {
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music);
+    file_put_contents($music.'/a.mp3', 'x');
+    $folder = RiengFolder::create(['path' => $this->own, 'music' => ['enabled' => true, 'dir' => $music, 'mode' => 'mix', 'gain_db' => -12]]);
+    $v = ($this->rieng)('a.mp4', null, ['meta' => ['folder_id' => $folder->id, 'rel_path' => 'a.mp4']]);
+    $account = ($this->account)();
+
+    $empty = ($this->batch)()->preview(($this->input)($account, [$v], ['music' => ['kind' => 'random', 'dir' => $this->own.'/rong']]), $this->now);
+    expect($empty['ok'])->toBeFalse()->and($empty['error'])->toContain('không có bài nhạc nào');
+
+    $done = ($this->batch)()->commit(($this->input)($account, [$v], ['music' => ['kind' => 'none']]), false, $this->now);
+    $post = Post::query()->firstOrFail();
+
+    expect($done['done'])->toBe(1)->and($post->meta)->not->toHaveKey('fork_music')
+        ->and(Storage::path(Media::query()->where('post_id', $post->id)->value('path')))->toBeFile();
+});
+
+test('music listen route streams only audio files inside the chosen music folder', function () {
+    $owner = ownerUser();
+    $music = $this->own.'/_nhac';
+    File::ensureDirectoryExists($music.'/them');
+    file_put_contents($music.'/a.mp3', 'abcdef');
+    file_put_contents($music.'/them/b.m4a', 'x');
+    file_put_contents($music.'/ghi-chu.txt', 'x');
+    file_put_contents($this->own.'/ngoai.mp3', 'x');
+    $listen = fn (string $rel, ?string $dir = null) => $this->actingAs($owner)->get('/auto/kho/rieng/nhac/nghe?'.http_build_query(['dir' => $dir ?? $music, 'rel' => $rel]));
+
+    $listen('a.mp3')->assertOk()->assertHeader('Content-Type', 'audio/mpeg');
+    $listen('them/b.m4a')->assertOk()->assertHeader('Content-Type', 'audio/mp4');
+    $this->actingAs($owner)->get('/auto/kho/rieng/nhac/nghe?'.http_build_query(['dir' => $music, 'rel' => 'a.mp3']), ['Range' => 'bytes=0-1'])->assertStatus(206);
+    $listen('../ngoai.mp3')->assertNotFound();
+    $listen('ghi-chu.txt')->assertNotFound();
+    $listen('a.mp3', $this->own.'/rong')->assertNotFound();
+    $listen($this->own.'/ngoai.mp3')->assertNotFound();
+
+    $this->actingAs($owner)->postJson('/auto/kho/rieng/nhac/bai', ['dir' => $music, 'seed' => 1])->assertOk()
+        ->assertJsonCount(2, 'tracks')->assertJsonCount(2, 'plan');
+});
+
 // ---------------------------------------------------------------- Sản phẩm theo từng video khi đăng hàng loạt
 
 test('batch "per video" attaches each video its own AI or owner product and never a shared one', function () {
