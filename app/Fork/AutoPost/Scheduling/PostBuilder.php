@@ -19,6 +19,7 @@ use App\Fork\AutoPost\Models\ProductCover;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Persona\CoverStore;
 use App\Fork\AutoPost\Persona\Hashtags;
+use App\Fork\AutoPost\Rieng\RiengClean;
 use App\Fork\AutoPost\Rieng\RiengCovers;
 use App\Fork\AutoPost\Rieng\RiengMusic;
 use App\Fork\AutoPost\Shop\CartRules;
@@ -93,13 +94,15 @@ final class PostBuilder
         $storedPath = null;
         // Kho riêng: thư mục bật "Ghép nhạc" thì đăng bản đã ghép (file tạm, xoá sau khi chép). Lỗi ghép = không đăng.
         $music = app(RiengMusic::class)->apply($video, $path);
+        // Video Kho riêng luôn đăng bản đã xoá metadata (bản ghép nhạc đã sạch sẵn). Lỗi làm sạch = không đăng.
+        $tmp = $music['path'] ?? ($video->isRieng() ? app(RiengClean::class)->file((int) $video->id, $path) : null);
 
-        if ($music !== null) {
-            $path = $music['path'];
+        if ($tmp !== null) {
+            $path = $tmp;
         }
 
         try {
-            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, $optional, $music, &$storedPath): Post {
+            return DB::transaction(function () use ($social, $video, $caption, $slot, $workspace, $owner, $content, $path, $link, $hashtags, $cartName, $videoName, $coverFile, $ownCover, $optional, $music, $tmp, &$storedPath): Post {
                 $post = $workspace->posts()->forceCreate([
                     'post_group_id' => (string) Str::uuid7(),
                     'user_id' => $owner->id,
@@ -140,8 +143,8 @@ final class PostBuilder
                 $mime = ['mp4' => 'video/mp4', 'mov' => 'video/quicktime', 'webm' => 'video/webm'][$ext];
                 $displayName = (string) $video->file_name;
 
-                if ($sourceExt === 'm4v' || ($music !== null && strtolower(pathinfo($displayName, PATHINFO_EXTENSION)) !== 'mp4')) {
-                    $displayName = pathinfo($displayName, PATHINFO_FILENAME).'.mp4';
+                if ($sourceExt === 'm4v' || ($tmp !== null && strtolower(pathinfo($displayName, PATHINFO_EXTENSION)) !== $ext)) {
+                    $displayName = pathinfo($displayName, PATHINFO_FILENAME).'.'.$ext;
                 }
 
                 $storedPath = 'medias/'.Str::uuid().'.'.$ext;
@@ -204,8 +207,8 @@ final class PostBuilder
 
             throw $e;
         } finally {
-            if ($music !== null) {
-                @unlink($music['path']);
+            if ($tmp !== null) {
+                @unlink($tmp);
             }
         }
     }

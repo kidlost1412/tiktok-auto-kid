@@ -20,7 +20,7 @@ use Throwable;
  * Ghép nhạc hàng loạt cho video Kho riêng, cài theo từng thư mục (cột fork_rieng_folders.music):
  *   enabled, dir (thư mục nhạc), mode: replace (tắt hẳn tiếng video, chỉ còn nhạc) | mix (giữ tiếng gốc, nhạc nhỏ đi gain_db).
  * Lúc tạo bài, mỗi video bốc ngẫu nhiên một bài nhạc (tránh lặp các bài vừa dùng), cắt vừa độ dài video, nhỏ dần ở cuối,
- * ra một file mp4 MỚI để đăng. File gốc trong thư mục không bao giờ bị đụng tới.
+ * ra một file mp4 MỚI để đăng (đã xoá metadata, RiengClean::args). File gốc trong thư mục không bao giờ bị đụng tới.
  */
 final class RiengMusic
 {
@@ -287,7 +287,7 @@ final class RiengMusic
 
         $cmd = [$ffmpeg, '-y', '-v', 'error', '-i', $video, '-stream_loop', '-1', '-ss', (string) $offset, '-i', $track,
             '-filter_complex', $filter, '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
-            '-t', sprintf('%.3f', $videoDur), '-movflags', '+faststart', $out];
+            '-t', sprintf('%.3f', $videoDur), ...RiengClean::args(RiengClean::isH264($ffmpeg, $video)), $out];
         $p = new Process($cmd);
         $p->setTimeout(600);
         $p->run();

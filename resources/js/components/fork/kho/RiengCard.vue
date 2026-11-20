@@ -3,12 +3,13 @@
 import {
     IconAlertTriangle,
     IconCheck,
+    IconFolder,
     IconMovie,
     IconPlaylistAdd,
     IconSparkles,
     IconTrash,
 } from '@tabler/icons-vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import { fmtDuration, whereLabel } from '@/components/fork/kho/kho';
 import type { RiengVideo } from '@/components/fork/kho/rieng';
@@ -30,6 +31,14 @@ const props = defineProps<{
     /** Đang nhấn giữ (cảm ứng) chờ vào chế độ kéo chọn: thẻ thu nhẹ + viền nháy. */
     holding?: boolean;
 }>();
+
+// Thư mục con trong thư mục đã thêm (vd "test" của MIG 38/test/a.mp4); rỗng = nằm ngay thư mục gốc.
+const subFolder = computed(() => {
+    const rel = props.video.rel_path ?? '';
+    const i = rel.lastIndexOf('/');
+
+    return i > 0 ? rel.slice(0, i).replaceAll('/', ' › ') : '';
+});
 
 const emit = defineEmits<{
     open: [];
@@ -206,10 +215,18 @@ const onClick = (e: MouseEvent) => {
                 {{ video.file_name }}
             </div>
             <div
-                class="truncate text-xs text-muted-foreground"
+                class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
                 :title="video.rel_path ?? ''"
             >
-                {{ video.folder }}
+                <span class="truncate">{{ video.folder }}</span>
+                <span
+                    v-if="subFolder"
+                    class="inline-flex min-w-0 shrink items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+                    :data-testid="`fork-rieng-subfolder-${video.id}`"
+                >
+                    <IconFolder class="size-3 shrink-0" />
+                    <span class="truncate">{{ subFolder }}</span>
+                </span>
             </div>
             <div
                 v-if="video.moved_from"
