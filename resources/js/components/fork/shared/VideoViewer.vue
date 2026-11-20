@@ -536,6 +536,16 @@ const statLine = computed(() => {
                                 video.cart_name ?? '—'
                             }}</span>
                         </dd>
+                        <template v-if="video.music">
+                            <dt class="text-muted-foreground">Nhạc</dt>
+                            <dd
+                                class="min-w-0 truncate font-medium"
+                                :title="video.music"
+                                data-testid="fork-viewer-music"
+                            >
+                                ♪ {{ video.music }}
+                            </dd>
+                        </template>
                         <dt class="text-muted-foreground">Kênh</dt>
                         <dd
                             class="flex min-w-0 items-center gap-1.5 font-medium"

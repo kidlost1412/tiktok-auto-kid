@@ -46,6 +46,8 @@ export interface KhoVideo {
     schedule_state?: ScheduleWhere | null;
     product_image?: string | null;
     channel_avatar?: string | null;
+    /** Tên file bản nhạc đã ghép vào bài đăng (null = không ghép nhạc). */
+    music?: string | null;
     stats?: {
         views: number | null;
         likes: number | null;

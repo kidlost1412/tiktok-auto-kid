@@ -13,7 +13,11 @@ import { ref } from 'vue';
 import { fmtDuration, whereLabel } from '@/components/fork/kho/kho';
 import type { RiengVideo } from '@/components/fork/kho/rieng';
 import ProductThumb from '@/components/fork/shared/ProductThumb.vue';
-import { toneClasses, type Tone } from '@/components/fork/shared/status';
+import {
+    fmtNum,
+    toneClasses,
+    type Tone,
+} from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import dayjs from '@/dayjs';
 import { cn } from '@/lib/utils';
@@ -227,6 +231,37 @@ const onClick = (e: MouseEvent) => {
                 :class="cn('mt-1 text-xs', toneClasses[status().tone].text)"
             >
                 {{ detail() }}
+            </div>
+            <div
+                v-if="video.stats"
+                class="mt-1 flex flex-wrap gap-x-2.5 text-xs text-muted-foreground"
+                :data-testid="`fork-rieng-stats-${video.id}`"
+                :title="
+                    video.stats.collected_at
+                        ? `Đọc lúc ${dayjs(video.stats.collected_at).format('HH:mm DD/MM')}`
+                        : undefined
+                "
+            >
+                <span
+                    ><b class="text-foreground">{{
+                        fmtNum(video.stats.views)
+                    }}</b>
+                    view</span
+                >
+                <span>{{ fmtNum(video.stats.likes) }} thích</span>
+                <span>{{ fmtNum(video.stats.comments) }} bình luận</span>
+                <span>{{ fmtNum(video.stats.shares) }} chia sẻ</span>
+                <span v-if="video.stats.saves != null"
+                    >{{ fmtNum(video.stats.saves) }} lưu</span
+                >
+            </div>
+            <div
+                v-if="video.music"
+                class="mt-1 truncate text-xs font-medium"
+                :title="video.music"
+                :data-testid="`fork-rieng-music-${video.id}`"
+            >
+                ♪ {{ video.music }}
             </div>
 
             <!-- Sản phẩm đã gắn (có sau khi hẹn giờ) -->

@@ -34,6 +34,8 @@ interface ProductOption {
     name: string;
     tags: string[];
     cover_count: number;
+    /** Ảnh bìa các bài kế tiếp sẽ dùng, đúng thứ tự xoay vòng ([] = bìa mặc định TikTok). */
+    cover_plan?: { file: string; url: string }[];
     /** Ảnh sản phẩm TikTok Shop đã gắn giỏ (nếu có). */
     image?: string | null;
 }
@@ -724,6 +726,35 @@ const checkForm = (): string => {
     return '';
 };
 
+// Bìa sản phẩm từng video sẽ dùng: ảnh kế tiếp của vòng xoay theo thứ tự danh sách (máy chủ chia y hệt lúc đăng).
+const plannedCover = computed<Record<number, string>>(() => {
+    const out: Record<number, string> = {};
+    const used: Record<string, number> = {};
+    const list = account.value?.products ?? [];
+
+    for (const it of ordered.value) {
+        if (rowCover.value[it.id]) {
+            continue;
+        }
+
+        const key = rowProduct.value[it.id];
+        const code = key
+            ? list.find((o) => optionKey(o) === key)?.code
+            : perVideo.value
+              ? videoProducts.value[it.id]?.code
+              : product.value?.code;
+        const plan = list.find((o) => o.code === code)?.cover_plan ?? [];
+        const k = used[code ?? ''] ?? 0;
+        used[code ?? ''] = k + 1;
+
+        if (plan[k]) {
+            out[it.id] = plan[k].url;
+        }
+    }
+
+    return out;
+});
+
 // Ảnh bìa hiện tại của một video trong danh sách (để hiện hình nhỏ).
 const coverUrlOf = (id: number): string | null => {
     if (rowCover.value[id]) {
@@ -731,7 +762,7 @@ const coverUrlOf = (id: number): string | null => {
     }
 
     if (coverMode.value === 'product') {
-        return null;
+        return plannedCover.value[id] ?? null;
     }
 
     return coverMode.value === 'upload'
@@ -1402,7 +1433,7 @@ const areaCls =
                                                 >
                                                     {{
                                                         coverMode === 'product'
-                                                            ? 'Bìa sản phẩm'
+                                                            ? 'Bìa TikTok tự chọn'
                                                             : 'Chưa có bìa'
                                                     }}
                                                 </span>

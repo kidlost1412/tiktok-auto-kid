@@ -153,6 +153,27 @@ test('default mode keeps the product cover rotation and says so in the preview',
         ->and(is_dir($this->covers.'/'.$a->id))->toBeFalse();
 });
 
+test('random product covers: the dialog plan, the preview and the posts use exactly the same image per video', function () {
+    $account = ($this->account)();
+    $cv = ProductCover::for((string) $account->id, $this->code);
+    $one = app(CoverStore::class)->add($cv, rcImage())['entry'];
+    $two = app(CoverStore::class)->add($cv, rcImage())['entry'];
+    $cv->forceFill(['cover_images' => [$one, $two], 'cover_mode' => 'random'])->save();
+    $vids = [($this->rieng)('a.mp4'), ($this->rieng)('b.mp4'), ($this->rieng)('c.mp4')];
+
+    $plan = array_column(app(RiengBatch::class)->productOptions((string) $account->id)[0]['cover_plan'], 'file');
+    $preview = app(RiengBatch::class)->preview(($this->input)($account, $vids), $this->now);
+    $done = app(RiengBatch::class)->commit(($this->input)($account, $vids), false, $this->now);
+
+    $shown = array_column(array_column($preview['rows'], 'cover'), 'file', null);
+    $posted = array_map(fn ($v) => Post::query()->findOrFail($v->refresh()->post_id)->meta['fork_cover'], $vids);
+    expect(array_slice($plan, 0, 3))->toBe([$one['file'], $two['file'], $one['file']])
+        ->and($shown)->toBe(array_slice($plan, 0, 3))
+        ->and($done['done'])->toBe(3)
+        ->and($posted)->toBe($shown)
+        ->and(collect(ProductCover::for((string) $account->id, $this->code)->cover_images)->pluck('used')->all())->toBe([2, 1]);
+});
+
 test('a product without covers falls back to the TikTok default cover and the dialog data says so', function () {
     $account = ($this->account)();
     $a = ($this->rieng)('a.mp4');

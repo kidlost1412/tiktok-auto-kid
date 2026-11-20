@@ -45,6 +45,9 @@ final class RiengBatch
     /** Cách chọn ảnh bìa: bìa của sản phẩm (xoay vòng), ảnh tải lên, hoặc một khung trong video. */
     public const COVER_PRODUCT = 'product';
 
+    /** Số ảnh bìa sản phẩm báo trước cho giao diện (đủ cho một lượt đăng hàng loạt). */
+    private const int COVER_PLAN_MAX = 60;
+
     public const COVER_UPLOAD = 'upload';
 
     public const COVER_FRAME = 'frame';
@@ -94,7 +97,7 @@ final class RiengBatch
                     // Ảnh sản phẩm TikTok Shop đã gắn giỏ trên kênh này (ảnh có sẵn của app, không tải thêm).
                     'image' => $images->forSlot($socialAccountId, (string) $code, $qc),
                     'tags' => app(Hashtags::class)->configFor($product)['tags'],
-                    'cover_count' => $this->productCoverInfo($product, (string) $socialAccountId)['count'],
+                    ...(fn (array $c): array => ['cover_count' => $c['count'], 'cover_plan' => $c['plan']])($this->productCoverInfo($product, (string) $socialAccountId, self::COVER_PLAN_MAX)),
                 ];
             }
         }
@@ -336,8 +339,11 @@ final class RiengBatch
             }
 
             $ownToken = filled($item['cover_token'] ?? null) ? (string) $item['cover_token'] : null;
-            $coverInfo[$pick['code'] ?? ''] ??= $this->productCoverInfo($product, (string) $social->id);
-            $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, $coverInfo[$pick['code'] ?? ''], $row);
+            $ck = $pick['code'] ?? '';
+            $coverInfo[$ck] ??= $this->productCoverInfo($product, (string) $social->id, count($items)) + ['i' => 0];
+            // Bìa sản phẩm: mỗi dòng nhận ảnh kế tiếp của vòng xoay theo thứ tự danh sách (giống giao diện), lúc đăng dùng đúng ảnh đó.
+            $planned = $coverMode === self::COVER_PRODUCT && $ownToken === null ? ($coverInfo[$ck]['plan'][$coverInfo[$ck]['i']++] ?? null) : null;
+            $row['cover'] = $this->coverFor($coverMode, $ownToken, $batchToken, $video, ['planned' => $planned] + $coverInfo[$ck], $row);
             $row['_at'] = $this->parseAt($item['at'] ?? null);
             $rows[] = $row;
         }
@@ -363,18 +369,21 @@ final class RiengBatch
      *
      * @return array{active: bool, count: int, url: ?string}
      */
-    private function productCoverInfo(?AutoProduct $product, string $accountId): array
+    private function productCoverInfo(?AutoProduct $product, string $accountId, int $n = 0): array
     {
         // Bộ ảnh bìa của sản phẩm trên đúng kênh đang đăng (kênh khác cùng sản phẩm có bộ riêng).
         $product = $product === null || $accountId === '' ? null : ProductCover::for($accountId, (string) $product->code);
 
         if ($product === null || CoverStore::normalizeMode($product->cover_mode) === CoverStore::DEFAULT) {
-            return ['active' => false, 'count' => 0, 'url' => null];
+            return ['active' => false, 'count' => 0, 'url' => null, 'plan' => []];
         }
 
         $files = collect(app(CoverStore::class)->describe($product))->filter(fn (array $c): bool => CoverStore::pathFor($product, $c['file']) !== null)->values();
+        $url = fn (string $f): string => '/auto/anh-bia/'.rawurlencode((string) $product->code).'/'.$f;
+        // Ảnh của $n bài kế tiếp (đúng thứ tự xoay vòng), để hộp đăng hàng loạt hiện trước đúng ảnh từng video sẽ dùng.
+        $plan = array_map(fn (string $f): array => ['file' => $f, 'url' => $url($f)], app(CoverStore::class)->plan($product, $n));
 
-        return ['active' => $files->isNotEmpty(), 'count' => $files->count(), 'url' => $files->first()['url'] ?? null];
+        return ['active' => $files->isNotEmpty(), 'count' => $files->count(), 'url' => $files->first()['url'] ?? null, 'plan' => $plan];
     }
 
     /**
@@ -404,11 +413,14 @@ final class RiengBatch
         $token = $mode === self::COVER_PRODUCT ? null : $batchToken;
 
         if ($mode === self::COVER_PRODUCT) {
+            $planned = $productCover['planned'] ?? null;
+
             return [
                 'kind' => 'product',
-                'url' => $productCover['url'],
+                'url' => $planned['url'] ?? null,
                 'token' => null,
-                'note' => $productCover['active'] ? 'Bìa của sản phẩm (xoay vòng)' : 'Sản phẩm chưa có ảnh bìa, dùng bìa mặc định của TikTok',
+                'file' => $planned['file'] ?? null,
+                'note' => $planned !== null ? 'Bìa của sản phẩm' : 'Sản phẩm chưa có ảnh bìa, dùng bìa mặc định của TikTok',
             ];
         }
 
@@ -812,7 +824,7 @@ final class RiengBatch
                 continue;
             }
 
-            $error = $this->postOne($social, (int) $row['id'], (string) $row['_code'], $row['_qc'] ?? null, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null);
+            $error = $this->postOne($social, (int) $row['id'], (string) $row['_code'], $row['_qc'] ?? null, (string) $row['caption'], (array) $row['hashtags'], CarbonImmutable::parse($row['at'])->utc(), (string) $plan['cover_mode'], $row['cover']['token'] ?? null, $row['cover']['file'] ?? null);
 
             if ($error === null) {
                 $done++;
@@ -865,7 +877,7 @@ final class RiengBatch
      *
      * @return string|null lỗi (tiếng Việt) hoặc null khi đã hẹn xong
      */
-    public function postOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null): ?string
+    public function postOne(SocialAccount $social, int $id, string $code, ?string $qc, string $caption, array $tags, CarbonImmutable $slot, string $coverMode = self::COVER_PRODUCT, ?string $coverToken = null, ?string $productCover = null): ?string
     {
         $video = AutoVideo::query()->whereKey($id)->where('source', AutoVideo::SOURCE_RIENG)->first();
 
@@ -922,7 +934,7 @@ final class RiengBatch
         }
 
         try {
-            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover);
+            $this->builder->build($social, $video, ['caption' => $caption, 'hashtags' => $tags, 'source' => 'rieng', 'product_name' => null], $slot, $ownCover, $productCover);
             // Đã hẹn giờ thì không còn nằm trong "Giỏ chờ đăng".
             RiengQueueItem::forget((int) $video->id);
 

@@ -103,7 +103,7 @@ final class RiengController extends Controller
 
         $names = $folders->mapWithKeys(fn (RiengFolder $f): array => [$f->id => $f->displayName()]);
         $info = new RiengInfo;
-        $videos = fn () => $once('videos', fn () => $this->applySort($filtered()->with('socialAccount:id,username,display_name,avatar_url'), $sort)
+        $videos = fn () => $once('videos', fn () => $this->applySort($filtered()->with(['socialAccount:id,username,display_name,avatar_url', 'post:id,meta']), $sort)
             ->paginate(self::PER_PAGE)
             ->withQueryString());
         // Chỉ video của trang đang xem mới tính cờ "trùng"; danh sách "Chọn tất cả" tính riêng ở selectAll (khi anh bấm).
@@ -294,6 +294,13 @@ final class RiengController extends Controller
             'can_preview' => ! $gone && is_file((string) $v->path),
             'duplicate' => $duplicate,
             'product' => $product,
+            // Bản nhạc đã ghép vào bài đăng (tên file nhạc), để nhìn thẻ là biết video nào có nhạc, nhạc gì.
+            'music' => data_get($v->post?->meta, 'fork_music') ?: null,
+            // Chỉ số lần đọc gần nhất của video đã đăng.
+            'stats' => ($s = (array) data_get($v->stats, 'latest', [])) === [] ? null : [
+                'views' => data_get($s, 'views'), 'likes' => data_get($s, 'likes'), 'comments' => data_get($s, 'comments'),
+                'shares' => data_get($s, 'shares'), 'saves' => data_get($s, 'saves'), 'collected_at' => data_get($s, 'at'),
+            ],
         ];
     }
 

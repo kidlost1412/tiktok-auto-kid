@@ -147,7 +147,7 @@ final class KhoController extends Controller
         $assessed = fn () => $once('assessed', fn () => $readiness->assess($waiting()));
 
         $videos = fn () => $once('videos', fn () => $base()
-            ->with('socialAccount:id,username,display_name,avatar_url')
+            ->with(['socialAccount:id,username,display_name,avatar_url', 'post:id,meta'])
             ->tap(fn ($q) => $this->applyTab($q, $tab))
             ->when($day !== '', fn ($q) => $q->whereRaw($dayExpr.' = ?', [$day]))
             ->when($product !== '', fn ($q) => $q->where('product_code', $product))
@@ -604,6 +604,7 @@ final class KhoController extends Controller
                 'traffic' => array_values((array) data_get($v->stats, 'insight.traffic', [])),
                 'collected_at' => data_get($stats, 'at'),
             ],
+            'music' => data_get($v->post?->meta, 'fork_music') ?: null,
             'legacy' => $v->source === 'ra',
             // Nguồn (AI / Kho riêng) và cờ "đã bỏ xếp lịch để sửa" cho khung xem video.
             'source' => $v->source,

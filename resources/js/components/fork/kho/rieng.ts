@@ -117,6 +117,17 @@ export interface RiengVideo {
     can_preview: boolean;
     duplicate: Duplicate | null;
     product: RiengProduct | null;
+    /** Tên file bản nhạc đã ghép vào bài đăng (null = không ghép nhạc). */
+    music?: string | null;
+    /** Chỉ số lần đọc gần nhất (video đã đăng). */
+    stats?: {
+        views: number | null;
+        likes: number | null;
+        comments: number | null;
+        shares: number | null;
+        saves: number | null;
+        collected_at: string | null;
+    } | null;
     /** Kho riêng tự đăng theo khung (AI xem video, sản phẩm, caption, kênh). */
     auto?: RiengAuto | null;
 }

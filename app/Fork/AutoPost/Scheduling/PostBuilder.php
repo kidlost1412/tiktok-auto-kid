@@ -45,7 +45,7 @@ final class PostBuilder
     /**
      * @param  array{caption: string, hashtags: list<string>, source: string, product_name?: ?string}  $caption
      */
-    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot, ?string $ownCover = null): Post
+    public function build(SocialAccount $social, AutoVideo $video, array $caption, CarbonImmutable $slot, ?string $ownCover = null, ?string $productCover = null): Post
     {
         // Ưu tiên file trên đĩa; không có thì tải từ hub qua HTTP vào cache (MissingVideoFile nếu file mất/sai sha256,
         // lỗi thường nếu hub tắt: video về kho, thử lại sau).
@@ -62,7 +62,7 @@ final class PostBuilder
         // $ownCover: ảnh bìa riêng của video (Kho riêng: tải lên / chọn khung), thay cho xoay vòng bìa sản phẩm.
         $coverFile = $ownCover !== null && $ownCover !== ''
             ? $ownCover
-            : ($product !== null ? app(CoverStore::class)->pick(ProductCover::for((string) $social->id, (string) $product->code)) : null);
+            : ($product !== null ? app(CoverStore::class)->pick(ProductCover::for((string) $social->id, (string) $product->code), $productCover) : null);
         $content = HubText::compose($final['caption'], $final['hashtags']);
 
         // Kho riêng: TikTok cho hẹn giờ không caption, nên bài này được phép rỗng (cờ fork_caption_optional trong meta).

@@ -204,42 +204,35 @@ final class CoverStore
 
     /**
      * Chọn ảnh bìa cho một bài mới theo chế độ của sản phẩm; null = dùng bìa mặc định của TikTok.
-     * Ngẫu nhiên = xoay vòng đều: ưu tiên ảnh đã dùng ít nhất, không lặp ảnh vừa dùng (khi có từ 2 ảnh trở lên).
+     * Ngẫu nhiên = xoay vòng đều: ưu tiên ảnh đã dùng ít nhất, không lặp ảnh vừa dùng (khi có từ 2 ảnh trở lên), hoà thì lấy ảnh
+     * đứng trước trong bộ (cố định để hộp đăng hàng loạt báo trước đúng ảnh, xem plan()).
+     * $want: ảnh đã báo trước cho bài này (hộp đăng hàng loạt); còn trong bộ thì dùng đúng ảnh đó.
      */
-    public function pick(ProductCover $p): ?string
+    public function pick(ProductCover $p, ?string $want = null): ?string
     {
         if (self::normalizeMode($p->cover_mode) === self::DEFAULT) {
             return null;
         }
 
-        return DB::transaction(function () use ($p): ?string {
+        return DB::transaction(function () use ($p, $want): ?string {
             $fresh = $p->exists ? (ProductCover::query()->whereKey($p->getKey())->lockForUpdate()->first() ?? $p) : $p;
-            $files = collect($fresh->cover_images ?? [])
-                ->pluck('file')
-                ->filter(fn ($f): bool => is_string($f) && self::pathFor($fresh, $f) !== null)
-                ->values();
+            $files = self::usable($fresh);
 
-            if ($files->isEmpty()) {
+            if ($files === []) {
                 return null;
             }
 
             if (self::normalizeMode($fresh->cover_mode) === self::FIXED) {
-                return $files->contains($fresh->cover_fixed) ? $fresh->cover_fixed : $files->first();
+                return in_array($fresh->cover_fixed, $files, true) ? $fresh->cover_fixed : $files[0];
             }
 
-            // Xoay vòng đều: chọn ảnh đã dùng ít nhất (đếm ở cover_images[].used), hoà thì bốc ngẫu nhiên,
-            // không lặp lại ảnh vừa dùng ngay trước đó khi bộ có từ 2 ảnh. Ít ảnh vẫn được dùng lặp lại.
             $images = collect($fresh->cover_images ?? []);
-            $used = fn (string $f): int => (int) ($images->first(fn ($i): bool => ($i['file'] ?? null) === $f)['used'] ?? 0);
-            $pool = $files->count() > 1 ? $files->reject(fn ($f): bool => $f === $fresh->cover_last)->values() : $files;
-            $min = $pool->map(fn ($f): int => $used($f))->min();
-            $ties = $pool->filter(fn ($f): bool => $used($f) === $min)->values();
-            $chosen = $ties[random_int(0, $ties->count() - 1)];
+            $chosen = $want !== null && in_array($want, $files, true) ? $want : self::next($files, self::usedCounts($fresh), $fresh->cover_last);
 
             $fresh->forceFill([
                 'cover_last' => $chosen,
                 'cover_images' => $images->map(fn ($i) => is_array($i) && ($i['file'] ?? null) === $chosen
-                    ? array_merge($i, ['used' => $used($chosen) + 1])
+                    ? array_merge($i, ['used' => (int) ($i['used'] ?? 0) + 1])
                     : $i)->values()->all(),
             ])->save();
             $p->cover_images = $fresh->cover_images;
@@ -247,6 +240,65 @@ final class CoverStore
 
             return $chosen;
         });
+    }
+
+    /**
+     * $n ảnh mà $n bài kế tiếp sẽ dùng (không ghi gì), cùng cách chọn với pick(); [] = bìa mặc định của TikTok.
+     *
+     * @return list<string>
+     */
+    public function plan(ProductCover $p, int $n): array
+    {
+        $files = self::normalizeMode($p->cover_mode) === self::DEFAULT ? [] : self::usable($p);
+
+        if ($files === [] || $n <= 0) {
+            return [];
+        }
+
+        if (self::normalizeMode($p->cover_mode) === self::FIXED) {
+            return array_fill(0, $n, in_array($p->cover_fixed, $files, true) ? (string) $p->cover_fixed : $files[0]);
+        }
+
+        [$used, $last, $out] = [self::usedCounts($p), $p->cover_last, []];
+
+        for ($i = 0; $i < $n; $i++) {
+            $last = $out[] = self::next($files, $used, $last);
+            $used[$last] = ($used[$last] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /** @return list<string> ảnh trong bộ còn file trên máy, theo thứ tự trong bộ */
+    private static function usable(ProductCover $p): array
+    {
+        return collect($p->cover_images ?? [])->pluck('file')
+            ->filter(fn ($f): bool => is_string($f) && self::pathFor($p, $f) !== null)->values()->all();
+    }
+
+    /** @return array<string, int> */
+    private static function usedCounts(ProductCover $p): array
+    {
+        return collect($p->cover_images ?? [])->filter(fn ($i): bool => is_array($i) && is_string($i['file'] ?? null))
+            ->mapWithKeys(fn (array $i): array => [$i['file'] => (int) ($i['used'] ?? 0)])->all();
+    }
+
+    /**
+     * @param  list<string>  $files
+     * @param  array<string, int>  $used
+     */
+    private static function next(array $files, array $used, ?string $last): string
+    {
+        $pool = count($files) > 1 ? array_values(array_filter($files, fn (string $f): bool => $f !== $last)) : $files;
+        $min = min(array_map(fn (string $f): int => $used[$f] ?? 0, $pool));
+
+        foreach ($pool as $f) {
+            if (($used[$f] ?? 0) === $min) {
+                return $f;
+            }
+        }
+
+        return $pool[0];
     }
 
     /**
