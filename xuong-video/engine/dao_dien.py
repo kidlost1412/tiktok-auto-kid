@@ -42,7 +42,11 @@ BO_CUC_MO_TA = {
 
 # ---------------------------------------------------------------- mệt cảnh (chống lặp cảnh qua video)
 KHO_NHO = 80              # kho riêng < 80 cảnh dùng được = "kho nhỏ": hạn mức ứng viên chặt hơn, kho chung được thêm rộng hơn
-TOI_DA_MOI_CAU = 6        # ứng viên mỗi câu (gồm cả cảnh kho chung)
+TOI_DA_MOI_CAU = 10       # mặc định ứng viên mỗi câu (gồm cả cảnh kho chung); config dao_dien.ung_vien_moi_cau, trần TRAN_MOI_CAU
+TRAN_MOI_CAU = 14
+KHUNG_MOI_CANH = 3        # mặc định số khung/ô ứng viên (đầu–giữa–cuối đoạn dùng được); config dao_dien.khung_moi_canh, 1 = ảnh _khung cũ
+TRAN_KHUNG = 4
+TOI_DA_TO_SHEET = 4       # tối đa 4 tờ ảnh ứng viên
 TRAN_KHO_NHO = 0.60       # kho nhỏ: tổng ứng viên riêng của 1 video ≤ 60% kho
 TY_BO_MET = 0.35          # bỏ tối đa 35% cảnh MỆT NHẤT khỏi ứng viên (miễn mọi vai trò của cảnh còn đủ cảnh thay)
 W_MET = 1.5               # 1 đơn vị mệt = trừ 1,5 điểm liên quan
@@ -56,8 +60,40 @@ PHAT_MO_CHOT = 30.0       # cảnh trùng cảnh mở/chốt của 6 video gần
 SO_VIDEO_MO_CHOT = 6
 TY_ANH_EM = 0.30          # 2 video cùng lời đọc: tối đa 30% cảnh chung
 TY_KHO_THEM_NHO = 0.45    # kho riêng nhỏ: kho chung được chiếm tới 45% (thay vì 30%) số cảnh + ô phụ
-TOI_DA_TO = 32            # 1 tờ ứng viên 8 cột × 4 hàng ô 190×338 (≤ 1520 px: model không thu nhỏ → ô ≥ 180 px); tối đa 2 tờ
-MAX_ANH = 2 * TOI_DA_TO
+TOI_DA_TO = 32            # 1 khung/ô: 1 tờ = 8 cột × 4 hàng ô 190×338 (≤ 1520 px: model không thu nhỏ → ô ≥ 180 px)
+MAX_ANH = TOI_DA_TO_SHEET * TOI_DA_TO
+
+
+def _cfg_dd(khoa, mac_dinh, lo, hi):
+    try:
+        v = int((cfg_hub().get("dao_dien") or {}).get(khoa, mac_dinh))
+    except Exception:
+        v = mac_dinh
+    return max(lo, min(hi, v))
+
+
+def moi_cau():
+    return _cfg_dd("ung_vien_moi_cau", TOI_DA_MOI_CAU, 3, TRAN_MOI_CAU)
+
+
+def khung_moi_canh():
+    return _cfg_dd("khung_moi_canh", KHUNG_MOI_CANH, 1, TRAN_KHUNG)
+
+
+FW, FH, GAP, CAO_TO = 128, 228, 2, 1560        # nhiều khung/ô: mỗi khung 128×228, ô = k khung liền nhau, tờ ≤ 1560 px mỗi chiều
+
+
+def bo_cuc_to(k):
+    """(rộng ô, cao ô, số cột, số hàng) của 1 tờ với k khung/ô. k=1: 8×4 ô 190×338 (kiểu cũ)."""
+    if k <= 1:
+        return 190, 338, 8, 4
+    cw, ch = k * FW + (k - 1) * GAP, FH
+    return cw, ch, max(1, CAO_TO // cw), max(1, CAO_TO // ch)
+
+
+def max_anh(k=None):
+    cw, ch, cot, hang = bo_cuc_to(khung_moi_canh() if k is None else k)
+    return TOI_DA_TO_SHEET * cot * hang
 
 
 def _ls_dir(hub=None):
@@ -260,7 +296,7 @@ def chon_ung_vien(ma, sents, y_canh, shots, rng, tranh=(), anh_em=None, qua=None
     chung = [x for x in (chung or []) if not bad(x)]
     nho = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-"))) < KHO_NHO
     nc = (2 if nho else 1) if chung else 0
-    per, chon = ung_vien(sents, y_canh, shots, rng, TOI_DA_MOI_CAU - nc, met=met, mo_gan=mo, chot_gan=chot)
+    per, chon = ung_vien(sents, y_canh, shots, rng, moi_cau() - nc, met=met, mo_gan=mo, chot_gan=chot)
     n, hien = len(sents), {}
     for k, st in enumerate(sents):
         yc = y_canh[k] if k < len(y_canh) else ""
@@ -280,15 +316,18 @@ def chon_ung_vien(ma, sents, y_canh, shots, rng, tranh=(), anh_em=None, qua=None
     for x in aff:
         chon.setdefault(x["id"], x)
     boi["aff"] = [x["id"] for x in aff]
-    if len(chon) > MAX_ANH:                             # quá nhiều ảnh: bỏ cảnh MỆT NHẤT (không bỏ quà Q-) cho vừa 2 tờ
-        for i in sorted([i for i in chon if not str(i).startswith("Q-")], key=lambda i: -met.get(i, 0))[:len(chon) - MAX_ANH]:
+    tran = max_anh()
+    if len(chon) > tran:                                # quá nhiều ảnh: bỏ cảnh MỆT NHẤT (không bỏ quà Q-) cho vừa số tờ tối đa
+        for i in sorted([i for i in chon if not str(i).startswith("Q-")], key=lambda i: -met.get(i, 0))[:len(chon) - tran]:
             del chon[i]
         per = [[i for i in p if i in chon] for p in per]
         boi["aff"] = [i for i in boi["aff"] if i in chon]
+    NGUON.update(chon)                                  # to_ung_vien cần file/tu/den để cắt khung từ video gốc
     return per, chon, boi
 
 
 ANH_RIENG = {}
+NGUON = {}      # id ứng viên → cảnh (file, tu, den, dep) — điền ở chon_ung_vien
 
 
 def canh_qua(ma_sp, cfg_kho_qua):
@@ -388,35 +427,109 @@ def gioi_han_kho_them(segs, shots, used, ty_le=None):
     return segs, sua
 
 
-def to_ung_vien(ma, ids, out, cols=8):
-    """Tờ ảnh ứng viên cho đạo diễn. Ô ≥ 180 px rộng (sàn, không thu nhỏ thêm): ≤ 32 ô/tờ (8×4, 1520×1352 px), nhiều hơn thì tách tối đa 2 tờ.
-    Trả LIST đường dẫn tờ (tờ 1 = out, tờ 2 = <out>-2.jpg); danh sách id rỗng → []. Thiếu file ảnh 1 cảnh → ô xám có số id (không sập)."""
+def _nguon_video(ma, sh):
+    """Đường dẫn video gốc của cảnh (None nếu không có). Cảnh kho riêng: file tương đối so với kho_video của sản phẩm; quà Q-/kho phụ V-: đã là đường dẫn
+    tuyệt đối. Thư mục kho từng bị đổi tên → thử bỏ ' - Copy' khỏi đường dẫn."""
+    f = (sh or {}).get("file")
+    if not f:
+        return None
+    p = Path(str(f))
+    if not p.is_absolute():
+        try:
+            kv = json.loads((HUB / "san-pham" / ma / "san-pham.json").read_text(encoding="utf-8")).get("kho_video")
+        except Exception:
+            kv = None
+        if not kv:
+            return None
+        p = Path(kv) / p
+    for q in (p, Path(str(p).replace(" - Copy", ""))):
+        if q.exists():
+            return q
+    return None
+
+
+def khung_canh(ma, sid, sh, k, dir_cache=None):
+    """k khung (đường dẫn jpg 192×342, cắt phủ) của 1 cảnh tại các mốc đầu→cuối đoạn dùng được (dep, không có thì tu–den); cache ở
+    <sản phẩm>/_khung3/<id>-<băm>-<j>.jpg. Thiếu nguồn / ffmpeg lỗi → None (người gọi dùng lại ảnh _khung cũ)."""
+    src = _nguon_video(ma, sh)
+    if not src:
+        return None
+    dep = sh.get("dep") or [sh.get("tu", 0.0), sh.get("den", sh.get("tu", 0.0) + sh.get("dai", 1.0))]
+    a, b = float(dep[0]), float(dep[1])
+    if b < a:
+        a, b = b, a
+    import hashlib
+    h = hashlib.md5(f"{src}|{a:.2f}|{b:.2f}|{k}".encode("utf-8")).hexdigest()[:6]
+    d = Path(dir_cache or (HUB / "san-pham" / ma / "_khung3")); d.mkdir(parents=True, exist_ok=True)
+    out = []
+    for j in range(k):
+        f = d / f"{sid}-{h}-{j}.jpg"
+        if not (f.exists() and f.stat().st_size > 0):
+            t = a + (b - a) * (0.08 + 0.84 * j / (k - 1)) if k > 1 else (a + b) / 2
+            try:
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(src), "-frames:v", "1",
+                                "-vf", "scale=192:342:force_original_aspect_ratio=increase,crop=192:342", "-q:v", "4", str(f)],
+                               capture_output=True, timeout=60)
+            except Exception:
+                pass
+        if not (f.exists() and f.stat().st_size > 0):
+            return None
+        out.append(f)
+    return out
+
+
+def to_ung_vien(ma, ids, out, cols=None, k=None):
+    """Tờ ảnh ứng viên cho đạo diễn. k = số khung/ô (mặc định config dao_dien.khung_moi_canh = 3): mỗi ô gồm k khung liền nhau theo thời gian
+    (đầu → giữa → cuối đoạn dùng được của cảnh, cắt từ video gốc, có cache); k=1 hoặc thiếu video gốc → ảnh _khung cũ. Tờ ≤ 1560 px mỗi chiều,
+    tối đa TOI_DA_TO_SHEET tờ. Trả LIST đường dẫn tờ (tờ 1 = out, tờ 2 = <out>-2.jpg); id rỗng → []. Thiếu cả ảnh → ô xám có số id (không sập)."""
+    k = khung_moi_canh() if k is None else max(1, int(k))
+    tw, th, c, r = bo_cuc_to(k)
+    cols = cols or c
+    per_to = cols * r
     d = HUB / "san-pham" / ma / "_khung"
-    ids = list(ids)[:MAX_ANH]
+    ids = list(ids)[:TOI_DA_TO_SHEET * per_to]
     if not ids:
         return []
-    tw, th = 190, 338
+    if k > 1:                                                     # cắt khung song song (ffmpeg), đã có cache thì bỏ qua
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            cat = dict(zip(ids, ex.map(lambda sid: khung_canh(ma, sid, NGUON.get(sid), k), ids)))
+    else:
+        cat = {}
     try:
         font = ImageFont.truetype("arialbd.ttf", 30)
+        nho = ImageFont.truetype("arialbd.ttf", 16)
     except Exception:
-        font = ImageFont.load_default()
+        font = nho = ImageFont.load_default()
     outs = []
-    for t in range(0, len(ids), TOI_DA_TO):
-        nhom = ids[t:t + TOI_DA_TO]
+    for t in range(0, len(ids), per_to):
+        nhom = ids[t:t + per_to]
         rows = (len(nhom) + cols - 1) // cols
-        sheet = Image.new("RGB", (cols * tw, rows * th), "black")
+        sheet = Image.new("RGB", ((cols if k <= 1 else min(cols, len(nhom))) * tw, rows * th), "black")
         dr = ImageDraw.Draw(sheet)
         for i, sid in enumerate(nhom):
             x, y = (i % cols) * tw, (i // cols) * th
-            f_anh = ANH_RIENG.get(sid) or (d / f"{sid}.jpg")          # cảnh quà tặng lấy từ kho sản phẩm khác
+            fs = cat.get(sid)
             try:
-                sheet.paste(Image.open(f_anh).convert("RGB").resize((tw, th)), (x, y))
+                if fs:                                            # k khung theo thời gian: 1 = đầu, 2 = giữa, … cuối
+                    for j, fj in enumerate(fs):
+                        xj = x + j * (FW + GAP)
+                        sheet.paste(Image.open(fj).convert("RGB").resize((FW, FH)), (xj, y))
+                        dr.rectangle([xj, y + FH - 20, xj + 16, y + FH - 1], fill="black"); dr.text((xj + 3, y + FH - 19), str(j + 1), fill="white", font=nho)
+                    dr.rectangle([x, y, x + tw - 1, y + th - 1], outline=(255, 200, 0), width=2)
+                else:
+                    f_anh = ANH_RIENG.get(sid) or (d / f"{sid}.jpg")          # cảnh quà tặng lấy từ kho sản phẩm khác
+                    im = Image.open(f_anh).convert("RGB")
+                    if k > 1:                                     # ô nhiều khung nhưng chỉ có 1 ảnh: đặt giữa ô
+                        sheet.paste(im.resize((FW, FH)), (x + (tw - FW) // 2, y))
+                    else:
+                        sheet.paste(im.resize((tw, th)), (x, y))
             except Exception:
                 dr.rectangle([x, y, x + tw - 1, y + th - 1], fill=(70, 70, 70))
             nhan = sid if len(sid) <= 6 else sid.replace("Q-", "Q:").replace("V-", "V:")
             rong = min(tw - 2, int(dr.textlength(nhan, font=font)) + 12)
             dr.rectangle([x, y, x + rong, y + 38], fill="black"); dr.text((x + 6, y + 3), nhan, fill="yellow", font=font)
-        f_out = Path(out) if t == 0 else Path(out).with_name(Path(out).stem + f"-{t // TOI_DA_TO + 1}" + Path(out).suffix)
+        f_out = Path(out) if t == 0 else Path(out).with_name(Path(out).stem + f"-{t // per_to + 1}" + Path(out).suffix)
         sheet.save(f_out, quality=85)
         outs.append(f_out)
     return outs

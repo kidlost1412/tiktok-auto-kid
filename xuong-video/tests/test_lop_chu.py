@@ -141,8 +141,13 @@ class KhungTron(unittest.TestCase):
 
 class PhuDe(unittest.TestCase):
     def test_cau_hinh_mac_dinh_va_ep_kieu(self):
-        self.assertEqual(PD.cau_hinh({}), {"bat": True, "co": 44, "y": 1500, "tu_moi_dong": [2, 5]})
-        self.assertEqual(PD.cau_hinh(None)["co"], 44)
+        self.assertEqual(PD.cau_hinh({}), {"bat": True, "co": 50, "co_chu": 1.0, "y": 1500, "tu_moi_dong": [2, 5]})
+        self.assertEqual(PD.cau_hinh(None)["co"], 50)
+        self.assertEqual(PD.cau_hinh({"phu_de": {"co": 44}})["co"], 50)            # mặc định cũ trong config → cỡ mới
+        self.assertEqual(PD.cau_hinh({"phu_de": {"co_chu": 1.2}})["co"], 60)
+        self.assertEqual(PD.cau_hinh({"phu_de": {"co_chu": 9}})["co_chu"], 1.6)     # kẹp 0.7–1.6
+        self.assertEqual(PD.cau_hinh({"phu_de": {"co_chu": 0.1}})["co"], 35)
+        self.assertEqual(PD.cau_hinh({"phu_de": {"co_chu": "abc"}})["co"], 50)
         c = PD.cau_hinh({"phu_de": {"bat": False, "co": "50", "y": 99999, "tu_moi_dong": [3, 4]}})
         self.assertEqual((c["bat"], c["co"], c["y"], c["tu_moi_dong"]), (False, 50, 1700, [3, 4]))
         self.assertEqual(PD.cau_hinh({"phu_de": {"tu_moi_dong": "rac", "co": "abc"}})["tu_moi_dong"], [2, 5])

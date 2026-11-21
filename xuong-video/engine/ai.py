@@ -25,6 +25,19 @@ NGUONG_DOI = 0.92      # dùng quá 92% cửa sổ 5 giờ / 7 ngày → ưu ti�
 
 
 VIEC = threading.local()      # ekip đặt VIEC.video = tên video trước khi gọi → token.csv biết lượt gọi thuộc video nào
+# ekip đặt thêm VIEC.so (dict sổ token của video) + VIEC.pha (bước: dao_dien / giam_khao / sua_dao_dien / ...) → _ghi_so cộng từng lượt gọi vào đó
+
+
+def _ghi_so(u, usd=0.0):
+    """Cộng token 1 lượt gọi (kể cả lượt hỏng / đổi tài khoản: đã tốn thật) vào sổ của việc đang chạy trong luồng này; không có sổ → bỏ qua."""
+    so = getattr(VIEC, "so", None)
+    if not isinstance(so, dict):
+        return
+    m = so.setdefault(getattr(VIEC, "pha", None) or "khac", {"luot": 0, "vao": 0, "cache_tao": 0, "cache_doc": 0, "ra": 0, "usd": 0.0})
+    m["luot"] += 1
+    for k, src in (("vao", "input_tokens"), ("cache_tao", "cache_creation_input_tokens"), ("cache_doc", "cache_read_input_tokens"), ("ra", "output_tokens")):
+        m[k] += int((u or {}).get(src) or 0)
+    m["usd"] = round(m["usd"] + float(usd or 0), 4)
 
 
 class HetHanMuc(RuntimeError):
@@ -383,6 +396,7 @@ def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
         usage["input_tokens"], 0, usage["cache_read_input_tokens"], usage["output_tokens"], 0, 1, len(anh or []), "chatgpt",
         getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
         dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
+    _ghi_so(usage)
     txt = loi + " " + (err or "")[-500:]
     if not msg and re.search(r"usage limit|rate limit|limit reached|quota|too many requests", txt, re.I):
         raise HetHanMuc("ChatGPT đã hết hạn mức: " + loi[:200])
@@ -430,6 +444,7 @@ def _goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
             u.get("output_tokens", 0), d.get("total_cost_usd", 0), d.get("num_turns", 0), len(anh or []), tk["ma"],
             getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
             dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
+        _ghi_so(u, d.get("total_cost_usd", 0))
         txt = res + " " + (r.stderr or "")
         if (rl and rl.get("status") == "rejected") or re.search(r"hit your .*limit|usage limit|limit reached", txt, re.I):
             if not (rl and rl.get("status") == "rejected"):

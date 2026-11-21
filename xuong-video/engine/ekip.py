@@ -175,14 +175,20 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     if lam_lai:                           # LÀM LẠI video anh không ưng: giữ lời + giọng cũ, đạo diễn dựng lại theo góp ý của anh
         log(f"BẮT ĐẦU LÀM LẠI (ê-kíp AI · {_ten_nao()}) {ma_sp}: {len(lam_lai)} video theo góp ý của anh")
         scripts = []
+        so_loi = {}
     else:
+        so_loi = {}
         log(f"BẮT ĐẦU (ê-kíp AI · {_ten_nao()}) {ma_sp}: {so_video} video ← "
             f"{math.ceil(so_video / per)} lời × {per} đạo diễn")
         SK.ghi("bien-kich", "bat-dau", "Đang viết lời đọc", so=math.ceil(so_video / per))
         try:
             n_loi = math.ceil(so_video / per)
             with TT.viec("bien-kich", "Đang viết lời đọc", sp=ten_sp, buoc=f"Bài 0/{n_loi}") as tt_bk:
-                scripts = viet(ma_sp, n_loi, log)
+                VIEC.so, VIEC.pha = so_loi, "viet_loi"          # token biên kịch của cả lô: chia đều cho các video ở bước lưu hồ sơ
+                try:
+                    scripts = viet(ma_sp, n_loi, log)
+                finally:
+                    VIEC.so = None
                 tt_bk.cap(buoc=f"Bài {len(scripts)}/{n_loi}", tien_do=min(1.0, len(scripts) / max(1, n_loi)))
                 tt_bk.ket("ok" if scripts else "loi")
         except HetHanMuc as e:
@@ -318,6 +324,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         SK.ghi("dao-dien", "bat-dau", f"Đạo diễn {t['gu']} lên bảng dựng", video=f'{t["vname"]}-{t["j"]}', gu=t["gu"])
         try:
             VIEC.video = f'{t["vname"]}-{t["j"]}'            # token.csv biết lượt gọi này thuộc video nào
+            VIEC.so, VIEC.pha = t.setdefault("token", {}), ("sua_dao_dien" if t.get("_cu") else "dao_dien")
             edl, sents, total = dao_dien(ma_sp, sp, t["voice"], t["sc"], shots, t["gu"], t["work"], t["rng"], gop_y or t.get("gop_y", ""),
                                          tranh=lo_dung, qua=qua, chung=chung, anh_em=t.get("anh_em_ds"), used_sigs=used_sigs)
             segs, sua = segs_tu_bang(edl, sents, total, shots + [x for ds in qua.values() for x in ds] + chung)
@@ -465,6 +472,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 SK.ghi("giam-khao", "bat-dau", "Đang xem và chấm", video=f'{t["vname"]}-{t["j"]}')
                 try:
                     VIEC.video = f'{t["vname"]}-{t["j"]}'
+                    VIEC.so, VIEC.pha = t.setdefault("token", {}), "giam_khao"
                     r = giam_khao(sp, t["job"]["out"], t["info"].get("_sents") or _sents(t), t["edl"], t["work"], **ngu_canh_gk(t, qua))
                 except Exception as e:
                     r = {"diem": None, "dat": None, "loi": [f"chưa chấm: {type(e).__name__}"], "sua": ""}
@@ -489,7 +497,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 for t in sua:                        # nhớ bản cũ để so điểm
                     t["_cu"] = {"job": dict(t["job"]), "info": t["info"], "fname": t["fname"], "gk": t["gk"], "edl": t["edl"],
                                 "plan": t["plan"], "music": t.get("music")}
-                gop = {id(t): f"{t['gk'].get('sua')} | Lỗi: {'; '.join(t['gk'].get('loi', []))}" for t in sua}
+                gop = {id(t): gop_vong_sua(t) for t in sua}
                 try:
                     lai = mot_vong(sua, gop)
                 except BaseException:            # hết hạn mức / lỗi giữa chừng → mọi bản về nguyên trạng cũ
@@ -511,6 +519,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         t["lan"] = 1
                 def cham_lai(t):             # chấm lại lỗi / hết hạn mức → điểm trống → giữ bản cũ (đã chấm), cất bản mới
                     try:
+                        VIEC.video = f'{t["vname"]}-{t["j"]}'
+                        VIEC.so, VIEC.pha = t.setdefault("token", {}), "sua_giam_khao"
                         return t, giam_khao(sp, t["job"]["out"], _sents(t), t["edl"], t["work"], **ngu_canh_gk(t, qua))
                     except Exception as e:
                         return t, {"diem": None, "dat": None, "loi": [f"chưa chấm: {type(e).__name__}"], "sua": ""}
@@ -582,7 +592,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         "giong_file": t["voice"].get("meta"), "dung_chung_giong": per,          # 1 giọng dùng cho `per` video
                         "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "don_ban", "nhan_tu", "captions", "caption",
                                                                  "hashtag", "dang", "quy_cach", "mo", "than", "chot", "vai", "chu_mo")},
-                        "lam_lai_tu": t.get("lam_lai_tu")}
+                        "lam_lai_tu": t.get("lam_lai_tu"),
+                        "token": so_token_video(t.get("token"), so_loi, len(scripts), per)}
                 kem(t["job"]["out"], ".json", ghi=True).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
                 SK.noi_them(da_dung_f, " ".join(sg["shot"]["id"] for sg in (t["plan"].get("edl_segs") or [])) + "\n", giu_dong=600, toi_da_byte=120_000)
                 ghi_lich_su_canh(ma_sp, t["plan"].get("edl_segs") or [], f'{t["vname"]}-{t["j"]}')
@@ -629,12 +640,48 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         gom_bai_hoc(ma_sp, log)
     except Exception as e:
         log(f"  (gom bài học lỗi: {str(e)[:80]})")
+    try:                                             # lần đầu vs vòng sửa (để cân xem vòng sửa đáng không)
+        sos = [so_token_video(t.get("token"), so_loi, len(scripts), per) for t in tasks if t.get("job")]
+        if sos:
+            n_sua = sum(1 for x in sos if x["sua"]["luot"])
+            log(f"   token trung bình/video lần đầu: {sum(x['token_lan_dau'] for x in sos) // len(sos):,}".replace(",", ".")
+                + (f" · vòng sửa: {n_sua} video, thêm {sum(x['token_sua'] for x in sos) // n_sua:,} token/video được sửa".replace(",", ".") if n_sua else " · không video nào qua vòng sửa"))
+    except Exception:
+        pass
     try:
         bao_chi_phi(t_bat_dau, made, log, ma_sp)
     except Exception as e:
         log(f"  (tính chi phí lỗi: {str(e)[:80]})")
     SK.ghi("he-thong", "ket-thuc-lo", f"Xong {made} video", so=made, tong=len(tasks), phut=round((time.time() - t_bat_dau) / 60, 1))
     log(f"XONG: {made} video tại {out_dir} trong {round((time.time() - t_bat_dau) / 60, 1)} phút")
+
+
+def gop_vong_sua(t):
+    """Góp ý cho vòng sửa: đưa lại bảng dựng cũ, dặn chỉ đổi đúng đoạn giám khảo bắt lỗi (không dựng lại từ đầu)."""
+    gk = t.get("gk") or {}
+    cu = json.dumps({k: v for k, v in (t.get("edl") or {}).items() if not str(k).startswith("_")}, ensure_ascii=False)
+    if len(cu) > 6000:
+        cu = cu[:6000] + "…"
+    return ("VÒNG SỬA — giám khảo đã xem bản dựng trước và bắt lỗi. GIỮ NGUYÊN mọi đoạn không bị bắt lỗi (cảnh, bố cục, chữ, nhịp như bảng cũ); "
+            "CHỈ đổi đúng các đoạn ở giây / mục bị nêu dưới đây. "
+            f"Lỗi: {'; '.join(gk.get('loi') or []) or '(không ghi)'}. Nên sửa: {gk.get('sua') or '(không ghi)'}. "
+            f"BẢNG DỰNG CŨ: {cu}")
+
+
+def so_token_video(so, so_loi, n_loi, per):
+    """Sổ token 1 video: từng bước (đạo diễn, giám khảo, vòng sửa…) + phần biên kịch chia đều (tổng lô ÷ số lời ÷ số video mỗi lời).
+    lan_dau = viết lời (chia) + đạo diễn + giám khảo lần đầu; sua = mọi bước sua_*; tong = cả hai."""
+    pha = {k: dict(v) for k, v in (so or {}).items()}
+    if so_loi and n_loi:
+        chia = max(1, n_loi) * max(1, per)
+        for k, v in so_loi.items():
+            pha["viet_loi_chia" if k == "viet_loi" else k] = {kk: (round(vv / chia, 4) if kk == "usd" else round(vv / chia, 2) if kk == "luot" else round(vv / chia)) for kk, vv in v.items()}
+    cong = lambda ks: {c: (round(sum(pha[k].get(c, 0) for k in ks), 4 if c == "usd" else 2) if c in ("usd", "luot") else sum(pha[k].get(c, 0) for k in ks))
+                       for c in ("luot", "vao", "cache_tao", "cache_doc", "ra", "usd")}
+    lan_dau = cong([k for k in pha if not k.startswith("sua_")]); sua = cong([k for k in pha if k.startswith("sua_")])
+    tong = {c: (round(lan_dau[c] + sua[c], 4) if c in ("usd", "luot") else lan_dau[c] + sua[c]) for c in lan_dau}
+    tok = lambda m: m["vao"] + m["cache_tao"] + m["cache_doc"] + m["ra"]
+    return {"pha": pha, "lan_dau": lan_dau, "sua": sua, "tong": tong, "token_lan_dau": tok(lan_dau), "token_sua": tok(sua), "token_tong": tok(tong)}
 
 
 def _sents(t):

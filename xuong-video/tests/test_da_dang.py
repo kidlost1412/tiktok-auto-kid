@@ -127,7 +127,7 @@ class MetCanhTest(unittest.TestCase):
             ids = [f"{i:03d}" for i in range(50)]
             for i in ids[:-1]:                                                       # thiếu đúng 1 file ảnh → ô xám, không sập
                 Image.new("RGB", (270, 480), "red").save(d / f"{i}.jpg")
-            outs = DD.to_ung_vien("t1", ids, self.hub / "uv.jpg")
+            outs = DD.to_ung_vien("t1", ids, self.hub / "uv.jpg", k=1)
             self.assertEqual(len(outs), 2)
             with Image.open(outs[0]) as im:
                 w, h = im.size

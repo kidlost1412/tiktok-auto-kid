@@ -17,7 +17,8 @@
  },
  "dao-dien": {
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
-  "1.2.15": "Đạo diễn được nghĩ như editor: tự chọn bố cục (thêm 3 ô, 3 dải, lật trang nhanh), đặt chữ lớn theo đúng từ trong lời đọc, chọn tiếng theo nghĩa, và dùng nhiều cảnh người thật cầm sản phẩm. Máy không còn tự đổi lựa chọn của đạo diễn."
+  "1.2.15": "Đạo diễn được nghĩ như editor: tự chọn bố cục (thêm 3 ô, 3 dải, lật trang nhanh), đặt chữ lớn theo đúng từ trong lời đọc, chọn tiếng theo nghĩa, và dùng nhiều cảnh người thật cầm sản phẩm. Máy không còn tự đổi lựa chọn của đạo diễn.",
+  "1.2.42": "Đạo diễn giờ xem mỗi cảnh qua 3 khung (đầu, giữa, cuối đoạn dùng được) thay vì 1 ảnh, và được chọn trong nhiều cảnh hơn mỗi câu, nên ít chọn nhầm cảnh có ảnh đại diện không đúng với clip thật."
  },
  "so-tay-editor": {
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",

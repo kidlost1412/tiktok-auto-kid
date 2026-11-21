@@ -7,7 +7,9 @@ export type CapLine = {text: string; f0: number; f1: number; words: CapWord[]};
 export type CapStyle = 'to_dan' | 'mo_sang' | 'o_nhay' | 'gach_chay' | 'nhich_len' | 'hop_mo' | 'quet_mau' | 'vien_day';
 export type CapCfg = {style: CapStyle; center_y: number; upper: boolean; max_px?: number; co?: number; bat?: boolean};
 
-const MAX_W = 860;   // vùng an toàn: tránh cột nút TikTok bên phải (x ≤ 920); chữ cỡ CỐ ĐỊNH, quá rộng thì xuống dòng (Python đã chia ngắn)
+const FRAME_W = 1080;
+// Khung phủ TRỌN bề ngang (left 0) rồi căn giữa → chữ luôn nằm giữa x=540. (Trước đây left 60 + width 860 làm tâm lệch về x=490.)
+const MAX_W = 860;   // bề rộng tối đa của chữ; chữ cỡ CỐ ĐỊNH, quá rộng thì xuống dòng (Python đã chia ngắn)
 
 export const Caption: React.FC<{lines: CapLine[]; cfg: CapCfg; font: string; accent: string; text: string}> = ({lines, cfg, font, accent, text}) => {
   const f = useCurrentFrame();
@@ -22,9 +24,9 @@ export const Caption: React.FC<{lines: CapLine[]; cfg: CapCfg; font: string; acc
   const stroke = st === 'vien_day' ? 14 : 10;
   const baseText: React.CSSProperties = st === 'hop_mo' ? {} : {WebkitTextStroke: `${stroke}px #000`, paintOrder: 'stroke fill'};
   const active = [...ln.words].reverse().find(w => f >= w.f0);
-  return <div style={{position: 'absolute', left: 60, width: MAX_W, top: cfg.center_y, display: 'flex', justifyContent: 'center',
+  return <div style={{position: 'absolute', left: 0, width: FRAME_W, top: cfg.center_y, display: 'flex', justifyContent: 'center',
     transform: `translateY(calc(-50% + ${(1 - enter) * 16}px))`, opacity: Math.min(1, enter * 1.4)}}>
-    <div style={{textAlign: 'center', fontFamily: font, fontWeight: 900, fontSize: px, lineHeight: 1.18, color: text,
+    <div style={{maxWidth: MAX_W, textAlign: 'center', fontFamily: font, fontWeight: 900, fontSize: px, lineHeight: 1.18, color: text,
       whiteSpace: 'normal',
       ...(st === 'hop_mo' ? {background: 'rgba(0,0,0,0.58)', borderRadius: 18, padding: '8px 22px'} : {}),
       textShadow: st === 'hop_mo' ? 'none' : '0 4px 14px rgba(0,0,0,0.45)'}}>

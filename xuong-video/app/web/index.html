@@ -1068,6 +1068,8 @@ details.kt-tech .stat{margin-top:12px}
           <div><label for="cdModel">Bản AI</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
           <div><label for="cdEffort">Độ kỹ của AI (Cao = kỹ hơn, tốn hạn mức hơn)</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
           <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
+          <div><label for="cdDungLai">Vòng sửa sau giám khảo</label><select id="cdDungLai"><option value="0">Tắt — giám khảo chỉ chấm, ghi bài học</option><option value="1">Bật — bản chưa đạt được đạo diễn sửa và dựng lại 1 lần (giữ bản điểm cao hơn)</option></select></div>
+          <div><label for="cdCoChu">Cỡ phụ đề (1 = mặc định, 0.7–1.6)</label><input type="number" id="cdCoChu" min="0.7" max="1.6" step="0.05" value="1"></div>
         </div>
         <div class="row" style="margin-top:18px"><span class="pill y hidden" id="cdChuaLuu">Chưa lưu</span><button class="btn go" id="btnLuuCd" disabled><svg class="i"><use href="#i-save"/></svg>Lưu cài đặt</button></div>
       </div>
@@ -1108,6 +1110,8 @@ details.kt-tech .stat{margin-top:12px}
       <button class="btn ghost sm x" id="mDong"><svg class="i"><use href="#i-x"/></svg>Đóng</button></div>
     <div class="t" id="mTen" style="font-weight:600;font-size:16px;letter-spacing:-.01em;word-break:break-all"></div>
     <div id="mPills" class="row" style="gap:6px"></div>
+    <details id="mTokWrap" class="hidden"><summary class="note">Token AI của video này</summary><div class="tbl-wrap" style="margin-top:8px"><table class="tbl" id="mTok"></table></div>
+      <div class="note" style="margin-top:6px">Vào = token mới gửi đi · Cache tạo = lần đầu ghi vào bộ nhớ đệm · Cache đọc = đọc lại từ bộ nhớ đệm (rẻ hơn nhiều) · Ra = token AI viết. "Viết lời" là phần của cả lô chia đều cho từng video. ≈USD là giá quy đổi Claude tự báo, không phải tiền bị trừ (tài khoản gói tính theo hạn mức).</div></details>
     <div><h3>Caption để đăng</h3><div class="cap" id="mCap"></div>
       <div class="row" style="margin-top:10px;gap:8px"><button class="btn ghost sm" id="mCopy"><svg class="i"><use href="#i-copy"/></svg>Chép caption</button>
         <a class="btn ghost sm" id="mBia" download><svg class="i"><use href="#i-dl"/></svg>Tải ảnh bìa</a></div></div>
@@ -1722,7 +1726,7 @@ function dienTuST() {                    // lần đầu có ST: điền các ô
   if (!$('#tkChuyen')._ok) { $('#tkChuyen')._ok = true; $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; }
 }
 ['#tdyBat', '#tdyDat', '#tdyBo'].forEach(i => { $(i).addEventListener('input', () => { TDY_BAN = true; banVe(); }); $(i).addEventListener('change', () => { TDY_BAN = true; banVe(); }); });
-['#cdModel', '#cdEffort', '#cdPer'].forEach(i => $(i).addEventListener('change', () => { CD_BAN = true; banVe(); }));
+['#cdModel', '#cdEffort', '#cdPer', '#cdCoChu', '#cdDungLai'].forEach(i => $(i).addEventListener('change', () => { CD_BAN = true; banVe(); }));
 let CN_P = null, CN_LAI = false, CN_LOI = false, CN_T = null, LO_TRUOC = null, LO_XONG = {}, KHO_YC = null;
 function mangLoi(loi) {                       // chấm đầu trang đỏ + "Mất kết nối" khi không hỏi được xưởng; hết lỗi thì tự xoá
   CN_LOI = loi; const c = document.querySelector('.hdr-chip'); c.classList.toggle('bad', loi); c.querySelector('.dot').classList.toggle('bad', loi);
@@ -2097,17 +2101,27 @@ document.addEventListener('click', e => {
   const vd = $('#mVideo'), s = parseFloat(t.dataset.t); if (!vd || isNaN(s)) return;
   vd.currentTime = s; vd.play().catch(() => {});
 });
+const TOK_PHA = {viet_loi_chia: 'Viết lời (chia đều)', dao_dien: 'Đạo diễn', giam_khao: 'Giám khảo', sua_dao_dien: 'Vòng sửa: đạo diễn', sua_giam_khao: 'Vòng sửa: chấm lại', khac: 'Khác'};
+function tokenBang(ct) {                   // bảng token 1 video: từng bước + lần đầu / vòng sửa / tổng
+  const so = n => (+n || 0).toLocaleString('vi-VN', {maximumFractionDigits: 2}), tong = m => (m.vao || 0) + (m.cache_tao || 0) + (m.cache_doc || 0) + (m.ra || 0);
+  const hang = (ten, m, dam) => `<tr${dam ? ' style="font-weight:600"' : ''}><td>${esc(ten)}</td><td class="num">${so(m.luot)}</td><td class="num">${so(m.vao)}</td><td class="num">${so(m.cache_tao)}</td><td class="num">${so(m.cache_doc)}</td><td class="num">${so(m.ra)}</td><td class="num">${so(tong(m))}</td><td class="num">${(+m.usd || 0).toFixed(3)}</td></tr>`;
+  const pha = ct.pha || {}, ks = Object.keys(TOK_PHA).filter(k => pha[k]).concat(Object.keys(pha).filter(k => !(k in TOK_PHA)));
+  return `<thead><tr><th>Bước</th><th class="num">Lượt</th><th class="num">Vào</th><th class="num">Cache tạo</th><th class="num">Cache đọc</th><th class="num">Ra</th><th class="num">Tổng</th><th class="num">≈USD</th></tr></thead><tbody>`
+    + ks.map(k => hang(TOK_PHA[k] || k, pha[k])).join('')
+    + hang('Lần đầu (không sửa)', ct.lan_dau || {}, true) + ((ct.sua || {}).luot ? hang('Vòng sửa', ct.sua, true) : '') + hang('Tổng video', ct.tong || {}, true) + '</tbody>';
+}
 function moVideo(v) {
   CUR = v; $('#mVideo').src = v.url; $('#mBia').href = v.bia || '#'; $('#mBia').classList.toggle('hidden', !v.bia); $('#mVideo').poster = v.bia || ''; $('#mTen').textContent = v.file; $('#mCap').textContent = v.caption || '(chưa có caption)';
   $('#mLoi').textContent = v.loi || ''; $('#mGop').value = v.danh_gia.gop_y || '';
   $('#mPills').innerHTML = [v.diem && `<span class="pill ${+v.diem >= 7 ? 'g' : 'y'}">${ic('star')} Giám khảo ${v.diem}/10</span>`,
     v.gu && `<span class="pill p">${ic('clap')} ${esc(v.gu.replaceAll('_', ' '))}</span>`, v.cong_thuc && `<span class="pill g">${esc(v.cong_thuc)}</span>`,
     v.nhac && `<span class="pill y">${ic('music')} ${esc(v.nhac)}</span>`,
-    v.token && `<span class="pill b">${ic('coins')} ${Math.round(v.token / 1000)}k token</span>`,
+    (v.token_ct ? v.token_ct.token_tong : v.token) && `<span class="pill b">${ic('coins')} ${Math.round((v.token_ct ? v.token_ct.token_tong : v.token) / 1000)}k token${v.token_ct && v.token_ct.token_sua ? ' (sửa ' + Math.round(v.token_ct.token_sua / 1000) + 'k)' : ''}</span>`,
     v.ky_tu_giong && `<span class="pill b">${ic('mic')} ${v.ky_tu_giong} ký tự${v.dung_chung_giong > 1 ? ' (chung ' + v.dung_chung_giong + ' video)' : ''}</span>`,
     v.thoi_luong && `<span class="pill">${ic('clock')} ${Math.round(v.thoi_luong * 10) / 10}s</span>`,
     v.dang_bai && `<span class="pill y">${ic('file')} ${esc(v.dang_bai)}</span>`,
     v.lam_lai_tu && `<span class="pill r">${ic('repeat')} làm lại</span>`].filter(Boolean).join('');
+  $('#mTokWrap').classList.toggle('hidden', !v.token_ct); $('#mTok').innerHTML = v.token_ct ? tokenBang(v.token_ct) : '';
   $('#mGk').innerHTML = (v.y_tuong || v.loi_gk) ? `${v.y_tuong ? `<div class="help" style="display:flex;gap:8px">${ic('spark')}<span>${esc(v.y_tuong)}</span></div>` : ''}${v.loi_gk ? `<div class="gk-box" style="margin-top:10px"><b>Giám khảo góp ý</b>${gkDanhSach(v.loi_gk)}</div>` : ''}` : '';
   const i = LOC_DS.findIndex(x => x.file === v.file), kq = v.danh_gia.ket_qua;
   setT($('#mVt'), i >= 0 ? `${i + 1} / ${LOC_DS.length}${VID_CON ? '+' : ''}` : '');
@@ -2860,7 +2874,7 @@ $('#btnGdId').onclick = async () => {
 async function taiCd() { taiNhac(); taiODia(); taiTp(); taiKg(); taiGd();
   // mở thẳng ?tab=cai-dat lúc trạng thái chưa về: chờ lấy trạng thái rồi mới điền
   if (!ST.claude) { try { ST = await api('/api/trang-thai'); } catch (e) { return; } }
-  if (!CD_BAN) { $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; }   // anh đang sửa dở thì không ghi đè
+  if (!CD_BAN) { $('#cdModel').value = ST.claude.model; $('#cdEffort').value = ST.claude.effort; $('#cdPer').value = ST.video_moi_giong; $('#cdCoChu').value = ST.co_chu ?? 1; $('#cdDungLai').value = ST.dung_lai ? '1' : '0'; }   // anh đang sửa dở thì không ghi đè
   $('#btnLuuCd').disabled = false; taiTk(); }
 // ---------- NHẠC & ÂM THANH
 let NH_T = null;
@@ -2898,7 +2912,7 @@ $('#btnNhacThem').onclick = () => nhacThem('nhac');
 $('#btnSfxThem').onclick = () => nhacThem('sfx');
 $('#btnLuuCd').onclick = async () => {
   if ($('#btnLuuCd').disabled) return;
-  const r = await api('/api/cai-dat', {model: $('#cdModel').value, effort: $('#cdEffort').value, video_moi_giong: +$('#cdPer').value});
+  const r = await api('/api/cai-dat', {model: $('#cdModel').value, effort: $('#cdEffort').value, video_moi_giong: +$('#cdPer').value, co_chu: +$('#cdCoChu').value || 1, dung_lai: $('#cdDungLai').value === '1'});
   if (r && r.ok === false) return toast(r.loi || 'Không lưu được', 'loi');
   CD_BAN = false; banVe(); toast('Đã lưu cài đặt'); capNhat();
 };

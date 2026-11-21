@@ -1178,7 +1178,8 @@ def _video_mot_ngay(ngay, dg, tp):
         m = json.loads(fm.read_text(encoding="utf-8")) if fm.exists() else {}
         out[-1].update({"diem": out[-1]["diem"] or (m.get("diem") if m.get("diem") is not None else ""),
                         "thoi_luong": m.get("thoi_luong"), "ky_tu_giong": m.get("ky_tu_giong"), "dung_chung_giong": m.get("dung_chung_giong"),
-                        "token": token_video(m.get("ma_viec")), "lam_lai_tu": Path(m["lam_lai_tu"]).name if m.get("lam_lai_tu") else "",
+                        "token": token_video(m.get("ma_viec")), "token_ct": m.get("token") if isinstance(m.get("token"), dict) else None,
+                        "lam_lai_tu": Path(m["lam_lai_tu"]).name if m.get("lam_lai_tu") else "",
                         "duong_dan": f"{ngay}/{v.name}", "dang_bai": (m.get("kich_ban") or {}).get("dang") or m.get("dang") or ""})
     return out
 
@@ -1424,7 +1425,8 @@ class H(BaseHTTPRequestHandler):
                                "cac_lo": cac_lo, "hang_cho": [dict(x, ten=dieu_phoi.ten_sp(x["ma"])) for x in dieu_phoi.hang_cho()], "suc_may": suc_may.suc_may(),
                                "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(), "cho_duyet": so_cho_duyet(),
-                               "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"]})
+                               "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"],
+                               "co_chu": (c.get("phu_de") or {}).get("co_chu", 1.0), "dung_lai": bool(c.get("dung_lai"))})
         if u.path == "/api/luong":             # SSE: đẩy tin tức thì cho trang Khu Tự Trị (xem luong.py)
             return self._luong()
         if u.path == "/api/truc-tiep":         # các việc engine đang làm NGAY BÂY GIỜ (chữ Claude đang viết, điểm giám khảo...): chỉ đọc, rẻ; CORS như /api/luong
@@ -1710,6 +1712,13 @@ class H(BaseHTTPRequestHandler):
                 c["tu_chuyen"] = bool(b["tu_chuyen"])
             if b.get("video_moi_giong") in (1, 2, 3):
                 c["lo"]["video_moi_giong"] = b["video_moi_giong"]
+            if "dung_lai" in b:
+                c["dung_lai"] = bool(b["dung_lai"])
+            if "co_chu" in b:
+                try:
+                    c.setdefault("phu_de", {})["co_chu"] = round(min(1.6, max(0.7, float(b["co_chu"]))), 2)
+                except (TypeError, ValueError):
+                    pass
             luu_cfg(c); return self._json({"ok": True})
         if u.path.startswith("/api/san-pham/"):
             ma = u.path.split("/")[-1]

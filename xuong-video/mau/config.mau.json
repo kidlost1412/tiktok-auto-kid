@@ -63,12 +63,17 @@
   },
   "phu_de": {
     "bat": true,
-    "co": 44,
+    "co": 50,
+    "co_chu": 1.0,
     "y": 1500,
     "tu_moi_dong": [
       2,
       5
     ]
+  },
+  "dao_dien": {
+    "ung_vien_moi_cau": 10,
+    "khung_moi_canh": 3
   },
   "giam_khao": {
     "may": "gemini",

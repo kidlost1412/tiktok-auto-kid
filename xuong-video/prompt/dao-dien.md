@@ -21,7 +21,7 @@ LỜI ĐỌC ĐÁNH SỐ TỪNG TỪ (dùng số này để canh điểm cắt c
 {{tu}}
 
 === CẢNH ỨNG VIÊN ===
-Xem tờ ảnh (số vàng = id). {{ds}}
+Xem tờ ảnh (số vàng = id; mỗi ô viền vàng là MỘT cảnh, gồm các khung 1→2→3 = đầu, giữa, cuối đoạn dùng được của cảnh đó theo thời gian — xem cả ba khung rồi mới chọn). {{ds}}
 id bắt đầu "Q-" = QUÀ TẶNG THẬT (dùng ở câu nhắc quà); id bắt đầu "V-" = KHO PHỤ (b-roll, không quá ~30% số cảnh).
 CẢNH AFF (người thật cầm/dùng/nói về sản phẩm) đang có: {{aff}} — đây là bằng chứng "người khác cũng mua", quý nhất trong kho.
 Miệng họ không khớp lời đọc KHÔNG phải vấn đề. Dùng được toàn màn, trong ô, chia nhiều ô, hay lật trang nhanh nhiều người liên tiếp.

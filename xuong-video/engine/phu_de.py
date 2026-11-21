@@ -81,7 +81,8 @@ def auto_lines(plain):
     return final
 
 
-MAC_DINH = {"bat": True, "co": 44, "y": 1500, "tu_moi_dong": [2, 5]}
+MAC_DINH = {"bat": True, "co": 50, "co_chu": 1.0, "y": 1500, "tu_moi_dong": [2, 5]}   # co 44 → 50 (+14%); co_chu = hệ số nhân người dùng chỉnh
+CO_CHU_DUOI, CO_CHU_TREN = 0.7, 1.6
 SO_CHU = {"không", "một", "hai", "ba", "bốn", "tư", "năm", "lăm", "sáu", "bảy", "tám", "chín", "mười", "mươi", "mốt", "trăm", "nghìn", "ngàn",
           "triệu", "tỷ", "linh", "lẻ", "rưỡi"}
 DON_VI = {"ml", "lít", "lit", "l", "kg", "g", "gam", "gói", "chai", "phần", "%", "m", "cm", "mm", "ha", "sào", "lần", "con", "lá", "ngày", "giờ", "phút", "đồng", "k"}
@@ -99,6 +100,13 @@ def cau_hinh(cfg=None):
             out[k] = int(min(hi, max(lo, int(float(raw[k])))))
         except Exception:
             pass
+    if out["co"] == 44:                      # 44 = mặc định cũ còn nằm trong config.json → lên cỡ mới
+        out["co"] = MAC_DINH["co"]
+    try:
+        out["co_chu"] = round(min(CO_CHU_TREN, max(CO_CHU_DUOI, float(raw["co_chu"]))), 2)
+    except Exception:
+        pass
+    out["co"] = int(min(90, max(24, round(out["co"] * out["co_chu"]))))      # cỡ chữ cuối (px) = co × co_chu
     try:
         a, b = [int(x) for x in raw["tu_moi_dong"]][:2]
         a = max(1, min(a, 8)); b = max(a, min(b, 8))
