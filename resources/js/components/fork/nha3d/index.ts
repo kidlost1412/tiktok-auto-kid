@@ -36,7 +36,7 @@ import { Overlay } from './overlay';
 import { Pond } from './pond';
 import { Speech } from './speech';
 import { Kit, pick, Shapes } from './util';
-import { Weather, type Sky } from './weather';
+import { fetchRealSky, Weather, type Sky } from './weather';
 import { Wings } from './wings';
 import { World } from './world';
 
@@ -224,6 +224,16 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
             director.onRain(false);
         }
     };
+    // Thời tiết thật: hỏi máy chủ lúc mở và mỗi 15 phút; chưa đặt nơi / lỗi thì Weather tự dùng giả ngẫu nhiên.
+    let realGone = false;
+    const pullSky = async () => {
+        const r = await fetchRealSky();
+        if (!realGone) {
+            weather.setReal(r.sky);
+        }
+    };
+    void pullSky();
+    const realTimer = window.setInterval(() => void pullSky(), 15 * 60 * 1000);
     // người điều phối lời nói chung (chống nói dồn dập)
     const speech = new Speech(now);
     ctx.speech = speech;
@@ -573,6 +583,7 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         avPanel = openAvatarPanel({
             host,
             current: avatar,
+            onWeather: (sky) => weather.setReal(sky),
             onSave: (c) => {
                 applyAvatar(c, true);
                 kidActor.say(
@@ -1458,6 +1469,8 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
         },
         dispose() {
             save();
+            realGone = true;
+            window.clearInterval(realTimer);
             avPanel?.close(); // bảng chỉnh nhân vật đang mở thì đóng theo, không để sót trên trang khác
             avPanel = null;
             document.removeEventListener('visibilitychange', onHide);

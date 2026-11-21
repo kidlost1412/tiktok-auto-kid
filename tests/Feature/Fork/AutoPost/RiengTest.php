@@ -538,7 +538,7 @@ test('auto batch keeps the channel daily cap (spilling to later days) and is not
         ->and(AutoVideo::query()->where('status', 'new')->count())->toBe(1);
 });
 
-test('auto times always stay inside the posting window and spill to the next day, 20 minutes apart on the same channel only', function () {
+test('auto times always stay inside the posting window, spill to the next day and spread over the window, clear of the same channel only', function () {
     $account = ($this->account)(['window_start' => 6, 'window_end' => 23]);
     $other = ($this->account)();
     // 22:50 giờ VN: bài đầu 22:55, bài kế (23:15) quá 23:00 => phải sang 06:00 sáng hôm sau, không bao giờ 01:00–02:00.
@@ -553,10 +553,11 @@ test('auto times always stay inside the posting window and spill to the next day
     $local = array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i'), $r['rows']);
 
     expect($r['ok'])->toBeTrue()->and($r['window'])->toBe('06:00–23:00')
-        ->and($local)->toBe(['2026-11-20 22:55', '2026-11-21 06:00', '2026-11-21 06:50']);
+        // Hai bài ngày mai chia đều từ 06:00 tới cuối khung 23:00 (06:00 vẫn cách bài 06:30 của kênh đủ 20 phút).
+        ->and($local)->toBe(['2026-11-20 22:55', '2026-11-21 06:00', '2026-11-21 23:00']);
 });
 
-test('a batch never goes over the channel daily cap: 10 videos with 9 per day put 9 today from now + 5 minutes and 1 tomorrow', function () {
+test('a batch never goes over the channel daily cap: 10 videos with 9 per day put 9 today from now + 5 minutes spread to the window end and 1 tomorrow', function () {
     $account = ($this->account)(['daily_cap' => 9, 'window_start' => 5, 'window_end' => 22]);
     $now = CarbonImmutable::parse('2026-11-20 10:00', 'Asia/Ho_Chi_Minh')->utc();
     $v = array_map(fn ($i) => ($this->rieng)($i.'.mp4'), range(1, 10));
@@ -567,9 +568,22 @@ test('a batch never goes over the channel daily cap: 10 videos with 9 per day pu
 
     expect($r['ok'])->toBeTrue()
         ->and($local[0]->format('Y-m-d H:i'))->toBe('2026-11-20 10:05')
-        ->and($local[1]->format('H:i'))->toBe('10:25')
+        ->and($local[1]->format('H:i'))->toBe('11:34')
+        ->and($local[8]->format('Y-m-d H:i'))->toBe('2026-11-20 22:00')
         ->and($days)->toBe(['2026-11-20' => 9, '2026-11-21' => 1])
         ->and($local[9]->format('Y-m-d H:i'))->toBe('2026-11-21 05:00');
+});
+
+test('nine videos for one day are spread evenly over the posting window, not bunched at its start', function () {
+    $account = ($this->account)(['daily_cap' => 9, 'window_start' => 6, 'window_end' => 20]);
+    // 21:00: khung hôm nay đã hết, cả 9 bài sang ngày mai, rải đều 06:00 → 20:00 (cách nhau 1 giờ 45 phút).
+    $now = CarbonImmutable::parse('2026-11-20 21:00', 'Asia/Ho_Chi_Minh')->utc();
+    $v = array_map(fn ($i) => ($this->rieng)($i.'.mp4'), range(1, 9));
+
+    $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => array_map(fn ($x) => ['id' => $x->id], $v)], $now);
+
+    expect(array_map(fn ($row) => CarbonImmutable::parse($row['at'])->setTimezone('Asia/Ho_Chi_Minh')->format('d H:i'), $r['rows']))
+        ->toBe(['21 06:00', '21 07:45', '21 09:30', '21 11:15', '21 13:00', '21 14:45', '21 16:30', '21 18:15', '21 20:00']);
 });
 
 test('posts already on the channel that day count toward the daily cap, and an edited time on a full day is only a warning', function () {
@@ -590,7 +604,7 @@ test('posts already on the channel that day count toward the daily cap, and an e
 
     // Giờ sửa tay 18:00 chiếm chỗ thứ 3 của hôm nay => hai video tự xếp sang ngày mai.
     expect($r['rows'][2]['status'])->toBe('ok')->and($at(2))->toBe('2026-11-20 18:00')
-        ->and($at(0))->toBe('2026-11-21 05:00')->and($at(1))->toBe('2026-11-21 05:20');
+        ->and($at(0))->toBe('2026-11-21 05:00')->and($at(1))->toBe('2026-11-21 22:00');
 
     // Sửa tay vào một ngày đã đủ: chỉ cảnh báo (vẫn hẹn được).
     $r = ($this->batch)()->propose(['social_account_id' => $account->id, 'items' => [
@@ -612,7 +626,7 @@ test('posting times always use Vietnam time even when the channel was saved with
 
     expect($r['window'])->toBe('05:00–23:00')
         ->and($local[0]->format('Y-m-d'))->toBe('2026-11-20')->and($local[0]->hour)->toBe(9)
-        ->and($local[1]->hour)->toBeIn([9, 10]);
+        ->and($local[1]->format('H:i'))->toBe('23:00');
 
     // Xưởng cũng vậy: mọi giờ trong ngày nằm trong 05:00–23:00 giờ VN.
     $slots = app(Planner::class)->slotsFor(AutoAccount::query()->findOrFail($account->id), $now, $now->addDay());

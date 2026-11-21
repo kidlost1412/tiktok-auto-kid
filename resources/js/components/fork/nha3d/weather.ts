@@ -31,6 +31,34 @@ export const skyAt = (ms: number): Sky => {
     return r < 0.45 ? 'cloudy' : 'sunny';
 };
 
+/** Trời thật ở nơi chủ app đã đặt (null = chưa đặt hoặc lỗi → dùng giả ngẫu nhiên). Không bao giờ ném lỗi. */
+export const fetchRealSky = async (): Promise<{
+    sky: Sky | null;
+    noi: string | null;
+}> => {
+    try {
+        const r = await fetch('/nha/thoi-tiet', {
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        if (!r.ok) {
+            return { sky: null, noi: null };
+        }
+        const j = (await r.json()) as { sky?: unknown; noi?: unknown };
+        const sky: Sky | null =
+            j.sky === 'sunny' || j.sky === 'cloudy' || j.sky === 'rain'
+                ? j.sky
+                : null;
+
+        return { sky, noi: typeof j.noi === 'string' ? j.noi : null };
+    } catch {
+        return { sky: null, noi: null };
+    }
+};
+
 export class Weather {
     readonly group = new THREE.Group();
     sky: Sky;
@@ -41,6 +69,8 @@ export class Weather {
     /** 0..1 độ ướt mặt đất (khô dần sau mưa). */
     wet = 0;
     private forced: Sky | null = null;
+    /** Trời thật từ máy chủ; null = dùng giả ngẫu nhiên theo giờ. */
+    private real: Sky | null = null;
     private pos: Float32Array;
     private lines: THREE.LineSegments;
     private mat: THREE.LineBasicMaterial;
@@ -134,8 +164,14 @@ export class Weather {
         this.check(true);
     }
 
+    /** Đặt trời thật (null = quay về giả ngẫu nhiên). */
+    setReal(s: Sky | null) {
+        this.real = s;
+        this.check();
+    }
+
     private check(force = false) {
-        const s = this.forced ?? skyAt(this.clockMs());
+        const s = this.forced ?? this.real ?? skyAt(this.clockMs());
         if (s !== this.sky || force) {
             const prev = this.sky;
             this.sky = s;

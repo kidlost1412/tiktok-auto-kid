@@ -47,6 +47,35 @@ final class NhaController extends Controller
         return response()->json(['ok' => true, 'avatar' => Avatar::write($who, $data)]);
     }
 
+    /** Trời thật ở nơi chủ app đã đặt: sky = sunny|cloudy|rain, hoặc null (chưa đặt / lỗi) để trang dùng ngẫu nhiên. */
+    public function weather(): JsonResponse
+    {
+        return response()->json(['ok' => true, 'noi' => ThoiTiet::place()['name'] ?? null, 'sky' => ThoiTiet::sky()])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /** Đặt nơi ở cho thời tiết thật (gõ tên, máy chủ tra toạ độ). Để trống = xoá, quay về ngẫu nhiên. */
+    public function saveWeather(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->isAccountOwner(), 403);
+        $data = $request->validate(['noi' => ['nullable', 'string', 'max:80']]);
+        $noi = trim((string) ($data['noi'] ?? ''));
+
+        if ($noi === '') {
+            ThoiTiet::save(null);
+
+            return response()->json(['ok' => true, 'noi' => null, 'sky' => null]);
+        }
+
+        $place = ThoiTiet::geocode($noi);
+        if ($place === null) {
+            return response()->json(['ok' => false, 'message' => 'Không tìm thấy nơi này (hoặc chưa kết nối được). Thử gõ tên tỉnh/thành khác.'], 422);
+        }
+        ThoiTiet::save($place);
+
+        return response()->json(['ok' => true, 'noi' => $place['name'], 'sky' => ThoiTiet::sky()]);
+    }
+
     public function state(): JsonResponse
     {
         // Nhiều trang cùng hỏi (Khu Tự Trị, Xưởng Video, nhiều tab): dùng chung một kết quả trong 2 giây, đỡ gọi hub

@@ -823,6 +823,10 @@ final class RiengBatch
             $auto2 = ProductMix::order($items, $this->recentProducts($auto, $minTs), crc32($auto->social_account_id.'|'.implode(',', array_map(fn (int $i): int => (int) $rows[$i]['id'], $auto2))));
         }
 
+        // Giờ tự đề xuất của từng ngày (để chia đều trong khung giờ sau khi biết mỗi ngày có mấy bài); giờ đã có sẵn trước đó.
+        $placed = [];
+        $fixedCount = count($batch);
+
         foreach ($auto2 as $i) {
             $r = &$rows[$i];
 
@@ -842,8 +846,12 @@ final class RiengBatch
             $day = $sched->dayKey($auto, $ts);
             $counts[$day] = ($counts[$day] ?? 0) + 1;
             $batch[] = $ts;
+            $placed[$day][$i] = $ts;
             $used++;
         }
+
+        unset($r);
+        $this->spreadDays($placed, $rows, $auto, $sched, [...$busy, ...array_slice($batch, 0, $fixedCount)], $gap, $iso);
 
         foreach ($rows as &$r) {
             unset($r['_at']);
@@ -852,6 +860,51 @@ final class RiengBatch
         unset($r);
 
         return $left;
+    }
+
+    /**
+     * Chia đều các giờ tự đề xuất của mỗi ngày từ giờ sớm nhất tới cuối khung giờ đăng (vd 9 bài, khung 6h–20h: 6:00, 7:45 … 20:00)
+     * thay vì dồn sát nhau đầu khung. Giờ chia đều nào vướng bài sẵn có (gần hơn giãn cách) thì cả ngày đó giữ giờ cũ.
+     *
+     * @param  array<string, array<int, int>>  $placed  ngày => [chỉ số dòng => giờ]
+     * @param  list<array<string, mixed>>  $rows
+     * @param  list<int>  $fixed  giờ bài sẵn có + giờ chủ app tự sửa
+     */
+    private function spreadDays(array $placed, array &$rows, AutoAccount $auto, RiengSchedule $sched, array $fixed, int $gap, Closure $iso): void
+    {
+        foreach ($placed as $day) {
+            $k = count($day);
+
+            if ($k < 2) {
+                continue;
+            }
+
+            asort($day);
+            $lo = (int) reset($day);
+            [, $hi] = $sched->dayWindow($auto, $lo);
+            $times = [];
+
+            for ($j = 0; $j < $k; $j++) {
+                $t = $lo + intdiv(($hi - $lo) * $j, $k - 1);
+                $t -= $t % 60;
+
+                foreach ($fixed as $b) {
+                    if (abs($b - $t) < $gap) {
+                        continue 3;
+                    }
+                }
+
+                $times[] = $t;
+            }
+
+            if ($gap > $times[1] - $times[0]) {
+                continue;
+            }
+
+            foreach (array_keys($day) as $n => $i) {
+                $rows[$i]['at'] = $iso($times[$n]);
+            }
+        }
     }
 
     /** Lượt này có trộn xen kẽ sản phẩm không: chủ app chọn trong hộp (mix), mặc định theo cài đặt kênh. */

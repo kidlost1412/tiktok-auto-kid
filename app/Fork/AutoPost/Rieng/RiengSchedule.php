@@ -208,6 +208,19 @@ final class RiengSchedule
     }
 
     /**
+     * Đầu và cuối khung giờ đăng (giây UTC) của ngày chứa $ts.
+     *
+     * @return array{0: int, 1: int}
+     */
+    public function dayWindow(AutoAccount $a, int $ts): array
+    {
+        [$ws, $we] = $this->window($a);
+        [, $s, $e] = $this->dayBounds($ts, $this->planner->timezoneFor($a), $ws, $we);
+
+        return [$s, $e];
+    }
+
+    /**
      * Mốc 0h địa phương, đầu khung, cuối khung (giây UTC) của ngày chứa $ts.
      *
      * @return array{0: int, 1: int, 2: int}

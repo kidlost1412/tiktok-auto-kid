@@ -36,6 +36,8 @@ export interface AvatarPanelOpts {
     current: AvatarCfg;
     /** Đã lưu thành công trên máy chủ. */
     onSave: (cfg: AvatarCfg) => void;
+    /** Vừa đặt/xoá nơi ở: trời thật mới (null = quay về ngẫu nhiên). */
+    onWeather: (sky: 'sunny' | 'cloudy' | 'rain' | null) => void;
     onClose: () => void;
 }
 
@@ -118,6 +120,14 @@ export const openAvatarPanel = (o: AvatarPanelOpts) => {
                     ${row('Phụ kiện', chips('phu_kien'))}
                     ${row('Nét mặt', chips('mat'))}
                     ${row('Biểu tượng trên đầu', chips('bieu_tuong'))}
+                    ${row(
+                        'Thời tiết thật (nơi ở)',
+                        `<div class="n3-av-wx">
+                            <input class="n3-av-place" data-testid="nha-weather-place" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Vd: Buôn Ma Thuột (để trống = ngẫu nhiên)">
+                            <button type="button" class="n3-av-wxbtn" data-testid="nha-weather-save">Đặt nơi</button>
+                        </div>
+                        <div class="n3-av-wxmsg" data-testid="nha-weather-msg" role="status">Chỉ tên nơi này được gửi tới Open-Meteo để lấy thời tiết.</div>`,
+                    )}
                 </div>
             </div>
             <div class="n3-av-msg" role="status"></div>
@@ -186,6 +196,58 @@ export const openAvatarPanel = (o: AvatarPanelOpts) => {
         'click',
         () => close(),
     );
+    // Thời tiết thật: lưu riêng (PUT /nha/thoi-tiet), không cần bấm "Lưu" của nhân vật.
+    const place = el.querySelector('.n3-av-place') as HTMLInputElement;
+    const wxBtn = el.querySelector('.n3-av-wxbtn') as HTMLButtonElement;
+    const wxMsg = el.querySelector('.n3-av-wxmsg') as HTMLDivElement;
+    void fetch('/nha/thoi-tiet', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+    })
+        .then((r) => r.json())
+        .then((j: { noi?: unknown }) => {
+            if (typeof j.noi === 'string' && !place.value) {
+                place.value = j.noi;
+            }
+        })
+        .catch(() => undefined);
+    wxBtn.addEventListener('click', async () => {
+        wxBtn.disabled = true;
+        wxMsg.textContent = 'Đang tìm…';
+        try {
+            const r = await fetch('/nha/thoi-tiet', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': xsrf(),
+                },
+                body: JSON.stringify({ noi: place.value.trim() }),
+            });
+            const j = (await r.json().catch(() => null)) as {
+                noi?: string | null;
+                sky?: 'sunny' | 'cloudy' | 'rain' | null;
+                message?: string;
+            } | null;
+            if (!r.ok) {
+                wxMsg.textContent =
+                    j?.message ?? 'Chưa lưu được nơi ở, thử lại nha.';
+
+                return;
+            }
+            place.value = j?.noi ?? '';
+            wxMsg.textContent = j?.noi
+                ? `Đã đặt: ${j.noi}`
+                : 'Đã xoá nơi ở, thời tiết sẽ ngẫu nhiên.';
+            o.onWeather(j?.sky ?? null);
+        } catch {
+            wxMsg.textContent = 'Mất kết nối, chưa lưu được.';
+        } finally {
+            wxBtn.disabled = false;
+        }
+    });
     saveBtn.addEventListener('click', async () => {
         const ten = cfg.ten.trim();
         if (!ten) {
