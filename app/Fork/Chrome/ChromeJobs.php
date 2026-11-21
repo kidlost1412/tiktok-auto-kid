@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Fork\Chrome;
 
 use App\Fork\AutoPost\Persona\CoverStore;
+use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
@@ -331,7 +332,7 @@ final class ChromeJobs
 
         // TikTok từ chối vì đầy lịch hẹn không tính là một lần thử hỏng (bài chưa lên, chỉ chờ chỗ trống).
         $tries = ChromeJob::query()->where('post_id', $post->id)->get(['state', 'result'])
-            ->reject(fn (ChromeJob $j): bool => self::isQuotaRejection($j))->count();
+            ->reject(fn (ChromeJob $j): bool => self::isQuotaRejection($j) || self::isCartBlock($j))->count();
 
         if ($tries >= self::MAX_ATTEMPTS) {
             throw new ChromeRefusal('Đã thử giao cho Chrome '.self::MAX_ATTEMPTS.' lần mà chưa đăng được — kiểm tra Chrome rồi bấm thử lại bằng cách nhân bản bài.');
@@ -441,6 +442,15 @@ final class ChromeJobs
     {
         return $j !== null && $j->state === 'rejected'
             && (int) data_get(is_array($j->result) ? $j->result : [], 'status_code') === self::SCHEDULE_QUOTA_CODE;
+    }
+
+    /** Chrome dừng vì giỏ hàng trước khi tải gì lên (chưa gửi): sửa giỏ xong được thử lại, không tính vào số lần thử. */
+    public static function isCartBlock(?ChromeJob $j): bool
+    {
+        $r = $j !== null && is_array($j->result) ? $j->result : [];
+
+        return $j !== null && $j->state === 'failed' && ($r['not_sent'] ?? false) === true
+            && in_array($r['reason'] ?? null, [...CartRules::FAIL_REASONS, CartRules::RETRY_REASON], true);
     }
 
     /** Số bài hẹn giờ tối đa mỗi kênh được để chờ trên TikTok (TikTok cho 50). */
@@ -574,7 +584,7 @@ final class ChromeJobs
             case 'revoked':
                 return new ChromeOutcome(false, false, $j->note ?: self::CANCEL_TEXT);
             case 'failed':
-                return new ChromeOutcome(false, false, FailureReasons::forJob($j, \App\Models\Post::query()->whereKey($j->post_id)->first()?->meta['fork_shop_product_name'] ?? null)['title'].' — chưa đăng gì');
+                return new ChromeOutcome(false, false, FailureReasons::forJob($j, Post::query()->whereKey($j->post_id)->first()?->meta['fork_shop_product_name'] ?? null)['title'].' — chưa đăng gì');
             default:
                 return new ChromeOutcome(false, false, 'Đang chờ Chrome đăng bài…');
         }

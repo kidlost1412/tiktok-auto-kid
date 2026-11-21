@@ -381,6 +381,23 @@ test('product job: found only in the showcase (search_type=2) is accepted', asyn
   assert.deepEqual(shopCalls(p).map((x) => qs(x.url).search_type), ['3', '2']);
 });
 
+test('product job: keyword search misses but the shop listing has it in stock -> accepted', async () => {
+  const shop = (url) => { const q = qs(url); return shopRes(q.keyword === '' && q.search_type === '2' ? [sp('7598765432109876544'), sp(NEW_ID)] : []); };
+  const p = page({ shop });
+  p.run({ product: product() });
+  const r = await p.done();
+  assert.equal(r.outcome, 'posted', JSON.stringify(r));
+  assert.deepEqual(shopCalls(p).map((x) => [qs(x.url).search_type, qs(x.url).keyword]), [['3', NEW_ID], ['2', NEW_ID], ['3', ''], ['2', '']]);
+});
+
+test('product job: listing has it but out of stock -> product-unavailable, nothing uploaded', async () => {
+  const p = page({ shop: (url) => shopRes(qs(url).keyword === '' ? [sp(NEW_ID, { stock: 0 })] : []) });
+  p.run({ product: product() });
+  const r = await p.done();
+  assert.deepEqual([r.outcome, r.reason], ['failed', 'product-unavailable'], JSON.stringify(r));
+  assert.equal(uploaded(p), false);
+});
+
 // nothing may be uploaded, authorized or published for any of these
 for (const [name, opts, prod, reason] of [
   ['not found in my shop nor showcase', { shop: shopKnows({}) }, product(), 'product-unavailable'],

@@ -8,6 +8,7 @@ use App\Fork\AutoPost\Models\AutoProduct;
 use App\Fork\AutoPost\Models\AutoVideo;
 use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
+use App\Fork\AutoPost\Scheduling\ResultWatcher;
 use App\Fork\AutoPost\Shop\CartRules;
 use App\Fork\AutoPost\Shop\ShopSync;
 use App\Fork\Chrome\ChromeJobs;
@@ -266,4 +267,19 @@ test('changing the cart also moves already scheduled posts that Chrome has not s
     // Bỏ chọn: bài đã xếp lịch không bị huỷ, chỉ báo cho chủ app.
     $this->actingAs($this->owner)->delete($url, ['quy_cach' => '1l'])->assertSessionHas('flash.warning');
     expect($legacy->fresh()->status)->toBe(Status::Scheduled);
+});
+
+test('lấy lại shop thấy giỏ đã có hàng thì mở lại giỏ bị tạm dừng vì không còn / hết hàng', function (): void {
+    $msg = ResultWatcher::CART_MESSAGES['product-unavailable'];
+    $row = ['social_account_id' => $this->sa->id, 'auto_product_id' => 'dam-ca', 'display_name' => 'ĐẠM CÁ'];
+    $l1 = ProductLink::query()->create([...$row, 'quy_cach' => '1l', 'shop_product_id' => GH_1L, 'paused_reason' => $msg]);
+    $l5 = ProductLink::query()->create([...$row, 'quy_cach' => '5l', 'shop_product_id' => GH_5L, 'paused_reason' => $msg]);
+    $manual = ProductLink::query()->create([...$row, 'auto_product_id' => 'nano-dong', 'quy_cach' => null, 'shop_product_id' => GH_1L, 'paused_reason' => 'Tạm dừng thủ công']);
+
+    $p = fn (string $id, int $stock): array => ['product_id' => $id, 'title' => 'x', 'price' => null, 'cover_url' => null, 'stock_num' => $stock, 'stock_status' => null];
+    app(ShopSync::class)->ingestProducts($this->sa->id, '', 'my_shop', [$p(GH_1L, 1085), $p(GH_5L, 0)], true);
+
+    expect($l1->refresh()->paused_reason)->toBeNull()
+        ->and($l5->refresh()->paused_reason)->toBe($msg)
+        ->and($manual->refresh()->paused_reason)->toBe('Tạm dừng thủ công');
 });

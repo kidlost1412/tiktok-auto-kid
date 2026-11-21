@@ -108,7 +108,7 @@ test('chế độ bạn bè, riêng tư kèm hẹn giờ, không video, ảnh, h
     expect(fn () => chromeJobs()->queueForPost($photo, 'now'))->toThrow(ChromeRefusal::class, 'ảnh');
 
     $far = chromePost($sa, [], ['scheduled_at' => now()->addDays(31)]);
-    expect(fn () => chromeJobs()->queueForPost($far, 'scheduled'))->toThrow(ChromeRefusal::class, "10 ngày");
+    expect(fn () => chromeJobs()->queueForPost($far, 'scheduled'))->toThrow(ChromeRefusal::class, '10 ngày');
 });
 
 test('video sai định dạng, thiếu file hoặc file rỗng bị từ chối', function () {
@@ -555,4 +555,23 @@ test('heartbeat của client cũ (claim_token đã xoay) không đẩy được 
     chromeJobs()->heartbeat($old, true);
 
     expect(ChromeJob::find($stale->id)->state)->toBe('claimed');
+});
+
+test('lỗi giỏ hàng chưa gửi gì không tính vào MAX_ATTEMPTS, lỗi khác vẫn tính', function () {
+    [$sa] = chromeSetup();
+    $post = chromePost($sa);
+
+    for ($i = 1; $i <= ChromeJobs::MAX_ATTEMPTS; $i++) {
+        chromeJobs()->queueForPost($post, 'now')->update(['state' => 'failed', 'result' => ['reason' => 'product-unavailable', 'not_sent' => true]]);
+    }
+
+    $job = chromeJobs()->queueForPost($post, 'now');
+    expect($job->exists)->toBeTrue();
+
+    $job->update(['state' => 'failed', 'result' => ['reason' => 'product-unavailable', 'not_sent' => false]]);
+    for ($i = 2; $i <= ChromeJobs::MAX_ATTEMPTS; $i++) {
+        chromeJobs()->queueForPost($post, 'now')->update(['state' => 'revoked', 'note' => ChromeJobs::MISSED_NOW_TEXT]);
+    }
+
+    expect(fn () => chromeJobs()->queueForPost($post, 'now'))->toThrow(ChromeRefusal::class, 'thử lại bằng cách nhân bản bài');
 });

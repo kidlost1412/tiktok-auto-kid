@@ -218,14 +218,16 @@ test('retry refuses whenever it is not certain nothing was sent', function (stri
     expect(ChromeJob::query()->where('post_id', $v->post_id)->count())->toBe($case === 'no-job' ? 0 : 1);
 })->with(['uncertain', 'rejected', 'authorized-and-unsure', 'has-tiktok-id', 'post-failed', 'running', 'no-job']);
 
-test('retry respects the attempt cap', function () {
+test('retry respects the attempt cap (cart blocks that sent nothing do not count)', function () {
     $v = faMake($this, 1);
+    $other = ['reason' => 'upload-failed', 'detail' => 'x'] + FA_OOS;
+    ChromeJob::query()->where('post_id', $v->post_id)->update(['result' => json_encode($other)]);
 
     foreach ([2, 3] as $attempt) {
         ChromeJob::query()->create([
             'id' => 'ej_'.str_repeat((string) $attempt, 24), 'post_id' => $v->post_id, 'social_account_id' => $this->social->id, 'attempt' => $attempt,
             'expect_user_id' => '7012345678901234567', 'nonce' => 'nn'.$attempt, 'media_path' => 'x', 'video_name' => 'x', 'video_size' => 1,
-            'video_mime' => 'video/mp4', 'mode' => 'scheduled', 'caption' => 'c', 'options' => [], 'state' => 'failed', 'result' => FA_OOS,
+            'video_mime' => 'video/mp4', 'mode' => 'scheduled', 'caption' => 'c', 'options' => [], 'state' => 'failed', 'result' => $other,
         ]);
     }
 

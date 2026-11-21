@@ -34,7 +34,7 @@ final class ResultWatcher
     private const int RECHECK_FAILED_DAYS = 14;
 
     /** Thông báo hiện trên /auto khi mã hub bị tạm dừng vì lỗi giỏ hàng, theo lý do tiện ích báo. */
-    private const array CART_MESSAGES = [
+    public const array CART_MESSAGES = [
         'product-unavailable' => 'Sản phẩm không còn hoặc đã hết hàng trên TikTok Shop khi đăng (chưa đăng gì). Hãy lấy lại sản phẩm từ shop, chọn lại rồi lưu.',
         'anchor-build-failed' => 'Tiện ích không dựng được giỏ hàng từ mẫu (chưa đăng gì). Hãy đăng tay lại 1 bài mẫu có gắn giỏ trong TikTok Studio, rồi lưu lại liên kết.',
     ];

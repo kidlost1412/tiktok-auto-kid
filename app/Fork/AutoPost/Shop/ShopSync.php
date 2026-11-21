@@ -7,8 +7,10 @@ namespace App\Fork\AutoPost\Shop;
 use App\Fork\AutoPost\Jobs\PrefetchProductCovers;
 use App\Fork\AutoPost\Models\AnchorTemplate;
 use App\Fork\AutoPost\Models\AutoAccount;
+use App\Fork\AutoPost\Models\ProductLink;
 use App\Fork\AutoPost\Models\ShopProduct;
 use App\Fork\AutoPost\Scheduling\Planner;
+use App\Fork\AutoPost\Scheduling\ResultWatcher;
 use App\Fork\Chrome\ChromeJobs;
 use App\Fork\Chrome\Models\ChromeAccount;
 use App\Fork\Chrome\Models\ChromeClient;
@@ -299,6 +301,13 @@ final class ShopSync
                 ->where('missing', false)
                 ->whereNotIn('product_id', array_column($products, 'product_id'))
                 ->update(['missing' => true, 'updated_at' => $now]);
+
+            // Giỏ bị tạm dừng vì "không còn / hết hàng" mà shop vừa lấy lại có hàng thì mở lại, chủ app không phải chọn lại rồi lưu.
+            $inStock = array_column(array_filter($products, fn (array $p): bool => ($p['stock_num'] ?? 0) > 0), 'product_id');
+            ProductLink::query()->where('social_account_id', $socialAccountId)
+                ->where('paused_reason', ResultWatcher::CART_MESSAGES['product-unavailable'])
+                ->whereIn('shop_product_id', $inStock === [] ? [''] : $inStock)
+                ->update(['paused_reason' => null, 'updated_at' => $now]);
 
             $auto = AutoAccount::query()->firstOrCreate(['social_account_id' => $socialAccountId]);
             $changes = ['products_synced_at' => $now];

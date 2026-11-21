@@ -210,6 +210,18 @@
       else if (r.reason !== 'not-found') found = r.reason;           // found but out-of-stock / stock-unknown
     }
     if (found) return { ok: false, reason: 'product-unavailable', detail: found };
+    // keyword=<id> can miss a product the shop listing has (seen: synced in stock, search said not-found) -> page the listing like sync does
+    for (const type of [3, 2]) {
+      for (let page = 0; page < 10; page++) {
+        let text;
+        try { text = await shopGet(L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE, count: SYNC_PAGE })); } catch (e) { errored = e.message; break; }
+        const r = L.checkProductAvailable(text, productId);
+        if (r.ok) return { ok: true, source: type === 3 ? 'my_shop' : 'showcase', product: r.product, via: 'list' };
+        if (r.reason === 'search-error') { errored = 'search-error: ' + r.detail; break; }
+        if (r.reason !== 'not-found') return { ok: false, reason: 'product-unavailable', detail: r.reason };
+        if (L.parseShopProducts(text).rawCount < SYNC_PAGE) break;
+      }
+    }
     if (errored) return { ok: false, reason: 'product-check-failed', detail: errored };
     return { ok: false, reason: 'product-unavailable', detail: 'not-found' };
   }
