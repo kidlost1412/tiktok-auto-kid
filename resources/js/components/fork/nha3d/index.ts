@@ -36,7 +36,7 @@ import { Overlay } from './overlay';
 import { Pond } from './pond';
 import { Speech } from './speech';
 import { Kit, pick, Shapes } from './util';
-import { fetchRealSky, Weather, type Sky } from './weather';
+import { autoLocateSky, fetchRealSky, Weather, type Sky } from './weather';
 import { Wings } from './wings';
 import { World } from './world';
 
@@ -228,8 +228,10 @@ export const createNhaWorld = (o: NhaWorldOptions): NhaWorld => {
     let realGone = false;
     const pullSky = async () => {
         const r = await fetchRealSky();
+        // Chưa đặt nơi ở: thử tự lấy vị trí của máy (không cần thiết lập).
+        const sky = r.noi === null ? await autoLocateSky() : r.sky;
         if (!realGone) {
-            weather.setReal(r.sky);
+            weather.setReal(sky);
         }
     };
     void pullSky();

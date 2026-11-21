@@ -31,6 +31,66 @@ export const skyAt = (ms: number): Sky => {
     return r < 0.45 ? 'cloudy' : 'sunny';
 };
 
+const AUTO_TRIED = 'nha.thoi-tiet.tu-lay';
+
+/**
+ * Chưa đặt nơi ở: hỏi trình duyệt vị trí hiện tại (một lần trên máy này; bị từ chối / máy tắt định vị thì thôi, vẫn gõ tay được),
+ * gửi toạ độ cho máy chủ lưu. Trả trời mới hoặc null.
+ */
+export const autoLocateSky = async (force = false): Promise<Sky | null> => {
+    try {
+        if (
+            (!force && localStorage.getItem(AUTO_TRIED)) ||
+            !navigator.geolocation
+        ) {
+            return null;
+        }
+
+        localStorage.setItem(AUTO_TRIED, '1');
+    } catch {
+        return null;
+    }
+
+    const pos = await new Promise<GeolocationPosition | null>((ok) =>
+        navigator.geolocation.getCurrentPosition(ok, () => ok(null), {
+            timeout: 15000,
+            maximumAge: 3600000,
+        }),
+    );
+
+    if (!pos) {
+        return null;
+    }
+
+    try {
+        const xsrf = decodeURIComponent(
+            document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
+        );
+        const r = await fetch('/nha/thoi-tiet', {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': xsrf,
+            },
+            body: JSON.stringify({
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+            }),
+        });
+        const j = (await r.json()) as { sky?: unknown };
+
+        return r.ok &&
+            (j.sky === 'sunny' || j.sky === 'cloudy' || j.sky === 'rain')
+            ? j.sky
+            : null;
+    } catch {
+        return null;
+    }
+};
+
 /** Trời thật ở nơi chủ app đã đặt (null = chưa đặt hoặc lỗi → dùng giả ngẫu nhiên). Không bao giờ ném lỗi. */
 export const fetchRealSky = async (): Promise<{
     sky: Sky | null;

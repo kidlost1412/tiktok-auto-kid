@@ -132,3 +132,16 @@ test('a failed lookup is remembered briefly so the provider is not hammered', fu
 
     Http::assertSentCount(2); // geocode + 1 forecast lỗi; lần GET sau lấy từ đệm lỗi
 });
+
+test('the browser location is saved as rounded coordinates without geocoding, and bad coordinates are refused', function (): void {
+    Http::fake(forecastFake(80));
+
+    $this->actingAs($this->owner)->putJson('/nha/thoi-tiet', ['lat' => 12.687654, 'lon' => 108.041234])
+        ->assertOk()->assertJson(['noi' => ThoiTiet::HERE, 'sky' => 'rain']);
+
+    expect(ThoiTiet::place())->toBe(['name' => ThoiTiet::HERE, 'lat' => 12.69, 'lon' => 108.04]);
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'geocoding'));
+
+    $this->actingAs($this->owner)->putJson('/nha/thoi-tiet', ['lat' => 120, 'lon' => 108])->assertStatus(422);
+    $this->actingAs($this->owner)->putJson('/nha/thoi-tiet', ['lat' => 12.6])->assertStatus(422);
+});

@@ -24,6 +24,9 @@ final class ThoiTiet
 
     public const CACHE_SECONDS = 900;
 
+    /** Tên hiện khi nơi ở do trình duyệt tự lấy (không tra ngược ra tên tỉnh). */
+    public const HERE = 'Vị trí hiện tại của máy';
+
     /** Nơi đã lưu: name + lat + lon, hoặc null nếu chưa đặt. */
     public static function place(): ?array
     {

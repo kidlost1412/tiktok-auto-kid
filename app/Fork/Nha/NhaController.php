@@ -58,7 +58,19 @@ final class NhaController extends Controller
     public function saveWeather(Request $request): JsonResponse
     {
         abort_unless($request->user()?->isAccountOwner(), 403);
-        $data = $request->validate(['noi' => ['nullable', 'string', 'max:80']]);
+        $data = $request->validate([
+            'noi' => ['nullable', 'string', 'max:80'],
+            'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lon'],
+            'lon' => ['nullable', 'numeric', 'between:-180,180', 'required_with:lat'],
+        ]);
+
+        // Trình duyệt tự lấy vị trí (chủ app bấm Cho phép): lưu toạ độ làm tròn ~1 km, không cần gõ tên.
+        if (isset($data['lat'], $data['lon'])) {
+            ThoiTiet::save(['name' => ThoiTiet::HERE, 'lat' => round((float) $data['lat'], 2), 'lon' => round((float) $data['lon'], 2)]);
+
+            return response()->json(['ok' => true, 'noi' => ThoiTiet::HERE, 'sky' => ThoiTiet::sky()]);
+        }
+
         $noi = trim((string) ($data['noi'] ?? ''));
 
         if ($noi === '') {

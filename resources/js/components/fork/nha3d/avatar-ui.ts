@@ -14,6 +14,7 @@ import {
 } from './avatar';
 import { applyPose, Chibi, poseFor, restPose } from './chibi';
 import { Kit, Shapes } from './util';
+import { autoLocateSky } from './weather';
 
 const xsrf = () =>
     decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
@@ -125,8 +126,9 @@ export const openAvatarPanel = (o: AvatarPanelOpts) => {
                         `<div class="n3-av-wx">
                             <input class="n3-av-place" data-testid="nha-weather-place" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Vd: Buôn Ma Thuột (để trống = ngẫu nhiên)">
                             <button type="button" class="n3-av-wxbtn" data-testid="nha-weather-save">Đặt nơi</button>
+                            <button type="button" class="n3-av-wxbtn n3-av-wxhere" data-testid="nha-weather-here">📍 Vị trí máy</button>
                         </div>
-                        <div class="n3-av-wxmsg" data-testid="nha-weather-msg" role="status">Chỉ tên nơi này được gửi tới Open-Meteo để lấy thời tiết.</div>`,
+                        <div class="n3-av-wxmsg" data-testid="nha-weather-msg" role="status">App tự lấy vị trí máy (trình duyệt hỏi Cho phép) hoặc anh gõ tên nơi. Chỉ toạ độ / tên nơi được gửi tới Open-Meteo để lấy thời tiết.</div>`,
                     )}
                 </div>
             </div>
@@ -211,6 +213,24 @@ export const openAvatarPanel = (o: AvatarPanelOpts) => {
             }
         })
         .catch(() => undefined);
+    const wxHere = el.querySelector('.n3-av-wxhere') as HTMLButtonElement;
+    wxHere.addEventListener('click', async () => {
+        wxHere.disabled = true;
+        wxMsg.textContent = 'Đang lấy vị trí máy…';
+        const sky = await autoLocateSky(true);
+        wxHere.disabled = false;
+
+        if (sky === null) {
+            wxMsg.textContent =
+                'Chưa lấy được vị trí (trình duyệt bị chặn hoặc máy tắt định vị). Anh gõ tên nơi rồi bấm Đặt nơi.';
+
+            return;
+        }
+
+        place.value = 'Vị trí hiện tại của máy';
+        wxMsg.textContent = 'Đã đặt theo vị trí hiện tại của máy.';
+        o.onWeather(sky);
+    });
     wxBtn.addEventListener('click', async () => {
         wxBtn.disabled = true;
         wxMsg.textContent = 'Đang tìm…';
