@@ -350,6 +350,14 @@ request of the account bound to this Chrome, and shows it on the Giỏ hàng pag
 An old app (404) is ignored.
 
 ### 10.3 Product sync and `POST /api/ext/products`
+Từ v1.4.12, nếu `selection/search?search_type=2` trả rỗng hoặc không đọc được, phải đọc thêm
+`GET https://shop.tiktok.com/api/v1/streamer_desktop/showcase_product/list?offset=0&count=50`.
+Đây là nguồn trưng bày của nhà sáng tạo đang được chính hộp gắn sản phẩm trong Studio sử dụng.
+Phân trang bằng `offset` (0, 50, 100...), giữ nguyên ID dạng chuỗi và gửi dưới source `showcase`.
+Nếu nguồn trưng bày chưa đọc đủ / bị lỗi, KHÔNG gửi snapshot rỗng `complete:true` của nguồn cũ để thay thế.
+Kiểm tra giỏ trước khi tải video cũng phải đọc nguồn này; vẫn đối chiếu đúng ID và tồn kho lớn hơn 0.
+Kiểm thử hồi quy `cart source regression` mô phỏng cả hai kênh shop và kênh dùng trưng bày; phải chạy khi đóng gói bản mới.
+
 On `sync_products` the extension opens a (minimized) Studio tab `#autotok=sync-<request_id>`, armed in `block` mode (no
 `/project/post/` can leave it), identifies the account with the passport endpoint and reads, for `search_type=3` (`my_shop`)
 then `2` (`showcase`): `keyword=` empty, `count=50`, `cursor` = offset 0, 50, 100, ... until a page has < 50 products or the

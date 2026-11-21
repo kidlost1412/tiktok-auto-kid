@@ -164,6 +164,16 @@ test('shopFetch: only the shop search endpoint, only for the active job/sync tab
   assert.equal(sw.calls.filter((c) => c.host === 'shop.tiktok.com').length, 1);
 });
 
+test('cart source regression: canonical showcase relay is GET-only, exact host/path and active tab only', async () => {
+  const sw = loadSw({ server: baseServer(), store0: { activeSync: activeSync() } });
+  const url = 'https://shop.tiktok.com/api/v1/streamer_desktop/showcase_product/list?offset=0&count=50';
+  assert.equal((await sw.send({ type: 'shopFetch', url }, { id: 9 })).ok, true);
+  assert.equal((await sw.send({ type: 'shopFetch', url }, { id: 77 })).ok, false);
+  const request = sw.calls.find((c) => c.host === 'shop.tiktok.com');
+  assert.equal(request.method, 'GET');
+  assert.equal(request.credentials, 'include');
+});
+
 // ---- passive capture ----
 const anchors = () => [{ type: 'product', id: OLD, title: 'Áo', extra: JSON.stringify({ product_id: OLD, seller_id: SELLER }) }];
 // the shop knows only the ids in `known` (search by keyword returns that product, my shop = type 3)

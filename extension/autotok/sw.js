@@ -26,6 +26,7 @@ const CLOSE_GRACE_MS = 10000;
 // K4 (cart): product sync + passive anchor template capture
 const SHOP_HOST = 'shop.tiktok.com';
 const SHOP_PATH = '/api/v1/streamer_desktop/selection/search';
+const SHOWCASE_PATH = '/api/v1/streamer_desktop/showcase_product/list';
 const SYNC_DEADLINE_MS = 4.5 * 60 * 1000;   // whole sync (content.js waits 4 min for the page)
 const SYNC_RETRY_MS = 60 * 1000;            // the same request_id is not retried sooner than this ... (a NEW request_id is never throttled)
 const SYNC_MAX_TRIES = 3;
@@ -463,6 +464,10 @@ async function uploadProducts(sy, r) {
     return { ok: false, reason: r && r.reason };
   }
   const out = { ok: false, sources: {} };
+  const sources = ['my_shop', 'showcase'].map((name) => r.sources && r.sources[name]);
+  if (sources.some((src) => !src || !src.complete) && !sources.some((src) => src && src.complete && src.products.length > 0)) {
+    return { ok: false, reason: 'sync-incomplete: empty-source-only' };
+  }
   for (const source of ['my_shop', 'showcase']) {
     const src = r.sources && r.sources[source];
     if (!src) continue;
@@ -533,7 +538,8 @@ async function recoverSync() {
 const SYNC_PAGE_SIZE = 50, SYNC_PAGE_CAP = 40, SYNC_PARALLEL = 4;
 
 async function shopPageSw(type, page) {
-  const url = L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE_SIZE, count: SYNC_PAGE_SIZE });
+  const url = type === 'showcase' ? L.showcaseListUrl({ offset: page * SYNC_PAGE_SIZE, count: SYNC_PAGE_SIZE })
+    : L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE_SIZE, count: SYNC_PAGE_SIZE });
   let last = 'unknown';
   for (let a = 0; a < 2; a++) {
     try {
@@ -556,6 +562,7 @@ async function shopSourceSw(type, note) {
   const list = [], seen = new Set();
   let total = null, pages = 0, complete = false, error = null;
   const add = (r) => {
+    if (r.skipped > 0) throw new Error('products-invalid');
     pages++;
     if (r.total != null) total = r.total;
     for (const p of r.products) if (!seen.has(p.product_id)) { seen.add(p.product_id); list.push(p); }
@@ -580,6 +587,7 @@ async function shopSourceSw(type, note) {
         if (r.rawCount < SYNC_PAGE_SIZE) { complete = true; break; }
       }
     }
+    if (complete && total != null && list.length < total) throw new Error('products-incomplete');
   } catch (e) { error = e.message; complete = false; }
   return { products: list, complete, total, pages, error };
 }
@@ -606,8 +614,13 @@ async function directSync(rid) {
     lastSent = now;
     reportSyncProgress(rid, all.size, Math.max(0, ...Object.values(totals)));
   };
-  const [mine, showcase] = await Promise.all([shopSourceSw(3, note('my_shop')), shopSourceSw(2, note('showcase'))]);
-  if (!mine.complete && !showcase.complete) {
+  const [mine, legacyShowcase] = await Promise.all([shopSourceSw(3, note('my_shop')), shopSourceSw(2, note('showcase'))]);
+  let showcase = legacyShowcase;
+  if (!showcase.complete || showcase.products.length === 0) {
+    // Không dùng snapshot rỗng của API cũ để kết luận giỏ trưng bày đã bị gỡ.
+    showcase = await shopSourceSw('showcase', note('showcase'));
+  }
+  if ([mine, showcase].some((src) => !src.complete) && ![mine, showcase].some((src) => src.complete && src.products.length > 0)) {
     await log(`đồng bộ nhanh không được (${mine.error || showcase.error || 'chưa đủ'}), dùng cửa sổ Studio`, 'WARN');
     return false;
   }
@@ -1153,7 +1166,7 @@ const handlers = {
   // Only that one endpoint, GET, only for the active job tab or the active sync tab.
   async shopFetch(msg, sender) {
     let u; try { u = new URL(String(msg.url || '')); } catch (_) { return { ok: false, error: 'bad-url' }; }
-    if (u.protocol !== 'https:' || u.host !== SHOP_HOST || u.pathname !== SHOP_PATH) return { ok: false, error: 'url-not-allowed' };
+    if (u.protocol !== 'https:' || u.host !== SHOP_HOST || ![SHOP_PATH, SHOWCASE_PATH].includes(u.pathname)) return { ok: false, error: 'url-not-allowed' };
     const tabId = sender.tab && sender.tab.id;
     const a = await getActive(), sy = await getSync();
     const mine = (a && !a.finished && a.tabId === tabId) || (sy && !sy.finished && sy.tabId === tabId);

@@ -68,6 +68,48 @@ const shopServer = (n, m, over) => async (p, body, rec) => {
 };
 const until = async (f) => { for (let i = 0; i < 200 && !f(); i++) await sleep(20); };
 
+for (const [label, count, current] of [['store-a', 39, false], ['store-b', 39, false], ['creator-showcase', 50, true]]) {
+  test(`cart source regression: ${label} keeps its own catalog and correct source`, async () => {
+    const modern = current ? mk(count) : [];
+    const sw = loadSw({ settings: { polling: true }, server: shopServer(current ? 0 : count, 0, {
+      '/api/v1/streamer_desktop/showcase_product/list': (_, rec) => {
+        const q = new URLSearchParams(rec.search), offset = Number(q.get('offset')), size = Number(q.get('count'));
+        return json({ code: 0, data: { products: modern.slice(offset, offset + size), total: modern.length } });
+      },
+    }) });
+    await until(() => sw.store.syncState && sw.store.syncState.done);
+    const posts = sw.calls.filter((c) => c.path === '/api/ext/products');
+    const populated = posts.find((c) => c.body.source === (current ? 'showcase' : 'my_shop'));
+    assert.ok(populated, 'catalog must reach the backend');
+    assert.equal(populated.body.products.length, count);
+    assert.equal(populated.body.user_id, '7000000000000000001');
+    assert.equal(populated.body.products[0].product_id, mk(1)[0].product_id);
+    assert.equal(sw.created.length, 0);
+  });
+}
+
+test('cart source regression: canonical showcase failure cannot wipe the saved showcase with legacy zero', async () => {
+  const sw = loadSw({ settings: { polling: true }, server: shopServer(0, 0, {
+    '/api/v1/streamer_desktop/showcase_product/list': () => json({ code: 7 }, 403),
+  }) });
+  await until(() => sw.created.length > 0);
+  assert.equal(sw.calls.filter((c) => c.path === '/api/ext/products').length, 0);
+  assert.equal(sw.created.length, 1);
+});
+
+test('cart source regression: canonical showcase paginates by offset without dropping products', async () => {
+  const sw = loadSw({ settings: { polling: true }, server: shopServer(0, 0, {
+    '/api/v1/streamer_desktop/showcase_product/list': (_, rec) => {
+      const q = new URLSearchParams(rec.search), offset = Number(q.get('offset')), size = Number(q.get('count'));
+      return json({ code: 0, data: { products: mk(107).slice(offset, offset + size), total: 107 } });
+    },
+  }) });
+  await until(() => sw.store.syncState && sw.store.syncState.done);
+  const sent = sw.calls.find((c) => c.path === '/api/ext/products' && c.body.source === 'showcase');
+  assert.equal(sent.body.products.length, 107);
+  assert.deepEqual(sw.calls.filter((c) => c.path.endsWith('/showcase_product/list')).map((c) => new URLSearchParams(c.search).get('offset')), ['0', '50', '100']);
+});
+
 test('fast sync: 58 products come from the service worker alone (2 pages), no Studio window, progress reported, then uploaded once', async () => {
   const sw = loadSw({ settings: { polling: true }, server: shopServer(58, 0) });
   await until(() => sw.calls.some((c) => c.path === '/api/ext/products'));

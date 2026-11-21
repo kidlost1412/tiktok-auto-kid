@@ -222,6 +222,19 @@
         if (L.parseShopProducts(text).rawCount < SYNC_PAGE) break;
       }
     }
+    // Giỏ trưng bày mới không nhất thiết xuất hiện trong selection/search.
+    for (let page = 0; page < SYNC_MAX_PAGES; page++) {
+      let text;
+      try { text = await shopGet(L.showcaseListUrl({ offset: page * SYNC_PAGE, count: SYNC_PAGE })); }
+      catch (e) { errored = e.message; break; }
+      const parsed = L.parseShopProducts(text);
+      if (!parsed.ok || parsed.skipped > 0) { errored = parsed.reason || 'products-invalid'; break; }
+      const checked = L.checkProductAvailable(text, productId);
+      if (checked.ok) return { ok: true, source: 'showcase', product: checked.product, via: 'showcase-list' };
+      if (checked.reason !== 'not-found') return { ok: false, reason: 'product-unavailable', detail: checked.reason };
+      if (parsed.rawCount < SYNC_PAGE || (parsed.total != null && (page + 1) * SYNC_PAGE >= parsed.total)) break;
+      if (page === SYNC_MAX_PAGES - 1) errored = 'showcase-incomplete';
+    }
     if (errored) return { ok: false, reason: 'product-check-failed', detail: errored };
     return { ok: false, reason: 'product-unavailable', detail: 'not-found' };
   }
@@ -253,21 +266,33 @@
     if (!id.ok) return failed('identity-unknown', id.reason);
     progress('identity', 'sync: ' + id.username, null, { username: id.username, userId: mask(id.userId) });
     const sources = {};
-    for (const [type, source] of [[3, 'my_shop'], [2, 'showcase']]) {
+    async function readSource(type, source) {
       const list = [], seen = new Set();
       let complete = false, total = null, error = null, pages = 0;
       for (let page = 0; page < SYNC_MAX_PAGES; page++) {
         pages++;
         let r;
-        try { r = L.parseShopProducts(await shopGet(L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE, count: SYNC_PAGE }))); } catch (e) { error = e.message; break; }
+        try {
+          const url = type === 'showcase' ? L.showcaseListUrl({ offset: page * SYNC_PAGE, count: SYNC_PAGE })
+            : L.shopSearchUrl({ type, keyword: '', cursor: page * SYNC_PAGE, count: SYNC_PAGE });
+          r = L.parseShopProducts(await shopGet(url));
+        } catch (e) { error = e.message; break; }
         if (!r.ok) { error = r.reason; break; }
+        if (r.skipped > 0) { error = 'products-invalid'; break; }
         if (r.total != null) total = r.total;
         for (const p of r.products) if (!seen.has(p.product_id)) { seen.add(p.product_id); list.push(p); }
         progress('sync', `${source} trang ${page + 1}: ${list.length}${total != null ? '/' + total : ''}`, null, { source, page: page + 1, got: r.rawCount });
         if (r.rawCount < SYNC_PAGE || (total != null && (page + 1) * SYNC_PAGE >= total)) { complete = true; break; }
         await sleep(300);
       }
-      sources[source] = { products: list, complete: complete && !error, total, pages, error };
+      if (complete && total != null && list.length < total) { complete = false; error = 'products-incomplete'; }
+      return { products: list, complete: complete && !error, total, pages, error };
+    }
+    for (const [type, source] of [[3, 'my_shop'], [2, 'showcase']]) {
+      sources[source] = await readSource(type, source);
+    }
+    if (!sources.showcase.complete || sources.showcase.products.length === 0) {
+      sources.showcase = await readSource('showcase', 'showcase');
     }
     const anyOk = Object.keys(sources).some((k) => sources[k].complete);
     post('done', { result: { outcome: anyOk ? 'sync_ok' : 'failed', definite: true, notSent: true, reason: anyOk ? undefined : 'sync-incomplete', identity: { username: id.username, user_id: id.userId },

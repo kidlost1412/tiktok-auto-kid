@@ -306,6 +306,10 @@
   function shopSearchUrl({ type, keyword = '', cursor = 0, count = 50 }) {
     return `${SHOP_SEARCH}?search_type=${type}&keyword=${encodeURIComponent(keyword)}&origin=2&cursor=${cursor}&count=${count}&aid=1180`;
   }
+  // Hộp gắn sản phẩm của Studio dùng API này cho giỏ trưng bày của nhà sáng tạo.
+  function showcaseListUrl({ offset = 0, count = 50 } = {}) {
+    return `https://shop.tiktok.com/api/v1/streamer_desktop/showcase_product/list?offset=${offset}&count=${count}`;
+  }
   const toInt = (v) => { const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v; return typeof n === 'number' && Number.isFinite(n) ? Math.trunc(n) : null; };
   const strOrNull = (v) => (typeof v === 'string' && v ? v : null);
 
@@ -318,6 +322,8 @@
     if (!(j.code === 0 || j.code === '0')) return bad('code-' + (j.code === undefined ? 'missing' : String(j.code)));
     const d = j.data;
     if (!d || typeof d !== 'object' || Array.isArray(d)) return bad('no-data');
+    // TikTok có thể bỏ products khi total=0; thiếu danh sách với total khác 0 không phải giỏ rỗng.
+    if (d.products == null && toInt(d.total) !== 0) return bad('products-missing');
     const arr = d.products == null ? [] : d.products;
     if (!Array.isArray(arr)) return bad('products-not-array');
     const products = []; let skipped = 0;
@@ -492,6 +498,6 @@
 
   const api = { validateJob, sanitizeResponse, mapPublishResult, extractPostId, parseKeepNumbers, createPublishGate, checkIdentity, CHUNK_SIZE, MAX_CAPTION_LENGTH, crc32Hex, splitParts, sigv4, sha256Hex, pyStrip, codePointLength, validateCaption, TOKEN_RE, mentionsIn,
     buildCaption, visibilityCode, resolveSchedule, finalizeSchedule, buildPayload, validateCoverMeta, buildCoverInfo, coverApplyPath, parseCoverApply, parseCoverCommit, COVER_MAX_BYTES,
-    buildProductAnchors, buildProductAnchorsDetailed, rewriteAnchors, rewriteAnchorsDetailed, parseShopProducts, checkProductAvailable, extractAnchorCapture, shopSearchUrl };
+    buildProductAnchors, buildProductAnchorsDetailed, rewriteAnchors, rewriteAnchorsDetailed, parseShopProducts, checkProductAvailable, extractAnchorCapture, shopSearchUrl, showcaseListUrl };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AutotokLib = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

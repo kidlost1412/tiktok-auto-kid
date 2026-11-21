@@ -458,6 +458,7 @@ test('job without a product keeps anchors [] and never calls the shop', async ()
 // ---- product sync ----
 // a shop with `n` products per source, paged by cursor/count like the real API
 const pagedShop = (counts, log) => (url) => {
+  if (new URL(url).pathname.endsWith('/showcase_product/list')) return shopRes([]);
   const q = qs(url); log.push([q.search_type, q.cursor, q.count, q.keyword]);
   const n = counts[q.search_type] == null ? 0 : counts[q.search_type];
   const from = Number(q.cursor), to = Math.min(from + Number(q.count), n);
@@ -483,6 +484,33 @@ test('sync: pages my shop (3) then showcase (2) by cursor offset 50, stops on a 
   assert.equal(uploaded(p), false);
 });
 
+test('cart source regression: Studio reads creator showcase even when selection/search is empty', async () => {
+  const p = page({ shop: (url) => new URL(url).pathname.endsWith('/showcase_product/list') ? shopRes([sp(NEW_ID)]) : shopRes([]) });
+  p.runSync();
+  const result = await p.done();
+  assert.equal(result.sources.showcase.complete, true);
+  assert.equal(result.sources.showcase.products[0].product_id, NEW_ID);
+  assert.equal(p.posts().length, 0);
+  assert.equal(uploaded(p), false);
+});
+
+for (const [label, item, outcome] of [['available', sp(NEW_ID), 'posted'], ['out-of-stock', sp(NEW_ID, { stock: 0 }), 'failed'], ['different-id', sp('7598765432109876544'), 'failed']]) {
+  test(`cart source regression: pre-publish canonical showcase ${label} checks exact ID and stock`, async () => {
+    const p = page({ shop: (url) => new URL(url).pathname.endsWith('/showcase_product/list') ? shopRes([item]) : shopRes([]) });
+    p.run({ product: product() });
+    const result = await p.done();
+    assert.equal(result.outcome, outcome);
+    if (outcome === 'failed') {
+      assert.equal(uploaded(p), false);
+      assert.equal(p.posts().length, 0);
+      assert.equal(p.authReqs.length, 0);
+    } else {
+      const check = p.net.findIndex((x) => x.url.includes('/showcase_product/list'));
+      assert.ok(check >= 0 && check < p.net.findIndex((x) => x.url.startsWith('/api/v1/web/project/create/')));
+    }
+  });
+}
+
 test('sync: stops when total is reached on an exact page boundary (100 of 100: no third request)', async () => {
   const log = [];
   const p = page({ shop: pagedShop({ 3: 100, 2: 50 }, log) });
@@ -496,7 +524,7 @@ test('sync: stops when total is reached on an exact page boundary (100 of 100: n
 test('sync: a failing source is reported incomplete (never complete:true); the other source still goes through', async () => {
   const log = [];
   const inner = pagedShop({ 3: 10 }, log);
-  const p = page({ shop: (url) => (qs(url).search_type === '2' ? new Response('{"code":5}') : inner(url)) });
+  const p = page({ shop: (url) => (qs(url).search_type === '2' || new URL(url).pathname.endsWith('/showcase_product/list') ? new Response('{"code":5}') : inner(url)) });
   p.runSync();
   const r = await p.done();
   assert.equal(r.outcome, 'sync_ok');

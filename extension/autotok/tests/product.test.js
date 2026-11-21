@@ -126,6 +126,14 @@ test('parseShopProducts: code != 0, non-JSON, missing data are errors; null prod
   assert.deepEqual([e.ok, e.products.length, e.total], [true, 0, 0]);
 });
 
+test('cart source regression: explicit zero is valid but a missing positive catalog is not empty', () => {
+  const empty = L.parseShopProducts('{"code":0,"msg":"success","data":{"total":0}}');
+  assert.deepEqual([empty.ok, empty.products.length, empty.total], [true, 0, 0]);
+  assert.equal(L.parseShopProducts('{"code":0,"data":{"total":50}}').reason, 'products-missing');
+  assert.equal(L.parseShopProducts('{"code":0,"data":{"products":null,"total":50}}').reason, 'products-missing');
+  assert.equal(L.showcaseListUrl({ offset: 6, count: 6 }), 'https://shop.tiktok.com/api/v1/streamer_desktop/showcase_product/list?offset=6&count=6');
+});
+
 test('checkProductAvailable: exact product_id + stock > 0 only', () => {
   const t = shopText([prod(OLD, { stock: 3 })]);
   assert.deepEqual([L.checkProductAvailable(t, OLD).ok, L.checkProductAvailable(t, OLD).reason], [true, 'ok']);
