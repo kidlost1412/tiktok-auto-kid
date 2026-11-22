@@ -39,6 +39,23 @@ def pick(key, val, rng):
     return val if val in MENU[key] else rng.choice(MENU[key])
 
 
+def goi_gio_khi_mat_mui_ten(props, blocks, qua):
+    """Chai chiếm chỗ nên bỏ mũi tên giỏ → thẻ chốt phải tự kêu bấm giỏ (dòng 1 quà, dòng 2 bấm giỏ)."""
+    if props["arrow"].get("top") != -999:
+        return
+    goi = (qua or {}).get("dong2") or "BẤM GIỎ HÀNG"
+    if blocks:
+        d = blocks[-1].setdefault("data", {})
+        if "GIỎ" not in " ".join(map(str, d.values())).upper():
+            if qua:
+                d["dong1"] = qua["dong1"]
+            d.update(dong2=goi, text=goi)
+            if blocks[-1]["loai"] == "bang_qua":
+                d["tieu_de"] = goi
+    elif "GIỎ" not in (props["cta"]["line1"] + props["cta"]["line2"]).upper():
+        props["cta"]["line2"] = goi[:24]
+
+
 def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
     rng = random.Random(plan.get("seed", 0))
     st = plan["phong_cach"]
@@ -102,6 +119,7 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
             chot["top"] = 150
         if chot["loai"] == "nut_gio_hang":
             props["arrow"]["top"] = -999      # đã có nút giỏ hàng → không vẽ thêm mũi tên chồng lên
+    goi_gio_khi_mat_mui_ten(props, blocks, qua)
     (work_dir / "props.json").write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")   # LUÔN ghi (lỗi rà soát #1)
     if blocks:
         props["open_card"]["kind"] = blocks[0]["loai"]; props["cta"]["kind"] = blocks[-1]["loai"]

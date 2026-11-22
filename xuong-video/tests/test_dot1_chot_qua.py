@@ -278,5 +278,25 @@ class CtHopTest(unittest.TestCase):
 
 
 
+
+
+class GoiGioKhiMatMuiTenTest(unittest.TestCase):
+    def test_the_chot_tu_keu_bam_gio(self):
+        import dung_remotion as DR
+        qua = {"dong1": "MUA 1 CAN TẶNG 1 TC01", "dong2": "BẤM GIỎ NHẬN QUÀ"}
+        b = [{"loai": "the_qua", "data": {"dong1": "MUA 1 CAN 1 LÍT", "dong2": "TẶNG 1 CHAI TC01", "text": "TẶNG 1 CHAI TC01"}}]
+        DR.goi_gio_khi_mat_mui_ten({"arrow": {"top": -999}}, b, qua)
+        self.assertEqual((b[0]["data"]["dong1"], b[0]["data"]["dong2"]), (qua["dong1"], "BẤM GIỎ NHẬN QUÀ"))
+        b = [{"loai": "the_qua", "data": {"dong1": "X", "dong2": "ĐẶT NGAY TRONG GIỎ"}}]   # đã có giỏ → giữ nguyên
+        DR.goi_gio_khi_mat_mui_ten({"arrow": {"top": -999}}, b, qua)
+        self.assertEqual(b[0]["data"]["dong1"], "X")
+        b = [{"loai": "the_qua", "data": {"dong1": "A", "dong2": "B"}}]                     # còn mũi tên → không đụng
+        DR.goi_gio_khi_mat_mui_ten({"arrow": {"top": 900}}, b, qua)
+        self.assertEqual(b[0]["data"]["dong2"], "B")
+        p = {"arrow": {"top": -999}, "cta": {"line1": "QUÀ", "line2": "TẶNG TC01"}}
+        DR.goi_gio_khi_mat_mui_ten(p, None, None)
+        self.assertEqual(p["cta"]["line2"], "BẤM GIỎ HÀNG")
+
+
 if __name__ == "__main__":
     unittest.main()
