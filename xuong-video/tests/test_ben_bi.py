@@ -132,6 +132,9 @@ def _dung_ekip(td, so_video, so_loi, dao_dien, tao_giong, chon_tk=lambda: object
     d = td / "san-pham" / ma; d.mkdir(parents=True)
     (d / "san-pham.json").write_text(json.dumps({"ten_goi": "SP Thử", "kho_video": str(td / "kho")}), encoding="utf-8")
     (d / "canh.json").write_text(json.dumps(kho_gia(10)), encoding="utf-8")
+    (td / "kho").mkdir()
+    for s in kho_gia(10):                 # ekip bỏ cảnh không còn file gốc → kho giả cần file thật
+        (td / "kho" / s["file"]).touch()
     (td / "lich-su").mkdir(exist_ok=True)
     cfg = copy.deepcopy(ekip.CFG)
     cfg["duong_dan"]["ra"] = str(td / "ra"); cfg["giong"]["danh_sach"] = {"G": "vid"}; cfg["lo"]["video_moi_giong"] = 2; cfg["dung_lai"] = False

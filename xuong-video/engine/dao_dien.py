@@ -224,10 +224,10 @@ VAI_TU = {    # vai trò (tên ASCII trong kho) → từ khoá trong lời tiế
 CAY_RE = {   # cây trồng: mã trong canh.json "cay" ↔ cách nói trong lời (né "mục tiêu", "sáng mai", "cải thiện")
     "ca_phe": r"cà phê|ca_phe", "ho_tieu": r"(?<!mục )\btiêu\b(?! (?:chuẩn|hao|dùng|thụ|diệt|độc|biểu|chí))|ho_tieu",
     "ot": r"\bớt\b|\bot\b", "sau_rieng": r"sầu riêng|sau_rieng", "mai_vang": r"mai vàng|cây mai|vườn mai|gốc mai|mai_vang",
-    "rau_mau": r"\brau\b|\bcải\b(?! (?:thiện|tạo|tiến|cách))|dưa leo|rau_mau",
+    "rau_mau": r"\brau\b|\bcải\b(?! (?:thiện|tạo|tiến|cách))|dưa leo|rau_mau", "lua": r"\blúa\b|\blua\b",
 }
 DIEM_CAY = 4
-TEN_CAY = {"ca_phe": "cà phê", "ho_tieu": "tiêu", "ot": "ớt", "sau_rieng": "sầu riêng", "mai_vang": "mai vàng", "rau_mau": "rau màu"}
+TEN_CAY = {"ca_phe": "cà phê", "ho_tieu": "tiêu", "ot": "ớt", "sau_rieng": "sầu riêng", "mai_vang": "mai vàng", "rau_mau": "rau màu", "lua": "lúa"}
 
 
 def cay_trong(text):

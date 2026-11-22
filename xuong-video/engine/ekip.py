@@ -179,6 +179,13 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     chung = canh_them(ds_them)
     log("  kho phụ: " + (", ".join("%s (%d cảnh dùng được)" % (m, sum(1 for x in chung if x["kho_them"] == m)) for m in ds_them) if ds_them else "không dùng"))
     qua = canh_qua(ma_sp, CFG.get("kho_qua"))             # cảnh quà tặng thật từ kho sản phẩm khác
+    # cảnh mà file gốc không còn (thư mục kho bị đổi tên/xoá) → bỏ trước khi đạo diễn chọn; trước đây 1 cảnh mất làm hỏng cả video ("dựng nền lỗi")
+    mat = lambda s: not (Path(s["file"]) if Path(s["file"]).is_absolute() else Path(sp["kho_video"]) / s["file"]).exists()
+    n0 = len(shots) + len(chung) + sum(map(len, qua.values()))
+    shots = [s for s in shots if not mat(s)]; chung = [s for s in chung if not mat(s)]
+    qua = {k: v for k, v in ((k, [s for s in v if not mat(s)]) for k, v in qua.items()) if v}
+    if n0 > len(shots) + len(chung) + sum(map(len, qua.values())):
+        log(f"  ⚠ bỏ {n0 - len(shots) - len(chung) - sum(map(len, qua.values()))} cảnh vì không còn file gốc (thư mục kho đổi tên/xoá?) — kiểm lại đường dẫn kho trong app")
     if qua:
         log(f"  cảnh quà tặng thật: " + ", ".join(f"{k} ({len(v)})" for k, v in qua.items()))
     per = CFG["lo"]["video_moi_giong"]
@@ -402,7 +409,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 job, info = chuan_bi(t["plan"], t["voice"], shots, sp["kho_video"], t["work"] / "dung", music)
                 break
             except Exception as e:
-                log(f"  dựng nền lỗi lần {lan + 1} {fname}: {str(e)[-120:]}")
+                log(f"  dựng nền lỗi lần {lan + 1} {fname}: {str(e)[-400:]}")
                 if lan == 1:
                     return t if t.get("job") else None   # dựng lại hỏng → giữ bản cũ
                 time.sleep(20)

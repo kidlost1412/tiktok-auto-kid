@@ -25,6 +25,13 @@ MENU = {
 }
 
 
+def _ffmpeg(cmd):
+    """Chạy FFmpeg; hỏng thì lỗi mang theo vài dòng cuối FFmpeg báo (trước đây chỉ còn mã thoát, không biết vì sao)."""
+    r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:
+        raise RuntimeError(f"FFmpeg lỗi {r.returncode}: " + " | ".join(r.stderr.strip().splitlines()[-3:])[-400:])
+
+
 def pick(menu_key, value):
     opts = MENU[menu_key]
     keys = list(opts) if isinstance(opts, dict) else opts
@@ -178,7 +185,7 @@ def render(plan, voice, shots, kho, out_path, music=None):
         clip = seg_dir / f"d{i:02d}.mp4"
         scmd += ["-filter_threads", "2", "-filter_complex", ";".join(lines), "-map", f"[v{i}]", "-t", f"{d:.3f}", "-an",
                  "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-threads", "4", str(clip)]
-        subprocess.run(scmd, check=True)
+        _ffmpeg(scmd)
         cmd += ["-threads", "1", "-i", str(clip)]   # nối nhiều đoạn: 1 luồng giải mã/đoạn để không hết RAM
         clips.append(clip)
         dpad = d + (0.1 if extra else 0)             # chuyển cảnh: đoạn kéo dài thêm ~3 khung (khung cuối nhân bản) để xfade luôn có hình tới hết offset+duration
@@ -225,7 +232,7 @@ def render(plan, voice, shots, kho, out_path, music=None):
     cmd += ["-filter_threads", "2", "-filter_complex", ";".join(fc), "-map", "[vout]", "-map", "[aout]", "-t", str(total), "-threads", "4",
             "-c:v", "libx264", *enc, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out_path)]
-    subprocess.run(cmd, check=True)
+    _ffmpeg(cmd)
     frames = int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
                                  "stream=nb_read_packets", "-of", "csv=p=0", str(out_path)], capture_output=True, text=True).stdout.strip() or 0)
     if frames < (total - 0.2) * FPS:
