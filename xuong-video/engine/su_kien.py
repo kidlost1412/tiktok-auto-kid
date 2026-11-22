@@ -40,6 +40,17 @@ def _cat_dong(f, giu, toi_da_byte, ma_hoa, giu_dau):
         pass
 
 
+def _noi_cot_dau(f, dau, ma_hoa):
+    """Tiêu đề cũ thiếu cột mới thêm ở cuối (vd token.csv thiếu "lo") → thay dòng tiêu đề, giữ nguyên dữ liệu."""
+    with open(f, "r", encoding=ma_hoa, newline="") as fh:
+        dau_cu = fh.readline()
+    cu, moi = dau_cu.lstrip("﻿").rstrip("\r\n"), dau.rstrip("\r\n")
+    if cu == moi or not moi.startswith(cu + ","):
+        return
+    t = Path(f).read_text(encoding=ma_hoa)
+    Path(f).write_text(dau_cu[:len(dau_cu) - len(dau_cu.lstrip("﻿"))] + dau + t[len(dau_cu):], encoding=ma_hoa, newline="")
+
+
 def noi_them(f, noi_dung, ma_hoa="utf-8", dau=None, thu=4, doi=0.3, giu_dong=None, toi_da_byte=None):
     """Ghi NỐI `noi_dung` (chuỗi, tự kèm xuống dòng) vào file f — KHÔNG BAO GIỜ ném lỗi vào dây chuyền sản xuất.
     File đang bị khoá (Excel mở bảng, quét virus...) → thử lại `thu` lần cách nhau `doi` s, vẫn không được thì ghi tạm vào
@@ -54,6 +65,8 @@ def noi_them(f, noi_dung, ma_hoa="utf-8", dau=None, thu=4, doi=0.3, giu_dong=Non
                 try:
                     f.parent.mkdir(parents=True, exist_ok=True)
                     moi = (not f.exists()) or f.stat().st_size == 0
+                    if dau and not moi:
+                        _noi_cot_dau(f, dau, ma_hoa)
                     ton = cho.read_bytes().decode("utf-8", errors="replace") if cho.exists() else ""
                     with open(f, "a", encoding=ma_hoa, newline="") as fh:
                         if moi and dau:

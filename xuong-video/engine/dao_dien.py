@@ -221,12 +221,29 @@ VAI_TU = {    # vai trò (tên ASCII trong kho) → từ khoá trong lời tiế
 }
 
 
+CAY_RE = {   # cây trồng: mã trong canh.json "cay" ↔ cách nói trong lời (né "mục tiêu", "sáng mai", "cải thiện")
+    "ca_phe": r"cà phê|ca_phe", "ho_tieu": r"(?<!mục )\btiêu\b(?! (?:chuẩn|hao|dùng|thụ|diệt|độc|biểu|chí))|ho_tieu",
+    "ot": r"\bớt\b|\bot\b", "sau_rieng": r"sầu riêng|sau_rieng", "mai_vang": r"mai vàng|cây mai|vườn mai|gốc mai|mai_vang",
+    "rau_mau": r"\brau\b|\bcải\b(?! (?:thiện|tạo|tiến|cách))|dưa leo|rau_mau",
+}
+DIEM_CAY = 4
+TEN_CAY = {"ca_phe": "cà phê", "ho_tieu": "tiêu", "ot": "ớt", "sau_rieng": "sầu riêng", "mai_vang": "mai vàng", "rau_mau": "rau màu"}
+
+
+def cay_trong(text):
+    t = str(text or "").lower()
+    return {k for k, p in CAY_RE.items() if re.search(p, t)}
+
+
 def _diem_lien_quan(shot, sent, y_canh):
     q = (sent + " " + (y_canh or "")).lower()
     blob = ((shot.get("soat") or {}).get("ghi", "") + " " + shot.get("mo_ta", "") + " " + " ".join(shot.get("the", [])) + " " + (shot.get("noi") or "")).lower()
     toks = {t for t in re.findall(r"\w+", q) if len(t) > 2}
     s = sum(1 for t in toks if t in blob)
     s += 2 * sum(1 for v in shot.get("vai_tro", []) if v.replace("_", " ") in q or v in q or any(k in q for k in VAI_TU.get(v, ())))
+    cq, cs = cay_trong(sent), cay_trong(" ".join(map(str, shot.get("cay") or [])))   # lời nhắc cây nào → cảnh đúng cây lên, cảnh cây khác xuống
+    if cq and cs:
+        s += DIEM_CAY if cq & cs else -DIEM_CAY
     return s + ((shot.get("soat") or {}).get("dep") or 3) * 0.5
 
 
@@ -599,7 +616,8 @@ def dong_ds(i, s):
     cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | AFF người thật cầm/nói về sản phẩm" if la_aff(s) else "")]
     if s.get("co_canh"):
         cot.append(str(s["co_canh"]))
-    cot.append(mo + (" [CÓ CHỮ GỐC trong hình]" if ((s_ := (s.get("soat") or {})).get("chu_muc") or 0) >= 1 else ""))
+    cay = sorted(cay_trong(" ".join(map(str, s.get("cay") or []))))
+    cot.append(mo + (f" [cây: {', '.join(TEN_CAY[c] for c in cay)}]" if cay else "") + (" [CÓ CHỮ GỐC trong hình]" if ((s_ := (s.get("soat") or {})).get("chu_muc") or 0) >= 1 else ""))
     if kieu2 and s.get("noi"):
         cot.append("nói: " + str(s["noi"])[:80])
     cot.append(str(s["dai"]))

@@ -249,6 +249,9 @@ def _xet_lo_da_xong(cau, now):
             TRANG_THAI["ly_do_nghi"] = None
             TRANG_THAI["ghi"] = f"Mọi tài khoản hết hạn mức — nghỉ tới {TRANG_THAI['nghi_den']:%H:%M}"
             nghi_chung = True
+        elif any("ElevenLabs hết credit" in l for l in nk):       # hết credit giọng: mọi sản phẩm đều hỏng ở bước giọng (đã tốn tiền viết lời) → nghỉ chung tới khi anh nạp rồi bấm chạy tay
+            tam_nghi(12 * 60, "ElevenLabs hết credit — nạp thêm rồi bấm chạy tay")
+            nghi_chung = True
         elif loi:                                         # lô lỗi → nghỉ lùi dần (khỏi chạy lại mãi, đốt token) — riêng từng sản phẩm
             n = int(_doc_sp(ma).get("loi_lien_tiep", 0))
             tam_nghi(BACKOFF_PHUT[min(n, len(BACKOFF_PHUT) - 1)], f"Lô tự động lỗi/không ra video lần {n + 1} (xem nhật ký)", dem_loi=n + 1, ma=ma)

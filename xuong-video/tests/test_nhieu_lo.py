@@ -1,6 +1,7 @@
 """Nhiều lô sản xuất chạy cùng lúc: sức máy (RAM → số lô / khe dựng), khoá lô riêng từng sản phẩm, khe dựng giữa các tiến trình,
 hàng chờ bền, nhật ký + tiến độ từng lô, vòng tự động nhiều sản phẩm, chữ ký chống trùng dùng chung.
 Không gọi AI / ElevenLabs / ffmpeg / node. Test tiến trình con chỉ chạy một đoạn python nhỏ có hạn chót cứng (không tự gọi lại chính nó)."""
+import datetime
 import json
 import os
 import subprocess
@@ -430,6 +431,11 @@ class TuDongNhieuSpTest(unittest.TestCase):
         x = json.loads(f.read_text(encoding="utf-8")); x["sp"]["a"]["nghi_den"] = None; f.write_text(json.dumps(x), encoding="utf-8")
         self.luot(self.CFG, toi_da=2, vua_chay={"a": True}, ma_thoat=lambda ma: 0, cau_them={"nhat_ky": lambda ma: ["XONG: 3 video"]})
         self.assertEqual(json.loads(f.read_text(encoding="utf-8"))["sp"]["a"]["loi_lien_tiep"], 0)
+
+    def test_het_credit_giong_nghi_chung(self):
+        goi = self.luot(self.CFG, toi_da=2, vua_chay={"a": True}, cau_them={"nhat_ky": lambda ma: ["[1] ⛔ ElevenLabs hết credit (x): dừng", "XONG: 0 video"]})
+        self.assertEqual(goi, [])                                                                              # b cũng không chạy (sẽ hỏng giọng y hệt)
+        self.assertAlmostEqual((tu_dong.TRANG_THAI["nghi_den"] - datetime.datetime.now()).total_seconds() / 3600, 12, delta=0.1)
 
     def test_het_han_muc_nghi_chung_va_bam_dung_tung_san_pham(self):
         goi = self.luot(self.CFG, toi_da=2, vua_chay={"a": True}, cau_them={"nhat_ky": lambda ma: ["[1] ⛔ HẾT HẠN MỨC CLAUDE (mọi tài khoản): x"]})

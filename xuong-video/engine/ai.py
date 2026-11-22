@@ -89,6 +89,8 @@ def env_tk(tk):
     env = dict(os.environ)
     for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
         env.pop(k, None)                       # không để khoá API ghi đè gói đăng ký
+    # CLI ghi cache 1 giờ (giá ×2 đầu vào) cho cả đề bài, mà đề bài mỗi lượt khác đuôi nên không lượt nào đọc lại (đo 14–22/11: 0 token đọc) → tắt
+    env["DISABLE_PROMPT_CACHING"] = "1"
     if tk.get("thu_muc"):
         env["CLAUDE_CONFIG_DIR"] = str(Path(tk["thu_muc"]).resolve())
     else:

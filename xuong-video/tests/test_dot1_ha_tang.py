@@ -141,5 +141,36 @@ class PhuDeChamMepNhanTest(unittest.TestCase):
         self.assertIn("khong_che_nhan", muc(sg([0.3, 0.70, 0.7, 0.80])))
 
 
+
+
+class CayTrongTest(unittest.TestCase):
+    def test_loi_nhac_cay_nao_canh_dung_cay_len(self):
+        import dao_dien as dd
+        self.assertEqual(dd.cay_trong("Cùng trồng ớt, sáng mai hái bán"), {"ot"})          # "sáng mai" không phải mai vàng
+        self.assertEqual(dd.cay_trong("mục tiêu là cải thiện năng suất"), set())
+        self.assertEqual(dd.cay_trong("vườn tiêu và cà phê con"), {"ho_tieu", "ca_phe"})
+        ot, cf = {"id": "a", "cay": ["ot"], "mo_ta": "vườn"}, {"id": "b", "cay": ["cà phê con"], "mo_ta": "vườn"}
+        cau = "Ớt vẫn đậu trái dày"
+        self.assertGreater(dd._diem_lien_quan(ot, cau, ""), dd._diem_lien_quan(cf, cau, "") + 6)
+        self.assertIn("[cây: ớt]", " | ".join(map(str, [dd.dong_ds(1, {**ot, "dai": 3})])))
+
+
+
+
+class TieuDeCsvThemCotTest(unittest.TestCase):
+    def test_tieu_de_cu_thieu_cot_lo_duoc_noi(self):
+        import csv, tempfile
+        from pathlib import Path
+        import su_kien
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "token.csv"
+            f.write_text("﻿luc,video\r\n1,a,x\r\n", encoding="utf-8", newline="")
+            su_kien.noi_them(f, "2,b,y\r\n", dau="luc,video,lo\r\n")
+            r = list(csv.DictReader(open(f, encoding="utf-8-sig")))
+            self.assertEqual([x["lo"] for x in r], ["x", "y"])
+            su_kien.noi_them(f, "3,c,z\r\n", dau="khac,hoan,toan\r\n")          # tiêu đề lạ → không đụng
+            self.assertTrue(f.read_text(encoding="utf-8-sig").startswith("luc,video,lo"))
+
+
 if __name__ == "__main__":
     unittest.main()
