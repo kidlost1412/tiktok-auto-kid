@@ -224,10 +224,10 @@ VAI_TU = {    # vai trò (tên ASCII trong kho) → từ khoá trong lời tiế
 CAY_RE = {   # cây trồng: mã trong canh.json "cay" ↔ cách nói trong lời (né "mục tiêu", "sáng mai", "cải thiện")
     "ca_phe": r"cà phê|ca_phe", "ho_tieu": r"(?<!mục )\btiêu\b(?! (?:chuẩn|hao|dùng|thụ|diệt|độc|biểu|chí))|ho_tieu",
     "ot": r"\bớt\b|\bot\b", "sau_rieng": r"sầu riêng|sau_rieng", "mai_vang": r"mai vàng|cây mai|vườn mai|gốc mai|mai_vang",
-    "rau_mau": r"\brau\b|\bcải\b(?! (?:thiện|tạo|tiến|cách))|dưa leo|rau_mau", "lua": r"\blúa\b|\blua\b",
+    "rau_mau": r"\brau\b|\bcải\b(?! (?:thiện|tạo|tiến|cách))|dưa leo|rau_mau", "lua": r"\blúa\b|\blua\b", "thanh_long": r"thanh long|thanh_long",
 }
 DIEM_CAY = 4
-TEN_CAY = {"ca_phe": "cà phê", "ho_tieu": "tiêu", "ot": "ớt", "sau_rieng": "sầu riêng", "mai_vang": "mai vàng", "rau_mau": "rau màu", "lua": "lúa"}
+TEN_CAY = {"ca_phe": "cà phê", "ho_tieu": "tiêu", "ot": "ớt", "sau_rieng": "sầu riêng", "mai_vang": "mai vàng", "rau_mau": "rau màu", "lua": "lúa", "thanh_long": "thanh long"}
 
 
 def cay_trong(text):
@@ -377,6 +377,8 @@ def canh_qua(ma_sp, cfg_kho_qua):
             if not s.get("soat") or bad(s) or nguoi_noi(s) or not ({"chai_ro", "nhan_can"} & set(s.get("vai_tro", []))):
                 continue
             x = dict(s); x["id"] = f"Q-{ma}-{s['id']}"; x["file"] = str(Path(sp["kho_video"]) / s["file"])
+            if not Path(x["file"]).is_file():            # lọc trước khi lấy 12 cảnh đẹp nhất (kho đổi tên/xoá file)
+                continue
             x["vai_tro"] = list(s.get("vai_tro", [])) + ["qua_tang"]; x["qua_tu_khoa"] = tu_khoa; x.setdefault("dep", [s["tu"], s.get("den", s["tu"] + s["dai"])])
             ANH_RIENG[x["id"]] = d / "_khung" / f"{s['id']}.jpg"
             ds.append(x)

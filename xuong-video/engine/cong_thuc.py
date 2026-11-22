@@ -110,6 +110,12 @@ def _muc_qua(e):
     return (m.group(1) if m else None), ([w for w in tu if w not in _CHUNG] or tu)
 
 
+def qua_that_trong(chu, ds_qua):
+    """Chữ thẻ chốt có nhắc tên một món quà thật trong hồ sơ (so không dấu, theo từ khoá món quà)?"""
+    t = _kd(chu)
+    return any(re.search(rf"\b{w}\b", t) for e in ds_qua or [] for w in _muc_qua(e)[1])
+
+
 def chon_qua(st, text_loi="", rng=None):
     """Mức quà dùng cho CẢ video: lời nhắc mức nào (số lượng mua + tên món quà) → mức đó; không thì cảnh quà ở đoạn chốt (st['_qua_canh']: từ khoá kho quà); không thì rng bốc MỘT lần.
     Lưu st['_qua_chon'] để mọi bước sau dùng lại. Hồ sơ không có quà → ''."""
@@ -149,9 +155,9 @@ def dong_qua(e, rng):
     if mua:
         kieu = rng.choice((0, 1, 2))
         mau = [lambda it, c: f"MUA {c} TẶNG {it}", lambda it, c: f"TẶNG {it} KHI MUA {c}", lambda it, c: f"ĐẶT {c} – TẶNG {it}"][kieu]
-        ds = [mau(mon + (" " + gia_s if gia_s else ""), sl), mau(mon, sl), mau(mon1, sl), mau(mon1, sl2), f"TẶNG {mon1}"]
+        ds = [mau(mon + (" " + gia_s if gia_s else ""), sl), mau(mon, sl), mau(mon1, sl), mau(mon1, sl2), f"MUA {sl2} TẶNG {mon1}"]   # không bao giờ bỏ điều kiện mua (quá dài → cắt bớt đuôi tên quà)
     elif dk:
-        ds = [f"{dk} TẶNG {mon}", f"{dk} TẶNG {mon1}", f"TẶNG {mon1}"]
+        ds = [f"{dk} TẶNG {mon}", f"{dk} TẶNG {mon1}"]
     else:
         ds = [f"TẶNG {mon}", f"TẶNG {mon1}"]
     ds = [x.upper() for x in ds]
@@ -392,6 +398,8 @@ def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu, words=
         loai_chot = st.get("ep_chot") or "the_qua"
     data = dict(cta[0]["du_lieu"]) if cta else {}
     data.setdefault("dong1", d1); data.setdefault("dong2", d2); data.setdefault("text", d2)
+    if ct_qua and loai_chot != "bang_qua" and not qua_that_trong(f'{data.get("dong1", "")} {data.get("dong2", "")}', st.get("_qua")):
+        data.update(dong1=d1, dong2=d2, text=d2)        # chữ quà đạo diễn ghi không nhắc món quà nào trong hồ sơ → dùng mức quà thật
     if "kieu" not in data:
         data["kieu"] = rng.choice(["hop_do", "hop_xanh", "nhan_vang", "the_trang"])
     if loai_chot == "bang_qua" and not data.get("cac_muc"):

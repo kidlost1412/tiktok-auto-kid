@@ -167,7 +167,7 @@ def kiem(segs, sents=None, info=None, props=None, co_qua=True, co_canh_qua=False
         for f0, f1, rect, _loai in khoi:
             if f1 / 30.0 > t0 and f0 / 30.0 < t1 and _chong(rect, hop) / dien >= CHONG_NHAN:
                 t_khoi.append(max(t0, f0 / 30.0))
-        cs = [r for a, b, r in dai if b > t0 and a < t1] if dai else [band]
+        cs = [] if ((props or {}).get("cap") or {}).get("bat") is False else [r for a, b, r in dai if b > t0 and a < t1] if dai else [band]   # tắt phụ đề → không có gì để đè
         if any(_chong(r, hop) / dien >= CHONG_NHAN_PHU_DE for r in cs):
             t_cap.append(t0)
     if t_khoi:

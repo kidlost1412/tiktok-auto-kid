@@ -45,13 +45,17 @@ def goi_gio_khi_mat_mui_ten(props, blocks, qua):
         return
     goi = (qua or {}).get("dong2") or "BẤM GIỎ HÀNG"
     if blocks:
-        d = blocks[-1].setdefault("data", {})
-        if "GIỎ" not in " ".join(map(str, d.values())).upper():
-            if qua:
-                d["dong1"] = qua["dong1"]
-            d.update(dong2=goi, text=goi)
-            if blocks[-1]["loai"] == "bang_qua":
+        loai, d = blocks[-1]["loai"], blocks[-1].setdefault("data", {})
+        if loai == "nut_gio_hang":
+            return
+        hien = [d.get("tieu_de")] + list(d.get("cac_muc") or []) if loai == "bang_qua" else [d.get("dong1"), d.get("dong2")]   # chỉ chữ thật sự vẽ ra
+        if "GIỎ" not in " ".join(map(str, hien)).upper():
+            if loai == "bang_qua":
                 d["tieu_de"] = goi
+            else:
+                if qua:
+                    d["dong1"] = qua["dong1"]
+                d.update(dong2=goi, text=goi)
     elif "GIỎ" not in (props["cta"]["line1"] + props["cta"]["line2"]).upper():
         props["cta"]["line2"] = goi[:24]
 

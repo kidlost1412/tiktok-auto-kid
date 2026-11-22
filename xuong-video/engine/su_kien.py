@@ -42,13 +42,19 @@ def _cat_dong(f, giu, toi_da_byte, ma_hoa, giu_dau):
 
 def _noi_cot_dau(f, dau, ma_hoa):
     """Tiêu đề cũ thiếu cột mới thêm ở cuối (vd token.csv thiếu "lo") → thay dòng tiêu đề, giữ nguyên dữ liệu."""
-    with open(f, "r", encoding=ma_hoa, newline="") as fh:
+    f = Path(f)
+    with open(f, "rb") as fh:
         dau_cu = fh.readline()
-    cu, moi = dau_cu.lstrip("﻿").rstrip("\r\n"), dau.rstrip("\r\n")
-    if cu == moi or not moi.startswith(cu + ","):
+    bom = b"\xef\xbb\xbf" if dau_cu.startswith(b"\xef\xbb\xbf") else b""
+    cu, moi = dau_cu[len(bom):].rstrip(b"\r\n"), dau.encode(ma_hoa).rstrip(b"\r\n")
+    if cu == moi or not moi.startswith(cu + b","):
         return
-    t = Path(f).read_text(encoding=ma_hoa)
-    Path(f).write_text(dau_cu[:len(dau_cu) - len(dau_cu.lstrip("﻿"))] + dau + t[len(dau_cu):], encoding=ma_hoa, newline="")
+    b = f.read_bytes()                                   # làm trên byte: giữ nguyên \r\n và từng ký tự dữ liệu
+    tam = f.with_name(f.name + ".tam")
+    tam.write_bytes(bom + moi + dau_cu[len(bom) + len(cu):] + b[len(dau_cu):])
+    if f.stat().st_size != len(b):                       # tiến trình khác vừa nối thêm → bỏ, lần ghi sau làm lại
+        tam.unlink(missing_ok=True); return
+    os.replace(tam, f)
 
 
 def noi_them(f, noi_dung, ma_hoa="utf-8", dau=None, thu=4, doi=0.3, giu_dong=None, toi_da_byte=None):

@@ -139,8 +139,22 @@ class PhuDeChamMepNhanTest(unittest.TestCase):
         muc = lambda s: [x["muc"] for x in km.kiem([s], sents, co_qua=False)]
         self.assertNotIn("khong_che_nhan", muc(sg([0.3, 0.40, 0.7, 0.78])))   # phụ đề phủ ~15% mép dưới nhãn: ngưỡng cũ 10% báo, nay không
         self.assertIn("khong_che_nhan", muc(sg([0.3, 0.70, 0.7, 0.80])))
+        tat = [x["muc"] for x in km.kiem([sg([0.3, 0.70, 0.7, 0.80])], sents, props={"cap": {"bat": False}}, co_qua=False)]
+        self.assertNotIn("khong_che_nhan", tat)                               # tắt phụ đề → không báo
 
 
+
+
+class TheChotQuaThatTest(unittest.TestCase):
+    def test_qua_that_trong(self):
+        import cong_thuc as ct
+        ds = ["Mua 1 can tặng 1 chai TC01", "Mua 3 can tặng 3 gói Kali Bo"]
+        self.assertTrue(ct.qua_that_trong("MUA 1 CAN 1 LÍT TẶNG 1 CHAI TC01", ds))
+        self.assertFalse(ct.qua_that_trong("QUÀ TẶNG THEO ĐƠN", ds))
+        import dung_remotion as DR
+        b = [{"loai": "bang_qua", "data": {"tieu_de": "QUÀ TẶNG", "cac_muc": ds, "dong2": "BẤM GIỎ HÀNG"}}]
+        DR.goi_gio_khi_mat_mui_ten({"arrow": {"top": -999}}, b, None)
+        self.assertEqual(b[0]["data"]["tieu_de"], "BẤM GIỎ HÀNG")               # bảng quà chỉ vẽ tiêu đề + mục → lời giỏ phải nằm ở tiêu đề
 
 
 class CayTrongTest(unittest.TestCase):
@@ -168,6 +182,8 @@ class TieuDeCsvThemCotTest(unittest.TestCase):
             su_kien.noi_them(f, "2,b,y\r\n", dau="luc,video,lo\r\n")
             r = list(csv.DictReader(open(f, encoding="utf-8-sig")))
             self.assertEqual([x["lo"] for x in r], ["x", "y"])
+            self.assertEqual([x["luc"] for x in r], ["1", "2"])                # dòng dữ liệu đầu không mất ký tự
+            self.assertIn(b"\r\n1,a,x\r\n", f.read_bytes())
             su_kien.noi_them(f, "3,c,z\r\n", dau="khac,hoan,toan\r\n")          # tiêu đề lạ → không đụng
             self.assertTrue(f.read_text(encoding="utf-8-sig").startswith("luc,video,lo"))
 
