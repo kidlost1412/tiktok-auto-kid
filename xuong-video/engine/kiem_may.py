@@ -41,6 +41,7 @@ NGUONG_DAT = 7.0
 TOI_THIEU_AI = 0.6           # AI phải trả lời ≥ 60% số mục được hỏi, ít hơn = trả lời hỏng
 STATIC_S = 5.0               # một cảnh đứng yên quá chừng này giây
 CHONG_NHAN = 0.10            # chữ phủ ≥ 10% diện tích khung nhãn = che nhãn
+CHONG_NHAN_PHU_DE = 0.25    # phụ đề chỉ chạm mép dưới nhãn (≤ 25%) vẫn đọc được tên — tờ ảnh 22/11: 11/12 ca 10% là oan hoặc chỉ chạm mép
 CAO_PHU_DE = 150             # dải phụ đề (1–2 dòng) quanh center_y
 CENTER_Y_MAC_DINH = 1490
 
@@ -167,7 +168,7 @@ def kiem(segs, sents=None, info=None, props=None, co_qua=True, co_canh_qua=False
             if f1 / 30.0 > t0 and f0 / 30.0 < t1 and _chong(rect, hop) / dien >= CHONG_NHAN:
                 t_khoi.append(max(t0, f0 / 30.0))
         cs = [r for a, b, r in dai if b > t0 and a < t1] if dai else [band]
-        if any(_chong(r, hop) / dien >= CHONG_NHAN for r in cs):
+        if any(_chong(r, hop) / dien >= CHONG_NHAN_PHU_DE for r in cs):
             t_cap.append(t0)
     if t_khoi:
         them("khong_che_nhan", min(t_khoi), f"khối chữ đè nhãn chai lúc {_giay(t_khoi)}", "dời khối chữ ra khỏi nhãn", MAY)

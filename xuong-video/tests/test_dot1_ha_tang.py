@@ -128,5 +128,18 @@ class LoiMayLopChuTest(unittest.TestCase):
             self.assertFalse(KM.la_loi_may(x), x)
 
 
+
+
+class PhuDeChamMepNhanTest(unittest.TestCase):
+    def test_cham_mep_khong_bao_che_that_van_bao(self):
+        import kiem_may as km
+        sents = [{"s": 0.0, "e": 3.0, "text": "a"}, {"s": 3.0, "e": 6.0, "text": "b"}]
+        def sg(nhan):
+            return {"shot": {"id": "A", "file": "A.mp4", "vai_tro": ["chai_ro"], "soat": {"mat": 0, "nhan": nhan, "dep": 4}}, "dur": 6.0, "bo_cuc": "day", "cau": 1, "src_start": 0.0, "phu_shots": []}
+        muc = lambda s: [x["muc"] for x in km.kiem([s], sents, co_qua=False)]
+        self.assertNotIn("khong_che_nhan", muc(sg([0.3, 0.40, 0.7, 0.78])))   # phụ đề phủ ~15% mép dưới nhãn: ngưỡng cũ 10% báo, nay không
+        self.assertIn("khong_che_nhan", muc(sg([0.3, 0.70, 0.7, 0.80])))
+
+
 if __name__ == "__main__":
     unittest.main()
