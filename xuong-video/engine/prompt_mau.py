@@ -239,7 +239,7 @@ HOP_DONG = {
     ],
     "doc-nhan": [
         {"khi_thieu": '"su_that"',
-         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT JSON {"su_that": ["mỗi dòng 1 ý ngắn, ghi rõ đọc ở đâu"], "chua_ro": ["điều thấy một phần nhưng chưa đọc chắc"]}'},
+         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT JSON {"su_that": ["mỗi dòng 1 câu ngắn, khẳng định, ghi thẳng sự thật; KHÔNG ghi chỗ đọc (kiểu Mặt trước nhãn:, Nhãn, mục …:) và không viết theo nhãn, chủ hàng xác nhận"], "chua_ro": ["điều thấy một phần nhưng chưa đọc chắc, mỗi dòng 1 ý ngắn"]}'},
     ],
     "soat-kho": [
         {"khi_thieu": '"chu_muc"',
@@ -250,9 +250,9 @@ HOP_DONG = {
     ],
     "bien-kich": [
         {"khi_thieu": '"y_canh"',
-         "noi_dung": 'ĐỊNH DẠNG MỖI PHẦN TỬ (bắt buộc): {"goc": "<mã góc>", "giong": "{{giong}}", "text": "<lời đọc có tag [..], mỗi câu kết thúc bằng . ! hoặc ?>", '
+         "noi_dung": 'ĐỊNH DẠNG MỖI PHẦN TỬ (bắt buộc): {"goc": "<mã góc>", "mo": "<khoá kiểu mở>", "than": "<khoá kiểu thân>", "chot": "<khoá kiểu chốt>", "vai": "<khoá vai>", "giong": "{{giong}}", "text": "<lời đọc có tag [..], mỗi câu kết thúc bằng . ! hoặc ?>", '
                      '"dong": ["<dòng phụ đề>", ...] (chia lời đọc bỏ tag thành cụm ý 5–10 từ, ghép lại đúng y lời đọc), '
-                     '"y_canh": ["<câu 1 nên thấy hình gì, ≤12 từ>", ... đúng bằng số câu], "nhan_tu": ["<2–4 từ cần phóng to>"], '
+                     '"y_canh": ["<câu 1 nên thấy hình gì, ≤12 từ>", ... đúng bằng số câu], "chu_mo": "<chữ hiện trên hình lúc mở, ≤ 6 từ, khác câu mở>", "nhan_tu": ["<2–4 từ cần phóng to>"], '
                      '"caption": ["3 caption khác nhau, mỗi cái ≤ 90 ký tự"], "hashtag": ["đúng 3 hashtag tiếng Việt không dấu"]}. Trả về một mảng JSON các phần tử này.'},
         {"khi_thieu": '"don_ban"',
          "noi_dung": 'THÊM MỘT TRƯỜNG (bắt buộc) vào mỗi phần tử: "don_ban": "<một câu tiếng Việt ≤ 20 từ nói đòn bán chính của bài: vì sao người này nên mua món này, lúc này>". '
@@ -260,9 +260,10 @@ HOP_DONG = {
     ],
     "dao-dien": [
         {"khi_thieu": '"doan"',
-         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT 1 đối tượng JSON {"cong_thuc":"..","phu_de":"..","mau_nhan":"..","chuyen_canh":"..","chuyen_dong":"..","mau":"..","sfx":"..","nhac":"..",'
-                     '"nhan_tu":["2–4 từ cần phóng to"],"khoi":[{"loai":"<khối>","cau":0,"du_lieu":{..}}, ...],'
-                     '"doan":[{"cau":0,"canh":[{"id":"<id>","bo_cuc":"<bố cục>","phu":["<id ô phụ nếu cần>"]}]}, ... đủ {{n}} câu],"ly_do":"≤12 từ"}'},
+         "noi_dung": 'ĐỊNH DẠNG TRẢ VỀ (bắt buộc): DUY NHẤT 1 đối tượng JSON {"cong_thuc":"..","phu_de":"..","mau_nhan":"..","chuyen_canh":"..","chuyen_dong":"..","mau":"..","sfx":"..","nhac":"..","vien":"trang","am_mo":"<nhóm âm hoặc khong>",'
+                     '"nhan_tu":["2–4 từ cần phóng to"],"khoi":[{"loai":"<loại khối>","tu":0,"den":3,"vi_tri":"giua","du_lieu":{..},"am":"<tuỳ chọn>"}, ... 3–6 khối, khối cuối là khối chốt],'
+                     '"doan":[{"cau":0,"canh":[{"id":"<id>","bo_cuc":"<bố cục>","phu":["<id cảnh phụ>"]},{"id":"<id>","tu":<số thứ tự từ>,"bo_cuc":"..","phu":[]}]}, ... đủ {{n}} câu (câu cuối là câu {{cuoi}})],'
+                     '"ly_do":"≤ 20 từ: ý dựng chủ đạo và nó phục vụ đòn bán thế nào"}'},
     ],
 }
 

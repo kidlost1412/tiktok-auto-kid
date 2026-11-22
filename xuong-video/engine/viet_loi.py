@@ -64,9 +64,10 @@ def _so_lieu(ma):
     return _tom_tat(ma) if _cong_so_lieu(ma) else ""
 
 
-BANNED = ["chữa khỏi", "khỏi hẳn", "100%", "số 1", "số một", "nhất thị trường", "duy nhất", "không độc", "ăn ngay",
-          "tham khảo", "xem chi tiết", "tìm hiểu thêm", "đáng cân nhắc", "theo hướng dẫn của", "quy cách rõ ràng",
-          "đúng nhu cầu", "giải pháp toàn diện", "hiệu quả vượt trội", "chất lượng hàng đầu"]
+CAM_CHU = ["số 1", "số một", "nhất thị trường", "duy nhất"]    # chủ quyết định: nội dung TikTok không giới hạn, chỉ cấm các tuyên bố này
+VAN_MAU_YEU = ["tham khảo", "xem chi tiết", "tìm hiểu thêm", "đáng cân nhắc", "theo hướng dẫn của", "quy cách rõ ràng",
+               "đúng nhu cầu", "giải pháp toàn diện", "hiệu quả vượt trội", "chất lượng hàng đầu"]
+BANNED = CAM_CHU + VAN_MAU_YEU
 
 
 def history_sentences(limit=400):
@@ -233,6 +234,9 @@ def gan_truc(sp, goc, need, dem, hs=None, lo=None, tong=None, rng=random):
     tong = max(tong or need, 1)
     gioi_qua, gioi_vuon = max(1, tong // 4), max(1, tong // 10)
     ben_em = _co_ben_em(sp)
+    co_qua = bool(sp.get("qua_tang"))
+    if not co_qua:                                          # không có quà thì không giao góc quà tặng (hết góc khác mới đành giữ)
+        goc = [x for x in goc if x != "qua-tang"] or goc
     out = []
     for _ in range(need):
         g = _chon(goc, dem["goc"], hs.get("goc"), rng)
@@ -244,6 +248,8 @@ def gan_truc(sp, goc, need, dem, hs=None, lo=None, tong=None, rng=random):
         than = _chon(list(THAN), dem["than"], hs.get("than"), rng)
         chot = "qua_cu_the" if mo == "qua_truoc" else _chon(list(CHOT), dem["chot"], hs.get("chot"), rng,
                                                               lambda k: (k != "qua_cu_the" or qua_ok) and (k != "dong_hanh" or ben_em))
+        if g == "qua-tang" and co_qua:                      # góc quà tặng có quà thật → chốt bằng quà cụ thể (không tính hạn mức 1/4)
+            chot = "qua_cu_the"
         cho = _vai_cho_phep(mo, than, chot)
         vai = _chon(list(VAI), dem["vai"], hs.get("vai"), rng, lambda k: k in cho)
         lo["mo"].add(mo)
@@ -267,6 +273,10 @@ def _de_bai(sp, truc):
     """Mỗi bản một khối: góc + kiểu mở/thân/chốt + vai (chỉ gửi mô tả của khoá được giao; góc lấy mô tả trong goc_ban của hồ sơ)."""
     gm = {g["ma"]: _mo_ta_goc(g) for g in sp.get("goc_ban") or [] if isinstance(g, dict) and g.get("ma")}
     dong, co_mo = [], False
+    vai_dung = list(dict.fromkeys(t["vai"] for t in truc if t.get("vai") in VAI))
+    if vai_dung:                                      # mô tả vai in MỘT lần ở đầu, mỗi bản chỉ ghi tên vai
+        dong.append("Vai được giao (mô tả chung, mỗi bản ghi tên vai):")
+        dong += [f"   {k} — {VAI[k]}" for k in vai_dung]
     for i, t in enumerate(truc):
         g = t.get("goc") or ""
         dong.append(f"bai[{i}]: góc = {g}" + (f" ({gm[g]})" if gm.get(g) else ""))
@@ -276,7 +286,7 @@ def _de_bai(sp, truc):
         for ax, ten in (("than", "kiểu thân"), ("chot", "kiểu chốt"), ("vai", "vai")):
             k = t.get(ax)
             if k in TRUC[ax]:
-                dong.append(f"   {ten} = {k} — {TRUC[ax][k]}")
+                dong.append(f"   {ten} = {k}" + ("" if ax == "vai" else f" — {TRUC[ax][k]}"))
     if co_mo:
         dong.append("Luật câu mở: " + LUAT_CAU_MO)
     return "\n".join(dong)
@@ -361,36 +371,19 @@ def _la_kho_chung(o):
     return bool(o) and (o.get("loai") == "kho-chung" or bool(o.get("chi_la_kho_canh")))
 
 
-def _kho_chung_dirs(ma):
-    out = []
-    try:
-        for f in sorted((HUB / "san-pham").glob("*/san-pham.json")):
-            o = json.loads(f.read_text(encoding="utf-8"))
-            if f.parent.name != ma and _la_kho_chung(o) and o.get("kho_video"):
-                out.append(o["kho_video"])
-    except Exception:
-        pass
-    return out
-
-
-def giong_that(sp, rng=random, toi_da=8):
-    """Khối "GIỌNG NÓI THẬT NGOÀI VƯỜN": tối đa 8 `loi_hay` từ mô tả kiểu 2 của kho sản phẩm (thiếu thì thêm kho dùng chung),
-    ưu tiên câu 8–30 từ, bỏ câu có chữ số và câu nhắc tên sản phẩm khác. Không có → ""."""
+def giong_that(sp, rng=None, toi_da=8):
+    """Khối "GIỌNG NÓI THẬT NGOÀI VƯỜN": tối đa 8 `loi_hay` từ mô tả kiểu 2 của CHÍNH kho sản phẩm (không mượn kho khác),
+    ưu tiên câu 8–30 từ, bỏ câu có chữ số và câu nhắc tên sản phẩm khác; cùng dữ liệu → cùng kết quả (xếp theo câu chuẩn hoá,
+    `rng` giữ cho khỏi vỡ chỗ gọi cũ, không dùng). Không có → ""."""
     try:
         khac = _ten_sp_khac(sp)
         thay, ds = set(), []
-        def them(kho):
-            for c in _loi_hay_kho(kho):
-                n = norm(c)
-                if n and n not in thay and not re.search(r"\d", c) and not any(x in _chuan(c) for x in khac):
-                    thay.add(n); ds.append(c)
-        them(sp.get("kho_video"))
-        if len(ds) < toi_da:                                  # thiếu thì mượn lời hay của kho dùng chung
-            for k in _kho_chung_dirs(sp.get("ma")):
-                them(k)
-        vua = [c for c in ds if 8 <= len(c.split()) <= 30]
-        con = [c for c in ds if c not in vua]
-        rng.shuffle(vua); rng.shuffle(con)
+        for c in _loi_hay_kho(sp.get("kho_video")):
+            n = norm(c)
+            if n and n not in thay and not re.search(r"\d", c) and not any(x in _chuan(c) for x in khac):
+                thay.add(n); ds.append(c)
+        vua = sorted((c for c in ds if 8 <= len(c.split()) <= 30), key=norm)
+        con = sorted((c for c in ds if not 8 <= len(c.split()) <= 30), key=norm)
         chon = (vua + con)[:toi_da]
         if not chon:
             return ""
@@ -440,11 +433,22 @@ def kho_canh(ma):
 _RE_BAI_HOC_LOI = re.compile(r"lời|câu|nói|nhắc|viết|ghi\b|chốt|quà|giá|liều|tên", re.I)
 
 
+# Việc của người dựng (chữ trên hình, bố cục, cắt cảnh, cảnh quay…): biên kịch không làm được, bỏ trước khi lọc theo từ "lời"
+_RE_VIEC_DUNG = re.compile(r"khối chữ|chữ to|phụ đề|bố cục|cảnh đứng yên|đổi cảnh|cắt cảnh|hình cuối|cảnh chai|cảnh quà|nút giỏ|vùng 12%|che nhãn|đè nhãn|khung(?!\w)", re.I)
+
+
+# Khoá hồ sơ chỉ máy dùng (kho, cắt khung, màu, mã shop, ghi chú đọc nhãn…): không gửi biên kịch cho đỡ token
+_KHOA_KY_THUAT = {"ma", "ten_gio", "goc_ban", "cat_khung", "cat_khung_ly_do", "thoi_luong", "kho_video", "kho_them", "loai_tru", "quy_cach",
+                  "shop_product_id", "mau_thuong_hieu", "vai_tro_rieng", "doc_la", "nhan_cung_san_pham", "chua_ro_can_kiem", "su_that_nguon"}
+
+
 def bai_hoc_cho_loi(ma, toi_da=10):
-    """Bài học giám khảo (chung + riêng sản phẩm, dùng lại bai_hoc_cho của đạo diễn) → tối đa toi_da dòng mới nhất liên quan tới lời; không có → ''."""
+    """Bài học giám khảo (chung + riêng sản phẩm, dùng lại bai_hoc_cho của đạo diễn) → tối đa toi_da dòng mới nhất liên quan tới lời
+    (bỏ dòng dặn việc dựng/hình); không có → ''."""
     try:
         from dao_dien import bai_hoc_cho
-        dong = [l.strip() for l in bai_hoc_cho(ma).splitlines() if l.startswith("- ") and _RE_BAI_HOC_LOI.search(l)]
+        dong = [l.strip() for l in bai_hoc_cho(ma).splitlines()
+                if l.startswith("- ") and not _RE_VIEC_DUNG.search(l) and _RE_BAI_HOC_LOI.search(l)]
     except Exception:
         return ""
     return "\n".join(dong[-toi_da:])
@@ -474,7 +478,7 @@ def ctx_bien_kich(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, 
     return {
         "luat": luat,
         # mã nội bộ, tên giỏ hàng, mục rỗng và các khoá không giúp viết lời không gửi (goc_ban: chỉ phần góc được giao, nằm trong de_bai)
-        "san_pham": json.dumps({k: v for k, v in sp.items() if k not in ("ma", "ten_gio", "goc_ban", "cat_khung_ly_do", "thoi_luong") and v not in ("", [], {}, None)},
+        "san_pham": json.dumps({k: v for k, v in sp.items() if k not in _KHOA_KY_THUAT and not k.startswith("_") and v not in ("", [], {}, None)},
                                ensure_ascii=False, indent=1),
         "so_gu": so_gu,
         "ban_hang": ban_hang(sp_day.get("ma")),
@@ -641,9 +645,17 @@ def _chuan(s):
 def ten_phai_nhac(sp):
     """Các cách gọi hợp lệ của sản phẩm (lời đọc phải chứa ít nhất 1): tên ngắn, tên gọi, tên khác."""
     ds = [sp.get("ten_ngan"), sp.get("ten_goi")] + list(sp.get("ten_khac") or [])
+    ds = [x for x in ds if isinstance(x, str) and x.strip()]
+    for x in list(ds):                                   # biến thể bỏ đuôi cỡ gói: "Đạm cá amino can 5l" → "Đạm cá amino" (còn ≥ 3 từ)
+        y = _RE_DUOI_GOI.sub("", x).strip()
+        if y != x and len(y.split()) >= 3:
+            ds.append(y)
     if sp.get("ma") == "nano-dong":
         ds.append("chai nano đồng này")
-    return [x for x in ds if isinstance(x, str) and x.strip()]
+    return list(dict.fromkeys(ds))
+
+
+_RE_DUOI_GOI = re.compile(r"\s*\(?\s*(?:can|chai|gói|hộp|xô|bao)\s+\d+(?:[.,]\d+)?\s*(?:ml|kg|lít|l|g)\s*\)?\s*$", re.I)
 
 
 TAG_OK = {"confident", "warm", "warm, confident", "serious", "matter-of-fact", "curious", "concerned", "surprised", "relieved", "proud", "satisfied",
@@ -728,10 +740,10 @@ def check(item, sp, used_norm, log=None):
     n = len(re.findall(r"\w+", plain))
     _lo, _hi, nho, lon, _c1, _c2 = khung_am_tiet(sp)
     if not nho <= n <= lon:
-        errs.append(f"{n} âm tiết (cần {_lo}–{_hi})")
+        errs.append(f"{n} âm tiết (máy nhận {nho}–{lon}, nên nhắm {_lo}–{_hi})")
     low = " " + plain.lower() + " "
-    errs += [f"từ cấm '{b.strip()}'" for b in BANNED
-             if re.search(r"(?<!\w)" + re.escape(b.strip()) + r"(?!\w)", low)]   # khớp nguyên từ, không bắt "nha" trong "nhanh"
+    for ds, mau in ((CAM_CHU, "từ cấm '{}'"), (VAN_MAU_YEU, "văn mẫu yếu '{}'")):   # khớp nguyên từ, không bắt "nha" trong "nhanh"
+        errs += [mau.format(b.strip()) for b in ds if re.search(r"(?<!\w)" + re.escape(b.strip()) + r"(?!\w)", low)]
     m = _RE_NHAN_DANG.search(low)
     if m:
         errs.append(f"tả/dạy nhận dạng bao bì '{m.group(0).strip()}' (góc nhận dạng thương hiệu đã bỏ)")

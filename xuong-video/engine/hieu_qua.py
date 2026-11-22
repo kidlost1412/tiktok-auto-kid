@@ -15,6 +15,7 @@ from duong_dan import DATA as HUB, cfg as cfg_hub, glob_kem  # noqa: E402
 
 LS = HUB / "lich-su"
 CHIEU = {"goc": "góc bán", "dang": "dạng bài", "dao_dien": "gu đạo diễn", "cong_thuc": "công thức dựng", "giong": "giọng đọc"}
+MIN_VIDEO_SO_LIEU, MIN_TRUNG_VI = 15, 200       # giống viet_loi.py
 _lock = threading.Lock()
 _khong_ho_so = {}              # id video chưa có hồ sơ cục bộ → giờ tìm lần cuối (nhớ 10 phút)
 
@@ -147,6 +148,8 @@ def tom_tat(ma, cho="bien_kich"):
     nguon = rieng if len(rieng) >= c["mau_tong"] else tat_ca
     pham_vi = "của sản phẩm này" if nguon is rieng else "của mọi sản phẩm (sản phẩm này chưa đủ video)"
     tb = statistics.median(_diem(r) for r in nguon) or 1
+    if cho == "dao_dien" and (len(nguon) < MIN_VIDEO_SO_LIEU or tb < MIN_TRUNG_VI):
+        return ""                  # cùng cổng với Biên kịch (viet_loi._cong_so_lieu): nhóm < 15 video hoặc trung vị < 200 view/24h là nhiễu
     dong = [f"Dựa trên {len(nguon)} video đã đăng {pham_vi}; trung vị {int(tb)} view/24h. "
             "Đây là gợi ý theo số liệu thật, KHÔNG phải luật — vẫn phải giữ đa dạng, không chép nguyên câu."]
     chieu_dung = ("goc", "dang") if cho == "bien_kich" else ("dao_dien", "cong_thuc", "dang")

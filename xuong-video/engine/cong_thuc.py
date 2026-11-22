@@ -1,5 +1,5 @@
 """8 CÔNG THỨC DỰNG (Kid duyệt 10/11/2026) + xếp khối theo câu/vùng + kiểm nội dung khối + chống lặp trong ngày."""
-import re
+import random, re, unicodedata
 
 FPS = 30
 RECIPES = {
@@ -39,7 +39,135 @@ RECIPES = {
 KHOI_MO = sorted({k for r in RECIPES.values() for k in r["mo"]})
 KHOI_CHOT = sorted({k for r in RECIPES.values() for k in r["chot"]})
 ZONE = {"lower_third": "LOWER"}           # còn lại đều ở vùng TOP (trừ hook_dap: CENTER, ngắn)
-SO_HOP_LE = {1, 2, 3, 5, 10, 200, 250, 300, 500, 15000}   # số đã có trong sự thật sản phẩm/quà
+SO_HOP_LE = {1, 2, 3, 5, 10, 200, 250, 300, 500, 15000}   # CHỈ dự phòng khi sản phẩm không có sự thật/quà nào (xem so_cho_phep)
+
+
+def _kd(s):
+    """Không dấu, chữ thường, dấu câu → khoảng trắng (để so khớp lời với mức quà)."""
+    s = unicodedata.normalize("NFD", str(s or "").replace("đ", "d").replace("Đ", "D"))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn").lower()
+    return " ".join(re.sub(r"[^\w%]+", " ", s).split())
+
+
+# ---------------------------------------------------------------- SỐ HỢP LỆ (khối so_dem) — lấy từ sự thật/quà của chính sản phẩm, KÈM ĐƠN VỊ
+_DON_VI = {"l": "lit", "nghin": "k", "ngan": "k"}
+
+
+def _don_vi(u):
+    u = _kd(u)
+    return _DON_VI.get(u, u)
+
+
+def _so(s):
+    """Chuỗi số → (giá trị, là_số_nguyên) hoặc None. '15.000' = 15000 (nhóm 3 chữ số); '1,12' / '1.5' = thập phân (KHÔNG thành 112)."""
+    s = str(s if s is not None else "").strip()
+    if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", s):
+        return float(re.sub(r"[.,]", "", s)), True
+    if re.fullmatch(r"\d+(?:[.,]\d+)?", s):
+        return float(s.replace(",", ".")), not re.search(r"[.,]", s)
+    return None
+
+
+_RE_SO = re.compile(r"(?<![\w.,])(\d+(?:[.,]\d+)*)\s*(%|[^\W\d_]+)?")
+
+
+def so_cho_phep(st):
+    """Tập (giá trị, đơn vị) rút từ sự thật được nói (st['_so_that']) + quà (st['_qua']) của sản phẩm; None = sản phẩm không có dữ kiện nào → dùng SO_HOP_LE."""
+    ds = [str(x) for k in ("_so_that", "_qua") for x in (st.get(k) or [])]
+    if not ds:
+        return None
+    out = set()
+    for t in ds:
+        for m in _RE_SO.finditer(t):
+            n = _so(m.group(1))
+            if n:
+                out.add((n[0], _don_vi(m.group(2) or "")))
+    return out
+
+
+def _so_ok(v, don_vi, hop):
+    if hop is None:
+        return v in SO_HOP_LE
+    dv = _don_vi(don_vi)
+    return any(x == v and (not dv or u == dv) for x, u in hop)
+
+
+# ---------------------------------------------------------------- QUÀ CHỐT: mỗi video chốt bằng MỘT mức quà thật trong hồ sơ, chữ/kiểu thẻ đổi theo video
+CHOT_QUA = ("the_qua", "hop_qua", "bang_qua")
+HEADER_QUA = ("QUÀ TẶNG", "TẶNG KÈM", "QUÀ CHO BÀ CON", "ƯU ĐÃI QUÀ")
+CTA_QUA = ("BẤM GIỎ HÀNG", "ĐẶT NGAY TRONG GIỎ", "BẤM GIỎ NHẬN QUÀ")
+_SO_CHU = {"mot": "1", "hai": "2", "ba": "3", "bon": "4", "nam": "5", "sau": "6", "bay": "7", "tam": "8", "chin": "9", "muoi": "10"}
+_CHUNG = {"kem", "chai", "goi", "can", "binh", "hop", "tui", "lon", "phan", "cho", "va", "mot", "them"}
+
+
+def _muc_qua(e):
+    """Mức quà → (số lượng mua hoặc None, [từ khoá món quà không dấu])."""
+    t = _kd(e)
+    m = re.search(r"\bmua (\d+)", t)
+    sau = (re.split(r"\b(?:tang|bieu)\b", t, maxsplit=1) + [t])[1]
+    sau = re.split(r"\b(?:tri gia|gia tri)\b", sau)[0]
+    tu = [w for w in re.findall(r"[a-z0-9]+", sau) if not w.isdigit()]
+    return (m.group(1) if m else None), ([w for w in tu if w not in _CHUNG] or tu)
+
+
+def chon_qua(st, text_loi="", rng=None):
+    """Mức quà dùng cho CẢ video: lời nhắc mức nào (số lượng mua + tên món quà) → mức đó; không thì cảnh quà ở đoạn chốt (st['_qua_canh']: từ khoá kho quà); không thì rng bốc MỘT lần.
+    Lưu st['_qua_chon'] để mọi bước sau dùng lại. Hồ sơ không có quà → ''."""
+    if st.get("_qua_chon"):
+        return st["_qua_chon"]
+    ds = [str(x).strip() for x in (st.get("_qua") or []) if str(x).strip()]
+    if not ds:
+        return ""
+    t = re.sub(r"\bmua (" + "|".join(_SO_CHU) + r")\b", lambda m: "mua " + _SO_CHU[m.group(1)], _kd(text_loi))
+    best, diem = None, 0
+    for e in ds:
+        sl, tu = _muc_qua(e)
+        hit = sum(1 for w in tu if re.search(rf"\b{w}\b", t))
+        if hit and (sl is None or re.search(rf"\bmua {sl}\b", t)) and hit + (2 if sl else 0) > diem:
+            best, diem = e, hit + (2 if sl else 0)
+    if best is None:
+        canh = [_kd(k) for k in (st.get("_qua_canh") or []) if _kd(k)]
+        theo_canh = [e for e in ds if any(k in _kd(e) for k in canh)]
+        best = (rng or random).choice(theo_canh or ds)
+    st["_qua_chon"] = best
+    return best
+
+
+def dong_qua(e, rng):
+    """Mức quà 'Mua 2 can tặng 1 chai TC01 trị giá 120k' → dòng 1 thẻ chốt ≤ 26 ký tự, IN HOA, GIỮ điều kiện mua + món quà; xoay 3 cách nói.
+    Quá dài: bỏ giá trị trước, rồi bỏ '1 ' ở đầu món quà, rồi bỏ đơn vị ở điều kiện."""
+    m = re.match(r"(?i)^(.*?)\b(?:tặng|biếu)\b[\s:]*(.*)$", str(e).strip())
+    dk, mon = (m.group(1).strip(" ,:-–"), m.group(2).strip()) if m else ("", str(e).strip())
+    mon = re.sub(r"(?i)^kèm\s+", "", mon)
+    gia = re.search(r"(?i)\s*\(?(?:trị giá|giá trị)\b.*$", mon)
+    gia_s, mon = (gia.group(0).strip(" ()"), mon[:gia.start()]) if gia else ("", mon)
+    mon = mon.strip(" ,.)(")
+    mon1 = re.sub(r"^1\s+", "", mon)
+    mua = re.match(r"(?i)^mua\s+(.*)$", dk)
+    sl = mua.group(1) if mua else ""
+    sl2 = re.match(r"^\d+", sl).group(0) if re.match(r"^\d+", sl) else sl
+    if mua:
+        kieu = rng.choice((0, 1, 2))
+        mau = [lambda it, c: f"MUA {c} TẶNG {it}", lambda it, c: f"TẶNG {it} KHI MUA {c}", lambda it, c: f"ĐẶT {c} – TẶNG {it}"][kieu]
+        ds = [mau(mon + (" " + gia_s if gia_s else ""), sl), mau(mon, sl), mau(mon1, sl), mau(mon1, sl2), f"TẶNG {mon1}"]
+    elif dk:
+        ds = [f"{dk} TẶNG {mon}", f"{dk} TẶNG {mon1}", f"TẶNG {mon1}"]
+    else:
+        ds = [f"TẶNG {mon}", f"TẶNG {mon1}"]
+    ds = [x.upper() for x in ds]
+    return next((x for x in ds if len(x) <= 26), None) or _cat_tu(ds[-1], 26)
+
+
+def chot_qua(st, text_loi, rng):
+    """Thẻ chốt quà của video: {'qua','dong1','dong2','loai','header'} hoặc None (hồ sơ không có quà). Chọn MỘT lần (rng) rồi lưu st['_qua_chot']."""
+    if st.get("_qua_chot"):
+        return st["_qua_chot"]
+    e = chon_qua(st, text_loi, rng)
+    if not e:
+        return None
+    c = {"qua": e, "dong1": dong_qua(e, rng), "dong2": rng.choice(CTA_QUA), "loai": rng.choice(CHOT_QUA), "header": rng.choice(HEADER_QUA)}
+    st["_qua_chot"] = c
+    return c
 
 DATA_SPEC = """Nội dung khối (chữ IN HOA ngắn, đúng sự thật sản phẩm; mỗi dòng ≤ 26 ký tự):
 - chu_dap|chu_mat_na|chu_nghieng|chu_tang|chu_gach (chữ phá cách): {"text": "≤28 ký tự, ≤14/dòng", "nhan": <chỉ số chữ nhấn>}; chu_so: {"so": "240", "don_vi": "ML", "nhan_tren": "tuỳ chọn"}
@@ -67,8 +195,8 @@ def _txt(x, n=34):
 KHOI_CHU_LON_TAM = {"chu_dap", "chu_mat_na", "chu_nghieng", "chu_tang", "chu_so", "chu_gach"}
 
 
-def clean_data(loai, d):
-    """Kiểm/cắt nội dung khối; trả None nếu khối không dùng được."""
+def clean_data(loai, d, hop=None):
+    """Kiểm/cắt nội dung khối; trả None nếu khối không dùng được. hop = so_cho_phep(st) (None → SO_HOP_LE)."""
     d = dict(d or {})
     if loai.startswith("hook_"):
         if not d.get("text"):
@@ -93,13 +221,10 @@ def clean_data(loai, d):
             return None
         d["items"] = items
     elif loai == "so_dem":
-        try:
-            so = int(str(d.get("so")).replace(".", "").replace(",", ""))
-        except Exception:
+        n = _so(d.get("so"))
+        if n is None or not n[1] or not _so_ok(n[0], d.get("don_vi"), hop):       # số thập phân: khối đếm chỉ nhận số nguyên → xep_khoi đổi sang chu_so
             return None
-        if so not in SO_HOP_LE:
-            return None
-        d["so"] = so
+        d["so"] = int(n[0])
     elif loai == "so_sanh":
         if not d.get("trai") or not d.get("phai"):
             return None
@@ -196,13 +321,21 @@ def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu, words=
     S = lambda i: sents[max(0, min(i, len(sents) - 1))]
     nw = len(words or [])
     sach = []                                         # đạo diễn trả rác → bỏ/ép kiểu an toàn (lỗi rà soát #2)
+    hop = so_cho_phep(st)
     for k in khoi_ai or []:
         if not isinstance(k, dict) or not isinstance(k.get("loai"), str) or k["loai"] not in KHOI_TAT_CA:
             continue
-        d = clean_data(k["loai"], k.get("du_lieu") if isinstance(k.get("du_lieu"), dict) else {})
+        loai_k, du = k["loai"], (k.get("du_lieu") if isinstance(k.get("du_lieu"), dict) else {})
+        if loai_k == "so_dem":
+            n = _so(du.get("so"))
+            if n is None or not _so_ok(n[0], du.get("don_vi"), hop):
+                continue
+            if not n[1]:                              # thập phân (1,12): khối đếm chỉ có số nguyên → giữ thành chữ số to tĩnh
+                loai_k, du = "chu_so", {"so": str(du["so"]), "don_vi": du.get("don_vi") or "", "nhan_tren": du.get("nhan_trai") or ""}
+        d = clean_data(loai_k, du, hop)
         if d is None:
             continue
-        it = {"loai": k["loai"], "du_lieu": d, "cau": _nguyen(k.get("cau"), 1), "tu": None, "den": None,
+        it = {"loai": loai_k, "du_lieu": d, "cau": _nguyen(k.get("cau"), 1), "tu": None, "den": None,
               "vi_tri": k.get("vi_tri") if k.get("vi_tri") in VI_TRI_ZONE else None,
               "am": k.get("am") if isinstance(k.get("am"), str) and k.get("am") else None}
         tu = _nguyen(k.get("tu"))
@@ -246,15 +379,25 @@ def xep_khoi(recipe_key, khoi_ai, sents, total, st, rng, ten_thuong_hieu, words=
         h_it = {"vi_tri": None, "am": None}
         hook_data = {"text": _txt(st.get("chu_the_mo") or ten_thuong_hieu, 30), "nhan": 0}
         hook_loai = st.get("ep_mo") or rng.choice(R["mo"])
+    ct_qua = chot_qua(st, " ".join(s.get("text") or " ".join(w.get("w", "") for w in s.get("words") or []) for s in sents), rng)   # mọi video chốt bằng một mức quà thật (None: hồ sơ không có quà)
     d1, d2 = st.get("chu_chot_1") or "QUÀ TẶNG THEO ĐƠN", st.get("chu_chot_2") or "BẤM GIỎ HÀNG"
+    if ct_qua:
+        d1, d2 = ct_qua["dong1"], st.get("chu_chot_2") or ct_qua["dong2"]
     c_it = cta[0] if cta else {"vi_tri": None, "am": None}
-    loai_chot = cta[0]["loai"] if cta else (st.get("ep_chot") or "the_qua")
+    if cta:
+        loai_chot = cta[0]["loai"]
+    elif ct_qua:                                        # có quà → luôn thẻ quà (không nút giỏ hàng trơn); giữ ep_chot nếu nó đã là thẻ quà
+        loai_chot = st["ep_chot"] if st.get("ep_chot") in CHOT_QUA else ct_qua["loai"]
+    else:
+        loai_chot = st.get("ep_chot") or "the_qua"
     data = dict(cta[0]["du_lieu"]) if cta else {}
     data.setdefault("dong1", d1); data.setdefault("dong2", d2); data.setdefault("text", d2)
     if "kieu" not in data:
         data["kieu"] = rng.choice(["hop_do", "hop_xanh", "nhan_vang", "the_trang"])
     if loai_chot == "bang_qua" and not data.get("cac_muc"):
         data["cac_muc"] = st.get("_qua") or []          # lấy đúng các mức quà trong hồ sơ sản phẩm
+        if ct_qua:
+            data.setdefault("tieu_de", ct_qua["header"])
         if not data["cac_muc"]:
             loai_chot = "hop_qua"
     cta_f0 = max(int(round((sents[-1]["s"] - 0.15) * FPS)), dur_f - 5 * FPS)
@@ -346,9 +489,12 @@ TAT_CA = {"phu_de": ["to_dan", "mo_sang", "o_nhay", "gach_chay", "nhich_len", "h
 
 
 CT_HOP = {   # dạng bài (THAN trong viet_loi.py) → các công thức hợp (tiện nhất đứng trước); không biết dạng → mọi công thức
-    "van_de_giai_phap": ["tin_nhanh", "ke_chuyen", "soi_dong", "tvc_sang"], "truoc_sau": ["so_sanh", "ke_chuyen", "tvc_sang", "soi_dong"],
-    "chuyen_that_bai": ["ke_chuyen", "tin_nhanh", "soi_dong"], "ba_sai_lam": ["danh_sach", "tin_nhanh", "soi_dong"],
-    "hoai_nghi": ["so_sanh", "ke_chuyen", "tvc_sang"], "phep_tinh": ["con_so", "danh_sach", "so_sanh"],
+    "van_de_giai_phap": ["tin_nhanh", "ke_chuyen", "soi_dong", "tvc_sang"], "ba_sai_lam": ["danh_sach", "tin_nhanh", "soi_dong"],
+    "so_sanh": ["so_sanh", "con_so", "tvc_sang", "soi_dong"], "go_ngai": ["so_sanh", "ke_chuyen", "tvc_sang"],
+    "phep_tinh": ["con_so", "danh_sach", "so_sanh"], "vi_sao": ["ke_chuyen", "tvc_sang", "so_sanh"],
+    # khoá cũ (kịch bản/thống kê đã lưu trước khi đổi bộ THAN) — giữ để vẫn xếp được công thức
+    "truoc_sau": ["so_sanh", "ke_chuyen", "tvc_sang", "soi_dong"], "chuyen_that_bai": ["ke_chuyen", "tin_nhanh", "soi_dong"],
+    "hoai_nghi": ["so_sanh", "ke_chuyen", "tvc_sang"],
     "tung_buoc": ["danh_sach", "ke_chuyen", "tvc_sang"], "khach_hoi": ["ke_chuyen", "so_sanh", "tin_nhanh"],
     "soi_nhan": ["tvc_sang", "danh_sach", "so_sanh", "con_so"], "dau_hieu": ["danh_sach", "tin_nhanh", "ke_chuyen"],
     "khang_dinh": ["tvc_sang", "soi_dong", "qua_tang"],

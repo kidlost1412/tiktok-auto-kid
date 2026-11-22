@@ -306,10 +306,14 @@ def chon_ung_vien(ma, sents, y_canh, shots, rng, tranh=(), anh_em=None, qua=None
         for x in sorted(chung, key=lambda x: -diem(x))[:nc]:
             chon[x["id"]] = x; per[k].append(x["id"]); hien[x["id"]] = hien.get(x["id"], 0) + 1
     for k, st in enumerate(sents):                      # câu nhắc tới quà (vd. "tặng gói kali bo") → cho đạo diễn cảnh quà thật
-        for tu_khoa, ds in (qua or {}).items():
-            cau = st["text"].lower()
-            if tu_khoa in cau and re.search(r"tặng|quà|kèm|biếu", cau):          # chỉ câu nói về QUÀ (lỗi rà soát #7)
-                for x in rng.sample(ds, k=min(3, len(ds))):
+        cau = st["text"].lower()
+        nhac = [t for t in (qua or {}) if t in cau and re.search(r"tặng|quà|kèm|biếu", cau)]       # chỉ câu nói về QUÀ (lỗi rà soát #7)
+        if k == n - 1 and not nhac:                       # mọi video chốt bằng quà → câu chốt luôn có cảnh quà thật để chọn (mỗi món 2 cảnh); lời đã nhắc món nào thì chỉ món đó
+            nhac = [t for t in (qua or {}) if any(t in s["text"].lower() and re.search(r"tặng|quà|kèm|biếu", s["text"].lower()) for s in sents)] or list(qua or {})
+        for tu_khoa in nhac:
+            ds = qua[tu_khoa]
+            for x in rng.sample(ds, k=min(3 if len(nhac) == 1 else 2, len(ds))):
+                if x["id"] not in per[k]:
                     chon[x["id"]] = x; per[k].append(x["id"])
     aff = sorted([s for s in shots if la_aff(s) and not bad(s, chinh=False) and not str(s["id"]).startswith(("Q-", "V-"))],
                  key=lambda s: (met.get(s["id"], 0), -((s.get("soat") or {}).get("dep") or 3), rng.random()))[:SO_AFF]
@@ -356,7 +360,7 @@ def canh_qua(ma_sp, cfg_kho_qua):
             if not s.get("soat") or bad(s) or nguoi_noi(s) or not ({"chai_ro", "nhan_can"} & set(s.get("vai_tro", []))):
                 continue
             x = dict(s); x["id"] = f"Q-{ma}-{s['id']}"; x["file"] = str(Path(sp["kho_video"]) / s["file"])
-            x["vai_tro"] = list(s.get("vai_tro", [])) + ["qua_tang"]; x.setdefault("dep", [s["tu"], s.get("den", s["tu"] + s["dai"])])
+            x["vai_tro"] = list(s.get("vai_tro", [])) + ["qua_tang"]; x["qua_tu_khoa"] = tu_khoa; x.setdefault("dep", [s["tu"], s.get("den", s["tu"] + s["dai"])])
             ANH_RIENG[x["id"]] = d / "_khung" / f"{s['id']}.jpg"
             ds.append(x)
         if ds:
@@ -736,15 +740,20 @@ def segs_tu_bang(edl, sents, total, shots):
             if may:
                 segs[-1]["bo_cuc_may"] = True
     # Câu chốt PHẢI thấy chai sản phẩm (giám khảo bắt lỗi này nhiều nhất): đoạn cuối không phải cảnh chai → đổi sang cảnh chai đẹp chưa dùng
-    if segs and not la_chai(segs[-1]["shot"]) and not la_aff(segs[-1]["shot"]):       # chốt bằng người thật cầm chai cũng đạt
+    la_q = lambda s: str(s.get("id", "")).startswith("Q-")
+    if segs and (la_q(segs[-1]["shot"]) or (not la_chai(segs[-1]["shot"]) and not la_aff(segs[-1]["shot"]))):       # chốt bằng người thật cầm chai cũng đạt; chai QUÀ không phải chai sản phẩm
         sp_chai = sorted([s for s in shots if not str(s["id"]).startswith(("Q-", "V-")) and la_chai(s) and not bad(s) and s["id"] not in used
                           and not nguoi_noi(s)], key=lambda s: (phat(s) + (PHAT_MO_CHOT if s["id"] in chot_gan else 0), -dep_(s)))
         if sp_chai:
             sh = sp_chai[0]; used.add(sh["id"]); cu = segs[-1]
             mid = (sh["dep"][0] + sh["dep"][1]) / 2
+            qua_giu = [s for s in [cu["shot"]] + list(cu.get("phu_shots") or []) if la_q(s)][:1]       # cảnh quà đang có ở đoạn chốt: giữ làm cảnh phụ
+            bc = "khung_mo" if cu["bo_cuc"] in ("pip_troi", "pip_giua", "luoi_4") else cu["bo_cuc"]
+            if qua_giu and cu["dur"] >= 1.5 and (BC.so_phu_toi_da(bc) < 1 or bc in ("pip_troi", "pip_giua")):
+                bc = "chia_ngang"; cu.pop("bo_cuc_may", None)       # kiểu 2 ô (chai chính + quà) đạo diễn-chọn: máy không đổi lại làm mất ô quà
             cu.update(shot=sh, src_start=round(min(max(sh["tu"], mid - cu["dur"] / 2), max(sh["tu"], sh["den"] - cu["dur"])), 2),
-                      bo_cuc="khung_mo" if cu["bo_cuc"] in ("pip_troi", "pip_giua", "luoi_4") else cu["bo_cuc"], phu_shots=[])
-            sua.append("câu chốt: đổi sang cảnh chai rõ")
+                      bo_cuc=bc, phu_shots=qua_giu[:BC.so_phu_toi_da(bc)])
+            sua.append("câu chốt: đổi sang cảnh chai rõ" + (", giữ cảnh quà làm ô phụ" if cu["phu_shots"] else ""))
     sua += _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh)
     segs, sua2 = _bu_bo_cuc(segs, shots, used, met)
     own = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-")))

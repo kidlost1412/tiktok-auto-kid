@@ -28,6 +28,19 @@ COT = ["file", "goc", "giong", "gu_dao_dien", "cong_thuc", "diem_giam_khao", "la
        "sfx", "nhac", "thoi_luong", "caption", "hashtag", "loi", "canh", "may_sua", "danh_gia_kid", "gop_y_kid", "luot_xem", "don"]
 
 
+def ly_do_giong(e):
+    """(lý do dễ đọc, hết credit?) từ lỗi ElevenLabs: lấy status/message trong e.body["detail"] (str(e) chỉ có header HTTP), không có thì str(e)."""
+    b = getattr(e, "body", None)
+    d = b.get("detail", b) if isinstance(b, dict) else b
+    if isinstance(d, dict):
+        tt, msg = str(d.get("status") or ""), str(d.get("message") or "")
+        ly = (f"{tt}: {msg}" if tt and msg else tt or msg).strip()
+    else:
+        tt, ly = "", (str(d).strip() if d else "")
+    ly = ly or str(e)
+    return ly[:200], tt == "quota_exceeded" or "quota" in ly.lower()
+
+
 _khoa_sig = threading.Lock()
 F_KHOA = HUB / "lich-su" / "dang-chay.lock"      # khoá kiểu cũ (lô khởi động bằng bản CLI cũ); khoá mới: dang-chay-<mã sp>.lock (don_dep._f_khoa)
 
@@ -208,6 +221,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     tasks, n_gu = [], 0
     stamp0 = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     het_han = {"v": False}
+    het_credit = {"v": False}                        # ElevenLabs báo hết credit → dừng cả đợt giọng, không thử từng lời
     n_sc_dot = max(1, 6 // max(1, per))              # số lời mỗi đợt
 
     def co_tai_khoan():
@@ -222,7 +236,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     def lam_giong(i_sc):                 # giọng chạy song song 3 lời một lúc (trong 1 đợt)
         i, sc = i_sc
         vname = f"{ma_sp}-{sc['goc']}-{sc['giong']}-{stamp0}-{i:02d}"
-        if het_han["v"]:
+        if het_han["v"] or het_credit["v"]:
             return vname, None                       # đã hết hạn mức → không mua thêm giọng
         cau_doc = [x.strip() for x in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", sc["text"]).strip()) if x.strip()]
         with TT.viec("giong", "Đang thu giọng", sp=ten_sp, video=vname, buoc=f"Giọng {i + 1}/{max(len(scripts), i + 1)}") as tt_g:
@@ -233,8 +247,13 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 tt_g.cap(viec="Thu xong giọng", tien_do=1.0, chi_tiet={"giay": round(float(v.get("dur") or 0), 1)})
                 return vname, v
             except Exception as e:
-                log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__} {str(e)[:120]}")
-                SK.ghi("giong", "nghi", "Thu hỏng 1 giọng", buoc="hong", goc=sc.get("goc"), loi=f"{type(e).__name__} {str(e)[:60]}")
+                ly, het = ly_do_giong(e)
+                if het and not het_credit["v"]:
+                    het_credit["v"] = True
+                    log(f"⛔ ElevenLabs hết credit ({ly}): dừng làm giọng, nạp thêm credit rồi chạy lại")
+                elif not het:
+                    log(f"  giọng lỗi ({sc['goc']}): {type(e).__name__} {ly[:120]}")
+                SK.ghi("giong", "nghi", "Thu hỏng 1 giọng", buoc="hong", goc=sc.get("goc"), loi=f"{type(e).__name__} {ly[:100]}")
                 tt_g.cap(viec="Thu hỏng giọng"); tt_g.ket("loi")
                 return vname, None
 
@@ -292,7 +311,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 voice = tao_giong(sc["text"], CFG["giong"]["danh_sach"].get(sc["giong"], list(CFG["giong"]["danh_sach"].values())[0]),
                                   out_dir / "_giong", vname, doc=sp.get("doc_la"))
             except Exception as e:
-                log(f"  giọng lỗi khi làm lại {ll['file']}: {str(e)[:120]}"); continue
+                log(f"  giọng lỗi khi làm lại {ll['file']}: {ly_do_giong(e)[0][:120]}"); continue
         if voice is None:
             log(f"  bỏ làm lại {Path(ll['file']).name}: không còn lời đọc"); continue
         tasks.append({"sc": sc, "voice": voice, "gu": meta.get("dao_dien") if meta.get("dao_dien") in GU else random.choice(gu_keys),
@@ -353,6 +372,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 st["chu_the_mo"] = t["sc"]["chu_mo"]      # chữ mở do biên kịch viết: dùng khi đạo diễn không tự đặt chữ móc câu
             st = chuan_hoa(st, t["rng"], used_sigs, tu_do=bool(segs) and not may_dung, dang=t["sc"].get("dang"), goc=t["sc"].get("goc"))      # máy tự dựng: cho xoay vòng công thức như thường
         st["_qua"] = sp.get("qua_tang", [])
+        st["_so_that"] = sp.get("su_that_duoc_noi", [])           # số to (so_dem) chỉ nhận số có trong sự thật của chính sản phẩm
         t.update(edl=edl, st=st, sua=sua)
         t["plan"] = {"seed": t["rng"].randint(1, 10**9), "phong_cach": st, "canh": t["sc"].get("canh", []), "dong": t["sc"].get("dong"),
                      "ten_thuong_hieu": (sp.get("ten_ngan") or sp["ten_goi"]).upper(), "edl_segs": segs,
@@ -439,7 +459,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 yield tasks[i0:i0 + 6]
             return
         for i0 in range(0, len(scripts), n_sc_dot):
-            if het_msg or het_han["v"] or len(tasks) >= so_video:
+            if het_msg or het_han["v"] or het_credit["v"] or len(tasks) >= so_video:
                 return
             if not co_tai_khoan():
                 het_han["v"] = True
@@ -769,10 +789,10 @@ def gom_bai_hoc(ma_sp, log=print, nguong=25):
     fc = HUB / "lich-su" / "bai-hoc.txt"
     if not f.exists():
         return
-    dong = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
+    dong = [l for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not KM.la_loi_may(l)]     # dòng lỗi máy (render/khung) đạo diễn không sửa được → không gửi, không tính ngưỡng
     if len(dong) <= nguong:
         return
-    chung = [l for l in fc.read_text(encoding="utf-8").splitlines() if l.strip()] if fc.exists() else []
+    chung = [l for l in fc.read_text(encoding="utf-8").splitlines() if l.strip() and not KM.la_loi_may(l)] if fc.exists() else []
     import prompt_mau
     p = prompt_mau.dien("gom-bai-hoc", **ctx_gom(chung, dong))
     txt, _ = goi("gom bài học", p, model="sonnet", effort="low")

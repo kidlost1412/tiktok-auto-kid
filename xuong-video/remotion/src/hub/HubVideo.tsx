@@ -26,7 +26,7 @@ export type HubProps = {
   caption: {style: string; center_y: number; upper: boolean; group: number};
   colors: {accent: string; brand_red: string; brand_green: string; text: string};
   open_card: {kind: string; text: string; f1: number};
-  cta: {kind: string; line1: string; line2: string; f0: number};
+  cta: {kind: string; line1: string; line2: string; f0: number; header?: string};
   arrow: {f0: number; label: string};
   progress_bar: boolean;
 };
@@ -184,7 +184,7 @@ const Cta: React.FC<{p: HubProps}> = ({p}) => {
   return <div style={{position: 'absolute', top: 240, left: 0, width: 1080, display: 'flex', justifyContent: 'center', transform: `translateY(${(1 - inn) * -120}px)`, opacity: Math.min(1, inn * 1.5)}}>
     <div style={{background: bg, color: fg, fontFamily: FONT, fontWeight: 900, textAlign: 'center', padding: '22px 44px', borderRadius: 28, maxWidth: 860,
       boxShadow: '0 16px 40px rgba(0,0,0,0.4)', transform: `scale(${pulse})`, border: c.kind === 'the_qua' ? `8px solid ${p.colors.brand_red}` : 'none'}}>
-      {c.kind === 'the_qua' && <div style={{fontSize: 44, color: p.colors.brand_green, marginBottom: 6}}>🎁 QUÀ TẶNG</div>}
+      {c.kind === 'the_qua' && <div style={{fontSize: 44, color: p.colors.brand_green, marginBottom: 6}}>{c.header ?? '🎁 QUÀ TẶNG'}</div>}
       <div style={{fontSize: 70, lineHeight: 1.08}}>{c.line1}</div>
       <div style={{fontSize: 52, marginTop: 8, opacity: 0.95}}>{c.line2}</div>
     </div>

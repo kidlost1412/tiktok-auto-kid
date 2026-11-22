@@ -15,10 +15,15 @@ F_TK = HUB / "lich-su" / "tai-khoan.json"
 _lock = threading.RLock()
 
 
+def vai_he_thong(vai):
+    """Vai ghi vào lời dặn HỆ THỐNG: mọi "đạo diễn <gu>" gộp thành "đạo diễn" để 4 gu cùng 1 system prompt (giữ prompt cache). Log/token vẫn dùng vai đầy đủ."""
+    return "đạo diễn" if str(vai).startswith("đạo diễn") else vai
+
+
 def he_thong(vai):
     """Lời dặn chung gửi mọi vai AI — mẫu prompt/he-thong.md (chỉnh được trong tab Prompt AI)."""
     import prompt_mau
-    return prompt_mau.dien("he-thong", vai=vai)
+    return prompt_mau.dien("he-thong", vai=vai_he_thong(vai))
 
 
 NGUONG_DOI = 0.92      # dùng quá 92% cửa sổ 5 giờ / 7 ngày → ưu tiên tài khoản khác
@@ -350,7 +355,7 @@ def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
     model = str(g.get("model") or "gpt-6.2-sol")
     effort = str(effort if effort in ("low", "medium", "high", "xhigh", "max") and effort != "high" else (g.get("effort") or "high"))
     codex = cfg().get("duong_dan", {}).get("codex") or shutil.which("codex") or "codex"
-    full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
+    full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai_he_thong(vai)}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
             + (("Ảnh đính kèm theo thứ tự: " + " ".join(f"{i}) {Path(str(a)).name}" for i, a in enumerate(anh, 1)) + "\n\n") if anh else "")
             + "Trả lời thẳng bằng nội dung đề bài yêu cầu. Không dùng công cụ, không chạy lệnh, không đọc/ghi file.\n")
     t0 = datetime.datetime.now()

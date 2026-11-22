@@ -22,7 +22,7 @@ MUC = [
     ("nhan_ro", "NHÃN RÕ: khi lời nhắc tên sản phẩm thì thấy chai/can với nhãn đọc được", DAO_DIEN, True),
     ("chot_chai", "CHỐT CÓ CHAI: đoạn chốt thấy rõ chai/can sản phẩm", DAO_DIEN, True),
     ("hinh_hop_loi", "HÌNH HỢP LỜI: hình ở từng câu khớp điều đang nói (đủ phù hợp là được, không khắt khe)", DAO_DIEN, False),
-    ("chot_qua", "CHỐT CÓ QUÀ: nếu lời nhắc quà tặng thì đoạn chốt thấy gói quà thật (chọn 'không áp dụng' nếu lời không nhắc quà)", "qua", False),
+    ("chot_qua", "CHỐT CÓ QUÀ: video nào cũng chốt bằng quà tặng (thẻ chốt nêu quà) nên đoạn chốt phải thấy gói quà thật, DÙ lời đọc im về quà; chỉ chọn 'không áp dụng' nếu tờ ảnh không cho thấy kho có cảnh quà", "qua", False),
     ("nut_gio", "NÚT GIỎ HÀNG: đoạn chốt có nút/mũi tên giỏ hàng nhìn thấy được", MAY, False),
     ("khong_che_nhan", "KHÔNG CHE NHÃN: chữ, phụ đề, sticker, khối chữ không đè lên nhãn chai", MAY, True),
     ("nguoi_noi", "NGƯỜI THẬT: có cảnh người thật cầm/dùng/nói về sản phẩm (lệch khẩu hình với lời đọc KHÔNG phải lỗi); chọn 'không áp dụng' nếu tờ ảnh không cho thấy kho có cảnh như vậy", DAO_DIEN, False),
@@ -196,13 +196,13 @@ def kiem(segs, sents=None, info=None, props=None, co_qua=True, co_canh_qua=False
     n_cau = len(sents or [])
     cuoi = [(s, ab) for s, ab in zip(segs, mo) if n_cau and s.get("cau") == n_cau - 1] or [(segs[-1], mo[-1])]
     t_chot = cuoi[0][1][0]
-    if not any(la_chai(sh) or nguoi_noi(sh) for s, _ in cuoi for sh in [s["shot"]] + list(s.get("phu_shots") or [])):
+    if not any((la_chai(sh) and not str(sh.get("id", "")).startswith("Q-")) or nguoi_noi(sh) for s, _ in cuoi for sh in [s["shot"]] + list(s.get("phu_shots") or [])):   # chai QUÀ không phải chai sản phẩm
         them("chot_chai", t_chot, "đoạn chốt không có cảnh chai/can rõ", "đổi cảnh chốt sang cảnh chai rõ")
     text_cuoi = (sents[-1].get("text") if sents else "") or ""
-    if co_qua and sents and nhac_qua(text_cuoi):
+    if co_qua and sents and (nhac_qua(text_cuoi) or co_canh_qua):       # mọi video chốt bằng quà: kho có cảnh quà thì đoạn chốt phải có, dù lời im
         co_q = any(str(sh.get("id", "")).startswith("Q-") for s, _ in cuoi for sh in [s["shot"]] + list(s.get("phu_shots") or []))
         if not co_q:
-            them("chot_qua", t_chot, "câu chốt nhắc quà tặng nhưng không có cảnh quà thật (Q-) ở đoạn chốt",
+            them("chot_qua", t_chot, "video chốt bằng quà tặng nhưng không có cảnh quà thật (Q-) ở đoạn chốt",
                  "chốt bằng cảnh gói quà thật" if co_canh_qua else "")
     # 5) nút giỏ hàng bị bỏ (chai chiếm mọi chỗ mũi tên) mà khối chốt cũng không phải nút giỏ hàng
     if props and (props.get("arrow") or {}).get("top") == -999:

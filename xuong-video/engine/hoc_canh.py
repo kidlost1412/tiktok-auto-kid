@@ -763,7 +763,8 @@ def ctx_dien_phieu(viec, to, ra, ten_sp=""):
     for i, v in enumerate(viec, 1):
         ds.append(f"VIDEO {i}: {v['src']}")
         for c in v["canh"]:
-            ds.append(f"   cảnh {c['so']}: từ giây {c['tu']} đến giây {c['den']}")
+            sai = f" (lần trước sai: {c['sai']} — sửa đúng chỗ này)" if c.get("sai") else ""
+            ds.append(f"   cảnh {c['so']}: từ giây {c['tu']} đến giây {c['den']}{sai}")
         n += len(v["canh"])
     return {"so_video": len(viec), "so_canh": n, "ds_video": "\n".join(ds), "ds_to": "\n".join(f"- {t}" for t in to), "ra": str(ra),
             "ten_sp": ten_sp or "sản phẩm của chủ hàng"}
@@ -1266,7 +1267,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                 cs = []
                 for i in idxs:
                     dem += 1; c = v["canh"][i]
-                    phang.append((dem, v, i)); cs.append({"so": dem, "tu": c["tu"], "den": c["den"]})
+                    phang.append((dem, v, i)); cs.append({"so": dem, "tu": c["tu"], "den": c["den"], "sai": str(v["loi_canh"].get(i) or "") if lan > 1 else ""})   # lần 2: kèm lý do lần 1 (khoá theo video + chỉ số cảnh gốc, vì lô đánh số lại)
                     vao_anh.append((dem, str((kho / v["rel"]).resolve()), c["giua"]))
                 viec.append({"rel": v["rel"], "src": str((kho / v["rel"]).resolve()), "dai": v["dai"], "canh": cs})
             to = to_anh(vao_anh, str(thu_muc / "to"))

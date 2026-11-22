@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dung import render, sentence_times, MENU as MENU_NEN
 from phu_de import chia_dong, cau_hinh as cau_hinh_phu_de, loc_phu_de
-from cong_thuc import RECIPES, xep_khoi, chon_atmos, khung_tron
+from cong_thuc import RECIPES, xep_khoi, chon_atmos, khung_tron, chot_qua, HEADER_QUA
 import sfx as SFX
 from lam_sach import lam_sach
 from anh_bia import chon_bia
@@ -55,6 +55,9 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
     pd = cau_hinh_phu_de(CFG)                 # phụ đề nhỏ, tuỳ chọn: config["phu_de"] = {bat, co, y, tu_moi_dong}
     lines, by_ai = chia_dong(voice["text"], plan.get("dong"), voice["words"], keys, *pd["tu_moi_dong"])
     recipe = st.get("cong_thuc") if st.get("cong_thuc") in RECIPES else None
+    segs = plan.get("edl_segs") or []
+    st["_qua_canh"] = [x["qua_tu_khoa"] for sg in segs[-1:] for x in [sg["shot"]] + list(sg.get("phu_shots") or []) if x.get("qua_tu_khoa")]   # quà ở cảnh chốt → thẻ chốt cùng mức quà
+    qua = chot_qua(st, voice["text"], rng)           # một mức quà thật cho cả video (None: hồ sơ không có quà → chữ dự phòng cũ)
     blocks, atmos = None, None
     if recipe:   # chặng 2: thư viện khối theo công thức dựng
         blocks, cta_f0 = xep_khoi(recipe, st.get("khoi"), sents, total, st, rng, plan.get("ten_thuong_hieu", ""), voice["words"])
@@ -77,8 +80,9 @@ def chuan_bi(plan, voice, shots, kho, work_dir, music=None):
         "colors": {"accent": ACCENT[mau_nhan], "brand_red": "#D7262E", "brand_green": "#2E9E44", "text": "#FFFFFF"},
         "open_card": {"kind": pick("the_mo", st.get("the_mo"), rng), "text": (st.get("chu_the_mo") or plan.get("ten_thuong_hieu", ""))[:26],
                       "f1": min(int(round((sents[0]["e"] + 0.3) * FPS)), 100)},
-        "cta": {"kind": pick("the_chot", st.get("the_chot"), rng), "line1": (st.get("chu_chot_1") or "QUÀ TẶNG THEO ĐƠN")[:26],
-                "line2": (st.get("chu_chot_2") or "BẤM GIỎ HÀNG")[:24], "f0": cta_f0},
+        "cta": {"kind": pick("the_chot", st.get("the_chot"), rng), "line1": ((qua or {}).get("dong1") or st.get("chu_chot_1") or "QUÀ TẶNG THEO ĐƠN")[:26],
+                "line2": (st.get("chu_chot_2") or (qua or {}).get("dong2") or "BẤM GIỎ HÀNG")[:24], "f0": cta_f0,
+                "header": "🎁 " + (qua["header"] if qua else HEADER_QUA[0])},
         "arrow": {"f0": cta_f0 + 10, "label": st.get("nhan_mui_ten") or rng.choice(["GIỎ HÀNG", "BẤM VÀO ĐÂY", "ĐẶT NGAY"])},
         "progress_bar": st.get("thanh_tien_do") == "co",          # mặc định tắt: chỉ bật khi đạo diễn nêu
     }
