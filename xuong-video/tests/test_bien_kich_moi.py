@@ -429,7 +429,7 @@ class MaNguonTest(unittest.TestCase):
         man = json.loads((REPO / "prompt" / "_ban-phat-hanh.json").read_text(encoding="utf-8"))
         notes = json.loads((REPO / "prompt" / "_ghi-chu-cap-nhat.json").read_text(encoding="utf-8"))
         for k in ("bien-kich", "luat-san-xuat"):
-            self.assertIn(man[k]["ver"], ("1.2.13", "1.2.14", "1.2.15", "1.2.19", "1.2.20", "1.2.29", "1.2.30", "1.2.37"))     # biên kịch đổi thêm ở 1.2.15 (kiến thức bán hàng), 1.2.19 (nói như người thật)
+            self.assertIn(man[k]["ver"], ("1.2.13", "1.2.14", "1.2.15", "1.2.19", "1.2.20", "1.2.29", "1.2.30", "1.2.37", "1.2.44"))     # biên kịch đổi thêm ở 1.2.15 (kiến thức bán hàng), 1.2.19 (nói như người thật)
             self.assertIn("15 kiểu mở đầu", notes[k]["1.2.13"])
         self.assertTrue(set(vl.DANG_BAI) == set(vl.THAN))
 

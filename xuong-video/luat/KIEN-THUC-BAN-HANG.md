@@ -1,7 +1,7 @@
 # KIẾN THỨC BÁN HÀNG — cách nghĩ của người bán giỏi
 
 Đây là CÁCH NGHĨ, không phải khuôn. Mỗi bài chọn MỘT đòn chính bên dưới rồi viết theo giọng riêng; đừng nhồi hết, đừng lặp khung câu của ví dụ.
-Giới hạn không đổi: điều nói về sản phẩm chỉ lấy trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG; giá được nói (không bịa giá bán khi hồ sơ không ghi); nói tự tin, chỉ tránh chữ cấm.
+Người nói là nhân viên công ty, hiểu tận gốc món hàng: sự thật về sản phẩm nằm trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG, nói ra chắc nịch, không rào đón, không thêm điều hồ sơ không có. Giá, giá trị quà nói thoải mái. Chỉ cấm "số 1", "duy nhất".
 
 ## 1. Bán cái vườn sau khi dùng, không bán cái chai
 Người trồng không mua thành phần, họ mua lứa bông giữ được, một lượt phun đỡ phải đi, một đêm ngủ yên. Mỗi chi tiết trên nhãn chỉ đáng nói khi trả lời được câu "vậy thì vườn tôi được gì?".
