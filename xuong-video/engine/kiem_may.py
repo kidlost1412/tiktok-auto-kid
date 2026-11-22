@@ -298,7 +298,8 @@ def hop_nhat_cu(kq_ai, may):
 
 # ------------------------------------------------------------------------------------------------ bài học
 _RE_MAY = re.compile(r"vùng an toàn|giao diện tiktok|đè (lên )?nhãn|che (khuất |mất )?nhãn|phụ đề|lớp phủ|lớp màu|overlay|bệt màu|"
-                     r"dấu reup|bình luận gốc|watermark", re.I)
+                     r"dấu reup|bình luận gốc|watermark|khối chữ|chữ .{0,40}(chồng|sát|đè)|(đè|che) nút|\d+ ?% trên|sticker|"
+                     r"tem chữ|chữ lạ|vòng tròn đè|ô rót thuốc đè", re.I)
 
 
 def la_loi_may(dong):

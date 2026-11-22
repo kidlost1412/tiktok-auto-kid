@@ -115,5 +115,18 @@ class LyDoThuLaiCanh(unittest.TestCase):
         self.assertNotIn("thiếu mô tả A", ds.split("VIDEO 2")[1])
 
 
+
+
+class LoiMayLopChuTest(unittest.TestCase):
+    def test_bat_loi_lop_chu_khong_bat_chot_qua(self):
+        import kiem_may as KM
+        for x in ("khoảng thở: Hai khối chữ xuất hiện cùng lúc", "Tránh chữ sát hoặc đè nút giỏ hàng",
+                  "tránh chữ trong 12% trên cùng", "5.8s dính chữ lạ", "Tránh gắn sticker “XOÀI TRỔ BÔNG”"):
+            self.assertTrue(KM.la_loi_may(x), x)
+        for x in ("Luôn chốt đủ quà Amino A6 và nút giỏ hàng cùng chai Bọ Trĩ Top One.",
+                  "Luôn mở bằng chuyển động, câu móc cụ thể, trọn câu.", "nhãn rõ: Chai lọt góc khung"):
+            self.assertFalse(KM.la_loi_may(x), x)
+
+
 if __name__ == "__main__":
     unittest.main()
