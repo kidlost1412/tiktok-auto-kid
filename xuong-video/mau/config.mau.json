@@ -73,7 +73,7 @@
   },
   "dao_dien": {
     "ung_vien_moi_cau": 10,
-    "khung_moi_canh": 4
+    "khung_moi_canh": 6
   },
   "giam_khao": {
     "may": "gemini",
