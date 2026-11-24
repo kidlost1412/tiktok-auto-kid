@@ -26,7 +26,7 @@ RECTS = {   # (x, y, w, h) — w,h là phần hình bên trong viền
     "chia_3":     [(40, 236, 1000, 700), (40, 968, 484, 600), (556, 968, 484, 600)],      # 1 ô to trên + 2 ô dưới
     "ba_doc":     [(38, 290, 316, 1240), (382, 290, 316, 1240), (726, 290, 316, 1240)],   # 3 dải dọc
     # Kid 24/11: "giữ 1 khung 3–5 s mà trong đó các khung aff khác hiện lên" — khung to + 2 thẻ nghiêng bật vào lần lượt hai bên (dưới tầm mặt)
-    "khung_hien": [(56, 180, 968, 1430), (36, 790, 400, 520), (644, 730, 400, 520)],
+    "khung_hien": [(56, 180, 968, 1430), (36, 790, 340, 604), (684, 730, 340, 604)],
     # Kid 24/11: "1 aff lớn 1 khung, có các khung video chạy xung quanh" — khung giữa + 2 cột cảnh phụ trôi dọc ngược chiều (cột dựng riêng ở loc)
     "khung_chay": [(252, 330, 568, 1180)],
     "chay_mot":   [(40, 300, 740, 1250)],      # 1 cột trôi bên phải, khung chính rộng hơn
@@ -51,12 +51,13 @@ CHAY = {"khung_chay": {"o": (200, 500), "dai": [("doc", 28, -1), ("doc", 1080 - 
 KHE_CHAY, TOC_CHAY = 18, 75       # Kid 24/11: dải trôi nhanh hơn để khoe nhiều cảnh hơn (40 → 75 px/s)
 # Kiểu "thẻ động" quanh khung chính: kích thước thẻ, số thẻ tối đa
 # Kid 24/11: thẻ xoay 5–10 cảnh (ít nhất 5), xoay nhanh hơn, nhiều kiểu quỹ đạo
-THE = {"xoay_quanh": {"o": (230, 306), "toi_da": 8}, "hien_mat": {"o": (400, 520), "toi_da": 4},
-       "chong_the": {"o": (380, 494), "toi_da": 6}, "roi_the": {"o": (260, 346), "toi_da": 8}}
+# Kid 24/11 tối: thẻ cắt 3:4 làm mất đầu người → mọi thẻ dọc 9:16 = lấy trọn khung cảnh gốc
+THE = {"xoay_quanh": {"o": (220, 392), "toi_da": 8}, "hien_mat": {"o": (340, 604), "toi_da": 4},
+       "chong_the": {"o": (330, 586), "toi_da": 6}, "roi_the": {"o": (240, 426), "toi_da": 8}}
 # quỹ đạo: x = 540 + px·sin(a), y = cy + py·sin(a) + pz·cos(a); sau=True: cos<0 là vòng sau (nhỏ, khuất sau khung)
 QUY_DAO = {"bang_chuyen": dict(px=440, py=0, pz=240, cy=1150, sau=True), "nghieng": dict(px=430, py=280, pz=170, cy=960, sau=True),
            "vong_tron": dict(px=450, py=0, pz=720, cy=930, sau=False), "elip_duoi": dict(px=470, py=0, pz=190, cy=1320, sau=True)}
-VONG_XOAY = (2.8, 4.0)   # giây/vòng (bốc trong khoảng)
+VONG_XOAY = (6.5, 9.0)   # giây/vòng; Kid 24/11 tối: 2,8–4 s quá nhanh, không kịp nhìn
 # Mọi ô của một kiểu nhiều ô vào CÙNG LÚC từ khung đầu của đoạn (không nền mờ trống). Chỉ ô trời (pip) hiện sau để nổi trên cảnh chính.
 SO_PHU = {"day": 0, "day_zoom": 0, "khung_mo": 0, "khung_nho": 0, "pip_troi": 1, "pip_giua": 1, "chia_doi": 1, "chia_ngang": 1, "luoi_4": 3,
           "chia_3": 2, "ba_doc": 2, "lat_trang": 2, "khung_hien": 2, "khung_chay": 3, "chay_mot": 3, "chay_ngang": 3,
@@ -776,7 +777,7 @@ def loc(i, L, d, main_idx, phu_idx, mask_idx, grade, motion, opt, shot, phu_shot
     return fc, times
 
 
-CHO_THE = [(36, 790), (644, 730), (36, 240), (644, 260)]     # khung_hien: chỗ đặt thẻ 400×520 (dưới trái, dưới phải, trên trái, trên phải)
+CHO_THE = [(36, 790), (684, 730), (36, 240), (684, 260)]     # khung_hien: chỗ đặt thẻ 340×604 (dưới trái, dưới phải, trên trái, trên phải)
 
 
 def o_hien(shot):

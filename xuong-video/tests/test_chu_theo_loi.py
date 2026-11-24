@@ -166,7 +166,7 @@ class ChiaOThua(unittest.TestCase):
 
     def test_the_khong_che_nhan_chai(self):
         o = BC.o_hien({"soat": {"nhan": [0.0, 0.5, 0.4, 0.9]}})        # can ở dưới trái → không đặt thẻ dưới trái
-        self.assertNotIn((36, 790, 400, 520), o[1:])
+        self.assertNotIn((36, 790, 340, 604), o[1:])
 
 
 if __name__ == "__main__":
