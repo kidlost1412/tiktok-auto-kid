@@ -99,6 +99,13 @@ class TaoKhoi(unittest.TestCase):
         self.assertEqual(SFX._khoi({"loai": "loi_fade", "f0": 30, "f1": 60, "vai": "warn"}, ctx), [])
 
 
+class CayNoiTiep(unittest.TestCase):
+    def test_cau_noi_ve_bo_phan_giu_cay_cau_chung_de_trong(self):
+        import dao_dien as DD
+        n = DD.cay_noi_tiep(["Hái sầu riêng xong để cây tự nghỉ.", "Đọt non ra trễ một tháng.", "Can đạm cá ở giỏ hàng.", "Lá xanh lại."])
+        self.assertEqual(n, [set(), {"sau_rieng"}, set(), set()])     # câu chung / sau câu chung → đa dạng cây
+
+
 class ChiaOThua(unittest.TestCase):
     def test_toi_da_hai_o_va_aff_vao_khung_mo(self):
         segs = [{"dur": 1.5, "shot": {"loai": "canh"}} for _ in range(6)] + [{"dur": 2.6, "shot": {"loai": "nguoi_noi"}}]

@@ -414,6 +414,9 @@ def _canh_bad(s):
     return bool(chu >= 2 or x.get("hang_khac") or (x.get("dep") or 3) <= 1)
 
 
+CAY_DU = 30          # Kid 24/11: kho đạm cá có 17 cảnh sầu riêng (2 video gốc) mà biên kịch vẫn viết bài sầu riêng → hình toàn cà phê
+
+
 def kho_canh(ma):
     """Khối "KHO CẢNH ĐANG CÓ" từ san-pham/<ma>/canh.json: số cảnh dùng được (không bad) theo vai trò, số cảnh người nói, cây trồng có trong kho. Chưa có → ""."""
     try:
@@ -421,18 +424,20 @@ def kho_canh(ma):
         if not isinstance(shots, list):
             return ""
         ok = [s for s in shots if isinstance(s, dict) and not _canh_bad(s)]
-        dem, cay = Counter(), []
+        dem, cay, goc = Counter(), Counter(), {}
         for s in ok:
             for v in s.get("vai_tro") or []:
                 dem[v] += 1
             for c in s.get("cay") or []:
-                if c in _TEN_CAY and _TEN_CAY[c] not in cay:
-                    cay.append(_TEN_CAY[c])
+                if c in _TEN_CAY:
+                    cay[c] += 1; goc.setdefault(c, set()).add(str(s.get("file", "")))
         so = lambda n: f"{n}" + (" (ít)" if 0 < n <= 2 else "")
         noi = sum(1 for s in ok if ((s.get("soat") or {}).get("mat") or 0) >= 2)
         dong = " · ".join([f"{ten}: {so(dem[k])}" for k, ten in _NHAN_VAI_TRO] + [f"người nói: {so(noi)}"])
         return ("\n=== KHO CẢNH ĐANG CÓ (viết sao cho hình có thật; loại ghi 0 hoặc \"ít\" thì đừng viết câu cần đúng hình đó) ===\n" + dong + "\n"
-                + (("Cây có trong kho: " + ", ".join(cay) + ".\n") if cay else ""))
+                + (("Cây có trong kho (số cảnh / số video gốc): " + ", ".join(f"{_TEN_CAY[c]} {n}/{len(goc[c])}" for c, n in cay.most_common()) + ".\n"
+                    f"Chỉ viết câu nói RIÊNG một cây (rễ sầu riêng, đọt cà phê…) khi cây đó có ≥ {CAY_DU} cảnh từ ≥ 3 video gốc; cây ít hơn thì nói chung"
+                    " (\"cây\", \"vườn\", \"các loại cây\") để hình được đa dạng nhiều loại cây.\n") if cay else ""))
     except Exception:
         return ""
 

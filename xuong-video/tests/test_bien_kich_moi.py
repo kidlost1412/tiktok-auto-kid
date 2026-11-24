@@ -178,7 +178,8 @@ class DeBaiTest(Nen):
         self.assertIn("chai rõ nhãn: 3 · mặt sau nhãn: 0 · pha, rót: 1 (ít) · phun, tưới: 1 (ít) · rễ, gốc: 0 · cây con: 0 · cây bệnh: 1 (ít)", k)
         self.assertIn("người nói: 1 (ít)", k)
         self.assertIn("kho hàng: 1 (ít)", k)
-        self.assertIn("Cây có trong kho: cà phê, hồ tiêu.", k)
+        self.assertIn("Cây có trong kho (số cảnh / số video gốc): cà phê", k)
+        self.assertIn("hồ tiêu", k)
         self.assertEqual(vl.kho_canh("khong-co-san-pham"), "")
         self.assertIn("chai rõ nhãn: 3", self.dung_prompt(self.truc3()))
 

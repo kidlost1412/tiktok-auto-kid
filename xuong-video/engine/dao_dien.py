@@ -235,7 +235,25 @@ def cay_trong(text):
     return {k for k, p in CAY_RE.items() if re.search(p, t)}
 
 
-def _diem_lien_quan(shot, sent, y_canh):
+BO_PHAN_CAY = re.compile(r"\b(rễ|gốc|đọt|lá|bông|hoa|trái|quả|cành|thân|mầm|chồi)\b", re.I)
+
+
+def cay_noi_tiep(texts):
+    """Kid 24/11: câu nối tiếp nói về BỘ PHẬN của cây vừa nhắc ("Rễ sầu riêng… Đọt non ra trễ") vẫn là cây đó → cảnh đúng cây.
+    Câu chung chung (không nhắc bộ phận cây) để trống → hình đa dạng nhiều loại cây (nhà vườn mỗi nơi trồng mỗi khác)."""
+    out, truoc = [], set()
+    for t in texts:
+        co = cay_trong(t)
+        if co:
+            out.append(set()); truoc = co
+        elif truoc and BO_PHAN_CAY.search(t):
+            out.append(set(truoc))
+        else:
+            out.append(set()); truoc = set()
+    return out
+
+
+def _diem_lien_quan(shot, sent, y_canh, cay_noi=frozenset()):
     q = (sent + " " + (y_canh or "")).lower()
     blob = ((shot.get("soat") or {}).get("ghi", "") + " " + shot.get("mo_ta", "") + " " + " ".join(shot.get("the", [])) + " " + (shot.get("noi") or "")).lower()
     toks = {t for t in re.findall(r"\w+", q) if len(t) > 2}
@@ -244,6 +262,8 @@ def _diem_lien_quan(shot, sent, y_canh):
     cq, cs = cay_trong(sent), cay_trong(" ".join(map(str, shot.get("cay") or [])))   # lời nhắc cây nào → cảnh đúng cây lên, cảnh cây khác xuống
     if cq and cs:
         s += DIEM_CAY if cq & cs else -DIEM_CAY
+    elif cay_noi and cs:                                # câu nối tiếp về bộ phận cây vừa nhắc: nghiêng nhẹ về cây đó
+        s += DIEM_CAY / 2 if cay_noi & cs else -DIEM_CAY / 2
     return s + ((shot.get("soat") or {}).get("dep") or 3) * 0.5
 
 
@@ -275,7 +295,8 @@ def ung_vien(sents, y_canh, shots, rng, n_moi_cau=TOI_DA_MOI_CAU, tranh=(), dem_
         return [[] for _ in sents], {}
     yc = lambda k: y_canh[k] if k < len(y_canh) else ""
     ok = loc_met(sach, met)
-    rel = [{s["id"]: _diem_lien_quan(s, st["text"], yc(k)) for s in ok} for k, st in enumerate(sents)]
+    noi = cay_noi_tiep([st["text"] for st in sents])
+    rel = [{s["id"]: _diem_lien_quan(s, st["text"], yc(k), noi[k]) for s in ok} for k, st in enumerate(sents)]
     if len(sach) < KHO_NHO:                                  # kho nhỏ: chọn trước "bể" ≤ 60% kho cho cả video rồi mới chia theo câu
         tran = max(int(TRAN_KHO_NHO * len(sach)), min(len(sach), n_moi_cau))
         if tran < len(ok):
