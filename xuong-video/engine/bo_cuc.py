@@ -742,7 +742,10 @@ def loc(i, L, d, main_idx, phu_idx, mask_idx, grade, motion, opt, shot, phu_shot
         nh_o = (o_shot.get("soat") or {}).get("nhan") if L == "ba_doc" else None
         cx_o = round(0.5 * 0.5 + 0.5 * min(max((float(nh_o[0]) + float(nh_o[2])) / 2, 0.0), 1.0), 3) if nh_o and len(nh_o) == 4 else (0.5 if L == "ba_doc" else None)   # chia_3: ô ngang của cảnh dọc → neo phần trên (đầu người), chỉ trôi ngang
         mat, fy_o, bien_o = o_shot.get("_mat"), None, None
-        if mat:                         # có mặt người: canh ô theo mặt (Kid 23/11: aff cầm chai mà ô cắt mất mặt), trôi rất nhẹ để mặt không trượt ra mép
+        nh_c = (o_shot.get("soat") or {}).get("nhan")
+        if not mat and nh_c and len(nh_c) == 4 and not la_nguoi(o_shot):    # cảnh chai/quà: canh ô theo nhãn (v10_8: ô chia_3 neo phần trên → chỉ thấy lá, mất chai TC01)
+            cx_o, fy_o, bien_o, truc_o = (float(nh_c[0]) + float(nh_c[2])) / 2, (float(nh_c[1]) + float(nh_c[3])) / 2, 0.03, None
+        if mat:                        # có mặt người: canh ô theo mặt (Kid 23/11: aff cầm chai mà ô cắt mất mặt), trôi rất nhẹ để mặt không trượt ra mép
             cx_o, fy_o, bien_o = mat[0], mat[1], 0.03
         fc.append(f"[s{i}_{k}]{_troi(w, h, d, opt, k, la_chai(o_shot), ay_o, truc_o, cx_o, bien_o, fy_o)},{grade},unsharp=5:5:0.5,"
                   f"pad={pw}:{ph}:{B}:{B}:color={opt['vien']},format=yuva420p[p{i}_{k}]")

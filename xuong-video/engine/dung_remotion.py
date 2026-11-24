@@ -372,6 +372,7 @@ def _dua_nguoi_hook(j, public_dir):
         try:
             shutil.copytree(ng["dir"], public_dir / ten, dirs_exist_ok=True)
             ng["dir"] = ten
+            return public_dir / ten
         except Exception:
             h.pop("nguoi", None); h.pop("top", None)
             raise
@@ -388,8 +389,11 @@ def dung_lo(jobs, public_dir, log=print):
                 "BeVietnamPro-Bold.ttf", "Anton-Regular.ttf"):
         if (REMOTION / "public" / ten).exists():                  # bản cài cũ chưa có font mới thì Remotion rơi về font mặc định, không sập
             shutil.copy2(REMOTION / "public" / ten, public_dir / ten)
-    for j in jobs:
-        _dua_nguoi_hook(j, public_dir)
+    import time as _t
+    for d in public_dir.glob("nguoi_*"):                         # lô cũ bị ngắt giữa chừng còn sót → dọn (> 1 ngày)
+        if d.is_dir() and _t.time() - d.stat().st_mtime > 86400:
+            shutil.rmtree(d, ignore_errors=True)
+    nguoi_tam = [x for x in (_dua_nguoi_hook(j, public_dir) for j in jobs) if x]
     jf = public_dir / "_jobs.json"
     jf.write_text(json.dumps([{"props": j["props"], "frames": j["frames"]} for j in jobs], ensure_ascii=False), encoding="utf-8")
     han = han_remotion(sum(float(j.get("total") or 30) for j in jobs))
@@ -398,6 +402,9 @@ def dung_lo(jobs, public_dir, log=print):
         chay_node(["node", "scripts/render_hub.mjs", str(jf), str(public_dir)], REMOTION, han, ok_frames, log)
     except RemotionQuaGio as e:        # treo → đã diệt node; video nào đã ra đủ lớp chữ vẫn ghép tiếp, video còn lại bị bỏ (lô sau làm bù)
         log(f"    ⚠ {e} Còn {len(ok_frames)}/{len(jobs)} video có lớp chữ.")
+    finally:
+        for d in nguoi_tam:                                      # ảnh người hook chỉ cần lúc Remotion vẽ → xoá, không để public phình
+            shutil.rmtree(d, ignore_errors=True)
 
     def ghep_an_toan(j):        # 1 video ghép lỗi không làm hỏng cả đợt (lỗi rà soát #3)
         try:
