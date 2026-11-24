@@ -200,7 +200,7 @@ const stepDone = {
                     </span>
                 </template>
 
-                <ol class="flex flex-col gap-3.5">
+                <ol class="flex flex-col gap-3">
                     <!-- Bước 1 -->
                     <li
                         class="rounded-xl border border-border bg-muted p-5"
@@ -212,7 +212,7 @@ const stepDone = {
                                 :class="
                                     stepDone.token()
                                         ? 'bg-success-subtle text-success-text'
-                                        : 'bg-primary-subtle text-primary-text'
+                                        : 'bg-secondary text-muted-foreground'
                                 "
                             >
                                 <IconCheck
@@ -316,7 +316,7 @@ const stepDone = {
                                 :class="
                                     stepDone.chat()
                                         ? 'bg-success-subtle text-success-text'
-                                        : 'bg-primary-subtle text-primary-text'
+                                        : 'bg-secondary text-muted-foreground'
                                 "
                             >
                                 <IconCheck
@@ -364,7 +364,7 @@ const stepDone = {
                                 :class="
                                     stepDone.chat()
                                         ? 'bg-success-subtle text-success-text'
-                                        : 'bg-primary-subtle text-primary-text'
+                                        : 'bg-secondary text-muted-foreground'
                                 "
                             >
                                 <IconCheck
@@ -420,7 +420,7 @@ const stepDone = {
 
                         <div
                             v-if="candidate"
-                            class="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary-strong/30 bg-primary-subtle p-3 text-sm"
+                            class="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3 text-sm"
                             data-testid="fork-telegram-candidate"
                         >
                             <span
@@ -559,7 +559,7 @@ const stepDone = {
                 </div>
 
                 <div
-                    class="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border bg-card/95 px-3 py-2.5 shadow-raised backdrop-blur"
+                    class="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border bg-card px-3 py-2 shadow-raised"
                     data-testid="fork-telegram-save-bar"
                 >
                     <Button
@@ -572,7 +572,7 @@ const stepDone = {
                     </Button>
                     <span
                         v-if="prefsDirty"
-                        class="text-[0.8125rem] font-medium text-amber-700 dark:text-amber-300"
+                        class="text-[0.8125rem] font-medium text-warning"
                         role="status"
                         data-testid="fork-telegram-dirty"
                         >Có thay đổi chưa lưu</span
@@ -596,14 +596,12 @@ const stepDone = {
                     class="flex flex-col gap-3 rounded-xl border border-border bg-muted p-4"
                     :data-testid="`fork-telegram-preview-${p.id}`"
                 >
-                    <div
-                        class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                    >
+                    <div class="text-xs font-medium text-muted-foreground">
                         {{ p.label }}
                     </div>
                     <!-- eslint-disable-next-line vue/no-v-html -- HTML do server dựng và đã escape, chỉ có thẻ b/i/code/a -->
                     <div
-                        class="flex-1 rounded-2xl rounded-tl-sm border border-border bg-card p-3 text-sm leading-relaxed whitespace-pre-line shadow-raised [&_a]:text-primary-text [&_a]:underline [&_code]:rounded [&_code]:bg-secondary [&_code]:px-1"
+                        class="flex-1 rounded-xl rounded-tl-sm border border-border bg-card p-3 text-sm leading-relaxed whitespace-pre-line shadow-raised [&_a]:text-primary-text [&_a]:underline [&_code]:rounded [&_code]:bg-secondary [&_code]:px-1"
                         @click.prevent
                         v-html="p.html"
                     />

@@ -54,11 +54,11 @@ function buildCards(kind){
     requestAnimationFrame(()=>requestAnimationFrame(()=>{ const i=c.querySelector('.bar i'); if(i) i.style.width=used+'%'; }));
   };
   if (kind==='app'){
-    mk(inf.defaultDir, ICO_USER, 'Mặc định', 'Khuyên dùng', 0, 0, 'KHUYÊN DÙNG');
+    mk(inf.defaultDir, ICO_USER, 'Mặc định', 'Khuyên dùng', 0, 0, '');
   }
   inf.drives.forEach(d=>{
     const path = d.letter+':\\'+(kind==='app'?'TikTok Auto Kid':'TikTok Auto Kid Data');
-    const badge = kind==='data' && d.letter===inf.bestDrive ? 'TRỐNG NHIỀU NHẤT' : '';
+    const badge = kind==='data' && d.letter===inf.bestDrive ? 'Trống nhiều nhất' : '';
     mk(path, d.letter, d.label || 'Ổ đĩa cục bộ', d.letter+':\\', d.free, d.total, badge);
   });
 }
@@ -162,7 +162,7 @@ async function beginGo(){
 }
 function onError(e){
   S.busy=false;
-  $('#errTitle').textContent = S.kind==='go' ? 'Chưa gỡ xong' : 'Ối, chưa cài xong 😢';
+  $('#errTitle').textContent = S.kind==='go' ? 'Chưa gỡ xong' : 'Chưa cài xong';
   $('#errMsg').textContent = e.msg || 'Đã có lỗi không rõ nguyên nhân.';
   $('#progWarns').innerHTML='';
   $$('#s-progress .prog-grid').forEach(g=>g.classList.add('hidden'));
@@ -177,8 +177,8 @@ function onDone(e){
 }
 function sumBox(label,val){ const d=el('div'); d.innerHTML='<small>'+esc(label)+'</small><span title="'+esc(val)+'">'+esc(val)+'</span>'; return d; }
 function finishInstall(e){
-  $('#doneTitle').textContent = e.dry ? 'Chạy thử xong' : 'Cài đặt xong rồi! 🎉';
-  $('#doneSub').textContent = e.dry ? 'Đây chỉ là chạy thử, chưa có gì bị thay đổi trên máy.' : (e.demo ? 'Đây là bản mô phỏng, chưa cài gì thật.' : 'TikTok Auto Kid đã sẵn sàng trên máy bạn rồi nè!');
+  $('#doneTitle').textContent = e.dry ? 'Chạy thử xong' : 'Cài đặt xong';
+  $('#doneSub').textContent = e.dry ? 'Đây chỉ là chạy thử, chưa có gì bị thay đổi trên máy.' : (e.demo ? 'Đây là bản mô phỏng, chưa cài gì thật.' : 'TikTok Auto Kid đã sẵn sàng trên máy bạn');
   const inf=$('#doneInfo'); inf.innerHTML='';
   inf.appendChild(sumBox('Ứng dụng', e.dir||'')); inf.appendChild(sumBox('Video & dữ liệu', e.data||''));
   const w=$('#doneWarns'); w.innerHTML='';

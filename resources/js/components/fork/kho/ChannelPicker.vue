@@ -37,7 +37,7 @@ const choose = (o: ChannelOption) => {
         <PopoverTrigger as-child>
             <button
                 type="button"
-                class="flex h-10 w-full min-w-0 items-center gap-2.5 rounded-md border bg-background px-2.5 text-left text-sm font-normal shadow-xs outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+                class="flex h-10 w-full min-w-0 items-center gap-3 rounded-md border bg-background px-3 text-left text-sm font-normal shadow-xs outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
                 :data-testid="testid"
                 aria-haspopup="listbox"
                 :aria-expanded="open"
@@ -60,7 +60,7 @@ const choose = (o: ChannelOption) => {
                         type="button"
                         role="option"
                         :aria-selected="o.id === modelValue"
-                        :class="cn('flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted', o.id === modelValue && 'bg-muted/70')"
+                        :class="cn('flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted', o.id === modelValue && 'bg-muted/70')"
                         :data-testid="testid ? `${testid}-${o.id}` : undefined"
                         @click="choose(o)"
                     >

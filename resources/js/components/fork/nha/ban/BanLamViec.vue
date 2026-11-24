@@ -4,8 +4,20 @@
 import { Link } from '@inertiajs/vue3';
 import {
     IconArrowUpRight,
+    IconChartBar,
+    IconChecklist,
     IconChevronLeft,
     IconChevronRight,
+    IconClipboardList,
+    IconHome,
+    IconMail,
+    IconMicrophone,
+    IconMovie,
+    IconPackage,
+    IconPaw,
+    IconPencil,
+    IconShoppingCart,
+    IconTool,
     IconX,
 } from '@tabler/icons-vue';
 import {
@@ -16,7 +28,7 @@ import {
     DialogRoot,
     DialogTitle,
 } from 'reka-ui';
-import { computed, watch } from 'vue';
+import { computed, watch, type Component } from 'vue';
 
 import { banBao } from '@/components/fork/nha/ban/bus';
 import LiveManHinh from '@/components/fork/nha/ban/LiveManHinh.vue';
@@ -28,6 +40,21 @@ import { cn } from '@/lib/utils';
 
 const vai = defineModel<string | null>('vai', { required: true });
 const props = defineProps<{ data: NhaData | null }>();
+
+const BAN_ICON: Record<string, Component> = {
+    buuta: IconMail,
+    chuquay: IconShoppingCart,
+    cu: IconChartBar,
+    thukho: IconPackage,
+    sanh: IconHome,
+    thodung: IconTool,
+    bang: IconClipboardList,
+    giamkhao: IconChecklist,
+    daodien: IconMovie,
+    bienkich: IconPencil,
+    thuam: IconMicrophone,
+    meo: IconPaw,
+};
 
 const def = computed(() => (vai.value ? (BAN[vai.value] ?? null) : null));
 /** Vai có sổ tự thoại (việc thật có lời lẩm bẩm). */
@@ -97,11 +124,11 @@ watch(vai, (now, before) => {
     <DialogRoot v-model:open="open">
         <DialogPortal>
             <DialogOverlay
-                class="fixed inset-0 z-50 bg-black/25 backdrop-blur-[1px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+                class="fixed inset-0 z-50 bg-black/40 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
             />
             <DialogContent
                 v-if="def"
-                class="fixed top-3 right-3 bottom-3 z-50 flex w-[min(1080px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border bg-background shadow-[0_24px_80px_-12px_rgba(0,0,0,.45)] duration-300 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-8 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-8 max-sm:inset-0 max-sm:w-full max-sm:rounded-none"
+                class="fixed top-3 right-3 bottom-3 z-50 flex w-[min(1080px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border bg-background shadow-xl duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-8 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-right-8 max-sm:inset-0 max-sm:w-full max-sm:rounded-none"
                 :data-testid="`nha-ban-${vai}`"
                 @open-auto-focus.prevent
             >
@@ -109,18 +136,17 @@ watch(vai, (now, before) => {
                     class="flex shrink-0 items-center gap-4 border-b bg-card/60 px-4 py-4 sm:px-6"
                 >
                     <span
-                        :class="
-                            cn(
-                                'grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-2xl shadow-sm ring-1 ring-white/20',
-                                def.mau,
-                            )
-                        "
+                        class="grid size-12 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground ring-1 ring-border ring-inset"
                         aria-hidden="true"
-                        >{{ def.emoji }}</span
                     >
+                        <component
+                            :is="BAN_ICON[vai ?? ''] ?? IconHome"
+                            class="size-6"
+                        />
+                    </span>
                     <div class="min-w-0 flex-1">
                         <DialogTitle
-                            class="font-heading text-xl leading-tight font-semibold tracking-[-0.015em]"
+                            class="font-heading text-xl leading-tight font-semibold"
                         >
                             {{ def.ten }}
                         </DialogTitle>
@@ -132,7 +158,7 @@ watch(vai, (now, before) => {
                                     cn(
                                         'size-2 shrink-0 rounded-full',
                                         trangThai.st === 'working'
-                                            ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,.18)]'
+                                            ? 'bg-emerald-500'
                                             : trangThai.st === 'sleep'
                                               ? 'bg-muted-foreground/40'
                                               : 'bg-amber-400',

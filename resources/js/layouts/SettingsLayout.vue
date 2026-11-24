@@ -15,7 +15,7 @@ defineProps<{
         >
             <header v-if="title" class="mb-1">
                 <h1
-                    class="text-[1.375rem] leading-tight font-semibold tracking-[-0.022em] text-foreground"
+                    class="text-[1.375rem] leading-tight font-semibold text-foreground"
                     data-testid="header-title"
                 >
                     {{ title }}

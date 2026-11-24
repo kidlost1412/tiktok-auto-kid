@@ -136,6 +136,13 @@ const chrome = computed<{ text: string; tone: Tone }>(() => {
     };
 });
 
+// Nhãn trạng thái: màu chỉ để báo trạng thái (ổn / cần để ý / lỗi).
+const pillCls: Partial<Record<Tone, string>> = {
+    success: 'bg-success-subtle text-success-text',
+    warn: 'bg-warning/15 text-warning',
+    danger: 'bg-critical-subtle text-destructive-text',
+};
+
 const hh = (h: number) => `${String(h).padStart(2, '0')}h`;
 const summary = computed(() => {
     const a = props.account;
@@ -178,9 +185,7 @@ const summary = computed(() => {
                 />
             </div>
             <div class="min-w-0 flex-1">
-                <div
-                    class="truncate text-[0.9375rem] font-semibold tracking-tight"
-                >
+                <div class="truncate text-[0.9375rem] font-semibold">
                     {{ name }}
                 </div>
                 <div class="truncate text-[0.7812rem] text-muted-foreground">
@@ -225,20 +230,15 @@ const summary = computed(() => {
                 href="/settings#chrome"
                 :class="
                     cn(
-                        'rounded-full px-2.5 py-1 font-medium hover:underline',
-                        toneClasses[chrome.tone].chip,
+                        'rounded-md px-3 py-1 font-medium hover:underline',
+                        pillCls[chrome.tone],
                     )
                 "
                 >{{ chrome.text }}</Link
             >
             <span
                 v-if="account.paused_reason"
-                :class="
-                    cn(
-                        'rounded-full px-2.5 py-1 font-medium',
-                        toneClasses.warn.chip,
-                    )
-                "
+                :class="cn('rounded-md px-3 py-1 font-medium', pillCls.warn)"
                 >Tạm dừng: {{ account.paused_reason }}</span
             >
             <Link
@@ -246,8 +246,8 @@ const summary = computed(() => {
                 :href="`/auto/gio-hang?kenh=${account.id}`"
                 :class="
                     cn(
-                        'rounded-full px-2.5 py-1 font-medium hover:underline',
-                        toneClasses.warn.chip,
+                        'rounded-md px-3 py-1 font-medium hover:underline',
+                        pillCls.warn,
                     )
                 "
                 >{{ blockedCount }} video chờ chọn giỏ</Link

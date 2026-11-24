@@ -3,10 +3,11 @@
 import {
     IconAlertTriangle,
     IconCheck,
+    IconCircleCheck,
     IconFolder,
     IconMovie,
+    IconMusic,
     IconPlaylistAdd,
-    IconSparkles,
     IconTrash,
 } from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
@@ -127,7 +128,7 @@ const onClick = (e: MouseEvent) => {
         :data-testid="`fork-rieng-card-${video.id}`"
         :class="
             cn(
-                'flex flex-col overflow-hidden rounded-[14px] border bg-card shadow-sm transition',
+                'flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition',
                 selected && 'ring-2 ring-primary',
                 holding && 'scale-[0.97] ring-2 ring-primary/60',
                 selectMode && 'cursor-pointer',
@@ -173,13 +174,13 @@ const onClick = (e: MouseEvent) => {
             </div>
             <span
                 v-if="video.duration"
-                class="absolute right-2 bottom-2 rounded bg-black/65 px-1.5 py-0.5 text-[0.75rem] font-medium text-white tabular-nums"
+                class="absolute right-2 bottom-2 rounded bg-black/65 px-1.5 py-0.5 text-xs font-medium text-white tabular-nums"
                 >{{ fmtDuration(video.duration) }}</span
             >
             <span
                 :class="
                     cn(
-                        'absolute top-2 left-2 rounded-full px-2.5 py-0.5 text-xs font-medium backdrop-blur',
+                        'absolute top-2 left-2 rounded-md px-2 py-0.5 text-xs font-medium',
                         toneClasses[status().tone].chip,
                     )
                 "
@@ -198,7 +199,7 @@ const onClick = (e: MouseEvent) => {
                 :data-testid="`fork-rieng-check-${video.id}`"
                 :class="
                     cn(
-                        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border-2 shadow-sm backdrop-blur transition',
+                        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border shadow-sm transition',
                         selected
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-white/90 bg-black/35 text-transparent hover:bg-black/55',
@@ -221,7 +222,7 @@ const onClick = (e: MouseEvent) => {
                 <span class="truncate">{{ video.folder }}</span>
                 <span
                     v-if="subFolder"
-                    class="inline-flex min-w-0 shrink items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+                    class="inline-flex min-w-0 shrink items-center gap-0.5 rounded-md bg-secondary px-1.5 py-0.5 font-medium text-foreground"
                     :data-testid="`fork-rieng-subfolder-${video.id}`"
                 >
                     <IconFolder class="size-3 shrink-0" />
@@ -230,7 +231,7 @@ const onClick = (e: MouseEvent) => {
             </div>
             <div
                 v-if="video.moved_from"
-                class="truncate text-xs text-sky-700 dark:text-sky-300"
+                class="truncate text-xs text-muted-foreground"
                 :title="`Anh vừa dời video từ ${video.moved_from}`"
             >
                 Đã dời từ {{ video.moved_from }}
@@ -251,7 +252,7 @@ const onClick = (e: MouseEvent) => {
             </div>
             <div
                 v-if="video.stats"
-                class="mt-1 flex flex-wrap gap-x-2.5 text-xs text-muted-foreground"
+                class="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"
                 :data-testid="`fork-rieng-stats-${video.id}`"
                 :title="
                     video.stats.collected_at
@@ -278,7 +279,7 @@ const onClick = (e: MouseEvent) => {
                 :title="video.music"
                 :data-testid="`fork-rieng-music-${video.id}`"
             >
-                ♪ {{ video.music }}
+                <IconMusic class="mr-1 inline size-3.5" />{{ video.music }}
             </div>
 
             <!-- Sản phẩm đã gắn (có sau khi hẹn giờ) -->
@@ -299,25 +300,23 @@ const onClick = (e: MouseEvent) => {
                     cn(
                         'mt-1 flex flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-xs leading-snug transition hover:bg-muted/60',
                         auto()!.ready
-                            ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/30'
-                            : 'border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/30',
+                            ? 'border-border bg-secondary/50'
+                            : 'border-border bg-secondary/50',
                     )
                 "
                 :title="'Bấm để xem AI thấy gì, chọn sản phẩm, sửa caption, chọn kênh'"
                 :data-testid="`fork-rieng-auto-${video.id}`"
                 @click.stop="emit('auto')"
             >
-                <span
-                    :class="
-                        cn(
-                            'flex items-center gap-1 font-medium',
-                            auto()!.ready
-                                ? 'text-emerald-800 dark:text-emerald-300'
-                                : 'text-amber-900 dark:text-amber-200',
-                        )
-                    "
-                >
-                    <IconSparkles class="size-3.5 shrink-0" />
+                <span class="flex items-start gap-1 font-medium">
+                    <IconCircleCheck
+                        v-if="auto()!.ready"
+                        class="mt-px size-3.5 shrink-0 text-success-text"
+                    />
+                    <IconAlertTriangle
+                        v-else
+                        class="mt-px size-3.5 shrink-0 text-warning"
+                    />
                     <span class="min-w-0 flex-1">{{
                         auto()!.ready ? 'Sẵn sàng tự đăng' : auto()!.blocker
                     }}</span>
@@ -337,7 +336,7 @@ const onClick = (e: MouseEvent) => {
                         auto()!.kid_caption ??
                         auto()!.ai_caption
                     "
-                    class="line-clamp-2 text-foreground/80 italic"
+                    class="line-clamp-2 text-foreground/80"
                     >“{{
                         auto()!.final_caption ??
                         auto()!.kid_caption ??
@@ -354,7 +353,7 @@ const onClick = (e: MouseEvent) => {
                         (auto()!.kid_hashtags ?? auto()!.ai_hashtags)?.length &&
                         auto()!.final_caption !== ''
                     "
-                    class="truncate text-sky-700 dark:text-sky-300"
+                    class="truncate text-muted-foreground"
                     >{{
                         (auto()!.kid_hashtags ?? auto()!.ai_hashtags).join(' ')
                     }}</span
@@ -364,7 +363,7 @@ const onClick = (e: MouseEvent) => {
             <!-- Cờ trùng video -->
             <div
                 v-if="video.duplicate"
-                class="mt-1 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs leading-snug text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                class="mt-1 flex items-start gap-1.5 rounded-md border border-l-2 border-l-warning bg-secondary px-2 py-1.5 text-xs leading-snug text-foreground"
                 :data-testid="`fork-rieng-dup-${video.id}`"
             >
                 <IconAlertTriangle class="mt-px size-3.5 shrink-0" />

@@ -4,13 +4,15 @@
 // Chữ viết thẳng bằng tiếng Việt (không qua lang/en).
 import { router } from '@inertiajs/vue3';
 import {
+    IconAlertTriangle,
     IconArrowBackUp,
     IconCloudDownload,
     IconExternalLink,
+    IconNotes,
     IconPackage,
     IconRefresh,
     IconSettings,
-    IconSparkles,
+    IconTag,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -162,8 +164,7 @@ const rollback = async (): Promise<void> => {
     if (
         !(await confirmDialog({
             title: `Quay lại bản ${props.rollback_version}?`,
-            description:
-                'Dữ liệu giữ nguyên, chỉ đổi mã chương trình.',
+            description: 'Dữ liệu giữ nguyên, chỉ đổi mã chương trình.',
             confirmText: 'Quay lại',
             destructive: true,
         }))
@@ -282,15 +283,15 @@ const blocks = computed<Block[]>(() => {
 
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div
-                        class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4"
+                        class="flex items-center gap-3 rounded-xl border border-border bg-muted px-5 py-4"
                     >
-                        <span class="fk-chip is-green"><IconPackage /></span>
+                        <span class="fk-chip"><IconPackage /></span>
                         <div class="min-w-0">
                             <p class="text-[0.8125rem] text-muted-foreground">
                                 Đang dùng
                             </p>
                             <p
-                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tabular-nums"
                                 data-testid="fork-update-current"
                             >
                                 v{{ current }}
@@ -298,15 +299,15 @@ const blocks = computed<Block[]>(() => {
                         </div>
                     </div>
                     <div
-                        class="flex items-center gap-3.5 rounded-xl border border-border bg-muted px-5 py-4"
+                        class="flex items-center gap-3 rounded-xl border border-border bg-muted px-5 py-4"
                     >
-                        <span class="fk-chip"><IconSparkles /></span>
+                        <span class="fk-chip"><IconTag /></span>
                         <div class="min-w-0">
                             <p class="text-[0.8125rem] text-muted-foreground">
                                 Bản mới nhất
                             </p>
                             <p
-                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                                class="mt-0.5 text-[1.625rem] leading-none font-semibold tabular-nums"
                                 data-testid="fork-update-latest"
                             >
                                 <template v-if="latest"
@@ -336,22 +337,30 @@ const blocks = computed<Block[]>(() => {
                 </div>
                 <div
                     v-else-if="!launcher_ok"
-                    class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                    class="flex items-start gap-2 rounded-xl border border-border bg-muted p-4 text-sm"
                     data-testid="fork-update-no-launcher"
                 >
-                    Không liên lạc được launcher. Cập nhật chỉ hoạt động khi ứng
-                    dụng được mở bằng
-                    <code>TikTokAuto.exe</code>.
+                    <IconAlertTriangle
+                        class="mt-0.5 size-4 shrink-0 text-warning"
+                    />
+                    <span class="min-w-0">
+                        Không liên lạc được launcher. Cập nhật chỉ hoạt động khi
+                        ứng dụng được mở bằng
+                        <code>TikTokAuto.exe</code>.
+                    </span>
                 </div>
                 <div
                     v-else-if="check_error && !latest"
-                    class="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                    class="flex items-start gap-2 rounded-xl border border-border bg-muted p-4 text-sm"
                 >
-                    {{ check_error }}
+                    <IconAlertTriangle
+                        class="mt-0.5 size-4 shrink-0 text-warning"
+                    />
+                    <span class="min-w-0">{{ check_error }}</span>
                 </div>
                 <div
                     v-else-if="update_available && latest"
-                    class="flex flex-wrap items-center gap-3 rounded-xl border border-success-text/30 bg-success-subtle p-4 text-sm"
+                    class="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
                     data-testid="fork-update-available"
                 >
                     <span class="fk-pill is-green">Có bản mới</span>
@@ -384,7 +393,7 @@ const blocks = computed<Block[]>(() => {
 
                 <div
                     v-if="working && live"
-                    class="rounded-xl border border-primary-strong/25 bg-primary-subtle p-4"
+                    class="rounded-xl border border-border bg-muted p-4"
                     data-testid="fork-update-progress"
                 >
                     <div class="flex items-center gap-2 text-sm font-semibold">
@@ -395,7 +404,7 @@ const blocks = computed<Block[]>(() => {
                         class="mt-3 h-2 overflow-hidden rounded-full bg-secondary"
                     >
                         <div
-                            class="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-700 transition-all"
+                            class="h-full rounded-full bg-primary transition-all"
                             :style="{ width: `${Math.max(3, live.percent)}%` }"
                         />
                     </div>
@@ -430,7 +439,7 @@ const blocks = computed<Block[]>(() => {
                 <ul
                     class="divide-y divide-border overflow-hidden rounded-xl border border-border"
                 >
-                    <li class="flex items-center gap-3 px-4 py-3.5">
+                    <li class="flex items-center gap-3 px-4 py-3">
                         <div class="min-w-0 flex-1">
                             <div class="text-[0.9375rem] font-medium">
                                 Tự kiểm tra bản mới mỗi ngày
@@ -451,7 +460,7 @@ const blocks = computed<Block[]>(() => {
                     </li>
                     <li
                         v-if="can_rollback"
-                        class="flex items-center gap-3 px-4 py-3.5"
+                        class="flex items-center gap-3 px-4 py-3"
                     >
                         <div class="min-w-0 flex-1">
                             <div class="text-[0.9375rem] font-medium">
@@ -485,8 +494,7 @@ const blocks = computed<Block[]>(() => {
             class="h-full"
             :title="`Có gì mới trong bản ${latest.version}`"
             description="Ghi chú phát hành do kho cập nhật cung cấp."
-            :icon="IconSparkles"
-            tone="amber"
+            :icon="IconNotes"
         >
             <template v-if="latest.page_url" #actions>
                 <a

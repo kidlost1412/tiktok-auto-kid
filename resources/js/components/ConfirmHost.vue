@@ -48,8 +48,8 @@ function onOpenChange(open: boolean): void {
                         class="grid size-10 shrink-0 place-items-center rounded-full"
                         :class="
                             state.destructive
-                                ? 'bg-critical/15 text-critical'
-                                : 'bg-primary/15 text-primary-text'
+                                ? 'bg-critical-subtle text-critical'
+                                : 'bg-secondary text-muted-foreground'
                         "
                         aria-hidden="true"
                     >

@@ -43,52 +43,52 @@ export const toneClasses: Record<Tone, ToneClasses> = {
         box: 'border-border bg-muted/50 text-foreground',
         bar: 'bg-muted-foreground/40',
     },
+    // Hộp (box) mọi tông đều chữ thường trên nền gần trung tính; màu chỉ ở viền mảnh + biểu tượng/chữ khoá.
     info: {
-        chip: 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300',
-        dot: 'bg-sky-500',
-        text: 'text-sky-700 dark:text-sky-300',
-        box: 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200',
-        bar: 'bg-sky-500',
+        chip: 'bg-info-subtle text-info-text',
+        dot: 'bg-info',
+        text: 'text-info-text',
+        box: 'border-info/30 bg-info/5 text-foreground',
+        bar: 'bg-info',
     },
     violet: {
-        chip: 'bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300',
-        dot: 'bg-violet-500',
-        text: 'text-violet-700 dark:text-violet-300',
-        box: 'border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200',
-        bar: 'bg-violet-500',
+        chip: 'bg-primary-subtle text-primary-text',
+        dot: 'bg-primary-strong',
+        text: 'text-primary-text',
+        box: 'border-primary-strong/30 bg-primary-strong/5 text-foreground',
+        bar: 'bg-primary-strong',
     },
     success: {
-        chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-        dot: 'bg-emerald-500',
-        text: 'text-emerald-700 dark:text-emerald-400',
-        box: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200',
-        bar: 'bg-emerald-500',
+        chip: 'bg-success-subtle text-success-text',
+        dot: 'bg-success',
+        text: 'text-success-text',
+        box: 'border-success/30 bg-success/5 text-foreground',
+        bar: 'bg-success',
     },
     warn: {
-        chip: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+        chip: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
         dot: 'bg-amber-500',
         text: 'text-amber-700 dark:text-amber-400',
-        box: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200',
+        box: 'border-amber-500/30 bg-amber-500/5 text-foreground',
         bar: 'bg-amber-500',
     },
     danger: {
-        chip: 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300',
-        dot: 'bg-red-500',
-        text: 'text-red-600 dark:text-red-400',
-        box: 'border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200',
-        bar: 'bg-red-500',
+        chip: 'bg-critical-subtle text-destructive-text',
+        dot: 'bg-destructive',
+        text: 'text-destructive-text',
+        box: 'border-destructive/30 bg-destructive/5 text-foreground',
+        bar: 'bg-destructive',
     },
 };
 
-/** Thẻ chuẩn của khu Tự động đăng (cùng kiểu Xưởng Video): bo 14px, viền 1px, bóng nhẹ nhiều lớp (sáng) / bề mặt nổi (tối). */
-export const cardCls =
-    'rounded-[14px] border bg-card text-card-foreground shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]';
+/** Thẻ chuẩn của khu Tự động đăng (cùng kiểu Xưởng Video): bo 12px, viền 1px, bóng nhẹ (sáng) / bề mặt nổi (tối). */
+export const cardCls = 'rounded-xl border bg-card text-card-foreground shadow-card';
 
 /** Bảng dữ liệu chuẩn: khung bo, đầu bảng dính, hàng rê chuột, số căn phải. */
 export const tableWrapCls = 'overflow-auto rounded-xl border bg-card';
 export const thCls =
-    'sticky top-0 z-[1] whitespace-nowrap border-b bg-muted px-3.5 py-2.5 text-left text-xs font-medium tracking-[.01em] text-muted-foreground';
-export const tdCls = 'border-b px-3.5 py-2.5 align-middle';
+    'sticky top-0 z-[1] whitespace-nowrap border-b bg-muted px-4 py-2 text-left text-xs font-medium text-muted-foreground';
+export const tdCls = 'border-b px-4 py-2 align-middle';
 
 export interface StatusMeta {
     label: string;

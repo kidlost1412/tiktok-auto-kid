@@ -221,7 +221,7 @@
         [data-slot='drawer-content']
     ) {
     --background: var(--raised);
-    --muted: #0f0f0f;
+    --muted: #16181f;
 }
 
 @theme inline {
@@ -289,8 +289,8 @@
     --font-display: var(--font-display);
     --font-logo: var(--font-logo);
 
-    --font-weight-emphasis: 550;
-    --font-weight-strong: 650;
+    --font-weight-emphasis: 500;
+    --font-weight-strong: 600;
 
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
@@ -402,51 +402,17 @@
 }
 
 @layer components {
-    /* Chip biểu tượng màu (38px) dùng ở tiêu đề thẻ và ô số liệu. */
+    /* Ô biểu tượng (36px) ở tiêu đề thẻ: luôn trung tính — màu để dành cho trạng thái thật,
+       không tô theo loại thẻ. Các lớp is-green/is-blue… giữ lại cho khỏi vỡ chỗ cũ nhưng không đổi màu. */
     .fk-chip {
         display: grid;
         place-items: center;
         flex: none;
-        width: 38px;
-        height: 38px;
-        border-radius: 11px;
-        background: var(--primary-subtle);
-        color: var(--primary-text);
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-strong) 16%, transparent);
-    }
-
-    .fk-chip.is-green {
-        background: var(--success-subtle);
-        color: var(--success-text);
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success-text) 18%, transparent);
-    }
-
-    .fk-chip.is-blue {
-        background: var(--info-subtle);
-        color: var(--info-text);
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info-text) 18%, transparent);
-    }
-
-    .fk-chip.is-amber {
-        background: #fef3c7;
-        color: #8a4b08;
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, #a15c07 20%, transparent);
-    }
-
-    .dark .fk-chip.is-amber {
-        background: #33290b;
-        color: #fcd34d;
-    }
-
-    .fk-chip.is-red {
-        background: var(--critical-subtle);
-        color: var(--destructive-text);
-        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive-text) 18%, transparent);
-    }
-
-    .fk-chip.is-neutral {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         background: var(--secondary);
-        color: var(--foreground);
+        color: var(--muted-foreground);
         box-shadow: inset 0 0 0 1px var(--border);
     }
 
@@ -461,8 +427,8 @@
         align-items: center;
         gap: 6px;
         min-height: 24px;
-        padding: 1px 10px;
-        border-radius: 9999px;
+        padding: 0 8px;
+        border-radius: 6px;
         font-size: 13px;
         font-weight: 500;
         line-height: 1.4;

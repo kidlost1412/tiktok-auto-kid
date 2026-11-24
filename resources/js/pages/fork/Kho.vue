@@ -549,7 +549,7 @@ const description = computed(
         <template #actions>
             <span
                 id="hub"
-                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-full border bg-card px-3 text-[0.7812rem] font-medium text-muted-foreground shadow-xs"
+                class="inline-flex h-8 scroll-mt-24 items-center gap-2 rounded-lg border bg-card px-3 text-xs font-medium text-muted-foreground shadow-xs"
                 data-testid="fork-kho-hub-status"
             >
                 <span
@@ -609,7 +609,7 @@ const description = computed(
                         variant="outline"
                         class="bg-background"
                     >
-                        <Link :href="b.href">{{ b.action }} →</Link>
+                        <Link :href="b.href">{{ b.action }}</Link>
                     </Button>
                     <span v-else class="text-xs opacity-80">{{
                         b.action
@@ -623,7 +623,7 @@ const description = computed(
             :class="
                 cn(
                     cardCls,
-                    'z-20 flex flex-col gap-2.5 bg-card/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:sticky lg:top-2',
+                    'z-20 flex flex-col gap-3 bg-card p-3 lg:sticky lg:top-2',
                 )
             "
             data-testid="fork-kho-filters"
@@ -642,7 +642,7 @@ const description = computed(
                             >
                                 {{ t.label }}
                                 <span
-                                    class="rounded-full bg-foreground/10 px-1.5 text-xs tabular-nums"
+                                    class="rounded-md bg-foreground/10 px-1.5 text-xs tabular-nums"
                                 >
                                     {{ counts[t.key] ?? 0 }}
                                 </span>
@@ -719,7 +719,7 @@ const description = computed(
                     size="sm"
                     :variant="activeProduct === '' ? 'default' : 'outline'"
                     :aria-pressed="activeProduct === ''"
-                    class="h-8 shrink-0 rounded-full"
+                    class="h-8 shrink-0 rounded-lg"
                     @click="go({ product: '' })"
                 >
                     Mọi sản phẩm
@@ -735,7 +735,7 @@ const description = computed(
                     size="sm"
                     :variant="activeProduct === p.code ? 'default' : 'outline'"
                     :aria-pressed="activeProduct === p.code"
-                    class="h-8 shrink-0 rounded-full"
+                    class="h-8 shrink-0 rounded-lg"
                     @click="pickProduct(p.code)"
                 >
                     <ProductThumb :src="p.image" class="size-5 rounded" />
@@ -762,7 +762,7 @@ const description = computed(
                     v-if="filtered"
                     size="sm"
                     variant="ghost"
-                    class="h-8 shrink-0 gap-1 rounded-full text-muted-foreground"
+                    class="h-8 shrink-0 gap-1 rounded-lg text-muted-foreground"
                     data-testid="fork-kho-clear-filters"
                     @click="clearFilters"
                 >
@@ -779,7 +779,7 @@ const description = computed(
         >
             <p
                 v-if="autoNote && !loading"
-                class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-[0.8125rem] text-muted-foreground"
+                class="mb-3 flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground"
                 data-testid="fork-kho-auto-note"
             >
                 <IconVideoOff class="size-4 shrink-0" />
@@ -815,7 +815,7 @@ const description = computed(
                 >
                     <h3
                         v-if="grouped"
-                        class="flex items-baseline gap-2 text-[0.9375rem] font-semibold"
+                        class="flex items-baseline gap-2 text-sm font-semibold"
                     >
                         {{ g.label }}
                         <span class="text-xs font-normal text-muted-foreground"
@@ -897,7 +897,7 @@ const description = computed(
         <!-- Thanh thao tác dính ở đáy: video lỗi đã chọn -->
         <div
             v-if="selectMode"
-            class="sticky bottom-3 z-30 flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur"
+            class="sticky bottom-3 z-30 flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-md"
             data-testid="fork-kho-bar"
         >
             <div class="min-w-0 flex-1 text-sm">
@@ -1007,7 +1007,7 @@ const description = computed(
                 <section :class="cn(cardCls, 'flex flex-col gap-4 p-5 sm:p-6')">
                     <SectionHeading
                         :icon="IconTable"
-                        tone="info"
+                        tone="neutral"
                         title="Số lượng theo sản phẩm và quy cách"
                     />
                     <div :class="tableWrapCls">
@@ -1041,7 +1041,7 @@ const description = computed(
                                     :key="`${r.code}|${r.quy_cach}`"
                                 >
                                     <td :class="cn(tdCls, 'font-medium')">
-                                        <span class="flex items-center gap-2.5">
+                                        <span class="flex items-center gap-3">
                                             <ProductThumb :src="r.image" />
                                             {{ r.name }}
                                         </span>
@@ -1067,7 +1067,7 @@ const description = computed(
                                         colspan="6"
                                         class="p-6 text-center text-muted-foreground"
                                     >
-                                        Chưa có video nào trong kho.
+                                        Chưa có video nào trong kho
                                     </td>
                                 </tr>
                             </tbody>

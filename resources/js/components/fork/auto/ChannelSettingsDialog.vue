@@ -5,13 +5,13 @@ import { router } from '@inertiajs/vue3';
 import {
     IconArrowsShuffle,
     IconCalendarClock,
-    IconSparkles,
+    IconClock,
 } from '@tabler/icons-vue';
 import { computed, reactive, ref, watch } from 'vue';
 
 import MixDialog from '@/components/fork/auto/MixDialog.vue';
 import type { AccountRow } from '@/components/fork/auto/types';
-import { fmtNum, toneClasses } from '@/components/fork/shared/status';
+import { fmtNum } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -174,8 +174,8 @@ const labelCls = 'font-medium text-foreground';
                         />
                         <span
                             v-if="capBad"
-                            :class="cn('text-xs', toneClasses.danger.text)"
-                            >Từ 1 đến 100 bài.</span
+                            class="text-xs text-destructive-text"
+                            >Từ 1 đến 100 bài</span
                         >
                     </label>
                     <label :class="fieldCls">
@@ -223,14 +223,9 @@ const labelCls = 'font-medium text-foreground';
                     </label>
                     <p
                         v-if="windowBad"
-                        :class="
-                            cn(
-                                'col-span-2 -mt-2 text-xs',
-                                toneClasses.danger.text,
-                            )
-                        "
+                        class="col-span-2 -mt-2 text-xs text-destructive-text"
                     >
-                        Giờ kết thúc phải sau giờ bắt đầu.
+                        Giờ kết thúc phải sau giờ bắt đầu
                     </p>
                 </div>
 
@@ -269,8 +264,8 @@ const labelCls = 'font-medium text-foreground';
                             <span class="text-xs text-muted-foreground">
                                 Bài đã xếp lịch mà chưa gửi lên TikTok được đổi
                                 chỗ giờ cho nhau để hai bài liền nhau khác sản
-                                phẩm (vd. A, B, C, A, B…). Bài anh tự
-                                chỉnh giờ và bài đã lên TikTok giữ nguyên.
+                                phẩm (vd. A, B, C, A, B…). Bài anh tự chỉnh giờ
+                                và bài đã lên TikTok giữ nguyên.
                             </span>
                         </span>
                         <Switch
@@ -280,7 +275,7 @@ const labelCls = 'font-medium text-foreground';
                     </label>
                     <button
                         type="button"
-                        class="justify-self-start text-xs font-medium text-primary underline-offset-4 hover:underline"
+                        class="justify-self-start text-xs font-medium text-primary-text underline-offset-4 hover:underline"
                         @click="mixOpen = true"
                     >
                         Xem trước và trộn ngay một lần…
@@ -288,12 +283,7 @@ const labelCls = 'font-medium text-foreground';
                 </div>
 
                 <p
-                    :class="
-                        cn(
-                            'rounded-xl border px-4 py-3 text-[0.8125rem] leading-relaxed',
-                            toneClasses.info.box,
-                        )
-                    "
+                    class="rounded-xl border bg-muted/50 px-4 py-3 text-[0.8125rem] leading-relaxed text-foreground"
                     data-testid="fork-auto-ahead-hint"
                 >
                     Có video là app hẹn sẵn lên TikTok cho
@@ -307,7 +297,7 @@ const labelCls = 'font-medium text-foreground';
                 >
                     <label :class="fieldCls">
                         <span :class="cn(labelCls, 'flex items-center gap-1.5')"
-                            ><IconSparkles
+                            ><IconClock
                                 class="size-4 text-muted-foreground"
                             />Chọn giờ đăng</span
                         >
@@ -325,23 +315,27 @@ const labelCls = 'font-medium text-foreground';
                             Giờ có lượt xem cao ({{ rec.videos }} bài,
                             {{ rec.days }} ngày):
                         </div>
-                        <ul class="flex flex-wrap gap-1.5">
+                        <ul class="flex flex-wrap gap-2">
                             <li
                                 v-for="h in rec.hours"
                                 :key="h.hour"
-                                class="rounded-lg border bg-background px-2.5 py-1 text-[0.8125rem] tabular-nums"
+                                class="inline-flex items-baseline gap-1.5 rounded-lg border bg-background px-3 py-1 text-[0.8125rem] tabular-nums"
                                 :title="`${fmtNum(h.avg_views)} lượt xem trung bình, ${h.samples} bài`"
                             >
-                                <b>{{ h.hour }}h</b>
+                                <b class="font-medium">{{ h.hour }}h</b>
                                 <span
                                     :class="
                                         h.delta_pct >= 0
-                                            ? toneClasses.success.text
-                                            : toneClasses.danger.text
+                                            ? 'text-success-text'
+                                            : 'text-destructive-text'
                                     "
                                 >
                                     {{ h.delta_pct > 0 ? '+' : ''
-                                    }}{{ h.delta_pct }}%</span
+                                    }}{{
+                                        Number(h.delta_pct).toLocaleString(
+                                            'vi-VN',
+                                        )
+                                    }}%</span
                                 >
                             </li>
                         </ul>

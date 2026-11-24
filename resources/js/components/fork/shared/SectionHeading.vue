@@ -2,7 +2,7 @@
 // Tiêu đề từng khối trong trang: chip biểu tượng màu + tiêu đề 18px + mô tả nhỏ + nút phụ (cùng kiểu với Xưởng Video).
 import type { Component } from 'vue';
 
-import { type Tone, toneClasses } from '@/components/fork/shared/status';
+import type { Tone } from '@/components/fork/shared/status';
 import { cn } from '@/lib/utils';
 
 withDefaults(
@@ -18,13 +18,12 @@ withDefaults(
 
 <template>
     <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div class="flex min-w-0 items-start gap-3.5">
+        <div class="flex min-w-0 items-start gap-3">
             <span
                 v-if="icon"
                 :class="
                     cn(
-                        'flex size-[38px] shrink-0 items-center justify-center rounded-[11px] ring-1 ring-inset ring-black/5 dark:ring-white/10',
-                        toneClasses[tone].chip,
+                        'flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground ring-1 ring-inset ring-border',
                     )
                 "
             >
@@ -32,13 +31,13 @@ withDefaults(
             </span>
             <div class="min-w-0">
                 <h2
-                    class="font-heading text-lg leading-snug font-semibold tracking-[-0.015em]"
+                    class="font-heading text-lg leading-snug font-semibold"
                 >
                     {{ title }}
                 </h2>
                 <p
                     v-if="description"
-                    class="mt-0.5 text-[0.8125rem] leading-relaxed text-muted-foreground"
+                    class="mt-0.5 text-sm leading-relaxed text-muted-foreground"
                 >
                     {{ description }}
                 </p>

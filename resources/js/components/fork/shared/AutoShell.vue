@@ -59,7 +59,7 @@ const active = (i: (typeof items)[number]) =>
                 >
                     <div class="min-w-[min(100%,20rem)] flex-1 basis-0">
                         <h1
-                            class="font-heading text-[1.375rem] leading-tight font-[650] tracking-[-0.022em]"
+                            class="font-heading text-[1.375rem] leading-tight font-semibold"
                         >
                             {{ title }}
                         </h1>
@@ -90,9 +90,9 @@ const active = (i: (typeof items)[number]) =>
                         :aria-current="active(i) ? 'page' : undefined"
                         :class="
                             cn(
-                                'inline-flex h-9 shrink-0 items-center gap-2 rounded-[9px] px-3.5 text-sm font-medium whitespace-nowrap transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+                                'inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
                                 active(i)
-                                    ? 'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgba(28,25,23,.08),0_1px_1px_rgba(28,25,23,.04)] dark:bg-[#2a2e3a] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.06),0_1px_3px_rgba(0,0,0,.5)]'
+                                    ? 'bg-card text-foreground shadow-sm dark:bg-accent'
                                     : 'text-muted-foreground hover:text-foreground',
                             )
                         "
@@ -101,17 +101,15 @@ const active = (i: (typeof items)[number]) =>
                             :is="i.icon"
                             :class="
                                 cn(
-                                    'size-[18px]',
-                                    active(i)
-                                        ? 'text-primary-text'
-                                        : 'opacity-80',
+                                    'size-4',
+                                    active(i) ? '' : 'opacity-80',
                                 )
                             "
                         />
                         {{ i.label }}
                         <span
                             v-if="i.href === '/auto/so-lieu' && buyBadge > 0"
-                            class="rounded-full bg-amber-500 px-2 text-xs leading-5 font-semibold text-amber-950"
+                            class="rounded-md bg-amber-500 px-1.5 text-xs leading-5 font-medium text-amber-950 tabular-nums"
                             title="Bình luận hỏi mua trong 24 giờ qua"
                             data-testid="fork-badge-buy-comments"
                             >{{ buyBadge }}</span

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // So sánh hiệu quả theo sản phẩm / kênh / góc / giờ đăng / giọng / nhạc: chọn chiều so sánh và chỉ số (view TB hoặc tương tác).
 // Bấm một dòng (sản phẩm, kênh, góc, giọng) là lọc cả trang theo nhóm đó; bấm lần nữa để bỏ lọc.
-import { IconChartBar } from '@tabler/icons-vue';
+import { IconChartBar, IconStarFilled } from '@tabler/icons-vue';
 import { computed, ref } from 'vue';
 
 import EmptyState from '@/components/fork/shared/EmptyState.vue';
@@ -102,9 +102,7 @@ const bestHours = computed(() =>
             class="flex flex-wrap items-start justify-between gap-3 px-5 pt-4"
         >
             <div>
-                <h2
-                    class="font-heading text-[1rem] font-semibold tracking-[-0.01em]"
-                >
+                <h2 class="text-base font-semibold">
                     So sánh hiệu quả
                 </h2>
                 <p class="text-[0.7812rem] text-muted-foreground">
@@ -216,8 +214,7 @@ const bestHours = computed(() =>
                                     'flex w-full flex-col gap-1 rounded-lg px-2 py-1.5 text-left',
                                     canFilter &&
                                         'transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring',
-                                    isActive(g) &&
-                                        'bg-accent/60 ring-1 ring-primary/40',
+                                    isActive(g) && 'bg-accent/60',
                                 )
                             "
                             @click="pick(g)"
@@ -232,14 +229,14 @@ const bestHours = computed(() =>
                                         title="Tốt nhất"
                                         role="img"
                                         aria-label="Tốt nhất"
-                                        >★</span
-                                    >
+                                        ><IconStarFilled class="size-3.5"
+                                    /></span>
                                     <span class="truncate font-medium">{{
                                         g.label
                                     }}</span>
                                     <span
                                         v-if="g.posts < MIN_POSTS"
-                                        class="shrink-0 rounded-full bg-muted px-1.5 text-[0.7rem] leading-5 text-muted-foreground"
+                                        class="shrink-0 rounded-md bg-muted px-1.5 text-[0.7rem] leading-5 text-muted-foreground"
                                         title="Dưới 3 bài, chưa đủ tin để so sánh"
                                         >ít bài</span
                                     >
@@ -258,7 +255,7 @@ const bestHours = computed(() =>
                                 <span
                                     :class="
                                         cn(
-                                            'block h-full rounded-full transition-[width] duration-500',
+                                            'block h-full rounded-full transition-[width] duration-200',
                                             g.key === bestKey
                                                 ? 'bg-primary'
                                                 : g.posts < MIN_POSTS

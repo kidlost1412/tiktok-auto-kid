@@ -22,7 +22,7 @@ const props = defineProps<{
     stale?: boolean;
     /** Đang hỏi lại (khoá nút "Thử lại"). */
     refreshing?: boolean;
-    /** Nền kính mờ cho bản 3D (đặt trên cảnh), bản 2D dùng nền thẻ. */
+    /** Nền trắng đặc cho bản 3D (đặt trên cảnh), bản 2D dùng nền thẻ. */
     glass?: boolean;
 }>();
 const emit = defineEmits<{ go: [key: string]; retry: [] }>();
@@ -43,14 +43,23 @@ const next = computed(() => props.data?.app?.next ?? null);
 
 const frame = computed(() =>
     cn(
-        'pointer-events-auto flex w-full [scrollbar-width:none] items-center gap-1.5 overflow-x-auto rounded-2xl border px-2 py-1.5 [&::-webkit-scrollbar]:hidden',
+        'pointer-events-auto flex w-full flex-wrap items-center gap-1.5 rounded-xl border px-2 py-1.5',
         props.glass
-            ? 'border-white/60 bg-white/75 text-[#3d2f5c] shadow-[0_4px_18px_rgba(74,56,104,.16)] backdrop-blur-md'
+            ? 'border-black/10 bg-white/95 text-neutral-800 shadow-md'
             : 'border-border bg-card shadow-sm',
     ),
 );
+// Khung kính luôn nền trắng (cả khi app ở giao diện tối) nên chip trên đó dùng bảng màu sáng.
+const GLASS_CHIP = {
+    danger: 'bg-red-50 text-red-700',
+    warn: 'bg-amber-50 text-amber-800',
+    success: 'bg-emerald-50 text-emerald-700',
+    neutral: 'bg-neutral-100 text-neutral-600',
+} as const;
+const chipTone = (tone: keyof typeof GLASS_CHIP) =>
+    props.glass ? GLASS_CHIP[tone] : toneClasses[tone].chip;
 const chipBase =
-    'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs leading-tight font-medium whitespace-nowrap';
+    'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs leading-tight font-medium whitespace-nowrap';
 </script>
 
 <template>
@@ -59,7 +68,7 @@ const chipBase =
             v-if="stale"
             :class="
                 cn(
-                    'pointer-events-auto flex w-fit max-w-full items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
+                    'pointer-events-auto flex w-fit max-w-full items-center gap-2 rounded-lg border px-3 py-1 text-xs font-medium',
                     toneClasses.warn.box,
                 )
             "
@@ -70,7 +79,7 @@ const chipBase =
             <span class="min-w-0">Mất kết nối, đang hiện số liệu cũ</span>
             <button
                 type="button"
-                class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 font-semibold hover:bg-amber-500/30 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
+                class="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500/20 px-2 py-0.5 font-medium hover:bg-amber-500/30 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
                 :disabled="refreshing"
                 @click="emit('retry')"
             >
@@ -90,7 +99,7 @@ const chipBase =
         >
             <template v-if="viec.length">
                 <span
-                    class="shrink-0 px-1.5 text-xs font-semibold whitespace-nowrap"
+                    class="shrink-0 px-1.5 text-xs font-medium whitespace-nowrap"
                     >Cần xử lý hôm nay ({{ viec.length }})</span
                 >
                 <button
@@ -101,7 +110,7 @@ const chipBase =
                     :class="
                         cn(
                             chipBase,
-                            toneClasses[v.tone].chip,
+                            chipTone(v.tone),
                             'hover:brightness-95 focus-visible:outline-2 focus-visible:outline-ring',
                         )
                     "
@@ -119,7 +128,7 @@ const chipBase =
             </template>
             <template v-else>
                 <span
-                    :class="cn(chipBase, toneClasses.success.chip)"
+                    :class="cn(chipBase, chipTone('success'))"
                     data-testid="nha-viec-on"
                 >
                     <IconCircleCheck class="size-3.5" aria-hidden="true" />
@@ -127,7 +136,7 @@ const chipBase =
                 </span>
                 <span
                     v-if="next"
-                    :class="cn(chipBase, toneClasses.neutral.chip)"
+                    :class="cn(chipBase, chipTone('neutral'))"
                     data-testid="nha-viec-ke-tiep"
                 >
                     Bài kế tiếp {{ dayjs(next.at).format('HH:mm')
@@ -141,7 +150,10 @@ const chipBase =
                 :class="
                     cn(
                         chipBase,
-                        'ml-auto border border-border/70 bg-background/70 text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
+                        'ml-auto border focus-visible:outline-2 focus-visible:outline-ring',
+                        glass
+                            ? 'border-black/10 bg-white hover:bg-neutral-100'
+                            : 'border-border/70 bg-background/70 hover:bg-accent',
                     )
                 "
                 data-testid="nha-mo-bang-tin"

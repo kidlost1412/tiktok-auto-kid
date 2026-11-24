@@ -58,7 +58,7 @@ const folderSel = computed({
 
 const fmtSize = (b: number) =>
     b >= 1024 ** 3
-        ? `${(b / 1024 ** 3).toFixed(1)} GB`
+        ? `${(b / 1024 ** 3).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} GB`
         : `${Math.max(1, Math.round(b / 1024 ** 2))} MB`;
 
 const add = (files: FileList | File[] | null) => {
@@ -83,7 +83,7 @@ const add = (files: FileList | File[] | null) => {
 
     if (skipped) {
         toast.error(
-            `Bỏ qua ${skipped} file không phải video (.mp4, .mov, .m4v, .webm).`,
+            `Bỏ qua ${skipped} file không phải video (.mp4, .mov, .m4v, .webm)`,
         );
     }
 };
@@ -174,7 +174,7 @@ const start = async () => {
     const bad = items.value.filter((i) => i.state === 'err').length;
 
     if (ok) {
-        toast.success(`Đã thêm ${ok} video vào thư mục.`);
+        toast.success(`Đã thêm ${ok} video vào thư mục`);
         emit('done');
     }
 
@@ -198,7 +198,7 @@ const waiting = computed(
         >
             <DialogHeader>
                 <DialogTitle>Thêm video vào thư mục</DialogTitle>
-                <DialogDescription class="text-[13px] text-foreground/70">
+                <DialogDescription class="text-sm text-foreground/70">
                     App chép video vào thư mục anh chọn (file gốc vẫn còn
                     nguyên) rồi tự hiện trong Kho riêng.
                 </DialogDescription>
@@ -229,9 +229,9 @@ const waiting = computed(
                     type="button"
                     :class="
                         cn(
-                            'flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition',
+                            'flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center transition',
                             over
-                                ? 'border-violet-600 bg-violet-50 dark:border-primary dark:bg-primary/10'
+                                ? 'border-primary bg-primary-subtle'
                                 : 'border-foreground/25 hover:border-foreground/50 hover:bg-muted/50',
                         )
                     "
@@ -246,7 +246,7 @@ const waiting = computed(
                     <span class="font-semibold"
                         >Kéo thả video vào đây, hoặc bấm để chọn file</span
                     >
-                    <span class="text-[13px] text-foreground/70"
+                    <span class="text-sm text-foreground/70"
                         >.mp4, .mov, .m4v, .webm · chọn được nhiều file</span
                     >
                 </button>
@@ -277,7 +277,7 @@ const waiting = computed(
                                     cn(
                                         'text-xs',
                                         it.state === 'err'
-                                            ? 'text-red-600 dark:text-red-400'
+                                            ? 'text-destructive-text'
                                             : 'text-foreground/70',
                                     )
                                 "
@@ -295,7 +295,7 @@ const waiting = computed(
                                 class="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"
                             >
                                 <div
-                                    class="h-full bg-violet-600 transition-all dark:bg-primary"
+                                    class="h-full bg-primary transition-all"
                                     :style="{ width: it.pct + '%' }"
                                 />
                             </div>
@@ -306,7 +306,7 @@ const waiting = computed(
                         />
                         <IconCheck
                             v-else-if="it.state === 'ok'"
-                            class="size-5 shrink-0 text-emerald-600"
+                            class="size-5 shrink-0 text-success-text"
                         />
                         <Button
                             v-else-if="!running"

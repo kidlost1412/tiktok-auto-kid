@@ -119,8 +119,8 @@ const save = async () => {
         open.value = false;
         toast.success(
             form.value.enabled
-                ? `Đã bật ghép nhạc cho "${props.folder.name}" (${r.data.tracks ?? 0} bài).`
-                : `Đã tắt ghép nhạc cho "${props.folder.name}".`,
+                ? `Đã bật ghép nhạc cho "${props.folder.name}" (${r.data.tracks ?? 0} bài)`
+                : `Đã tắt ghép nhạc cho "${props.folder.name}"`,
         );
         emit('saved');
     } else {
@@ -189,7 +189,7 @@ const save = async () => {
                             cn(
                                 'text-xs',
                                 tracks === 0
-                                    ? 'text-red-600 dark:text-red-400'
+                                    ? 'text-destructive-text'
                                     : 'text-muted-foreground',
                             )
                         "
@@ -259,7 +259,7 @@ const save = async () => {
                     >
                 </div>
 
-                <p v-if="error" class="text-sm text-red-600 dark:text-red-400">
+                <p v-if="error" class="text-sm text-destructive-text">
                     {{ error }}
                 </p>
             </div>

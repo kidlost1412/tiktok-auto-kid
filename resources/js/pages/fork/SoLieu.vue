@@ -351,7 +351,7 @@ const maxViews = computed(() =>
 
 // Bảng video: phân trang phía trình duyệt trên số bài đã tải; bấm tiêu đề cột để máy chủ sắp xếp lại.
 const videoGridCls =
-    'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]';
+    'lg:grid-cols-[28px_minmax(180px,1.5fr)_minmax(100px,1fr)_110px_repeat(3,60px)_72px_72px_28px] xl:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]';
 const pageSize = 15;
 const page = ref(1);
 
@@ -453,7 +453,7 @@ const seg = (on: boolean) =>
             ? 'bg-card text-foreground shadow-xs dark:bg-white/10'
             : 'text-muted-foreground hover:text-foreground',
     );
-const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
+const h2 = 'font-heading text-[1rem] font-semibold';
 </script>
 
 <template>
@@ -542,7 +542,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
             />
             <NativeSelect
                 :model-value="filters.channel"
-                class="h-9"
+                class="h-9 w-36 xl:w-44"
                 aria-label="Kênh"
                 @update:model-value="apply({ channel: String($event) })"
             >
@@ -553,7 +553,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
             </NativeSelect>
             <NativeSelect
                 :model-value="filters.product"
-                class="h-9"
+                class="h-9 w-36 xl:w-44"
                 aria-label="Sản phẩm"
                 @update:model-value="apply({ product: String($event) })"
             >
@@ -569,7 +569,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
             <NativeSelect
                 v-if="options.goc.length"
                 :model-value="filters.goc"
-                class="h-9"
+                class="h-9 w-36 xl:w-44"
                 aria-label="Góc nội dung"
                 @update:model-value="apply({ goc: String($event) })"
             >
@@ -581,7 +581,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
             <NativeSelect
                 v-if="options.giong.length"
                 :model-value="filters.giong"
-                class="h-9"
+                class="h-9 w-36 xl:w-44"
                 aria-label="Giọng"
                 @update:model-value="apply({ giong: String($event) })"
             >
@@ -666,7 +666,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                 >Xem 30 ngày</Button
             >
             <Button as-child size="sm">
-                <Link href="/auto">Xem lịch đăng →</Link>
+                <Link href="/auto">Xem lịch đăng</Link>
             </Button>
         </EmptyState>
 
@@ -702,13 +702,13 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         :title="t.hint"
                     >
                         <span
-                            class="text-[0.75rem] font-medium tracking-[0.02em] text-muted-foreground uppercase"
+                            class="text-[0.75rem] font-medium text-muted-foreground"
                             >{{ t.label }}</span
                         >
                         <Skeleton v-if="loading" class="mt-1 h-8 w-28" />
                         <span
                             v-else
-                            class="font-heading text-[1.875rem] leading-tight font-[650] tracking-[-0.03em] tabular-nums"
+                            class="font-heading text-[1.875rem] leading-tight font-semibold tabular-nums"
                             >{{ t.format(kpis[t.key].value) }}</span
                         >
                         <span
@@ -737,7 +737,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             v-if="t.key === 'views' && spark && !loading"
                             viewBox="0 0 100 28"
                             preserveAspectRatio="none"
-                            class="pointer-events-none absolute right-5 bottom-5 h-9 w-[38%] text-primary"
+                            class="pointer-events-none absolute top-12 right-5 h-9 w-[34%] text-primary"
                             aria-hidden="true"
                         >
                             <polygon
@@ -770,7 +770,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                     <div
                         v-for="t in secondary"
                         :key="t.key"
-                        class="flex flex-col gap-0.5 px-5 py-3.5"
+                        class="flex flex-col gap-0.5 px-5 py-3"
                         :data-testid="`fork-so-lieu-kpi-${t.key}`"
                     >
                         <span
@@ -844,7 +844,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                     <div class="grid items-stretch gap-6 2xl:grid-cols-2">
                         <Skeleton
                             v-if="loading"
-                            class="h-72 w-full rounded-[14px]"
+                            class="h-72 w-full rounded-xl"
                         />
                         <BreakdownCard
                             v-else
@@ -992,7 +992,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                             <template v-if="followers">
                                 <div class="flex items-baseline gap-3">
                                     <span
-                                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                                        class="font-heading text-[1.875rem] leading-none font-semibold tabular-nums"
                                         >{{ fmtNum(followers.current) }}</span
                                     >
                                     <span
@@ -1086,7 +1086,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                                 o.k === 'mua' &&
                                                 comments.counts.buy_24h
                                             "
-                                            class="rounded-full bg-amber-500 px-1.5 text-[0.7188rem] leading-5 font-semibold text-amber-950"
+                                            class="rounded-md bg-warning/20 px-1.5 text-[0.7188rem] leading-5 font-semibold text-foreground"
                                             >{{ comments.counts.buy_24h }}</span
                                         >
                                     </button>
@@ -1112,9 +1112,8 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                     :key="c.id"
                                     :class="
                                         cn(
-                                            'flex gap-3 px-5 py-3.5 text-[0.8438rem]',
-                                            c.buy &&
-                                                'bg-amber-50/60 dark:bg-amber-950/15',
+                                            'flex gap-3 px-5 py-3 text-[0.8438rem]',
+                                            c.buy && 'bg-warning/5',
                                         )
                                     "
                                     :data-testid="`fork-so-lieu-comment-${c.id}`"
@@ -1143,7 +1142,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                                                 v-if="c.buy"
                                                 :class="
                                                     cn(
-                                                        'rounded-full px-2 text-[0.7188rem] leading-5 font-medium',
+                                                        'rounded-md px-2 text-[0.7188rem] leading-5 font-medium',
                                                         toneClasses.warn.chip,
                                                     )
                                                 "
@@ -1279,7 +1278,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         role="row"
                         :class="
                             cn(
-                                'grid gap-x-4 border-b bg-muted/40 px-5 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase',
+                                'grid gap-x-4 border-b bg-muted/40 px-5 py-2 text-xs font-medium text-muted-foreground lg:gap-x-3 xl:gap-x-4',
                                 videoGridCls,
                             )
                         "
@@ -1293,7 +1292,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         >
                             <button
                                 type="button"
-                                class="uppercase hover:text-foreground"
+                                class="hover:text-foreground"
                                 @click="toggleSort('moi')"
                             >
                                 Video{{ sortMark('moi') }}
@@ -1307,7 +1306,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         >
                             <button
                                 type="button"
-                                class="uppercase hover:text-foreground"
+                                class="hover:text-foreground"
                                 @click="toggleSort('view')"
                             >
                                 Lượt xem{{ sortMark('view') }}
@@ -1327,7 +1326,7 @@ const h2 = 'font-heading text-[1rem] font-semibold tracking-[-0.01em]';
                         >
                             <button
                                 type="button"
-                                class="uppercase hover:text-foreground"
+                                class="hover:text-foreground"
                                 @click="toggleSort(c.k)"
                             >
                                 {{ c.t }}{{ sortMark(c.k) }}

@@ -46,12 +46,12 @@ const scrollTo = (href: string) =>
 
 <template>
     <section
-        class="rounded-[14px] border bg-card p-5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
+        class="rounded-xl border bg-card p-5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]"
         data-testid="fork-auto-onboarding"
     >
         <div class="flex items-start gap-3">
             <div
-                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-text"
+                class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground ring-1 ring-border ring-inset"
             >
                 <IconRocket class="size-5" />
             </div>
@@ -88,23 +88,20 @@ const scrollTo = (href: string) =>
                 :key="s.key"
                 :class="
                     cn(
-                        'flex flex-col gap-2 rounded-xl border p-3.5',
-                        s.done
-                            ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30'
-                            : 'bg-background',
+                        'flex flex-col gap-2 rounded-lg border bg-background p-4',
                     )
                 "
                 :data-testid="`fork-auto-onboarding-${s.key}`"
             >
-                <div class="flex items-center gap-2.5">
+                <div class="flex items-center gap-3">
                     <span
                         :class="
                             cn(
                                 'flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
                                 s.done
-                                    ? 'bg-emerald-500 text-white'
+                                    ? 'bg-success-subtle text-success-text'
                                     : s.state === 'offline'
-                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                      ? 'bg-warning/15 text-warning'
                                       : 'bg-muted text-muted-foreground',
                             )
                         "
@@ -122,11 +119,9 @@ const scrollTo = (href: string) =>
                     :class="
                         cn(
                             'text-sm leading-snug',
-                            s.done
-                                ? 'text-emerald-700 dark:text-emerald-300'
-                                : s.state === 'offline'
-                                  ? 'text-amber-700 dark:text-amber-300'
-                                  : 'text-muted-foreground',
+                            s.state === 'offline' && !s.done
+                                ? 'text-warning'
+                                : 'text-muted-foreground',
                         )
                     "
                 >

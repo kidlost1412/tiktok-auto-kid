@@ -15,7 +15,7 @@ const (
 	splashTextWeb    = "Đang bật máy chủ…"
 	splashTextVideo  = "Đang đánh thức Xưởng Video…"
 	splashTextAlmost = "Sắp xong…"
-	splashTextReady  = "Sẵn sàng!"
+	splashTextReady  = "Sẵn sàng"
 )
 
 // progService là phần dữ liệu của một dịch vụ mà việc tính tiến độ cần.

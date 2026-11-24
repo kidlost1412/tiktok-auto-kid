@@ -67,7 +67,7 @@ const load = async () => {
 
         loadLimits();
     } else {
-        toast.error('Không tải được cài đặt tự đăng.');
+        toast.error('Không tải được cài đặt tự đăng');
     }
 };
 
@@ -167,7 +167,7 @@ const save = async (changes: Partial<AutoSettings>) => {
         data.value = r.data;
         emit('changed', r.data);
     } else {
-        toast.error('Chưa lưu được, anh thử lại.');
+        toast.error('Chưa lưu được, anh thử lại');
         load();
     }
 };
@@ -202,14 +202,14 @@ const installCli = async () => {
 
     if (!r.ok) {
         installing.value = false;
-        toast.error(r.data?.error ?? 'Chưa cài được ChatGPT CLI.');
+        toast.error(r.data?.error ?? 'Chưa cài được ChatGPT CLI');
 
         return;
     }
 
     if (r.data?.cli.installed) {
         installing.value = false;
-        toast.success('Đã cài ChatGPT CLI.');
+        toast.success('Đã cài ChatGPT CLI');
 
         return;
     }
@@ -240,10 +240,10 @@ const watchInstall = () => {
 
         if (cli?.installed) {
             stopCliPoll();
-            toast.success('Đã cài xong ChatGPT CLI.');
+            toast.success('Đã cài xong ChatGPT CLI');
         } else if ((cli && !cli.installing) || ticks > 400) {
             stopCliPoll();
-            toast.error(cli?.error ?? 'Cài ChatGPT CLI chưa xong.');
+            toast.error(cli?.error ?? 'Cài ChatGPT CLI chưa xong');
         }
     }, 3000);
 };
@@ -289,7 +289,7 @@ const addAccount = async () => {
     }>('POST', '/auto/kho/rieng/tu-dong/chatgpt');
 
     if (!r.ok || !r.data?.id) {
-        toast.error(r.data?.error ?? 'Không mở được đăng nhập ChatGPT.');
+        toast.error(r.data?.error ?? 'Không mở được đăng nhập ChatGPT');
 
         if (r.data?.id) {
             watchLogin(r.data.id);
@@ -298,7 +298,7 @@ const addAccount = async () => {
         return;
     }
 
-    toast.success('Đã mở trang đăng nhập ChatGPT trong trình duyệt.');
+    toast.success('Đã mở trang đăng nhập ChatGPT trong trình duyệt');
     watchLogin(r.data.id);
 };
 
@@ -319,7 +319,7 @@ const watchLogin = (id: string) => {
             stopPoll();
             adding.value = null;
             toast.success(
-                `Đã thêm tài khoản ${r.data.account.email ?? 'ChatGPT'}.`,
+                `Đã thêm tài khoản ${r.data.account.email ?? 'ChatGPT'}`,
             );
             load();
         } else if (
@@ -362,7 +362,7 @@ const accountStatus = (a: ChatGptAccount): { text: string; cls: string } => {
         return a.logging_in || adding.value === a.id
             ? {
                   text: 'Đang chờ anh đăng nhập…',
-                  cls: 'text-amber-700 dark:text-amber-300',
+                  cls: 'text-warning',
               }
             : {
                   text: 'Chưa đăng nhập xong',
@@ -373,15 +373,15 @@ const accountStatus = (a: ChatGptAccount): { text: string; cls: string } => {
     if (a.cooldown_until) {
         return {
             text: `Hết lượt, nghỉ tới ${dayjs(a.cooldown_until).format('HH:mm DD/MM')}`,
-            cls: 'text-amber-700 dark:text-amber-300',
+            cls: 'text-warning',
         };
     }
 
     if (a.last_error) {
-        return { text: a.last_error, cls: 'text-red-600 dark:text-red-400' };
+        return { text: a.last_error, cls: 'text-destructive-text' };
     }
 
-    return { text: 'Sẵn sàng', cls: 'text-emerald-700 dark:text-emerald-400' };
+    return { text: 'Sẵn sàng', cls: 'text-success-text' };
 };
 
 const readyAccounts = computed(
@@ -450,11 +450,11 @@ const retryAll = async () => {
         loadLimits();
         toast.success(
             retried
-                ? `AI sẽ xem lại ${retried} video trong vòng 2 phút.`
-                : 'Không có video nào cần xem lại.',
+                ? `AI sẽ xem lại ${retried} video trong vòng 2 phút`
+                : 'Không có video nào cần xem lại',
         );
     } else {
-        toast.error('Chưa thử lại được, anh bấm lại nhé.');
+        toast.error('Chưa thử lại được, anh bấm lại nhé');
     }
 };
 
@@ -469,30 +469,30 @@ const pickModel = (key: string) => {
 // ---- Kiểu chung: lựa chọn dạng thẻ, đang chọn = viền đậm + chấm tròn đầy.
 const optionCls = (on: boolean) =>
     cn(
-        'flex min-w-0 flex-1 items-start gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition',
+        'flex min-w-0 flex-1 items-start gap-3 rounded-xl border px-3 py-3 text-left transition',
         on
-            ? 'border-violet-600 bg-violet-50 shadow-sm dark:border-primary dark:bg-primary/10'
+            ? 'border-primary bg-primary-subtle'
             : 'border-border bg-background hover:border-foreground/40 hover:bg-muted/50',
     );
 
 const dotCls = (on: boolean) =>
     cn(
-        'mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2',
+        'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border',
         on
-            ? 'border-violet-600 bg-violet-600 dark:border-primary dark:bg-primary'
+            ? 'border-primary bg-primary'
             : 'border-foreground/40 bg-background',
     );
 
 const chipCls = (on: boolean) =>
     cn(
-        'inline-flex items-center gap-1.5 rounded-full border-2 py-0.5 pr-2.5 pl-0.5 text-[13px] font-medium transition',
+        'inline-flex items-center gap-1.5 rounded-lg border py-0.5 pr-3 pl-0.5 text-sm font-medium transition',
         on
-            ? 'border-violet-600 bg-violet-50 text-foreground dark:border-primary dark:bg-primary/10'
+            ? 'border-primary bg-primary-subtle text-foreground'
             : 'border-border bg-background text-foreground/80 hover:border-foreground/40',
     );
 
-const sectionCls = 'flex flex-col gap-3 rounded-2xl border bg-card p-4';
-const hintCls = 'text-[13px] leading-snug text-foreground/70';
+const sectionCls = 'flex flex-col gap-3 rounded-xl border bg-card p-4';
+const hintCls = 'text-sm leading-snug text-foreground/70';
 </script>
 
 <template>
@@ -505,7 +505,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                 <DialogTitle class="text-lg"
                     >Kho riêng tự đăng theo khung</DialogTitle
                 >
-                <DialogDescription class="text-[13px] text-foreground/70">
+                <DialogDescription class="text-sm text-foreground/70">
                     AI xem từng video mới (hình và chữ trên video), chọn sản
                     phẩm gắn giỏ và viết caption. Video sẵn sàng được xếp vào
                     giờ trống của khung đăng,
@@ -526,9 +526,9 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                 <label
                     :class="
                         cn(
-                            'flex cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 p-4 transition',
+                            'flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4 transition',
                             s.enabled
-                                ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/40'
+                                ? 'border-primary bg-primary-subtle'
                                 : 'border-border bg-card',
                         )
                     "
@@ -541,9 +541,9 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             <span
                                 :class="
                                     cn(
-                                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                                        'rounded-md px-2 py-0.5 text-xs font-medium',
                                         s.enabled
-                                            ? 'bg-emerald-600 text-white'
+                                            ? 'bg-success-subtle text-success-text'
                                             : 'bg-muted text-foreground/70',
                                     )
                                 "
@@ -566,7 +566,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
 
                 <div
                     v-if="failed"
-                    class="-mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2 text-[13px] text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                    class="-mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-l-4 border-l-warning bg-card px-3 py-2 text-sm text-foreground"
                     data-testid="fork-rieng-ai-failed"
                 >
                     <span
@@ -591,7 +591,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                 <!-- Chuẩn bị: chỉ hiện việc còn thiếu, xong hết thì ẩn cả khung -->
                 <section
                     v-if="!data.codex_installed || readyAccounts === 0"
-                    class="flex flex-col gap-2.5 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                    class="flex flex-col gap-3 rounded-xl border border-l-4 border-l-warning bg-card p-4 text-foreground"
                     data-testid="fork-rieng-auto-setup"
                 >
                     <h3 class="flex items-center gap-1.5 font-semibold">
@@ -603,7 +603,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         class="flex flex-wrap items-center gap-2"
                     >
                         <span
-                            class="size-2.5 shrink-0 rounded-full bg-amber-600"
+                            class="size-2.5 shrink-0 rounded-full bg-warning"
                         />
                         <span class="min-w-0 flex-1">
                             <b>Cài ChatGPT CLI (Codex)</b>
@@ -616,7 +616,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             >
                             <span
                                 v-if="data.cli.error && !installing"
-                                class="block text-xs text-red-700 dark:text-red-300"
+                                class="block text-xs text-destructive-text"
                                 >{{ data.cli.error }}</span
                             >
                         </span>
@@ -639,7 +639,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         class="flex items-center gap-2"
                     >
                         <span
-                            class="size-2.5 shrink-0 rounded-full bg-amber-600"
+                            class="size-2.5 shrink-0 rounded-full bg-warning"
                         />
                         <span>
                             <b>Thêm tài khoản ChatGPT</b> — bấm "Thêm tài khoản
@@ -693,7 +693,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                     </div>
                     <div class="flex flex-col divide-y rounded-xl border">
                         <label
-                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5"
+                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-3"
                         >
                             <span>
                                 <span class="block font-medium"
@@ -713,7 +713,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         </label>
                         <label
                             v-if="s.caption_mode === 'ai'"
-                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5"
+                            class="flex cursor-pointer items-center justify-between gap-3 px-3 py-3"
                         >
                             <span>
                                 <span class="block font-medium"
@@ -798,7 +798,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         <div
                             v-for="f in data.folders"
                             :key="f.id"
-                            class="flex flex-col gap-2 px-3 py-2.5"
+                            class="flex flex-col gap-2 px-3 py-3"
                             :data-testid="`fork-rieng-auto-folder-${f.id}`"
                         >
                             <div
@@ -820,7 +820,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 >
                                     <IconCheck
                                         v-if="folderAll(f.id)"
-                                        class="size-3.5 text-violet-600 dark:text-primary"
+                                        class="size-3.5 text-muted-foreground"
                                         stroke-width="3"
                                     />
                                     Mọi kênh có giỏ
@@ -840,7 +840,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                             alt=""
                                         />
                                         <AvatarFallback
-                                            class="text-[11px] font-semibold"
+                                            class="text-xs font-semibold"
                                             >{{
                                                 initial(c.name)
                                             }}</AvatarFallback
@@ -849,7 +849,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                     {{ c.name }}
                                     <IconCheck
                                         v-if="folderHas(f.id, c.id)"
-                                        class="size-3.5 text-violet-600 dark:text-primary"
+                                        class="size-3.5 text-muted-foreground"
                                         stroke-width="3"
                                     />
                                 </button>
@@ -895,7 +895,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                         </div>
                         <span
                             v-if="data.model_effective"
-                            class="text-[13px] text-amber-700 dark:text-amber-400"
+                            class="text-sm text-warning"
                             >Model chọn trước đây ({{ s.model }}) tài khoản của
                             anh không dùng được, app tự dùng
                             {{
@@ -920,7 +920,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             ></span
                         >
                         <div
-                            class="flex flex-wrap gap-1 rounded-xl border-2 bg-muted/40 p-1"
+                            class="flex flex-wrap gap-1 rounded-xl border bg-muted/40 p-1"
                         >
                             <button
                                 v-for="e in modelEfforts"
@@ -928,9 +928,9 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                 type="button"
                                 :class="
                                     cn(
-                                        'flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition',
+                                        'flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition',
                                         s.effort === e.key
-                                            ? 'bg-violet-600 text-white shadow dark:bg-primary dark:text-primary-foreground'
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'text-foreground/80 hover:bg-background',
                                     )
                                 "
@@ -945,10 +945,10 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                     <label
                         :class="
                             cn(
-                                'flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 px-3 py-2.5 transition',
+                                'flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 transition',
                                 !fastOk && 'cursor-not-allowed opacity-60',
                                 s.fast && fastOk
-                                    ? 'border-amber-500 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/40'
+                                    ? 'border-primary bg-primary-subtle'
                                     : 'border-border',
                             )
                         "
@@ -959,7 +959,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                     cn(
                                         'mt-0.5 size-5 shrink-0',
                                         s.fast && fastOk
-                                            ? 'fill-amber-400 text-amber-600'
+                                            ? 'text-warning'
                                             : 'text-foreground/60',
                                     )
                                 "
@@ -987,7 +987,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                     </label>
 
                     <div
-                        class="flex items-start gap-2 rounded-xl border-2 px-3 py-2.5"
+                        class="flex items-start gap-2 rounded-xl border px-3 py-3"
                         data-testid="fork-rieng-speech"
                     >
                         <IconMicrophone
@@ -1003,12 +1003,12 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             <span
                                 :class="
                                     cn(
-                                        'block text-[13px]',
+                                        'block text-sm',
                                         data.speech.installed
-                                            ? 'text-emerald-700 dark:text-emerald-400'
+                                            ? 'text-success-text'
                                             : data.speech.error ||
                                                 !data.speech.python
-                                              ? 'text-amber-700 dark:text-amber-400'
+                                              ? 'text-warning'
                                               : 'text-foreground/70',
                                     )
                                 "
@@ -1034,7 +1034,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                             <div
                                 v-for="a in data.chatgpt"
                                 :key="a.id"
-                                class="flex items-center gap-3 px-3 py-2.5"
+                                class="flex items-center gap-3 px-3 py-3"
                                 :data-testid="`fork-chatgpt-${a.id}`"
                             >
                                 <IconCircleCheckFilled
@@ -1043,25 +1043,25 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                         !a.cooldown_until &&
                                         !a.last_error
                                     "
-                                    class="size-5 shrink-0 text-emerald-600"
+                                    class="size-5 shrink-0 text-success-text"
                                 />
                                 <IconAlertTriangle
                                     v-else
-                                    class="size-5 shrink-0 text-amber-600"
+                                    class="size-5 shrink-0 text-warning"
                                 />
                                 <div class="min-w-0 flex-1">
                                     <div class="truncate font-semibold">
                                         {{ a.email ?? 'Tài khoản mới' }}
                                         <span
                                             v-if="a.plan"
-                                            class="ml-1 rounded bg-foreground/10 px-1.5 py-0.5 text-[11px] uppercase"
+                                            class="ml-1 rounded bg-foreground/10 px-1.5 py-0.5 text-xs capitalize"
                                             >{{ a.plan }}</span
                                         >
                                     </div>
                                     <div
                                         :class="
                                             cn(
-                                                'truncate text-[13px]',
+                                                'truncate text-sm',
                                                 accountStatus(a).cls,
                                             )
                                         "
@@ -1130,10 +1130,10 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
                                                         cn(
                                                             'h-full rounded-full',
                                                             w.used >= 90
-                                                                ? 'bg-red-500'
+                                                                ? 'bg-destructive'
                                                                 : w.used >= 70
-                                                                  ? 'bg-amber-500'
-                                                                  : 'bg-emerald-500',
+                                                                  ? 'bg-warning'
+                                                                  : 'bg-success',
                                                         )
                                                     "
                                                     :style="{
@@ -1169,7 +1169,7 @@ const hintCls = 'text-[13px] leading-snug text-foreground/70';
 
                     <div
                         v-if="adding"
-                        class="rounded-xl border-2 border-sky-400 bg-sky-50 p-3 text-[13px] text-sky-950 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100"
+                        class="rounded-xl border bg-secondary p-3 text-sm text-foreground"
                     >
                         Đăng nhập ChatGPT trong trình duyệt vừa mở, xong quay
                         lại đây (app tự nhận).

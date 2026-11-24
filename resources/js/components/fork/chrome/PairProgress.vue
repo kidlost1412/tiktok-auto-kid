@@ -219,14 +219,7 @@ const done = computed(() => stage.value === 'account');
 <template>
     <div
         v-if="active"
-        class="flex flex-col gap-3 rounded-xl border p-4 text-sm shadow-raised"
-        :class="
-            done
-                ? 'border-success-text/30 bg-success-subtle'
-                : failed
-                  ? 'border-amber-500/40 bg-amber-500/10'
-                  : 'border-primary-strong/25 bg-primary-subtle'
-        "
+        class="flex flex-col gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
         data-testid="fork-chrome-pair-progress"
         aria-live="polite"
     >
@@ -242,7 +235,7 @@ const done = computed(() => stage.value === 'account');
             </p>
             <button
                 type="button"
-                class="-m-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="-m-1 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                 aria-label="Ẩn tiến trình"
                 @click="close"
             >
@@ -259,7 +252,7 @@ const done = computed(() => stage.value === 'account');
             >
                 <IconCircleCheckFilled
                     v-if="step.state === 'done'"
-                    class="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    class="mt-0.5 size-4 shrink-0 text-success-text"
                 />
                 <Spinner
                     v-else-if="step.state === 'active'"
@@ -267,7 +260,7 @@ const done = computed(() => stage.value === 'account');
                 />
                 <IconAlertTriangle
                     v-else-if="step.state === 'failed'"
-                    class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                    class="mt-0.5 size-4 shrink-0 text-warning"
                 />
                 <IconCircleDashed
                     v-else
@@ -277,7 +270,7 @@ const done = computed(() => stage.value === 'account');
                     :class="{
                         'text-muted-foreground': step.state === 'pending',
                         'font-emphasis': step.state === 'active',
-                        'text-emerald-700 dark:text-emerald-400':
+                        'text-success-text':
                             step.state === 'done' && step.key === 'account',
                     }"
                 >

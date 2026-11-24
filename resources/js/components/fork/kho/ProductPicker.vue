@@ -103,7 +103,7 @@ const onKey = (e: KeyboardEvent) => {
                 :data-testid="testid"
                 :class="
                     cn(
-                        'dark:bg-input/30 flex min-h-10 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-md border border-input bg-card px-2.5 py-1 text-left text-sm transition-[color,box-shadow] outline-none',
+                        'dark:bg-input/30 flex min-h-10 w-full min-w-0 cursor-pointer items-center gap-3 rounded-md border border-input bg-card px-3 py-1 text-left text-sm transition-[color,box-shadow] outline-none',
                         'hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
                         'data-[state=open]:border-ring data-[state=open]:outline-2 data-[state=open]:outline-offset-1 data-[state=open]:outline-ring',
                     )
@@ -152,7 +152,7 @@ const onKey = (e: KeyboardEvent) => {
                     :data-active="i === active"
                     :class="
                         cn(
-                            'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
+                            'flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
                             i === active ? 'bg-accent' : 'hover:bg-accent/60',
                         )
                     "

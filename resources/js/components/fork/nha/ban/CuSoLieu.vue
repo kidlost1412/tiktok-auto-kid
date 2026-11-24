@@ -194,9 +194,8 @@ const collectedText = computed(() =>
         : 'chưa thu số liệu lần nào',
 );
 
-const labelCls =
-    'text-xs font-medium tracking-[0.02em] text-muted-foreground uppercase';
-const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
+const labelCls = 'text-xs font-medium text-muted-foreground';
+const h2 = 'font-heading text-base font-semibold';
 </script>
 
 <template>
@@ -245,12 +244,12 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
 
         <template v-else-if="!p">
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-[14px]" />
+                <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-xl" />
             </div>
-            <Skeleton class="h-52 rounded-[14px]" />
+            <Skeleton class="h-52 rounded-xl" />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Skeleton class="h-64 rounded-[14px]" />
-                <Skeleton class="h-64 rounded-[14px]" />
+                <Skeleton class="h-64 rounded-xl" />
+                <Skeleton class="h-64 rounded-xl" />
             </div>
         </template>
 

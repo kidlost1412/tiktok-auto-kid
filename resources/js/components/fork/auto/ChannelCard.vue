@@ -4,13 +4,17 @@ import { Link, router } from '@inertiajs/vue3';
 import {
     IconCalendarClock,
     IconChevronDown,
+    IconClock,
     IconPlayerPause,
     IconShoppingCart,
-    IconSparkles,
 } from '@tabler/icons-vue';
 import { computed, reactive, ref } from 'vue';
 
-import type { AccountRow, HealthChannel, LichChannel } from '@/components/fork/auto/types';
+import type {
+    AccountRow,
+    HealthChannel,
+    LichChannel,
+} from '@/components/fork/auto/types';
 import { cardCls, fmtNum, toneClasses } from '@/components/fork/shared/status';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -48,6 +52,13 @@ const chromeStatus = computed(() => {
         tone: 'warn' as const,
     };
 });
+
+// Nhãn trạng thái: màu chỉ để báo trạng thái (ổn / cần để ý / lỗi).
+const pillCls = {
+    success: 'bg-success-subtle text-success-text',
+    warn: 'bg-warning/15 text-warning',
+    danger: 'bg-critical-subtle text-destructive-text',
+};
 
 const busy = ref(false);
 const opts = {
@@ -158,7 +169,7 @@ const recOpen = ref(false);
                 />
             </div>
             <div class="min-w-0 flex-1">
-                <div class="truncate text-lg font-semibold tracking-tight">{{ name }}</div>
+                <div class="truncate text-lg font-semibold">{{ name }}</div>
                 <div
                     v-if="account.display_name"
                     class="truncate text-sm text-muted-foreground"
@@ -170,7 +181,8 @@ const recOpen = ref(false);
                     class="truncate text-xs text-muted-foreground"
                     title="Tiện ích Chrome tự lấy ảnh đại diện khi bạn mở TikTok Studio hoặc tiktok.com trong Chrome đã ghép (cần tiện ích bản 1.4.5 trở lên)"
                 >
-                    Chưa có ảnh đại diện — mở TikTok Studio trong Chrome đã ghép, ảnh sẽ tự hiện (nhớ tải lại tiện ích)
+                    Chưa có ảnh đại diện — mở TikTok Studio trong Chrome đã
+                    ghép, ảnh sẽ tự hiện (nhớ tải lại tiện ích)
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
@@ -185,7 +197,7 @@ const recOpen = ref(false);
                         cn(
                             'text-sm font-medium',
                             account.enabled
-                                ? toneClasses.success.text
+                                ? 'text-success-text'
                                 : 'text-muted-foreground',
                         )
                     "
@@ -199,8 +211,8 @@ const recOpen = ref(false);
                 :href="'/settings#chrome'"
                 :class="
                     cn(
-                        'rounded-full px-3 py-1 text-sm font-medium hover:underline',
-                        toneClasses[chromeStatus.tone].chip,
+                        'rounded-md px-3 py-1 text-sm font-medium hover:underline',
+                        pillCls[chromeStatus.tone],
                     )
                 "
                 >{{ chromeStatus.text }}</Link
@@ -208,10 +220,7 @@ const recOpen = ref(false);
             <span
                 v-if="account.paused_reason"
                 :class="
-                    cn(
-                        'rounded-full px-3 py-1 text-sm font-medium',
-                        toneClasses.warn.chip,
-                    )
+                    cn('rounded-md px-3 py-1 text-sm font-medium', pillCls.warn)
                 "
                 >Tạm dừng: {{ account.paused_reason }}</span
             >
@@ -220,8 +229,8 @@ const recOpen = ref(false);
                 :href="`/auto/gio-hang?kenh=${account.id}`"
                 :class="
                     cn(
-                        'rounded-full px-3 py-1 text-sm font-medium hover:underline',
-                        toneClasses.warn.chip,
+                        'rounded-md px-3 py-1 text-sm font-medium hover:underline',
+                        pillCls.warn,
                     )
                 "
                 >{{ blockedCount }} video đang chờ giỏ</Link
@@ -230,15 +239,17 @@ const recOpen = ref(false);
 
         <div class="flex flex-col gap-2">
             <div class="flex items-baseline justify-between">
-                <span class="text-sm font-medium text-muted-foreground">Hôm nay</span>
-                <span class="font-heading text-2xl font-[650] tracking-tight tabular-nums">
+                <span class="text-sm font-medium text-muted-foreground"
+                    >Hôm nay</span
+                >
+                <span class="font-heading text-2xl font-medium tabular-nums">
                     {{ planned }}/{{ cap }} bài
                 </span>
             </div>
             <Progress :model-value="percent" class="h-2" />
             <div class="text-sm text-muted-foreground">
                 Đã đăng {{ today?.posted ?? 0 }}, còn
-                {{ Math.max(0, cap - planned) }} chỗ trong ngày.
+                {{ Math.max(0, cap - planned) }} chỗ trong ngày
             </div>
         </div>
 
@@ -301,15 +312,12 @@ const recOpen = ref(false);
             </label>
         </div>
         <p
-            :class="
-                cn(
-                    'flex items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed',
-                    toneClasses.info.box,
-                )
-            "
+            class="flex items-start gap-3 rounded-xl border bg-muted/50 px-4 py-3 text-sm leading-relaxed text-foreground"
             data-testid="fork-auto-ahead-hint"
         >
-            <IconCalendarClock class="mt-0.5 size-5 shrink-0" />
+            <IconCalendarClock
+                class="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            />
             <span
                 >Có video là app hẹn lịch luôn lên TikTok cho
                 <b>{{ aheadDays }} ngày tới</b> — tắt máy vẫn đăng đúng
@@ -369,7 +377,7 @@ const recOpen = ref(false);
                 :aria-expanded="recOpen"
                 @click="recOpen = !recOpen"
             >
-                <IconSparkles class="size-4" />
+                <IconClock class="size-4" />
                 Chế độ giờ đăng và đề xuất
                 <IconChevronDown
                     class="ml-auto size-4 text-muted-foreground transition-transform"

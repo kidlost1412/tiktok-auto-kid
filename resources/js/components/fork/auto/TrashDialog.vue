@@ -101,7 +101,7 @@ async function act(id: number | 'all', kind: 'restore' | 'purge') {
     confirming.value = null;
 
     if (!ok) {
-        toast.error(data?.message ?? 'Không làm được, hãy thử lại.');
+        toast.error(data?.message ?? 'Không làm được, hãy thử lại');
 
         return;
     }
@@ -109,8 +109,8 @@ async function act(id: number | 'all', kind: 'restore' | 'purge') {
     changed.value = true;
     toast.success(
         kind === 'restore'
-            ? 'Đã khôi phục về kho.'
-            : (data?.message ?? 'Đã xong.'),
+            ? 'Đã khôi phục về kho'
+            : (data?.message ?? 'Đã xong'),
     );
     items.value = id === 'all' ? [] : items.value.filter((i) => i.id !== id);
     selected.value = id === 'all' ? [] : selected.value.filter((x) => x !== id);
@@ -152,7 +152,7 @@ async function restoreSelected() {
     restoringSel.value = false;
 
     if (n === ids.length) {
-        toast.success(`Đã khôi phục ${n} video về kho.`);
+        toast.success(`Đã khôi phục ${n} video về kho`);
     } else {
         toast.error(
             `Khôi phục được ${n}/${ids.length} video. ${lastError ?? 'Hãy thử lại.'}`,
@@ -199,7 +199,7 @@ async function restoreSelected() {
                 class="py-10 text-center text-sm text-muted-foreground"
                 data-testid="fork-auto-trash-empty"
             >
-                Thùng rác trống.
+                Thùng rác trống
             </p>
             <ul
                 v-else
@@ -220,7 +220,7 @@ async function restoreSelected() {
                         :data-testid="`fork-auto-trash-select-${it.id}`"
                         @change="toggleSel(it.id)"
                     />
-                    <CoverThumb :id="it.id" class="h-[56px] w-[32px] rounded" />
+                    <CoverThumb :id="it.id" class="h-14 w-8 rounded" />
                     <div class="min-w-0">
                         <div class="flex min-w-0 items-center gap-2">
                             <span class="truncate text-sm font-medium">{{
@@ -238,10 +238,7 @@ async function restoreSelected() {
                             Xoá lúc
                             {{ dayjs(it.trashed_at).format('HH:mm DD/MM') }} ·
                             còn {{ it.days_left }} ngày
-                            <span
-                                v-if="!it.file_ok"
-                                class="text-amber-700 dark:text-amber-400"
-                            >
+                            <span v-if="!it.file_ok" class="text-warning">
                                 · không thấy file trên ổ đĩa</span
                             >
                         </p>
@@ -286,7 +283,7 @@ async function restoreSelected() {
                             <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                class="text-muted-foreground hover:text-red-600"
+                                class="text-muted-foreground hover:text-destructive-text"
                                 title="Xoá hẳn (không khôi phục được)"
                                 aria-label="Xoá hẳn"
                                 :disabled="busyId !== null"
@@ -321,7 +318,7 @@ async function restoreSelected() {
                         Khôi phục đã chọn ({{ selected.length }})
                     </Button>
                     <template v-if="confirming === 'all'">
-                        <span class="text-xs text-red-700 dark:text-red-400"
+                        <span class="text-xs text-destructive-text"
                             >Xoá hẳn cả {{ items.length }} video, không lấy lại
                             được?</span
                         >
@@ -346,7 +343,7 @@ async function restoreSelected() {
                         v-else
                         size="sm"
                         variant="outline"
-                        class="text-red-600 hover:text-red-700 dark:text-red-400"
+                        class="text-destructive-text"
                         :disabled="busyId !== null"
                         data-testid="fork-auto-trash-empty-all"
                         @click="confirming = 'all'"

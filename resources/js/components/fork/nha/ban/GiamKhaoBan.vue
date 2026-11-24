@@ -65,7 +65,7 @@ const mauDiem = (dat: boolean | null) =>
         <section class="shrink-0 rounded-xl border bg-card p-4">
             <div class="flex items-center justify-between gap-4">
                 <p
-                    class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    class="text-xs font-medium text-muted-foreground"
                 >
                     Video mới chấm
                 </p>
@@ -74,7 +74,7 @@ const mauDiem = (dat: boolean | null) =>
                     class="text-xs text-muted-foreground tabular-nums"
                 >
                     <span
-                        class="font-semibold text-emerald-600 dark:text-emerald-400"
+                        class="font-medium text-emerald-600 dark:text-emerald-400"
                         >{{ tong.dat }}</span
                     >
                     đạt ·

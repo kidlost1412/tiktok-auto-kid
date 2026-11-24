@@ -139,7 +139,7 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                     :key="p.product_id"
                     :class="
                         cn(
-                            'flex items-center gap-4 rounded-xl border p-3',
+                            'flex items-center gap-3 rounded-xl border p-3',
                             p.product_id === currentId &&
                                 'border-primary bg-primary/5',
                             p.stock_num <= 0 && 'opacity-70',
@@ -168,7 +168,7 @@ const fmtNum = (n: number) => n.toLocaleString('vi-VN');
                             <Badge
                                 v-for="u in p.used_by"
                                 :key="u"
-                                variant="info"
+                                variant="secondary"
                                 >Đang dùng cho {{ u }}</Badge
                             >
                         </div>

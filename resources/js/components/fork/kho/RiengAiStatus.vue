@@ -6,13 +6,12 @@ import {
     IconCircleCheck,
     IconLoader2,
     IconPlayerPlay,
-    IconSparkles,
+    IconEye,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 import { callJson, type AiStatus } from '@/components/fork/kho/rieng';
-import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -88,13 +87,13 @@ const runNow = async () => {
     if (r.ok && r.data) {
         st.value = r.data;
         kickUntil = Date.now() + 60000;
-        toast.success('AI bắt đầu xem video, anh chờ chút nhé.');
+        toast.success('AI bắt đầu xem video, anh chờ chút nhé');
         if (timer) {
             clearTimeout(timer);
         }
         schedule();
     } else {
-        toast.error('Chưa cho AI chạy được, anh thử lại sau ít phút.');
+        toast.error('Chưa cho AI chạy được, anh thử lại sau ít phút');
     }
 };
 
@@ -120,7 +119,11 @@ defineExpose({ reload: load });
         :class="
             cn(
                 'flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border px-3 py-2 text-sm',
-                toneClasses[st.tone].box,
+                st.tone === 'warn'
+                    ? 'border-l-4 border-l-warning bg-card'
+                    : st.tone === 'success'
+                      ? 'border-l-4 border-l-success bg-card'
+                      : 'bg-card',
             )
         "
         role="status"
@@ -129,13 +132,13 @@ defineExpose({ reload: load });
         <IconLoader2 v-if="st.running" class="size-4 shrink-0 animate-spin" />
         <IconAlertTriangle
             v-else-if="st.tone === 'warn'"
-            class="size-4 shrink-0"
+            class="size-4 shrink-0 text-warning"
         />
         <IconCircleCheck
             v-else-if="st.tone === 'success'"
-            class="size-4 shrink-0"
+            class="size-4 shrink-0 text-success-text"
         />
-        <IconSparkles v-else class="size-4 shrink-0" />
+        <IconEye v-else class="size-4 shrink-0 text-muted-foreground" />
         <div class="min-w-0 flex-1">
             <div class="font-medium break-words">{{ st.title }}</div>
             <div v-if="st.detail" class="text-xs break-words opacity-80">

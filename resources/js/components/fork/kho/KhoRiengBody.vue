@@ -16,7 +16,6 @@ import {
     IconRefresh,
     IconSearch,
     IconSend,
-    IconSparkles,
     IconArrowsShuffle,
     IconTrash,
     IconUpload,
@@ -305,7 +304,7 @@ const toggleAll = async () => {
         );
 
         if (!r.ok || !r.data) {
-            toast.error('Chưa chọn được, anh thử lại.');
+            toast.error('Chưa chọn được, anh thử lại');
 
             return;
         }
@@ -325,10 +324,10 @@ const toggleAll = async () => {
         });
 
         if (!plain.length) {
-            toast.info('Không có video nào để chọn.');
+            toast.info('Không có video nào để chọn');
         } else if (r.data.capped) {
             toast.info(
-                `Chỉ chọn tối đa ${r.data.max} video một lần (còn ${r.data.total - r.data.items.length} video nữa, đăng xong anh chọn tiếp).`,
+                `Chỉ chọn tối đa ${r.data.max} video một lần (còn ${r.data.total - r.data.items.length} video nữa, đăng xong anh chọn tiếp)`,
             );
         }
     } finally {
@@ -756,7 +755,7 @@ const queueCall = async (url: string, body: unknown): Promise<boolean> => {
     const r = await postJson<{ queue: QueueItem[]; added?: number }>(url, body);
 
     if (!r) {
-        toast.error('Không cập nhật được giỏ chờ đăng, hãy thử lại.');
+        toast.error('Không cập nhật được giỏ chờ đăng, hãy thử lại');
 
         return false;
     }
@@ -773,8 +772,8 @@ const addToQueue = async (ids: number[]) => {
         const n = queue.value.length - before;
         toast.success(
             n > 0
-                ? `Đã cất ${n} video vào giỏ chờ đăng.`
-                : 'Các video này đã có trong giỏ chờ đăng.',
+                ? `Đã cất ${n} video vào giỏ chờ đăng`
+                : 'Các video này đã có trong giỏ chờ đăng',
         );
     }
 };
@@ -1166,10 +1165,10 @@ const renameFolder = async (f: Folder) => {
 
     if (r.ok) {
         openMenu.value = null;
-        toast.success(`Đã đổi tên thành "${r.data?.name ?? renameVal.value}".`);
+        toast.success(`Đã đổi tên thành "${r.data?.name ?? renameVal.value}"`);
         reloadVideos();
     } else {
-        toast.error('Chưa đổi được tên, anh thử lại.');
+        toast.error('Chưa đổi được tên, anh thử lại');
     }
 };
 
@@ -1182,7 +1181,7 @@ const openFolderOnDisk = async (f: Folder) => {
     if (r.ok) {
         openMenu.value = null;
     } else {
-        toast.error(r.data?.error ?? 'Không mở được thư mục.');
+        toast.error(r.data?.error ?? 'Không mở được thư mục');
     }
 };
 
@@ -1451,7 +1450,7 @@ defineExpose({ scan, busy });
             data-testid="fork-rieng-folders"
         >
             <span
-                class="flex items-center gap-1.5 pr-1 text-[0.8125rem] font-semibold text-muted-foreground"
+                class="flex items-center gap-1.5 pr-1 text-sm font-semibold text-muted-foreground"
                 :title="`App chỉ đọc video trong các thư mục này (${FORMATS}; kể cả thư mục con, trừ thư mục bắt đầu bằng _). App không bao giờ dời hay xoá file của anh.`"
             >
                 <IconFolder class="size-4" /> Thư mục
@@ -1463,9 +1462,9 @@ defineExpose({ scan, busy });
                 :aria-pressed="!filters.folder"
                 :class="
                     cn(
-                        'flex items-center gap-1.5 rounded-lg border bg-background/60 px-2.5 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
+                        'flex items-center gap-1.5 rounded-lg border bg-background/60 px-3 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
                         !filters.folder &&
-                            'border-violet-600 bg-violet-50 dark:border-primary dark:bg-primary/15',
+                            'border-primary bg-primary-subtle',
                     )
                 "
                 data-testid="fork-rieng-folder-all"
@@ -1483,7 +1482,7 @@ defineExpose({ scan, busy });
                     cn(
                         'flex max-w-72 items-center rounded-lg border bg-background/60 transition hover:border-foreground/40',
                         filters.folder === f.id &&
-                            'border-violet-600 bg-violet-50 dark:border-primary dark:bg-primary/15',
+                            'border-primary bg-primary-subtle',
                     )
                 "
             >
@@ -1497,13 +1496,13 @@ defineExpose({ scan, busy });
                 >
                     <span
                         v-if="!f.exists"
-                        class="size-2 shrink-0 rounded-full bg-red-500"
+                        class="size-2 shrink-0 rounded-full bg-destructive"
                         title="Không mở được thư mục này (ổ đĩa đang tắt hoặc đã đổi tên?)"
                     />
                     <span class="truncate font-medium">{{ f.name }}</span>
                     <IconMusic
                         v-if="f.music?.enabled"
-                        class="size-3.5 shrink-0 text-violet-600 dark:text-primary"
+                        class="size-3.5 shrink-0 text-muted-foreground"
                         aria-label="Đang ghép nhạc"
                     />
                     <span
@@ -1534,7 +1533,7 @@ defineExpose({ scan, busy });
                         </div>
                         <div
                             v-if="!f.exists"
-                            class="mb-2 text-xs text-red-600 dark:text-red-400"
+                            class="mb-2 text-xs text-destructive-text"
                         >
                             Không mở được thư mục này (ổ đĩa đang tắt hoặc đã
                             đổi tên?).
@@ -1588,7 +1587,7 @@ defineExpose({ scan, busy });
                             <IconMusic class="size-4" /> Ghép nhạc
                             <span
                                 v-if="f.music?.enabled"
-                                class="ml-auto text-xs text-emerald-600 dark:text-emerald-400"
+                                class="ml-auto text-xs text-success-text"
                                 >{{
                                     f.music.mode === 'replace'
                                         ? 'Thay hẳn'
@@ -1626,7 +1625,7 @@ defineExpose({ scan, busy });
             </Button>
             <!-- Cụm nút bên phải của dải thư mục. -->
             <div
-                class="ml-auto flex flex-wrap items-center gap-2"
+                class="flex w-full flex-wrap items-center gap-2 border-t pt-3 xl:ml-auto xl:w-auto xl:border-t-0 xl:pt-0"
                 data-testid="fork-rieng-header-actions"
             >
                 <Button
@@ -1646,7 +1645,6 @@ defineExpose({ scan, busy });
                     data-testid="fork-rieng-auto-open"
                     @click="autoOpen = true"
                 >
-                    <IconSparkles class="size-4" />
                     Tự đăng theo khung: {{ autoEnabled ? 'Bật' : 'Tắt' }}
                 </Button>
             </div>
@@ -1666,7 +1664,7 @@ defineExpose({ scan, busy });
             data-testid="fork-rieng-subfolders"
         >
             <span
-                class="flex items-center gap-1.5 pr-1 text-[0.8125rem] font-semibold text-muted-foreground"
+                class="flex items-center gap-1.5 pr-1 text-sm font-semibold text-muted-foreground"
             >
                 <IconFolder class="size-4" /> Thư mục con
             </span>
@@ -1694,9 +1692,9 @@ defineExpose({ scan, busy });
                 :aria-pressed="(filters.sub ?? '') === s.key"
                 :class="
                     cn(
-                        'flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 px-2.5 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
+                        'flex max-w-72 items-center gap-1.5 rounded-lg border bg-background/60 px-3 py-1 text-sm transition hover:border-foreground/40 hover:bg-muted/60',
                         (filters.sub ?? '') === s.key &&
-                            'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-900/30',
+                            'border-primary bg-primary-subtle',
                     )
                 "
                 :data-testid="`fork-rieng-sub-${s.key || 'all'}`"
@@ -1704,7 +1702,7 @@ defineExpose({ scan, busy });
             >
                 <IconFolder
                     v-if="s.key && s.key !== ':'"
-                    class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                    class="size-3.5 shrink-0 text-warning"
                 />
                 <span class="truncate font-medium">{{ s.label }}</span>
                 <span
@@ -1782,7 +1780,7 @@ defineExpose({ scan, busy });
                     </label>
                     <p
                         v-if="pickError"
-                        class="text-sm text-red-600 dark:text-red-400"
+                        class="text-sm text-destructive-text"
                         data-testid="fork-rieng-pick-error"
                     >
                         {{ pickError }}
@@ -1923,7 +1921,7 @@ defineExpose({ scan, busy });
                 >
                 <span
                     v-if="capped"
-                    class="text-xs text-amber-700 dark:text-amber-300"
+                    class="text-xs text-warning"
                     data-testid="fork-rieng-select-cap"
                     >Chỉ chọn tối đa {{ SELECT_MAX }} video một lần</span
                 >
@@ -1941,7 +1939,7 @@ defineExpose({ scan, busy });
         <!-- Khung chọn khi kéo -->
         <div
             v-if="band"
-            class="pointer-events-none fixed z-50 rounded-sm border-2 border-primary bg-primary/15"
+            class="pointer-events-none fixed z-50 rounded-sm border border-primary bg-primary/15"
             :style="{
                 left: band.left + 'px',
                 top: band.top + 'px',
@@ -2088,7 +2086,7 @@ defineExpose({ scan, busy });
             type="button"
             :class="
                 cn(
-                    'flex items-center gap-2 rounded-full border bg-card px-4 py-3 text-sm font-semibold shadow-lg transition hover:bg-muted',
+                    'flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm font-semibold shadow-md transition hover:bg-muted',
                     embedded
                         ? cn(
                               'sticky z-20 self-end',
@@ -2107,7 +2105,7 @@ defineExpose({ scan, busy });
             <IconClipboardList class="size-5" />
             Giỏ chờ đăng
             <span
-                class="flex min-w-6 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground tabular-nums"
+                class="flex min-w-6 items-center justify-center rounded-md bg-primary px-1.5 py-0.5 text-xs text-primary-foreground tabular-nums"
                 data-testid="fork-rieng-queue-count"
                 >{{ queue.length }}</span
             >
@@ -2118,7 +2116,7 @@ defineExpose({ scan, busy });
             v-if="barVisible"
             :class="
                 cn(
-                    'flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 p-3 shadow-xl backdrop-blur',
+                    'flex flex-wrap items-center gap-2 rounded-xl border bg-card/95 p-3 shadow-xl backdrop-blur',
                     embedded
                         ? 'sticky bottom-3 z-30 w-full'
                         : 'fixed inset-x-3 bottom-3 z-40 mx-auto max-w-3xl',
@@ -2136,7 +2134,7 @@ defineExpose({ scan, busy });
                     >
                     <span
                         v-if="pickedDupCount"
-                        class="ml-1 text-amber-700 dark:text-amber-300"
+                        class="ml-1 text-warning"
                         >· {{ pickedDupCount }} video trùng</span
                     >
                 </template>

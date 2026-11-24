@@ -104,7 +104,7 @@ const go = (href: string) => {
                 type="button"
                 :class="
                     cn(
-                        'relative inline-flex size-[38px] shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+                        'relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary/60 text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
                     )
                 "
                 :aria-label="
@@ -131,9 +131,9 @@ const go = (href: string) => {
         >
             <p
                 v-if="!items.length"
-                class="px-3 py-6 text-center text-[0.8125rem] text-muted-foreground"
+                class="px-3 py-6 text-center text-sm text-muted-foreground"
             >
-                Không có gì cần chú ý lúc này.
+                Không có gì cần chú ý lúc này
             </p>
             <button
                 v-for="i in items"
@@ -149,10 +149,10 @@ const go = (href: string) => {
                     "
                 />
                 <span class="min-w-0">
-                    <span class="block text-[0.875rem] font-medium">{{
+                    <span class="block text-sm font-medium">{{
                         i.text
                     }}</span>
-                    <span class="block text-[0.75rem] text-muted-foreground">{{
+                    <span class="block text-xs text-muted-foreground">{{
                         i.hint
                     }}</span>
                 </span>

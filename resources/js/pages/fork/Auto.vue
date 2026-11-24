@@ -131,12 +131,12 @@ const description = computed(() => {
     const on = channelsOn.value.length;
 
     if (!props.accounts.length) {
-        return 'Kết nối kênh TikTok để bắt đầu tự động đăng.';
+        return 'Kết nối kênh TikTok để bắt đầu tự động đăng';
     }
 
     return on
-        ? `${on}/${props.accounts.length} kênh đang tự động đăng.`
-        : 'Chưa kênh nào bật tự động đăng.';
+        ? `${on}/${props.accounts.length} kênh đang tự động đăng`
+        : 'Chưa kênh nào bật tự động đăng';
 });
 
 // Kho theo sản phẩm: sản phẩm còn nhiều video chờ lên trước; sản phẩm đã hết hẳn video thì xuống cuối.
@@ -331,9 +331,9 @@ onBeforeUnmount(() => {
                 <span
                     v-for="g in blocked.groups"
                     :key="`${g.code}|${g.quy_cach}`"
-                    class="mx-0.5 inline-flex items-center gap-1 rounded-full bg-background/70 py-0.5 pr-2 pl-0.5 align-middle text-xs font-medium"
+                    class="mx-0.5 inline-flex items-center gap-1 rounded-md bg-background/70 py-0.5 pr-2 pl-0.5 align-middle text-xs font-medium"
                 >
-                    <ProductThumb :src="g.image" class="size-5 rounded-full" />
+                    <ProductThumb :src="g.image" class="size-5 rounded" />
                     {{ g.label }} ({{ g.count }})
                 </span>
                 <template #action>
@@ -395,9 +395,7 @@ onBeforeUnmount(() => {
                         aria-label="Kênh TikTok"
                     >
                         <div class="flex items-baseline justify-between px-1">
-                            <h2
-                                class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
-                            >
+                            <h2 class="text-[0.9375rem] font-semibold">
                                 Kênh TikTok
                             </h2>
                             <span class="text-[0.7812rem] text-muted-foreground"
@@ -436,9 +434,7 @@ onBeforeUnmount(() => {
                     class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b px-5 py-3"
                 >
                     <div class="flex flex-wrap items-baseline gap-x-3">
-                        <h2
-                            class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
-                        >
+                        <h2 class="text-[0.9375rem] font-semibold">
                             Kho theo sản phẩm
                         </h2>
                         <span
@@ -471,12 +467,12 @@ onBeforeUnmount(() => {
                 </header>
                 <ul
                     v-if="stockRows.length"
-                    class="grid gap-x-2 gap-y-0.5 p-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5"
+                    class="grid gap-x-2 gap-y-0.5 p-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
                 >
                     <li v-for="p in stockShown" :key="p.code">
                         <Link
                             :href="`/auto/kho?product=${encodeURIComponent(p.code)}&tab=${p.counts.new > 0 ? 'cho' : p.counts.scheduled > 0 ? 'xep' : 'all'}`"
-                            class="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                            class="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                             :class="!p.enabled && 'opacity-60'"
                             :title="
                                 p.enabled
@@ -490,9 +486,10 @@ onBeforeUnmount(() => {
                                 <div
                                     class="flex items-baseline justify-between gap-2 text-[0.8125rem]"
                                 >
-                                    <span class="truncate font-medium">{{
-                                        p.short_name
-                                    }}</span>
+                                    <span
+                                        class="line-clamp-2 leading-snug font-medium break-words"
+                                        >{{ p.short_name }}</span
+                                    >
                                     <span
                                         class="shrink-0 text-muted-foreground tabular-nums"
                                         ><b

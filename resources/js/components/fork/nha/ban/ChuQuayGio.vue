@@ -93,9 +93,9 @@ const onChannel = (id: string) => emit('kenh', id);
 
         <template v-else-if="!p">
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Skeleton v-for="i in 4" :key="i" class="h-16 rounded-[14px]" />
+                <Skeleton v-for="i in 4" :key="i" class="h-16 rounded-xl" />
             </div>
-            <Skeleton class="h-72 rounded-[14px]" />
+            <Skeleton class="h-72 rounded-xl" />
         </template>
 
         <template v-else>

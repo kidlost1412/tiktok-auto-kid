@@ -9,12 +9,10 @@ import { toast } from 'vue-sonner';
 import ConfirmRetryDialog from '@/components/fork/auto/ConfirmRetryDialog.vue';
 import type { FailedPostRow } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
-import { toneClasses } from '@/components/fork/shared/status';
 import { openVideo } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import dayjs from '@/dayjs';
-import { cn } from '@/lib/utils';
 
 const props = defineProps<{ rows: FailedPostRow[] }>();
 
@@ -105,24 +103,24 @@ const when = (iso: string | null) => {
 
 <template>
     <section
-        :class="cn('overflow-hidden rounded-xl border', toneClasses.danger.box)"
+        class="overflow-hidden rounded-xl border bg-card text-card-foreground"
         data-testid="fork-auto-failed-posts"
         aria-label="Bài không đăng được"
     >
-        <header class="flex items-center gap-2.5 px-4 py-3">
-            <IconAlertTriangle class="size-5 shrink-0" />
-            <h2 class="font-heading text-[0.9375rem] font-semibold">
+        <header class="flex items-center gap-3 px-4 py-3">
+            <IconAlertTriangle class="size-5 shrink-0 text-destructive-text" />
+            <h2 class="text-[0.9375rem] font-semibold">
                 Bài không đăng được ({{ rows.length }})
             </h2>
             <span
-                class="hidden text-[0.8125rem] font-normal opacity-80 sm:inline"
-                >Bấm vào bài để xem lý do và xử lý.</span
+                class="hidden text-[0.8125rem] font-normal text-muted-foreground sm:inline"
+                >Bấm vào bài để xem lý do và xử lý</span
             >
             <Button
                 v-if="retryable.length > 1"
                 size="sm"
                 variant="outline"
-                class="ml-auto h-8 shrink-0 bg-background px-2.5 text-[0.8125rem]"
+                class="ml-auto h-8 shrink-0 px-3 text-[0.8125rem]"
                 :disabled="busy !== null"
                 data-testid="fork-auto-failed-retry-all"
                 @click="retryAll"
@@ -137,13 +135,11 @@ const when = (iso: string | null) => {
             </Button>
         </header>
 
-        <ul
-            class="divide-y divide-red-200/70 border-t border-red-200/70 dark:divide-red-900/50 dark:border-red-900/50"
-        >
+        <ul class="divide-y border-t">
             <li
                 v-for="r in shown"
                 :key="r.id"
-                class="flex items-start gap-3 bg-background/60 px-4 py-3"
+                class="flex items-start gap-3 px-4 py-3"
                 :data-testid="`fork-auto-failed-post-${r.id}`"
             >
                 <button
@@ -154,7 +150,7 @@ const when = (iso: string | null) => {
                     <CoverThumb
                         :id="r.id"
                         :fallback="r.product_image"
-                        class="h-[56px] w-[32px] rounded"
+                        class="h-14 w-8 rounded"
                     />
                     <div class="min-w-0 flex-1 text-foreground">
                         <div
@@ -180,12 +176,7 @@ const when = (iso: string | null) => {
                             {{ r.caption }}
                         </p>
                         <p
-                            :class="
-                                cn(
-                                    'mt-0.5 text-[0.8125rem] font-medium',
-                                    toneClasses.danger.text,
-                                )
-                            "
+                            class="mt-0.5 text-[0.8125rem] font-medium text-destructive-text"
                         >
                             {{ r.title }}
                         </p>
@@ -204,7 +195,7 @@ const when = (iso: string | null) => {
                     v-if="r.can_retry"
                     size="sm"
                     variant="outline"
-                    class="h-8 shrink-0 bg-background px-2.5 text-[0.8125rem]"
+                    class="h-8 shrink-0 px-3 text-[0.8125rem]"
                     :disabled="busy !== null"
                     :data-testid="`fork-auto-failed-post-retry-${r.id}`"
                     @click="retry(r)"
@@ -217,7 +208,7 @@ const when = (iso: string | null) => {
                     v-else-if="r.can_confirm_retry"
                     size="sm"
                     variant="outline"
-                    class="h-8 shrink-0 bg-background px-2.5 text-[0.8125rem]"
+                    class="h-8 shrink-0 px-3 text-[0.8125rem]"
                     :disabled="busy !== null"
                     :data-testid="`fork-auto-failed-post-confirm-${r.id}`"
                     @click="confirming = r"
@@ -228,10 +219,7 @@ const when = (iso: string | null) => {
             </li>
         </ul>
 
-        <div
-            v-if="rows.length > FOLD"
-            class="border-t border-red-200/70 bg-background/60 px-4 py-2 text-center dark:border-red-900/50"
-        >
+        <div v-if="rows.length > FOLD" class="border-t px-4 py-2 text-center">
             <button
                 type="button"
                 class="text-[0.7812rem] font-medium text-primary-text hover:underline"

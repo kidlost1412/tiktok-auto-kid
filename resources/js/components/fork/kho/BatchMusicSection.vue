@@ -101,7 +101,7 @@ const gainLabel = computed(() =>
                     cn(
                         'text-xs',
                         count === 0
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-destructive-text'
                             : 'text-muted-foreground',
                     )
                 "
@@ -158,7 +158,7 @@ const gainLabel = computed(() =>
                     "
                 />
             </div>
-            <p v-if="error" class="text-xs text-red-600 dark:text-red-400">
+            <p v-if="error" class="text-xs text-destructive-text">
                 {{ error }}
             </p>
         </div>

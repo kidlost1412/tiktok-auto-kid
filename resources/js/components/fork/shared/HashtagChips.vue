@@ -150,7 +150,7 @@ const shown = computed(() =>
                     cn(
                         'shrink-0 tabular-nums',
                         full &&
-                            'font-semibold text-amber-700 dark:text-amber-300',
+                            'font-medium text-amber-700 dark:text-amber-300',
                     )
                 "
             >
@@ -196,7 +196,7 @@ const shown = computed(() =>
                 </button>
             </div>
             <p v-else class="text-xs text-muted-foreground">
-                Đã thêm hết các hashtag gợi ý.
+                Đã thêm hết các hashtag gợi ý
             </p>
         </div>
     </div>

@@ -73,12 +73,12 @@ const onChanged = (viec: 'quet' | 'xem') => {
         </div>
 
         <template v-else-if="!p">
-            <Skeleton class="h-14 rounded-[14px]" />
+            <Skeleton class="h-14 rounded-xl" />
             <div class="grid grid-cols-5 gap-3">
                 <Skeleton
                     v-for="i in 5"
                     :key="i"
-                    class="aspect-[9/16] rounded-[14px]"
+                    class="aspect-[9/16] rounded-xl"
                 />
             </div>
         </template>

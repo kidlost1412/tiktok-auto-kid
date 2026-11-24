@@ -40,7 +40,7 @@ watch(
             decoding="async"
             :class="
                 cn(
-                    'size-full object-cover transition-opacity duration-300',
+                    'size-full object-cover transition-opacity duration-200',
                     loaded ? 'opacity-100' : 'opacity-0',
                 )
             "

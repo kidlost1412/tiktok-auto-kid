@@ -235,11 +235,11 @@ onBeforeUnmount(() => {
                     :href="openUrl"
                     target="_blank"
                     rel="noopener"
-                    class="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border bg-background/90 px-2.5 py-1 text-[0.75rem] font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+                    class="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm hover:text-foreground"
                     title="Mở Xưởng Video trong một cửa sổ mới"
                     data-testid="fork-xuong-open-new"
                 >
-                    <IconExternalLink class="size-3.5" />
+                    <IconExternalLink class="size-4" />
                     Mở trong cửa sổ mới
                 </a>
                 <div

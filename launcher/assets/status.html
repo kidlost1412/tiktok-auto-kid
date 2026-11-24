@@ -5,30 +5,30 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TikTok Auto Kid - Đang khởi động</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--fg:#14171c;--mut:#667085;--bd:#e4e7ec;--ok:#12a150;--run:#2563eb;--err:#d92d20;--pend:#98a2b3;--code:#f2f4f7}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--fg:#e8ebf0;--mut:#8b95a5;--bd:#2a313c;--ok:#32d583;--run:#6aa1ff;--err:#f97066;--pend:#667085;--code:#0b0e13}}
+:root{--bg:#f6f7f9;--card:#fff;--fg:#14171c;--mut:#667085;--bd:#e4e7ec;--ok:#12a150;--run:#7c3aed;--err:#d92d20;--pend:#98a2b3;--code:#f2f4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--fg:#e8ebf0;--mut:#8b95a5;--bd:#2a313c;--ok:#32d583;--run:#a78bfa;--err:#f97066;--pend:#667085;--code:#0b0e13}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
 main{width:100%;max-width:640px}
-h1{font-size:22px;margin:0 0 4px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
 .sub{color:var(--mut);margin:0 0 20px}
 .bar{height:6px;background:var(--bd);border-radius:99px;overflow:hidden;margin-bottom:20px}
 .bar i{display:block;height:100%;width:0;background:var(--run);transition:width .4s}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:6px 0}
-.row{display:flex;gap:12px;align-items:flex-start;padding:9px 16px}
+.row{display:flex;gap:12px;align-items:flex-start;padding:8px 16px}
 .row+.row{border-top:1px solid var(--bd)}
 .dot{width:12px;height:12px;border-radius:50%;margin-top:6px;flex:none;background:var(--pend)}
 .ok .dot{background:var(--ok)}.error .dot{background:var(--err)}.skipped .dot{opacity:.5}
 .running .dot{background:var(--run);animation:p 1s infinite}
 @keyframes p{50%{opacity:.3}}
-.name{font-weight:600}.kind{color:var(--mut);font-size:12px;margin-left:6px}
+.name{font-weight:500}.kind{color:var(--mut);font-size:12px;margin-left:6px}
 .state{margin-left:auto;color:var(--mut);font-size:13px;white-space:nowrap;padding-top:2px}
 .error .state{color:var(--err)}.ok .state{color:var(--ok)}
-pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Consolas,monospace;overflow:auto;max-height:260px;margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:8px;font:12px/1.5 ui-monospace,Consolas,monospace;overflow:auto;max-height:260px;margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
 .grow{flex:1;min-width:0}
-.err-box{margin-top:16px;border:1px solid var(--err);border-radius:12px;padding:14px 16px;display:none}
+.err-box{margin-top:16px;border:1px solid var(--err);border-radius:12px;padding:12px 16px;display:none}
 .err-box.on{display:block}
-button{margin-top:10px;background:var(--run);color:#fff;border:0;border-radius:8px;padding:9px 18px;font:inherit;font-weight:600;cursor:pointer}
+button{margin-top:10px;background:var(--run);color:#fff;border:0;border-radius:8px;padding:8px 16px;font:inherit;font-weight:500;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
 .foot{color:var(--mut);font-size:13px;margin-top:16px}
 </style>
@@ -73,7 +73,7 @@ function render(s){
     document.getElementById("msg").textContent="Xem chi tiết bên dưới rồi bấm Thử lại.";
     document.getElementById("errmsg").textContent=s.message;eb.classList.add("on");
   }else if(s.state==="ready"){
-    document.getElementById("title").textContent="Sẵn sàng!";
+    document.getElementById("title").textContent="Sẵn sàng";
     document.getElementById("msg").textContent="Đang mở ứng dụng…";
     eb.classList.remove("on");
     if(!redirected){redirected=true;setTimeout(function(){location.replace(s.app_url)},600)}

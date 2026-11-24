@@ -12,7 +12,6 @@ import {
     mixUndo,
 } from '@/components/fork/auto/productMix';
 import type { MixPreview, MixRow } from '@/components/fork/auto/productMix';
-import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -66,7 +65,7 @@ const load = async () => {
         plan.value = res.data;
     } else {
         plan.value = null;
-        error.value = res.error ?? 'Không xem trước được, hãy thử lại.';
+        error.value = res.error ?? 'Không xem trước được, hãy thử lại';
     }
 };
 
@@ -101,7 +100,7 @@ const apply = async () => {
     busy.value = false;
 
     if (!res.ok || !res.data) {
-        error.value = res.error ?? 'Chưa trộn được, hãy thử lại.';
+        error.value = res.error ?? 'Chưa trộn được, hãy thử lại';
 
         return;
     }
@@ -124,9 +123,9 @@ const apply = async () => {
                 const back = await mixUndo(id, undo);
 
                 if (back.ok) {
-                    toast(back.data?.message ?? 'Đã trả về giờ cũ.');
+                    toast(back.data?.message ?? 'Đã trả về giờ cũ');
                 } else {
-                    toast.error(back.error ?? 'Không hoàn tác được.');
+                    toast.error(back.error ?? 'Không hoàn tác được');
                 }
 
                 reload();
@@ -207,12 +206,7 @@ const time = (iso: string) => dayjs(iso).format('HH:mm DD/MM');
 
                 <p
                     v-if="error"
-                    :class="
-                        cn(
-                            'rounded-lg border px-3 py-2',
-                            toneClasses.danger.box,
-                        )
-                    "
+                    class="rounded-lg border border-l-2 border-l-destructive bg-muted/50 px-3 py-2 text-foreground"
                 >
                     {{ error }}
                 </p>
@@ -223,7 +217,7 @@ const time = (iso: string) => dayjs(iso).format('HH:mm DD/MM');
                             cn(
                                 'rounded-lg border px-3 py-2',
                                 plan.changed > 0
-                                    ? toneClasses.info.box
+                                    ? 'bg-muted/50'
                                     : 'bg-muted/40',
                             )
                         "
@@ -283,7 +277,7 @@ const time = (iso: string) => dayjs(iso).format('HH:mm DD/MM');
                                     :title="`${time(r.at)} · ${r.name}${r.fixed ? ' · giữ nguyên' : ''}`"
                                     :class="
                                         cn(
-                                            'inline-flex max-w-[9rem] items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-xs ring-1',
+                                            'inline-flex max-w-36 items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-xs ring-1',
                                             colorOf(r.product),
                                             r.fixed && 'opacity-60',
                                         )

@@ -81,7 +81,7 @@ const description = computed(
                             v-for="t in tabs"
                             :key="t.key"
                             :value="t.key"
-                            class="gap-1.5"
+                            class="gap-1.5 data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:hover:bg-accent"
                         >
                             <component :is="t.icon" class="size-4" />
                             {{ t.label }}

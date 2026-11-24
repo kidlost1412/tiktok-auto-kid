@@ -6,7 +6,6 @@ import { IconBolt } from '@tabler/icons-vue';
 import { computed, reactive, ref, watch } from 'vue';
 
 import type { AccountRow, DirectWindow } from '@/components/fork/auto/types';
-import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -125,8 +124,8 @@ const labelCls = 'text-sm font-medium text-foreground';
         >
             <DialogHeader>
                 <DialogTitle class="flex items-center gap-2"
-                    ><IconBolt class="size-5 text-primary-text" />Khung giờ đăng
-                    thẳng</DialogTitle
+                    ><IconBolt class="size-5 text-muted-foreground" />Khung giờ
+                    đăng thẳng</DialogTitle
                 >
                 <DialogDescription>
                     Trong khung này (lúc máy tính bật), video không được hẹn
@@ -174,14 +173,9 @@ const labelCls = 'text-sm font-medium text-foreground';
                     </div>
                     <p
                         v-if="timeBad"
-                        :class="
-                            cn(
-                                '-mt-3 text-[0.8125rem]',
-                                toneClasses.danger.text,
-                            )
-                        "
+                        class="-mt-3 text-[0.8125rem] text-destructive-text"
                     >
-                        Giờ tắt phải sau giờ bật.
+                        Giờ tắt phải sau giờ bật
                     </p>
 
                     <div class="flex flex-col gap-2">
@@ -194,7 +188,7 @@ const labelCls = 'text-sm font-medium text-foreground';
                                 :aria-pressed="form.days.includes(d.n)"
                                 :class="
                                     cn(
-                                        'h-8 min-w-10 rounded-md border px-2.5 text-sm font-medium transition-colors',
+                                        'h-8 min-w-10 rounded-md border px-3 text-sm font-medium transition-colors',
                                         form.days.includes(d.n)
                                             ? 'border-primary bg-primary text-primary-foreground'
                                             : 'bg-card text-muted-foreground hover:bg-accent',
@@ -208,11 +202,9 @@ const labelCls = 'text-sm font-medium text-foreground';
                         </div>
                         <p
                             v-if="daysBad"
-                            :class="
-                                cn('text-[0.8125rem]', toneClasses.danger.text)
-                            "
+                            class="text-[0.8125rem] text-destructive-text"
                         >
-                            Chọn ít nhất một ngày.
+                            Chọn ít nhất một ngày
                         </p>
                     </div>
 
@@ -235,7 +227,7 @@ const labelCls = 'text-sm font-medium text-foreground';
                     </div>
 
                     <ul
-                        class="flex list-disc flex-col gap-1 rounded-lg border bg-muted/40 py-2.5 pr-3 pl-7 text-[0.8125rem] text-muted-foreground"
+                        class="flex list-disc flex-col gap-1 rounded-lg border bg-muted/40 py-3 pr-3 pl-7 text-[0.8125rem] text-muted-foreground"
                     >
                         <li v-if="lastDirect">
                             Bài từ {{ lastDirect }} tới {{ form.end }} vẫn hẹn

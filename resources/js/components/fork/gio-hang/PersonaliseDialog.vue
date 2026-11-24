@@ -357,7 +357,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                 >
                     <div class="flex items-start gap-3">
                         <span
-                            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary-text"
+                            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground ring-1 ring-border ring-inset"
                             ><IconPhoto class="size-4"
                         /></span>
                         <div class="min-w-0">
@@ -382,9 +382,9 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                             :key="m.v"
                             :class="
                                 cn(
-                                    'relative flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
+                                    'relative flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
                                     coverMode === m.v
-                                        ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                                        ? 'border-primary bg-primary/5'
                                         : 'hover:bg-muted/50',
                                 )
                             "
@@ -441,7 +441,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                             >
                                 <button
                                     type="button"
-                                    class="group relative aspect-[3/4] w-36 overflow-hidden rounded-lg border bg-muted shadow-sm focus-visible:outline-2 focus-visible:outline-ring sm:w-full"
+                                    class="group relative aspect-[3/4] w-36 overflow-hidden rounded-lg border bg-muted focus-visible:outline-2 focus-visible:outline-ring sm:w-full"
                                     :aria-label="`Phóng to ảnh ${previewCover.name}`"
                                     data-testid="fork-personalise-cover-main"
                                     @click="
@@ -457,7 +457,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                         class="size-full object-cover"
                                     />
                                     <span
-                                        class="absolute top-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[0.6875rem] font-medium text-white"
+                                        class="absolute top-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[0.6875rem] font-medium text-white"
                                     >
                                         {{
                                             coverMode === 'fixed'
@@ -478,7 +478,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                             </div>
 
                             <!-- Bộ ảnh -->
-                            <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+                            <div class="flex min-w-0 flex-1 flex-col gap-3">
                                 <div
                                     class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"
                                 >
@@ -558,7 +558,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                             </button>
                                             <button
                                                 type="button"
-                                                class="rounded-md bg-black/60 p-1 text-white hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-white"
+                                                class="rounded-md bg-black/60 p-1 text-white hover:bg-destructive focus-visible:outline-2 focus-visible:outline-white"
                                                 aria-label="Xoá ảnh"
                                                 :disabled="busy"
                                                 @click="removeCover(c.file)"
@@ -602,11 +602,11 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     bìa mặc định.
                                 </p>
                                 <p class="text-xs text-muted-foreground">
-                                    jpg, png hoặc webp, tối đa 5 MB/ảnh. Ảnh
-                                    dọc 9:16 (nên 1080×1920, tối thiểu 324×576)
-                                    hoặc 3:4 (nên 1080×1440, tối thiểu 324×432)
-                                    được giữ nguyên; tỉ lệ khác được cắt giữa về
-                                    tỉ lệ gần nhất. png/webp được đổi sang jpg.
+                                    jpg, png hoặc webp, tối đa 5 MB/ảnh. Ảnh dọc
+                                    9:16 (nên 1080×1920, tối thiểu 324×576) hoặc
+                                    3:4 (nên 1080×1440, tối thiểu 324×432) được
+                                    giữ nguyên; tỉ lệ khác được cắt giữa về tỉ
+                                    lệ gần nhất. png/webp được đổi sang jpg.
                                 </p>
                             </div>
                         </div>
@@ -641,7 +641,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                 <section :class="card" class="flex flex-col gap-4">
                     <div class="flex items-start gap-3">
                         <span
-                            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-subtle text-primary-text"
+                            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground ring-1 ring-border ring-inset"
                             ><IconHash class="size-4"
                         /></span>
                         <div class="min-w-0">
@@ -670,9 +670,9 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                             :key="m.v"
                             :class="
                                 cn(
-                                    'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
+                                    'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/50',
                                     tagMode === m.v
-                                        ? 'border-primary bg-primary/5 ring-1 ring-primary/40'
+                                        ? 'border-primary bg-primary/5'
                                         : 'hover:bg-muted/50',
                                 )
                             "
@@ -759,7 +759,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                         cn(
                                             'block h-full rounded-full bg-primary-strong transition-all',
                                             preview.length > preview.max &&
-                                                'bg-red-600',
+                                                'bg-destructive',
                                         )
                                     "
                                     :style="{
@@ -772,7 +772,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
                                     cn(
                                         'tabular-nums',
                                         preview.length > preview.max &&
-                                            'font-semibold text-red-600 dark:text-red-400',
+                                            'font-semibold text-destructive-text',
                                     )
                                 "
                                 >{{ preview.length }}/{{ preview.max }} ký
@@ -784,7 +784,7 @@ const card = 'rounded-xl border bg-card p-4 sm:p-5';
             </div>
 
             <div
-                class="flex shrink-0 items-center justify-end gap-2 border-t bg-background px-5 py-3.5 sm:px-6"
+                class="flex shrink-0 items-center justify-end gap-2 border-t bg-background px-5 py-3 sm:px-6"
             >
                 <Button variant="ghost" @click="emit('update:open', false)"
                     >Đóng</Button

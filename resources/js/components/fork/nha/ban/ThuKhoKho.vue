@@ -158,7 +158,7 @@ const onRetried = () => {
 };
 
 const tileLabel =
-    'text-xs font-medium tracking-[0.02em] text-muted-foreground uppercase';
+    'text-xs font-medium text-muted-foreground';
 </script>
 
 <template>
@@ -179,13 +179,13 @@ const tileLabel =
 
         <template v-else-if="!p">
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-[14px]" />
+                <Skeleton v-for="i in 4" :key="i" class="h-20 rounded-xl" />
             </div>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                 <Skeleton
                     v-for="i in 5"
                     :key="i"
-                    class="aspect-[9/16] rounded-[14px]"
+                    class="aspect-[9/16] rounded-xl"
                 />
             </div>
         </template>

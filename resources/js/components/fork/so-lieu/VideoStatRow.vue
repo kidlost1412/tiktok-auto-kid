@@ -48,9 +48,9 @@ const rate = computed(() =>
     <li
         :class="
             cn(
-                'relative isolate grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-2 transition-colors hover:bg-accent/40 lg:min-h-14',
+                'relative isolate grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-2 transition-colors hover:bg-accent/40 lg:min-h-14 lg:gap-x-3 xl:gap-x-4',
                 gridCls ??
-                    'lg:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]',
+                    'lg:grid-cols-[28px_minmax(180px,1.5fr)_minmax(100px,1fr)_110px_repeat(3,60px)_72px_72px_28px] xl:grid-cols-[28px_minmax(200px,1.5fr)_minmax(150px,1fr)_130px_repeat(3,64px)_76px_88px_28px]',
             )
         "
         :data-testid="`fork-so-lieu-video-${video.id}`"
@@ -66,7 +66,7 @@ const rate = computed(() =>
         <CoverThumb
             :id="video.id"
             :fallback="video.product_image"
-            class="h-10 w-7 rounded"
+            class="h-10 w-7 rounded-md"
         />
 
         <div class="min-w-0">
@@ -94,33 +94,39 @@ const rate = computed(() =>
                 <span
                     v-for="t in [video.goc, video.giong].filter(Boolean)"
                     :key="String(t)"
-                    class="truncate rounded bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
+                    class="truncate rounded-md bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
                     >{{ t }}</span
                 >
             </div>
         </div>
 
-        <!-- Dòng thứ hai (màn hẹp): ♥ 1,2K · 💬 34 · ↗ 5 · 4,1% -->
+        <!-- Dòng thứ hai (màn hẹp): tim · bình luận · chia sẻ · tỉ lệ tương tác -->
         <div
             v-if="video.has_metrics"
             class="col-start-2 row-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.75rem] text-muted-foreground tabular-nums lg:hidden"
             data-testid="fork-so-lieu-video-line2"
         >
             <span
-                ><span aria-hidden="true">♥</span
-                ><span class="sr-only">Tim </span>
+                ><IconHeart
+                    class="inline size-3.5 align-text-bottom"
+                    aria-hidden="true"
+                /><span class="sr-only">Tim </span>
                 {{ fmtCompact(video.likes) }}</span
             >
             <span aria-hidden="true">·</span>
             <span
-                ><span aria-hidden="true">💬</span
-                ><span class="sr-only">Bình luận </span>
+                ><IconMessageCircle
+                    class="inline size-3.5 align-text-bottom"
+                    aria-hidden="true"
+                /><span class="sr-only">Bình luận </span>
                 {{ fmtCompact(video.comments) }}</span
             >
             <span aria-hidden="true">·</span>
             <span
-                ><span aria-hidden="true">↗</span
-                ><span class="sr-only">Chia sẻ </span>
+                ><IconShare3
+                    class="inline size-3.5 align-text-bottom"
+                    aria-hidden="true"
+                /><span class="sr-only">Chia sẻ </span>
                 {{ fmtCompact(video.shares) }}</span
             >
             <span aria-hidden="true">·</span>
@@ -132,7 +138,7 @@ const rate = computed(() =>
             <span
                 v-for="t in [video.goc, video.giong].filter(Boolean)"
                 :key="String(t)"
-                class="max-w-full truncate rounded bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
+                class="max-w-full truncate rounded-md bg-muted px-1.5 text-[0.7188rem] leading-5 text-muted-foreground"
                 >{{ t }}</span
             >
             <span

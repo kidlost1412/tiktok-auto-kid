@@ -13,7 +13,6 @@ import {
     postJson,
     undoable,
 } from '@/components/fork/auto/undo';
-import { toneClasses } from '@/components/fork/shared/status';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -24,7 +23,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import dayjs from '@/dayjs';
-import { cn } from '@/lib/utils';
 
 const props = defineProps<{ entry: ScheduleEntry | null }>();
 const open = defineModel<boolean>('open', { default: false });
@@ -51,13 +49,13 @@ function run(kind: 'unschedule' | 'remove') {
             const { ok, data } = await postJson(url);
 
             if (!ok) {
-                toast.error(data?.message ?? 'Không làm được, hãy thử lại.');
+                toast.error(data?.message ?? 'Không làm được, hãy thử lại');
             } else if (data?.state === 'pending') {
                 toast.info(
                     'Đang nhờ Chrome xoá bài hẹn trên TikTok và kiểm lại. Xong là lịch tự cập nhật; không xác minh được thì app giữ nguyên bài.',
                 );
             } else {
-                toast.success(data?.message ?? 'Đã xong.');
+                toast.success(data?.message ?? 'Đã xong');
             }
 
             router.reload({ only: ['lich', 'stock', 'products'] });
@@ -86,14 +84,11 @@ function run(kind: 'unschedule' | 'remove') {
 
             <div
                 v-if="onTikTok"
-                :class="
-                    cn(
-                        'flex items-start gap-2 rounded-lg border p-2.5 text-sm',
-                        toneClasses.info.box,
-                    )
-                "
+                class="flex items-start gap-2 rounded-lg border bg-muted/50 p-3 text-sm text-foreground"
             >
-                <IconBrandTiktok class="mt-0.5 size-4 shrink-0" />
+                <IconBrandTiktok
+                    class="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                />
                 <span
                     >Đã hẹn trên TikTok: app xoá bài hẹn trước (cần Chrome đang
                     mở).</span
@@ -117,16 +112,15 @@ function run(kind: 'unschedule' | 'remove') {
                 </button>
                 <button
                     type="button"
-                    class="flex items-start gap-3 rounded-lg border border-red-200 p-3 text-left transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                    class="flex items-start gap-3 rounded-lg border border-destructive/30 p-3 text-left transition-colors hover:bg-critical-subtle disabled:opacity-50"
                     data-testid="fork-auto-remove-confirm"
                     @click="run('remove')"
                 >
                     <IconTrash
-                        class="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400"
+                        class="mt-0.5 size-4 shrink-0 text-destructive-text"
                     />
                     <span class="flex flex-col gap-0.5">
-                        <b
-                            class="text-sm font-medium text-red-700 dark:text-red-400"
+                        <b class="text-sm font-medium text-destructive-text"
                             >Xoá video (vào thùng rác)</b
                         >
                         <span class="text-[0.8125rem] text-muted-foreground"

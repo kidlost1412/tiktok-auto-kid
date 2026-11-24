@@ -16,7 +16,6 @@ import type {
 } from '@/components/fork/auto/types';
 import { moveWithUndo } from '@/components/fork/auto/undo';
 import DateTimePicker from '@/components/fork/shared/DateTimePicker.vue';
-import { toneClasses } from '@/components/fork/shared/status';
 import { timeNotice } from '@/components/fork/shared/timeNotice';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,7 +73,7 @@ const rulesText = computed(() => {
     const r = info.value?.rules;
 
     return r
-        ? `Sớm nhất sau ${r.min_lead_minutes} phút, xa nhất ${Math.floor(r.max_ahead_hours / 24)} ngày.`
+        ? `Sớm nhất sau ${r.min_lead_minutes} phút, xa nhất ${Math.floor(r.max_ahead_hours / 24)} ngày`
         : '';
 });
 const notice = computed(() =>
@@ -106,14 +105,14 @@ async function load(): Promise<RescheduleInfo | null> {
         });
 
         if (!r.ok) {
-            problem.value = 'Không tải được thông tin bài, hãy thử lại.';
+            problem.value = 'Không tải được thông tin bài, hãy thử lại';
 
             return null;
         }
 
         return (await r.json()) as RescheduleInfo;
     } catch {
-        problem.value = 'Mất kết nối với app, hãy thử lại.';
+        problem.value = 'Mất kết nối với app, hãy thử lại';
 
         return null;
     }
@@ -247,15 +246,12 @@ function save() {
             <div class="grid gap-4">
                 <p
                     v-if="isTikTok"
-                    :class="
-                        cn(
-                            'flex gap-2 rounded-xl border px-3.5 py-3 text-[0.8125rem] leading-relaxed',
-                            toneClasses.info.box,
-                        )
-                    "
+                    class="flex gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-[0.8125rem] leading-relaxed text-foreground"
                     data-testid="fork-auto-reschedule-tiktok"
                 >
-                    <IconBrandTiktok class="mt-0.5 size-4 shrink-0" />
+                    <IconBrandTiktok
+                        class="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                    />
                     <span>
                         <b>Đã hẹn trên TikTok:</b> app xoá bài hẹn cũ, kiểm lại
                         rồi hẹn giờ mới (cần Chrome đang mở). Không xoá được thì
@@ -265,12 +261,7 @@ function save() {
 
                 <p
                     v-if="info && !info.kind && !waiting && !success"
-                    :class="
-                        cn(
-                            'rounded-xl border px-3.5 py-3 text-[0.8125rem]',
-                            toneClasses.warn.box,
-                        )
-                    "
+                    class="rounded-lg border border-l-2 border-l-warning bg-muted/50 px-4 py-3 text-[0.8125rem] text-foreground"
                 >
                     {{ info.reason }}
                 </p>
@@ -302,9 +293,9 @@ function save() {
                         v-if="notice"
                         :class="
                             cn(
-                                'rounded-lg border px-2.5 py-2 text-xs leading-relaxed',
+                                'rounded-lg border px-3 py-2 text-xs leading-relaxed',
                                 notice.tight
-                                    ? toneClasses.warn.box
+                                    ? 'border-l-2 border-l-warning bg-muted/50 text-foreground'
                                     : 'border-border bg-muted/40 text-muted-foreground',
                             )
                         "
@@ -326,12 +317,7 @@ function save() {
 
                 <div
                     v-if="waiting"
-                    :class="
-                        cn(
-                            'flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-[0.8125rem]',
-                            toneClasses.info.box,
-                        )
-                    "
+                    class="flex items-center gap-3 rounded-lg border bg-muted/50 px-4 py-3 text-[0.8125rem] text-foreground"
                     data-testid="fork-auto-reschedule-waiting"
                     aria-live="polite"
                 >
@@ -352,27 +338,17 @@ function save() {
 
                 <p
                     v-if="success"
-                    :class="
-                        cn(
-                            'flex gap-2 rounded-xl border px-3.5 py-3 text-[0.8125rem]',
-                            toneClasses.success.box,
-                        )
-                    "
+                    class="flex gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-[0.8125rem] text-foreground"
                     data-testid="fork-auto-reschedule-ok"
                     aria-live="polite"
                 >
-                    <IconCircleCheck class="mt-0.5 size-4 shrink-0" />{{
-                        success
-                    }}
+                    <IconCircleCheck
+                        class="mt-0.5 size-4 shrink-0 text-success-text"
+                    />{{ success }}
                 </p>
                 <p
                     v-if="problem"
-                    :class="
-                        cn(
-                            'rounded-xl border px-3.5 py-3 text-[0.8125rem]',
-                            toneClasses.danger.box,
-                        )
-                    "
+                    class="rounded-lg border border-l-2 border-l-destructive bg-muted/50 px-4 py-3 text-[0.8125rem] text-foreground"
                     data-testid="fork-auto-reschedule-error"
                     aria-live="polite"
                 >
@@ -399,7 +375,7 @@ function save() {
                 "
                 class="-mt-2 text-xs text-muted-foreground sm:text-right"
             >
-                App sẽ xoá bài hẹn cũ trên TikTok rồi hẹn lại.
+                App sẽ xoá bài hẹn cũ trên TikTok rồi hẹn lại
             </p>
         </DialogContent>
     </Dialog>

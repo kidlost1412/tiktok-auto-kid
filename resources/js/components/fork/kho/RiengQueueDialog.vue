@@ -44,7 +44,7 @@ const failed = ref<Record<number, boolean>>({});
             </p>
 
             <ul v-else class="-mx-1 flex min-h-0 flex-1 flex-col divide-y overflow-y-auto rounded-lg border">
-                <li v-for="q in queue" :key="q.id" class="flex items-center gap-3 p-2.5" :data-testid="`fork-rieng-queue-item-${q.id}`">
+                <li v-for="q in queue" :key="q.id" class="flex items-center gap-3 p-3" :data-testid="`fork-rieng-queue-item-${q.id}`">
                     <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @click="emit('view', q.id)">
                         <span class="relative h-14 w-10 shrink-0 overflow-hidden rounded border bg-muted">
                             <img v-if="!failed[q.id]" :src="`/auto/kho/rieng/video/${q.id}/thumb`" alt="" loading="lazy" class="size-full object-cover" @error="failed[q.id] = true" />
@@ -53,7 +53,7 @@ const failed = ref<Record<number, boolean>>({});
                         <span class="min-w-0 flex-1">
                             <span class="block truncate text-sm font-medium">{{ q.file_name }}</span>
                             <span v-if="q.duration" class="text-xs text-muted-foreground">{{ fmtDuration(q.duration) }}</span>
-                            <span v-if="q.duplicate" class="mt-0.5 flex items-start gap-1 text-xs text-amber-800 dark:text-amber-300">
+                            <span v-if="q.duplicate" class="mt-0.5 flex items-start gap-1 text-xs text-warning">
                                 <IconAlertTriangle class="mt-px size-3.5 shrink-0" /> {{ q.duplicate }}
                             </span>
                         </span>

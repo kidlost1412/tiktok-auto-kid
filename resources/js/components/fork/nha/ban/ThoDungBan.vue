@@ -52,7 +52,7 @@ const pct = computed(() =>
             <div class="flex items-center justify-between gap-4">
                 <div class="min-w-0">
                     <p
-                        class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                        class="text-xs font-medium text-muted-foreground"
                     >
                         Lô đang làm
                     </p>
@@ -104,7 +104,7 @@ const pct = computed(() =>
             </p>
             <p
                 v-if="data?.mode === 'limit'"
-                class="mt-2 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400"
+                class="mt-2 rounded-lg border-l-2 border-amber-500 bg-muted/50 px-3 py-1.5 text-xs text-foreground"
             >
                 Hết hạn mức Claude — vào Cài đặt, đổi tài khoản rồi bấm Bắt đầu
                 làm để làm tiếp.

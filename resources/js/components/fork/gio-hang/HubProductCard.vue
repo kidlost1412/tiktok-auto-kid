@@ -58,9 +58,9 @@ const tone = computed<Tone>(() => {
 });
 
 const frame: Record<Tone, string> = {
-    need: 'border-amber-400 bg-amber-50 ring-1 ring-amber-300/60 dark:border-amber-700 dark:bg-amber-950/40 dark:ring-amber-800/60',
-    bad: 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30',
-    ok: 'border-emerald-300/70 bg-card dark:border-emerald-900',
+    need: 'border-warning/50 bg-card',
+    bad: 'border-destructive/40 bg-card',
+    ok: 'bg-card',
     idle: 'bg-card',
 };
 
@@ -89,7 +89,12 @@ const personaSummary = computed(() => {
 
 <template>
     <div
-        :class="cn('flex flex-col gap-4 rounded-[14px] border p-5 shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]', frame[tone])"
+        :class="
+            cn(
+                'flex flex-col gap-4 rounded-xl border p-5 shadow-card',
+                frame[tone],
+            )
+        "
         :data-testid="`fork-gio-hang-row-${row.code}-${row.quy_cach ?? ''}`"
     >
         <div class="flex items-start justify-between gap-2">
@@ -149,10 +154,10 @@ const personaSummary = computed(() => {
 
         <div
             v-if="tone === 'need'"
-            class="flex items-center gap-2 rounded-lg bg-amber-100 px-4 py-3 text-base font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+            class="flex items-center gap-2 rounded-lg border bg-muted px-4 py-3 text-base font-medium"
             data-testid="fork-gio-hang-need"
         >
-            <IconAlertTriangle class="size-5 shrink-0" />
+            <IconAlertTriangle class="size-5 shrink-0 text-warning" />
             {{ row.new_videos }} video đang chờ — chọn giỏ ngay
         </div>
         <div
@@ -164,13 +169,13 @@ const personaSummary = computed(() => {
 
         <div
             v-if="row.link?.paused_reason"
-            class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+            class="rounded-lg border border-destructive/40 bg-critical-subtle p-3 text-sm text-destructive-text"
         >
             Đã tạm dừng: {{ row.link.paused_reason }} (lưu lại để chạy tiếp)
         </div>
         <div
             v-else-if="row.link?.problem"
-            class="rounded-lg border border-orange-300 bg-orange-50 p-3 text-sm text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200"
+            class="rounded-lg border bg-muted p-3 text-sm text-foreground"
         >
             Video của dòng này đang được giữ trong kho: {{ row.link.problem }}.
         </div>
@@ -215,7 +220,7 @@ const personaSummary = computed(() => {
                 cn(
                     'flex items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 text-base font-medium transition-colors',
                     tone === 'need'
-                        ? 'border-amber-400 text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/30'
+                        ? 'border-warning/50 text-foreground hover:bg-muted'
                         : 'text-muted-foreground hover:bg-muted/50',
                 )
             "
@@ -232,9 +237,7 @@ const personaSummary = computed(() => {
             >
                 <span>Tên giỏ hiện trên video</span>
                 <span
-                    :class="
-                        left >= nameMax ? 'font-semibold text-amber-600' : ''
-                    "
+                    :class="left >= nameMax ? 'font-semibold text-warning' : ''"
                     >{{ left }}/{{ nameMax }}</span
                 >
             </span>

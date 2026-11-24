@@ -109,7 +109,7 @@ const retry = () => {
         tabindex="0"
         :class="
             cn(
-                'group flex cursor-pointer flex-col overflow-hidden rounded-[14px] border bg-card text-left shadow-[0_1px_2px_rgba(28,25,23,.04),0_2px_6px_-1px_rgba(28,25,23,.06)] transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_1px_2px_rgba(0,0,0,.35)]',
+                'group flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm transition duration-200 hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                 selected && 'ring-2 ring-primary',
             )
         "
@@ -173,12 +173,12 @@ const retry = () => {
 
             <StatusChip
                 :status="video.status"
-                class="absolute top-2 left-2 bg-background/90 shadow-sm backdrop-blur"
+                class="absolute top-2 left-2 bg-background/90 shadow-sm"
             />
 
             <span
                 v-if="video.duration"
-                class="absolute right-2 bottom-2 rounded bg-black/65 px-1.5 py-0.5 text-[0.75rem] font-medium text-white tabular-nums"
+                class="absolute right-2 bottom-2 rounded bg-black/65 px-1.5 py-0.5 text-xs font-medium text-white tabular-nums"
             >
                 {{ fmtDuration(video.duration) }}
             </span>
@@ -200,7 +200,7 @@ const retry = () => {
                 :data-testid="`fork-kho-check-${video.id}`"
                 :class="
                     cn(
-                        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border-2 shadow-sm backdrop-blur transition',
+                        'absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border shadow-sm transition',
                         selected
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-white/90 bg-black/35 text-transparent hover:bg-black/55',
@@ -223,7 +223,7 @@ const retry = () => {
                     :href="video.tiktok_link"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:bg-background"
+                    class="flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm transition hover:bg-background"
                     title="Mở trên TikTok"
                     aria-label="Mở trên TikTok"
                     @click.stop
@@ -251,14 +251,18 @@ const retry = () => {
             </div>
             <p
                 class="line-clamp-2 text-xs leading-snug"
-                :class="toneClasses[line.tone].text"
+                :class="
+                    ['success', 'danger', 'warn'].includes(line.tone)
+                        ? toneClasses[line.tone].text
+                        : 'text-muted-foreground'
+                "
             >
                 {{ line.text }}
             </p>
             <button
                 v-if="video.status === 'failed' && video.can_retry"
                 type="button"
-                class="mt-1 inline-flex items-center justify-center gap-1.5 self-start rounded-md border bg-background px-2.5 py-1 text-xs font-medium shadow-xs transition hover:bg-muted disabled:opacity-60"
+                class="mt-1 inline-flex items-center justify-center gap-1.5 self-start rounded-md border bg-background px-3 py-1 text-xs font-medium shadow-xs transition hover:bg-muted disabled:opacity-60"
                 :disabled="retrying"
                 :data-testid="`fork-kho-retry-${video.id}`"
                 @click.stop="retry"

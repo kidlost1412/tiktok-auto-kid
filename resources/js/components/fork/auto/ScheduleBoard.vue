@@ -212,9 +212,7 @@ const pct = (n: number, d: Day) =>
             <div class="min-w-0">
                 <HelpToggle>
                     <template #title>
-                        <h2
-                            class="font-heading text-[1.0625rem] font-semibold tracking-[-0.01em]"
-                        >
+                        <h2 class="font-heading text-[1.0625rem] font-semibold">
                             Lịch đăng
                         </h2>
                     </template>
@@ -252,12 +250,7 @@ const pct = (n: number, d: Day) =>
                     >
                     <span
                         v-if="directWindow?.enabled"
-                        :class="
-                            cn(
-                                'inline-flex items-center gap-1',
-                                toneClasses.violet.text,
-                            )
-                        "
+                        class="inline-flex items-center gap-1"
                         ><IconBolt class="size-3.5" />Đăng thẳng</span
                     >
                     <span class="inline-flex items-center gap-1.5"
@@ -271,7 +264,7 @@ const pct = (n: number, d: Day) =>
                     :aria-pressed="onlyEditable"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-[0.875rem] font-medium transition-colors',
                             onlyEditable
                                 ? 'border-primary bg-primary/10 text-primary-text'
                                 : 'bg-card text-foreground hover:bg-accent',
@@ -289,9 +282,9 @@ const pct = (n: number, d: Day) =>
                     type="button"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors hover:bg-accent',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-[0.875rem] font-medium transition-colors hover:bg-accent',
                             directWindow.enabled
-                                ? toneClasses.violet.chip
+                                ? 'bg-secondary text-foreground'
                                 : 'bg-card text-muted-foreground',
                         )
                     "
@@ -313,13 +306,10 @@ const pct = (n: number, d: Day) =>
                     :aria-pressed="onlyCart"
                     :class="
                         cn(
-                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.875rem] font-medium transition-colors',
+                            'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-[0.875rem] font-medium transition-colors',
                             onlyCart
-                                ? 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
-                                : cn(
-                                      toneClasses.danger.chip,
-                                      'hover:opacity-90',
-                                  ),
+                                ? 'border-destructive bg-critical-subtle text-destructive-text'
+                                : 'border-transparent bg-critical-subtle text-destructive-text hover:opacity-90',
                         )
                     "
                     title="Bài sắp đăng mà giỏ đã hết hàng hoặc không còn trong shop. Bấm để chỉ xem các bài này."
@@ -332,7 +322,7 @@ const pct = (n: number, d: Day) =>
                 <SourceFilter v-model="source" />
                 <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-3 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title="Đổi chỗ giờ các bài chưa gửi lên TikTok để hai bài liền nhau khác sản phẩm (có xem trước và hoàn tác)"
                     data-testid="fork-auto-mix-open"
                     @click="mixOpen = true"
@@ -341,7 +331,7 @@ const pct = (n: number, d: Day) =>
                 </button>
                 <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-3 text-[0.875rem] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title="Video anh đã xoá: khôi phục được trong 30 ngày"
                     data-testid="fork-auto-trash-open"
                     @click="trashOpen = true"
@@ -351,7 +341,7 @@ const pct = (n: number, d: Day) =>
             </div>
         </header>
 
-        <!-- Lọc theo kênh: mỗi kênh một màu -->
+        <!-- Lọc theo kênh -->
         <div
             v-if="multi"
             class="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-5 py-2"
@@ -364,7 +354,7 @@ const pct = (n: number, d: Day) =>
                 :aria-pressed="channel === 'all'"
                 :class="
                     cn(
-                        'inline-flex h-7 items-center rounded-full border px-3 text-[0.875rem] font-medium transition-colors',
+                        'inline-flex h-7 items-center rounded-md border px-3 text-[0.875rem] font-medium transition-colors',
                         channel === 'all'
                             ? 'border-foreground/30 bg-foreground/5 text-foreground'
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -381,9 +371,9 @@ const pct = (n: number, d: Day) =>
                 :aria-pressed="channel === a.id"
                 :class="
                     cn(
-                        'inline-flex h-7 max-w-[14rem] items-center gap-1.5 rounded-full border px-3 text-[0.875rem] font-medium transition-colors',
+                        'inline-flex h-7 max-w-56 items-center gap-1.5 rounded-md border px-3 text-[0.875rem] font-medium transition-colors',
                         channel === a.id
-                            ? cn('border-transparent', channelColor(i).chip)
+                            ? 'border-foreground/30 bg-foreground/5 text-foreground'
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                     )
                 "
@@ -408,14 +398,13 @@ const pct = (n: number, d: Day) =>
                 :key="n.id"
                 :class="
                     cn(
-                        'rounded-lg border px-3.5 py-2 text-[0.875rem]',
-                        toneClasses.warn.box,
+                        'rounded-lg border border-l-2 border-l-warning bg-muted/50 px-4 py-2 text-[0.875rem] text-foreground',
                     )
                 "
             >
                 <IconShoppingCartOff
                     v-if="n.cart"
-                    class="mr-1 inline size-4 align-[-3px]"
+                    class="mr-1 inline size-4 align-[-3px] text-warning"
                 />
                 <b v-if="multi">@{{ n.username }}: </b>{{ n.note }}
                 <Link
@@ -468,7 +457,7 @@ const pct = (n: number, d: Day) =>
                         </span>
                         <span class="flex items-baseline gap-1">
                             <span
-                                class="font-heading text-[1.5rem] leading-none font-[650] tracking-tight tabular-nums"
+                                class="font-heading text-[1.5rem] leading-none font-medium tabular-nums"
                                 >{{ d.real + d.planned }}</span
                             >
                             <span class="text-[0.8125rem] text-muted-foreground"
@@ -503,10 +492,10 @@ const pct = (n: number, d: Day) =>
                             >{{ d.inApp }} chưa lên TikTok</span
                         >
                         <span v-if="d.planned">{{ d.planned }} dự kiến</span>
-                        <span v-if="d.failed" :class="toneClasses.danger.text"
+                        <span v-if="d.failed" class="text-destructive-text"
                             >{{ d.failed }} lỗi</span
                         >
-                        <span v-if="d.empty" :class="toneClasses.warn.text"
+                        <span v-if="d.empty" class="text-warning"
                             >{{ d.empty }} giờ trống</span
                         >
                         <span v-if="!d.list.length">Chưa có giờ đăng</span>
@@ -576,7 +565,7 @@ const pct = (n: number, d: Day) =>
                     </span>
                     <span class="flex items-baseline gap-1">
                         <span
-                            class="font-heading text-[1.625rem] leading-none font-[650] tracking-tight tabular-nums"
+                            class="font-heading text-[1.625rem] leading-none font-medium tabular-nums"
                             >{{ d.real + d.planned }}</span
                         >
                         <span class="text-[0.8438rem] text-muted-foreground"

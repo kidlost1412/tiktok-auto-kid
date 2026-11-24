@@ -122,7 +122,7 @@ watch(
                 />
                 <IconAlertTriangle
                     v-else-if="loi"
-                    class="size-4 shrink-0 text-red-500"
+                    class="size-4 shrink-0 text-red-600 dark:text-red-400"
                     aria-hidden="true"
                 />
                 <span
@@ -137,14 +137,14 @@ watch(
                         class="relative inline-flex size-2.5 rounded-full bg-emerald-500"
                     />
                 </span>
-                <p class="min-w-0 flex-1 truncate text-sm font-semibold">
+                <p class="min-w-0 flex-1 truncate text-sm font-medium">
                     {{ tieuDe }}
                 </p>
                 <span
                     v-if="item.xong"
                     :class="
                         cn(
-                            'shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold',
+                            'shrink-0 rounded-md px-2 py-0.5 text-xs font-medium',
                             loi
                                 ? 'bg-red-500/15 text-red-600 dark:text-red-400'
                                 : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
@@ -186,7 +186,7 @@ watch(
         <div
             v-if="coChu"
             ref="man"
-            class="ls-man max-h-52 min-h-16 overflow-y-auto border-t border-zinc-800 bg-zinc-950 px-4 py-3 text-[0.8125rem] leading-relaxed text-zinc-300"
+            class="ls-man max-h-52 min-h-16 overflow-y-auto border-t border-zinc-800 bg-zinc-950 px-4 py-3 text-sm leading-relaxed text-zinc-300"
             role="log"
             aria-live="off"
             data-testid="nha-truc-tiep-man"
@@ -221,7 +221,7 @@ watch(
             </p>
             <p
                 v-if="item.suy_nghi && dang"
-                class="mt-1.5 text-xs break-words text-zinc-500 italic"
+                class="mt-1.5 text-xs break-words text-zinc-500"
             >
                 Đang nghĩ: …{{ item.suy_nghi }}
             </p>
@@ -234,7 +234,7 @@ watch(
             <span
                 v-for="c in chip"
                 :key="c"
-                class="rounded-full bg-secondary px-2 py-0.5 text-[0.6875rem] text-muted-foreground tabular-nums"
+                class="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground tabular-nums"
                 >{{ c }}</span
             >
         </footer>

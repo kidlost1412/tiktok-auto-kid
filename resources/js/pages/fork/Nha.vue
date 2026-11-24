@@ -225,18 +225,18 @@ onBeforeUnmount(() => {
                     @fallback="use2d = true"
                 />
                 <div
-                    class="pointer-events-none absolute top-3 left-3 flex max-w-[min(440px,calc(100%-24px))] flex-col gap-1.5 md:top-4 md:left-5"
+                    class="pointer-events-none absolute top-3 left-3 flex max-w-[min(440px,calc(100%-24px))] flex-col gap-2 md:top-4 md:left-5"
                 >
                     <div
-                        class="rounded-2xl border border-white/60 bg-white/75 px-3 py-1.5 text-[#3d2f5c] shadow-[0_4px_18px_rgba(74,56,104,.16)] backdrop-blur-md sm:px-3.5 sm:py-2 md:px-4 md:py-2.5"
+                        class="rounded-xl border border-black/10 bg-white/95 px-3 py-2 text-neutral-800 shadow-md sm:px-4 md:px-4 md:py-3"
                     >
                         <h1
-                            class="font-heading text-base leading-tight font-bold tracking-tight sm:text-lg md:text-2xl"
+                            class="font-heading text-base leading-tight font-semibold sm:text-lg md:text-2xl"
                         >
-                            {{ greeting }}!
+                            {{ greeting }}
                         </h1>
                         <p
-                            class="line-clamp-2 text-xs leading-snug font-medium text-[#5a4a78] sm:text-[0.8125rem] md:text-[0.9375rem]"
+                            class="line-clamp-2 text-xs leading-snug font-medium text-neutral-600 sm:text-sm"
                             role="status"
                             data-testid="nha-line"
                         >
@@ -253,7 +253,7 @@ onBeforeUnmount(() => {
                     />
                     <span
                         v-if="demo"
-                        class="self-start rounded-full bg-amber-300/90 px-2.5 py-0.5 text-[0.6875rem] font-bold text-amber-950 shadow sm:px-3 sm:py-1 sm:text-xs"
+                        class="self-start rounded-md bg-amber-300/90 px-2 py-1 text-xs font-medium text-amber-950"
                         >Xem thử · dữ liệu giả</span
                     >
                 </div>
@@ -264,9 +264,9 @@ onBeforeUnmount(() => {
             >
                 <div class="flex flex-col gap-1">
                     <h1
-                        class="font-heading text-2xl font-semibold tracking-tight md:text-3xl"
+                        class="font-heading text-2xl font-semibold md:text-3xl"
                     >
-                        {{ greeting }}!
+                        {{ greeting }}
                     </h1>
                     <p
                         class="text-base text-muted-foreground md:text-lg"
@@ -284,7 +284,7 @@ onBeforeUnmount(() => {
                     @retry="load"
                 />
                 <div
-                    class="relative overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
+                    class="relative overflow-hidden rounded-xl border border-border bg-card shadow-sm"
                 >
                     <House :data="data" @go="go" />
                 </div>

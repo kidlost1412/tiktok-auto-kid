@@ -94,7 +94,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 <template>
     <div class="flex min-h-screen flex-col bg-background text-foreground">
         <header
-            class="sticky top-0 z-30 shrink-0 border-b border-border bg-background/85 backdrop-blur-md backdrop-saturate-150"
+            class="sticky top-0 z-30 shrink-0 border-b border-border bg-background"
             data-testid="app-header"
         >
             <div
@@ -102,12 +102,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             >
                 <Link href="/nha" class="flex shrink-0 items-center gap-2.5">
                     <span
-                        class="grid size-[34px] place-items-center rounded-[10px] bg-linear-to-br from-violet-500 to-violet-700 text-white shadow-[0_6px_14px_-4px_rgb(109_40_217/0.5),inset_0_1px_0_rgb(255_255_255/0.25)]"
+                        class="grid size-8 place-items-center rounded-lg bg-primary-strong text-white"
                     >
                         <IconBrandTiktok class="size-[18px]" />
                     </span>
                     <span
-                        class="hidden text-[1.0625rem] font-semibold tracking-[-0.015em] whitespace-nowrap sm:inline"
+                        class="hidden text-[1.0625rem] font-semibold whitespace-nowrap xl:inline"
                         >TikTok Auto Kid</span
                     >
                 </Link>
@@ -123,22 +123,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         :aria-current="active(l.href) ? 'page' : undefined"
                         :class="
                             cn(
-                                'relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] px-2.5 text-[0.9375rem] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
+                                'relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[0.9375rem] font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
                                 active(l.href) &&
-                                    'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08),0_1px_1px_rgb(28_25_23/0.04)] dark:bg-accent dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_3px_rgb(0_0_0/0.5)]',
+                                    'bg-card text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08)] dark:bg-accent dark:shadow-none',
                             )
                         "
                     >
-                        <component
-                            :is="l.icon"
-                            :class="
-                                cn(
-                                    'size-[17px] opacity-80',
-                                    active(l.href) &&
-                                        'text-primary-text opacity-100',
-                                )
-                            "
-                        />
+                        <component :is="l.icon" class="size-4" />
                         <span :class="active(l.href) ? '' : 'max-md:sr-only'">{{
                             l.label
                         }}</span>
@@ -162,9 +153,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         @click="searchOpen = true"
                     >
                         <IconSearch class="size-[17px]" />
-                        <span class="hidden lg:inline">Tìm nhanh</span>
+                        <span class="hidden min-[1400px]:inline"
+                            >Tìm nhanh</span
+                        >
                         <kbd
-                            class="hidden rounded border border-border bg-background px-1.5 text-[0.6875rem] leading-5 lg:inline"
+                            class="hidden rounded border border-border bg-background px-1.5 text-[0.6875rem] leading-5 min-[1400px]:inline"
                             >Ctrl K</kbd
                         >
                     </button>
@@ -187,24 +180,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :title="`Giao diện ${o.label.toLowerCase()}`"
                             :class="
                                 cn(
-                                    'inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-sm font-medium transition-colors sm:px-3',
+                                    'inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors sm:px-3',
                                     dark === o.v
-                                        ? 'bg-card font-semibold text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08)] dark:bg-accent'
+                                        ? 'bg-card text-foreground shadow-[0_1px_2px_rgb(28_25_23/0.08)] dark:bg-accent dark:shadow-none'
                                         : 'text-muted-foreground hover:text-foreground',
                                 )
                             "
                             @click="setTheme(o.v)"
                         >
-                            <component
-                                :is="o.icon"
-                                :class="
-                                    cn(
-                                        'size-4',
-                                        dark === o.v && 'text-primary-text',
-                                    )
-                                "
-                            />
-                            <span class="hidden sm:inline">{{ o.label }}</span>
+                            <component :is="o.icon" class="size-4" />
+                            <span class="hidden min-[1400px]:inline">{{
+                                o.label
+                            }}</span>
                         </button>
                     </div>
                 </div>

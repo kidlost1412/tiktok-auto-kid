@@ -264,8 +264,7 @@ const system = computed<Sys[]>(() => {
     ];
 });
 
-const label =
-    'text-[0.75rem] font-medium tracking-[0.02em] text-muted-foreground uppercase';
+const label = 'text-xs font-medium text-muted-foreground';
 </script>
 
 <template>
@@ -273,7 +272,7 @@ const label =
         :class="
             cn(
                 cardCls,
-                'grid overflow-hidden sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1.05fr_1.3fr_0.95fr_1.25fr_1fr]',
+                'grid overflow-hidden sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[1fr_1.2fr_0.9fr_1.15fr_1.25fr]',
             )
         "
         data-testid="fork-auto-kpi"
@@ -284,7 +283,7 @@ const label =
             title="Số bài đã đăng hôm nay trên tổng chỉ tiêu các kênh đang bật. Vòng đậm = đã đăng, vòng nhạt = đã hẹn chờ giờ; chỗ trống = chỉ tiêu trừ số đã xếp."
             data-testid="fork-auto-kpi-today"
         >
-            <div class="relative size-[76px] shrink-0">
+            <div class="relative size-20 shrink-0">
                 <svg viewBox="0 0 76 76" class="size-full -rotate-90">
                     <circle
                         cx="38"
@@ -329,7 +328,7 @@ const label =
                 <div :class="label">Hôm nay đã đăng</div>
                 <div class="mt-1 flex items-baseline gap-1 whitespace-nowrap">
                     <span
-                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                        class="font-heading text-[1.875rem] leading-none font-medium tabular-nums"
                         >{{ today.posted }}</span
                     >
                     <span
@@ -371,7 +370,7 @@ const label =
                     <CoverThumb
                         :id="next.id ?? next.video_id"
                         :fallback="next.product_image"
-                        class="h-[78px] w-[44px] transition group-hover:brightness-90"
+                        class="h-20 w-11 transition group-hover:brightness-90"
                     />
                 </button>
                 <div class="min-w-0 flex-1">
@@ -379,21 +378,22 @@ const label =
                         <span :class="label">Bài kế tiếp · {{ nextDay }}</span>
                         <StatusChip
                             :status="lichStatus(next.state)"
-                            class="h-5 gap-1 px-1.5 text-[0.7188rem] [&_svg]:size-3"
+                            :class="
+                                cn(
+                                    'h-5 gap-1 rounded-md px-1.5 text-[0.7188rem] [&_svg]:size-3',
+                                    next.state === 'direct' &&
+                                        'bg-secondary text-muted-foreground dark:bg-secondary dark:text-muted-foreground',
+                                )
+                            "
                         />
                     </div>
                     <div class="mt-1 flex items-baseline gap-2">
                         <span
-                            class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                            class="font-heading text-[1.875rem] leading-none font-medium tabular-nums"
                             >{{ dayjs(next.at).format('HH:mm') }}</span
                         >
                         <span
-                            :class="
-                                cn(
-                                    'truncate text-[0.8125rem] font-medium',
-                                    toneClasses.info.text,
-                                )
-                            "
+                            class="truncate text-[0.8125rem] font-medium text-muted-foreground"
                             >{{ nextLeft }}</span
                         >
                     </div>
@@ -419,7 +419,7 @@ const label =
             <div v-else class="min-w-0">
                 <div :class="label">Bài kế tiếp</div>
                 <div
-                    class="mt-1.5 font-heading text-[1.25rem] font-semibold tracking-tight text-muted-foreground"
+                    class="mt-1.5 font-heading text-[1.25rem] font-medium text-muted-foreground"
                 >
                     Chưa có bài hẹn
                 </div>
@@ -435,7 +435,6 @@ const label =
             :class="
                 cn(
                     'group flex flex-col justify-center border-t p-5 transition-colors hover:bg-accent/40 xl:border-t-0 xl:border-l',
-                    stock.low && 'bg-amber-50/60 dark:bg-amber-950/20',
                 )
             "
             title="Video đã duyệt (cả chờ xếp lịch lẫn đã hẹn) của các sản phẩm đang bật. 'Đủ đăng ~N ngày' = số video đó chia chỉ tiêu bài mỗi ngày của các kênh đang bật; ngày hết là ngày dự kiến nếu không có video mới."
@@ -449,7 +448,7 @@ const label =
             </div>
             <div class="mt-1 flex items-baseline gap-1.5">
                 <span
-                    class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                    class="font-heading text-[1.875rem] leading-none font-medium tabular-nums"
                     >{{
                         fmtNum(stock.new_total + (stock.scheduled_total ?? 0))
                     }}</span
@@ -462,9 +461,7 @@ const label =
                 :class="
                     cn(
                         'mt-2 text-[0.7812rem] tabular-nums',
-                        stock.low
-                            ? toneClasses.warn.text
-                            : 'text-muted-foreground',
+                        stock.low ? 'text-warning' : 'text-muted-foreground',
                     )
                 "
             >
@@ -496,7 +493,7 @@ const label =
                 </div>
                 <div class="mt-1 flex items-baseline gap-1.5 whitespace-nowrap">
                     <span
-                        class="font-heading text-[1.875rem] leading-none font-[650] tracking-[-0.03em] tabular-nums"
+                        class="font-heading text-[1.875rem] leading-none font-medium tabular-nums"
                         >{{
                             trend.byViews
                                 ? fmtCompact(trend.views)
@@ -517,7 +514,7 @@ const label =
                 </div>
             </div>
             <div
-                class="flex h-[60px] min-w-[84px] flex-1 items-end gap-1"
+                class="flex h-15 min-w-21 flex-1 items-end gap-1"
                 role="img"
                 :aria-label="`Biểu đồ 7 ngày: ${trend.byViews ? 'lượt xem' : 'số bài'} theo ngày`"
             >
@@ -526,7 +523,7 @@ const label =
                     :key="b.date"
                     :class="
                         cn(
-                            'flex-1 rounded-[3px] transition-colors',
+                            'flex-1 rounded-sm transition-colors',
                             b.last
                                 ? 'bg-primary'
                                 : 'bg-primary/30 group-hover:bg-primary/45',
@@ -556,15 +553,17 @@ const label =
                         cn(
                             'size-2 shrink-0 rounded-full',
                             toneClasses[s.tone].dot,
-                            !hub && s.key === 'hub' && 'animate-pulse',
                         )
                     "
                 />
-                <span class="text-muted-foreground">{{ s.label }}</span>
+                <span
+                    class="shrink-0 whitespace-nowrap text-muted-foreground"
+                    >{{ s.label }}</span
+                >
                 <span
                     :class="
                         cn(
-                            'ml-auto truncate font-medium',
+                            'ml-auto line-clamp-2 min-w-0 text-right leading-snug font-medium break-words',
                             s.tone === 'neutral'
                                 ? 'text-muted-foreground'
                                 : toneClasses[s.tone].text,

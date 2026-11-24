@@ -577,7 +577,7 @@ watch(shownCover, () => {
                     size="sm"
                     variant="outline"
                     :disabled="!canEdit"
-                    class="text-red-600 hover:text-red-700 dark:text-red-400"
+                    class="text-destructive-text hover:text-destructive-text"
                     data-testid="fork-viewer-remove"
                     @click="confirmRemove = true"
                 >

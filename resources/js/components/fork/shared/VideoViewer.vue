@@ -365,10 +365,12 @@ const statLine = computed(() => {
 
                     <div
                         v-if="video.duplicate"
-                        class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                        class="flex items-start gap-2 rounded-lg border border-l-2 border-l-amber-500 bg-muted/50 p-3 text-sm text-foreground"
                         data-testid="fork-viewer-duplicate"
                     >
-                        <IconAlertTriangle class="mt-0.5 size-4 shrink-0" />
+                        <IconAlertTriangle
+                            class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                        />
                         <span>
                             {{ video.duplicate.text }}
                             <a
@@ -554,7 +556,7 @@ const statLine = computed(() => {
                                 :src="video.channel_avatar ?? null"
                                 :name="video.channel?.replace(/^@+/, '') || '?'"
                                 class="size-5 rounded-full"
-                                fallback-class="bg-secondary text-[0.65rem] font-bold"
+                                fallback-class="bg-secondary text-xs font-medium"
                             />
                             <span class="truncate">{{
                                 video.channel ?? '—'

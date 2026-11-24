@@ -52,7 +52,9 @@ const chips = computed<Chip[]>(() => {
         {
             key: 'telegram',
             href: '/settings#telegram',
-            hint: props.health.telegram ? 'Mở cài đặt Telegram' : 'Cài đặt Telegram (3 bước, không cần sửa file)',
+            hint: props.health.telegram
+                ? 'Mở cài đặt Telegram'
+                : 'Cài đặt Telegram (3 bước, không cần sửa file)',
             text: `Telegram: ${props.health.telegram ? 'Đã cấu hình' : 'Chưa cấu hình'}`,
             icon: IconBellRinging,
             level: props.health.telegram ? 'ok' : 'idle',
@@ -65,7 +67,7 @@ const tone = (l: Level): Tone => healthTone[l];
 
 <template>
     <div
-        class="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-2"
+        class="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2"
         data-testid="fork-auto-health"
     >
         <Link
@@ -76,12 +78,17 @@ const tone = (l: Level): Tone => healthTone[l];
             :data-testid="`fork-health-chip-${c.key}`"
             :class="
                 cn(
-                    'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition hover:bg-accent/50',
+                    'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium transition hover:bg-accent/50',
                 )
             "
         >
             <span
-                :class="cn('flex size-2.5 shrink-0 rounded-full', toneClasses[tone(c.level)].dot, c.loading && 'animate-pulse')"
+                :class="
+                    cn(
+                        'flex size-2.5 shrink-0 rounded-full',
+                        toneClasses[tone(c.level)].dot,
+                    )
+                "
             />
             <component :is="c.icon" class="size-4 text-muted-foreground" />
             <Skeleton v-if="c.loading" class="h-4 w-24" />

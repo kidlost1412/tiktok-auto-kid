@@ -76,7 +76,7 @@ const hasHighlight = computed(() => props.highlight.length > 0);
                     <div
                         :class="
                             cn(
-                                'w-full max-w-14 rounded-t-[4px] transition-[height,opacity] duration-500',
+                                'w-full max-w-14 rounded-t-[4px] transition-[height,opacity] duration-200',
                                 hasHighlight && !highlight.includes(p.key)
                                     ? 'bg-primary-strong/30 group-hover:bg-primary-strong/60'
                                     : 'bg-primary-strong/80 group-hover:bg-primary-strong',

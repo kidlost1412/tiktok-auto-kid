@@ -325,12 +325,12 @@ const chay = computed(() =>
 );
 
 const labelCls =
-    'text-xs font-medium tracking-[0.02em] text-muted-foreground uppercase';
+    'text-xs font-medium text-muted-foreground';
 const tileCls = cn(
     cardCls,
     'flex min-w-0 flex-col gap-1 px-4 py-3.5 text-left transition-colors',
 );
-const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
+const h2 = 'font-heading text-base font-semibold';
 </script>
 
 <template>
@@ -338,7 +338,7 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
         <!-- Lời chào + một câu tình hình -->
         <div>
             <h2
-                class="font-heading text-xl font-semibold tracking-[-0.015em]"
+                class="font-heading text-xl font-semibold"
                 data-testid="ban-sanh-loichao"
             >
                 {{ greeting }}
@@ -366,7 +366,7 @@ const h2 = 'font-heading text-base font-semibold tracking-[-0.01em]';
                                     ? 'bg-red-500'
                                     : c.xong
                                       ? 'bg-emerald-500'
-                                      : 'animate-pulse bg-emerald-500',
+                                      : 'bg-emerald-500',
                             )
                         "
                         aria-hidden="true"

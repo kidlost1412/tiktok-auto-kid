@@ -26,7 +26,12 @@ const tall = computed<boolean>(() => {
     const w = props.cover.w;
     const h = props.cover.h;
 
-    return w > 0 && h > 0 && Math.abs(Math.log(w / h / (9 / 16))) < Math.abs(Math.log(w / h / (3 / 4)));
+    return (
+        w > 0 &&
+        h > 0 &&
+        Math.abs(Math.log(w / h / (9 / 16))) <
+            Math.abs(Math.log(w / h / (3 / 4)))
+    );
 });
 
 /** Phần đã cắt khỏi ảnh gốc (px mỗi phía), null khi không biết ảnh gốc hoặc ảnh gốc đã đúng 3:4 / 9:16 (sai số 3%). */
@@ -96,7 +101,7 @@ const hatch =
                         />
                         <div
                             v-else
-                            class="flex size-full items-center justify-center bg-gradient-to-b from-muted to-muted-foreground/20"
+                            class="flex size-full items-center justify-center bg-muted"
                             aria-hidden="true"
                         >
                             <IconPhoto
@@ -121,10 +126,7 @@ const hatch =
             </figure>
 
             <!-- Bìa 9:16: hiện nguyên khung -->
-            <figure
-                v-if="tall"
-                class="flex flex-col items-center gap-1.5"
-            >
+            <figure v-if="tall" class="flex flex-col items-center gap-1.5">
                 <div
                     class="relative aspect-[9/16] w-28 overflow-hidden rounded-md border bg-background"
                     aria-label="Ảnh bìa 9:16 giữ nguyên"
@@ -135,7 +137,7 @@ const hatch =
                         class="size-full object-cover"
                     />
                     <span
-                        class="absolute top-0 left-0 m-1 rounded bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
+                        class="absolute top-0 left-0 m-1 rounded-md bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
                         >9:16</span
                     >
                 </div>
@@ -171,7 +173,7 @@ const hatch =
                         class="pointer-events-none absolute inset-x-0 top-[12.5%] h-3/4 border-2 border-dashed border-primary"
                     />
                     <span
-                        class="absolute top-[12.5%] left-0 m-1 rounded bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
+                        class="absolute top-[12.5%] left-0 m-1 rounded-md bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
                         >3:4</span
                     >
                     <div
@@ -197,7 +199,8 @@ const hatch =
             <template v-if="cropNote">{{ cropNote }} </template>
             <template v-if="tall"
                 >Lưới trang cá nhân vẫn là ô 3:4 nên bìa 9:16 bị cắt khoảng 1/8
-                ở trên và 1/8 ở dưới: hãy đặt chữ và sản phẩm ở giữa ảnh.</template
+                ở trên và 1/8 ở dưới: hãy đặt chữ và sản phẩm ở giữa
+                ảnh.</template
             >
             <template v-else
                 >Ảnh làm từ khung dọc 9:16 sẽ mất khoảng 1/8 ở trên và 1/8 ở

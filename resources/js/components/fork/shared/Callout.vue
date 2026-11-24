@@ -33,14 +33,18 @@ const icon = computed(
     <div
         :class="
             cn(
-                'flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm font-medium',
+                'flex items-start gap-3 rounded-xl border px-4 py-3 text-sm',
                 toneClasses[tone].box,
+                'text-foreground',
                 props.class,
             )
         "
         role="status"
     >
-        <component :is="icon" class="mt-0.5 size-5 shrink-0" />
+        <component
+            :is="icon"
+            :class="cn('mt-0.5 size-5 shrink-0', toneClasses[tone].text)"
+        />
         <div class="min-w-0 flex-1 leading-relaxed"><slot /></div>
         <div v-if="$slots.action" class="shrink-0 self-center">
             <slot name="action" />

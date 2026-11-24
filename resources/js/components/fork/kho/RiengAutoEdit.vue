@@ -4,7 +4,7 @@ import {
     IconCheck,
     IconLoader2,
     IconRefresh,
-    IconSparkles,
+    IconEye,
 } from '@tabler/icons-vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -153,7 +153,7 @@ const send = async (body: Record<string, unknown>, quiet = false) => {
     busy.value = null;
 
     if (!r.ok || !r.data?.auto) {
-        toast.error(r.data?.error ?? 'Chưa lưu được, anh thử lại.');
+        toast.error(r.data?.error ?? 'Chưa lưu được, anh thử lại');
 
         return false;
     }
@@ -162,7 +162,7 @@ const send = async (body: Record<string, unknown>, quiet = false) => {
     emit('saved', props.video.id, r.data.auto);
 
     if (!quiet) {
-        toast.success('Đã lưu.');
+        toast.success('Đã lưu');
     }
 
     return true;
@@ -243,11 +243,11 @@ const watchAi = () => {
             }
 
             if (r.data.auto.ai_state === 'ok') {
-                toast.success('AI đã nhận ra sản phẩm.');
+                toast.success('AI đã nhận ra sản phẩm');
             } else if (r.data.auto.ai_state === 'unsure') {
-                toast('AI xem xong nhưng chưa chắc sản phẩm, anh chọn giúp.');
+                toast('AI xem xong nhưng chưa chắc sản phẩm, anh chọn giúp');
             } else {
-                toast.error('AI chưa xem được video này.');
+                toast.error('AI chưa xem được video này');
             }
         }
     }, 3000);
@@ -271,7 +271,7 @@ const reanalyze = async () => {
         emit('saved', props.video.id, r.data.auto);
         watchAi();
     } else {
-        toast.error(r.data?.error ?? 'Chưa cho AI xem lại được, anh thử lại.');
+        toast.error(r.data?.error ?? 'Chưa cho AI xem lại được, anh thử lại');
     }
 };
 
@@ -280,9 +280,9 @@ const showSteps = ref(false);
 
 const chipCls = (on: boolean) =>
     cn(
-        'inline-flex items-center gap-1.5 rounded-full border-2 py-0.5 pr-2.5 pl-0.5 text-[13px] font-medium transition',
+        'inline-flex items-center gap-1.5 rounded-lg border py-0.5 pr-3 pl-0.5 text-sm font-medium transition',
         on
-            ? 'border-violet-600 bg-violet-50 text-foreground dark:border-primary dark:bg-primary/10'
+            ? 'border-primary bg-primary-subtle text-foreground'
             : 'border-border bg-background text-foreground/80 hover:border-foreground/40',
     );
 
@@ -307,10 +307,10 @@ const initial = (name: string) =>
 
             <div v-if="video" class="flex min-w-0 flex-col gap-4 text-sm">
                 <!-- AI thấy gì -->
-                <section class="rounded-xl border-2 bg-muted/30 p-3">
+                <section class="rounded-xl border bg-muted/30 p-3">
                     <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center gap-1.5 font-semibold">
-                            <IconSparkles class="size-4 shrink-0" />
+                            <IconEye class="size-4 shrink-0 text-muted-foreground" />
                             {{ sureText }}
                         </div>
                         <Button
@@ -334,7 +334,7 @@ const initial = (name: string) =>
                         class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
                     >
                         <div
-                            class="h-full rounded-full bg-violet-600 transition-all dark:bg-primary"
+                            class="h-full rounded-full bg-primary transition-all"
                             :style="{
                                 width:
                                     Math.round(
@@ -347,16 +347,16 @@ const initial = (name: string) =>
                     </div>
                     <p
                         v-if="auto?.ai_reason"
-                        class="mt-1 text-[13px] text-foreground/70"
+                        class="mt-1 text-sm text-foreground/70"
                     >
                         Vì: {{ auto.ai_reason }}
                     </p>
-                    <p v-if="auto?.ai_summary" class="mt-1 text-[13px]">
+                    <p v-if="auto?.ai_summary" class="mt-1 text-sm">
                         Video: {{ auto.ai_summary }}
                     </p>
                     <details
                         v-if="auto?.ai_heard"
-                        class="mt-1 text-[13px]"
+                        class="mt-1 text-sm"
                         data-testid="fork-rieng-ai-heard"
                     >
                         <summary class="cursor-pointer font-medium">
@@ -368,7 +368,7 @@ const initial = (name: string) =>
                     </details>
                     <div
                         v-if="auto?.ai_steps?.length && !auto.ai_progress"
-                        class="mt-1 text-[13px]"
+                        class="mt-1 text-sm"
                     >
                         <button
                             type="button"
@@ -445,7 +445,7 @@ const initial = (name: string) =>
                         "
                     />
                     <div
-                        class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-foreground/70"
+                        class="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground/70"
                     >
                         <span
                             >{{ caption.length }} ký tự · hashtag sản phẩm app
@@ -473,7 +473,7 @@ const initial = (name: string) =>
                             data-testid="fork-rieng-hashtags"
                         />
                         <div
-                            class="flex flex-wrap items-center justify-between gap-2 text-[13px] text-foreground/70"
+                            class="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground/70"
                         >
                             <span
                                 >Cách nhau bằng dấu cách. Để trống = không
@@ -522,7 +522,7 @@ const initial = (name: string) =>
                         >
                             <IconCheck
                                 v-if="channels.length === 0"
-                                class="size-3.5 text-violet-600 dark:text-primary"
+                                class="size-3.5 text-muted-foreground"
                                 stroke-width="3"
                             />
                             Theo thư mục / mọi kênh
@@ -542,14 +542,14 @@ const initial = (name: string) =>
                                     alt=""
                                 />
                                 <AvatarFallback
-                                    class="text-[11px] font-semibold"
+                                    class="text-xs font-semibold"
                                     >{{ initial(c.name) }}</AvatarFallback
                                 >
                             </Avatar>
                             {{ c.name }}
                             <IconCheck
                                 v-if="channels.includes(c.id)"
-                                class="size-3.5 text-violet-600 dark:text-primary"
+                                class="size-3.5 text-muted-foreground"
                                 stroke-width="3"
                             />
                         </button>
@@ -559,9 +559,9 @@ const initial = (name: string) =>
                 <!-- Video trùng -->
                 <section
                     v-if="video.duplicate && settings?.duplicates === 'ask'"
-                    class="flex items-center justify-between gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    class="flex items-center justify-between gap-3 rounded-lg border border-l-4 border-l-warning bg-card p-3 text-foreground"
                 >
-                    <span class="text-[13px] font-medium"
+                    <span class="text-sm font-medium"
                         >{{ video.duplicate.text }}. Vẫn đăng?</span
                     >
                     <Switch

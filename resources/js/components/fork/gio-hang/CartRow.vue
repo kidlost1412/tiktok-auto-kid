@@ -67,9 +67,9 @@ const state = computed<State>(() => {
 });
 
 const dot: Record<State, string> = {
-    need: 'bg-amber-500',
-    bad: 'bg-red-500',
-    ok: 'bg-emerald-500',
+    need: 'bg-warning',
+    bad: 'bg-destructive',
+    ok: 'bg-success',
     idle: 'bg-muted-foreground/40',
 };
 
@@ -130,9 +130,9 @@ const nameLen = computed(() => [...props.name].length);
                 'group/row grid gap-y-2 py-2.5 transition-colors lg:items-center',
                 compact
                     ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
-                    : 'gap-x-3 px-5 xl:gap-x-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px]',
-                state === 'need' && 'bg-amber-50/70 dark:bg-amber-950/25',
-                state === 'bad' && 'bg-red-50/50 dark:bg-red-950/20',
+                    : 'gap-x-3 px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_44px_84px] xl:grid-cols-[minmax(200px,1fr)_minmax(240px,1.3fr)_minmax(260px,1.4fr)_minmax(170px,0.8fr)_84px] xl:gap-x-5',
+                state === 'need' && 'bg-warning/5',
+                state === 'bad' && 'bg-destructive/5',
             )
         "
         :data-testid="`fork-gio-hang-row-${row.code}-${row.quy_cach ?? ''}`"
@@ -146,45 +146,49 @@ const nameLen = computed(() => [...props.name].length);
             <div class="min-w-0">
                 <div class="flex min-w-0 items-center gap-1.5">
                     <span
-                        class="truncate text-[0.875rem] font-semibold"
+                        class="line-clamp-2 text-[0.875rem] leading-snug font-semibold break-words"
                         :title="row.hub_name"
                         >{{ row.hub_name }}</span
                     >
                     <span
                         v-if="row.is_sample"
-                        class="shrink-0 rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
+                        class="shrink-0 rounded-md bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
                         data-testid="fork-gio-hang-sample-note"
                         >ví dụ</span
                     >
                     <span
                         v-if="!row.enabled"
-                        class="shrink-0 rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
+                        class="shrink-0 rounded-md bg-muted px-1.5 text-[0.6875rem] text-muted-foreground"
                         >hub tắt</span
                     >
+                </div>
+                <div
+                    class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.7812rem] text-muted-foreground"
+                >
                     <span
                         :class="
                             cn(
-                                'inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[0.7188rem] font-medium',
+                                'inline-flex h-5 shrink-0 items-center rounded-md px-2 text-[0.7188rem] font-medium',
                                 chipCls,
                             )
                         "
                         data-testid="fork-gio-hang-state"
                         >{{ stateText }}</span
                     >
-                </div>
-                <div class="truncate text-[0.7812rem] text-muted-foreground">
-                    <template v-if="row.quy_cach_name"
-                        >{{ row.quy_cach_name }} ·
-                    </template>
-                    <span
-                        v-if="state === 'need'"
-                        :class="cn('font-semibold', toneClasses.warn.text)"
-                        data-testid="fork-gio-hang-need"
-                        >{{ row.new_videos }} video đang chờ giỏ</span
-                    >
-                    <template v-else
-                        >{{ row.new_videos }} video chờ đăng</template
-                    >
+                    <span class="min-w-0">
+                        <template v-if="row.quy_cach_name"
+                            >{{ row.quy_cach_name }} ·
+                        </template>
+                        <span
+                            v-if="state === 'need'"
+                            :class="cn('font-semibold', toneClasses.warn.text)"
+                            data-testid="fork-gio-hang-need"
+                            >{{ row.new_videos }} video đang chờ giỏ</span
+                        >
+                        <template v-else
+                            >{{ row.new_videos }} video chờ đăng</template
+                        >
+                    </span>
                 </div>
             </div>
         </div>
@@ -200,7 +204,7 @@ const nameLen = computed(() => [...props.name].length);
             <ProductThumb :src="card.image" class="size-10 rounded-lg" />
             <div class="min-w-0 flex-1">
                 <div
-                    class="truncate text-[0.8438rem] font-medium"
+                    class="line-clamp-2 text-[0.8438rem] leading-snug font-medium break-words"
                     :title="card.title"
                 >
                     {{ card.title }}
@@ -236,13 +240,13 @@ const nameLen = computed(() => [...props.name].length);
                 cn(
                     'flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[0.8438rem] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring',
                     state === 'need'
-                        ? 'border-amber-400 bg-background/70 text-amber-800 hover:bg-amber-100/60 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/30'
+                        ? 'border-warning/50 bg-background/70 text-foreground hover:bg-warning/10'
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                 )
             "
             @click="emit('pick')"
         >
-            <IconShoppingCartPlus class="size-[18px]" />
+            <IconShoppingCartPlus class="size-4" />
             Chọn sản phẩm shop
         </button>
 
@@ -250,7 +254,7 @@ const nameLen = computed(() => [...props.name].length);
         <label v-if="card" class="relative block min-w-0">
             <span class="sr-only">Tên giỏ hiện trên video</span>
             <input
-                class="h-9 w-full rounded-lg border bg-background pr-14 pl-3 text-[0.8438rem] font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
+                class="pl-2.5text-[0.8438rem] h-9 w-full rounded-lg border bg-background pr-12 font-medium uppercase shadow-xs transition outline-none placeholder:font-normal placeholder:normal-case focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
                 :maxlength="nameMax"
                 placeholder="Tên giỏ hiện trên video"
                 :value="name"
@@ -266,7 +270,7 @@ const nameLen = computed(() => [...props.name].length);
             <span
                 :class="
                     cn(
-                        'pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[0.7188rem] tabular-nums',
+                        'pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[0.7188rem] tabular-nums',
                         nameLen >= nameMax
                             ? cn('font-semibold', toneClasses.warn.text)
                             : 'text-muted-foreground',
@@ -285,7 +289,8 @@ const nameLen = computed(() => [...props.name].length);
         <!-- Bìa & hashtag -->
         <button
             type="button"
-            class="flex min-w-0 items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+            class="flex min-w-0 items-center gap-3 rounded-lg p-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+            :title="`${persona.cover ?? 'Bìa mặc định'} · ${persona.tags ?? 'hashtag chung'}`"
             :data-testid="`fork-personalise-open-${row.code}-${row.quy_cach ?? ''}`"
             @click="emit('personalise')"
         >
@@ -301,7 +306,14 @@ const nameLen = computed(() => [...props.name].length);
                 />
                 <IconPhoto v-else class="size-4" />
             </span>
-            <span class="min-w-0 text-[0.7812rem] leading-snug">
+            <span
+                :class="
+                    cn(
+                        'min-w-0 text-[0.7812rem] leading-snug',
+                        !compact && 'hidden xl:block',
+                    )
+                "
+            >
                 <span
                     class="block truncate"
                     :class="

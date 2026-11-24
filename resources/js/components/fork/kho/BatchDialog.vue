@@ -1055,9 +1055,9 @@ const nameOf = (r: PlanRow) =>
 
 const chip = (s: string) =>
     ({
-        ok: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
-        warn: 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
-        error: 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300',
+        ok: 'bg-success-subtle text-success-text',
+        warn: 'bg-secondary text-warning',
+        error: 'bg-critical-subtle text-destructive-text',
         skip: 'bg-muted text-muted-foreground',
     })[s] ?? 'bg-muted';
 
@@ -1212,7 +1212,7 @@ const areaCls =
                                     cn(
                                         'text-xs',
                                         captionLen > limits.caption_max
-                                            ? 'text-red-600 dark:text-red-400'
+                                            ? 'text-destructive-text'
                                             : 'text-muted-foreground',
                                     )
                                 "
@@ -1341,7 +1341,7 @@ const areaCls =
                                     product &&
                                     product.cover_count === 0
                                 "
-                                class="text-xs text-amber-700 dark:text-amber-300"
+                                class="text-xs text-warning"
                                 data-testid="fork-rieng-cover-empty"
                             >
                                 Sản phẩm này chưa có ảnh bìa nên TikTok sẽ dùng
@@ -1364,7 +1364,7 @@ const areaCls =
                                     v-if="batchCover"
                                     :src="batchCover.url"
                                     alt="Ảnh bìa chung"
-                                    class="h-20 w-[60px] rounded border object-cover"
+                                    class="h-20 w-15 rounded border object-cover"
                                 />
                                 <label class="relative inline-flex">
                                     <input
@@ -1393,7 +1393,7 @@ const areaCls =
 
                             <p
                                 v-if="coverError"
-                                class="text-xs text-red-600 dark:text-red-400"
+                                class="text-xs text-destructive-text"
                                 data-testid="fork-rieng-cover-error"
                             >
                                 {{ coverError }}
@@ -1426,7 +1426,7 @@ const areaCls =
                             </HelpToggle>
                             <span
                                 v-if="slotProblem"
-                                class="text-xs text-red-600 dark:text-red-400"
+                                class="text-xs text-destructive-text"
                                 >{{ slotProblem }}</span
                             >
                             <div
@@ -1458,7 +1458,7 @@ const areaCls =
                                     :aria-checked="order === o.v"
                                     :class="
                                         cn(
-                                            'h-7 rounded-md border px-2.5 text-xs font-medium transition-colors',
+                                            'h-7 rounded-md border px-3 text-xs font-medium transition-colors',
                                             order === o.v
                                                 ? 'border-primary bg-primary text-primary-foreground'
                                                 : 'bg-background hover:bg-muted',
@@ -1494,17 +1494,17 @@ const areaCls =
                                 >Các video ({{ items.length }})</span
                             >
                             <ul
-                                class="flex flex-col gap-2.5"
+                                class="flex flex-col gap-3"
                                 data-testid="fork-rieng-rows"
                             >
                                 <li
                                     v-for="(it, n) in ordered"
                                     :key="it.id"
-                                    class="flex flex-col gap-2.5 rounded-xl border bg-card p-3 text-sm"
+                                    class="flex flex-col gap-3 rounded-xl border bg-card p-3 text-sm"
                                     :data-testid="`fork-rieng-row-${it.id}`"
                                 >
                                     <div
-                                        class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2.5"
+                                        class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-3"
                                     >
                                         <!-- Hình: video 9:16 (rê chuột để xem thử) và ảnh bìa 3:4 -->
                                         <div
@@ -1546,7 +1546,7 @@ const areaCls =
                                                 </button>
                                                 <span
                                                     v-else
-                                                    class="flex aspect-[3/4] w-12 items-center justify-center rounded-md border border-dashed px-0.5 text-center text-[0.625rem] leading-tight text-muted-foreground"
+                                                    class="flex aspect-[3/4] w-12 items-center justify-center rounded-md border border-dashed px-0.5 text-center text-xs leading-tight text-muted-foreground"
                                                 >
                                                     {{
                                                         coverMode === 'product'
@@ -1555,7 +1555,7 @@ const areaCls =
                                                     }}
                                                 </span>
                                                 <span
-                                                    class="text-[0.625rem] text-muted-foreground"
+                                                    class="text-xs text-muted-foreground"
                                                     >{{
                                                         rowCover[it.id]
                                                             ? rowCover[it.id]
@@ -1577,7 +1577,7 @@ const areaCls =
                                             >
                                             <span
                                                 v-if="it.duplicate"
-                                                class="mt-0.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                                                class="mt-0.5 inline-block rounded-md bg-secondary px-2 py-0.5 text-xs text-warning"
                                                 >Trùng video đã có</span
                                             >
                                             <span
@@ -1592,7 +1592,7 @@ const areaCls =
                                                         videoProducts[it.id]
                                                             ?.cart
                                                             ? 'text-muted-foreground'
-                                                            : 'text-red-600 dark:text-red-400',
+                                                            : 'text-destructive-text',
                                                     )
                                                 "
                                                 :data-testid="`fork-rieng-row-product-${it.id}`"
@@ -1642,7 +1642,7 @@ const areaCls =
                                                     perVideo &&
                                                     !rowProduct[it.id]
                                                 "
-                                                class="mt-1 block text-xs text-red-600 dark:text-red-400"
+                                                class="mt-1 block text-xs text-destructive-text"
                                                 :data-testid="`fork-rieng-row-product-${it.id}`"
                                             >
                                                 {{
@@ -1653,7 +1653,7 @@ const areaCls =
                                             </span>
                                             <span
                                                 v-if="mismatchOf(it.id)"
-                                                class="mt-1 block text-xs text-amber-700 dark:text-amber-300"
+                                                class="mt-1 block text-xs text-warning"
                                                 :data-testid="`fork-rieng-row-mismatch-${it.id}`"
                                             >
                                                 {{ mismatchOf(it.id) }}
@@ -1712,7 +1712,7 @@ const areaCls =
                                                 />
                                                 <span
                                                     v-if="edited[it.id]"
-                                                    class="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                                                    class="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
                                                     >Giờ bạn chọn</span
                                                 >
                                                 <span
@@ -1737,7 +1737,7 @@ const areaCls =
                                                     cn(
                                                         'text-xs',
                                                         spacing[it.id].tight
-                                                            ? 'text-amber-700 dark:text-amber-300'
+                                                            ? 'text-warning'
                                                             : 'text-muted-foreground',
                                                     )
                                                 "
@@ -1762,11 +1762,11 @@ const areaCls =
                                                         'text-xs',
                                                         slotInfo[it.id]
                                                             ?.status === 'error'
-                                                            ? 'text-red-600 dark:text-red-400'
+                                                            ? 'text-destructive-text'
                                                             : slotInfo[it.id]
                                                                     ?.status ===
                                                                 'warn'
-                                                              ? 'text-amber-700 dark:text-amber-300'
+                                                              ? 'text-warning'
                                                               : 'text-muted-foreground',
                                                     )
                                                 "
@@ -1901,7 +1901,7 @@ const areaCls =
 
                                     <div
                                         v-if="frameOpen[it.id]"
-                                        class="flex flex-wrap items-start gap-3 rounded-lg border bg-muted/40 p-2.5"
+                                        class="flex flex-wrap items-start gap-3 rounded-lg border bg-muted/40 p-3"
                                     >
                                         <video
                                             :id="`rieng-frame-${it.id}`"
@@ -1942,13 +1942,19 @@ const areaCls =
                                                 {{
                                                     (
                                                         frameT[it.id] ?? 0
-                                                    ).toFixed(1)
+                                                    ).toLocaleString('vi-VN', {
+                                                        minimumFractionDigits: 1,
+                                                        maximumFractionDigits: 1,
+                                                    })
                                                 }}
                                                 /
                                                 {{
                                                     (
                                                         frameDur[it.id] ?? 0
-                                                    ).toFixed(1)
+                                                    ).toLocaleString('vi-VN', {
+                                                        minimumFractionDigits: 1,
+                                                        maximumFractionDigits: 1,
+                                                    })
                                                 }}</span
                                             >
                                             <Button
@@ -2007,7 +2013,7 @@ const areaCls =
                         <li
                             v-for="r in plan.rows"
                             :key="r.id"
-                            class="flex flex-col gap-1 p-2.5"
+                            class="flex flex-col gap-1 p-3"
                         >
                             <div class="flex flex-wrap items-center gap-2">
                                 <ClipThumb
@@ -2047,7 +2053,7 @@ const areaCls =
                                     {{ nameOf(r) }}
                                     <span
                                         v-if="r.product"
-                                        class="mt-0.5 flex items-center gap-1.5 text-[0.8125rem] font-normal"
+                                        class="mt-0.5 flex items-center gap-1.5 text-sm font-normal"
                                         :data-testid="`fork-rieng-preview-product-${r.id}`"
                                     >
                                         <img
@@ -2123,7 +2129,7 @@ const areaCls =
                                 <span
                                     :class="
                                         cn(
-                                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                                            'rounded-md px-2 py-0.5 text-xs font-medium',
                                             chip(r.status),
                                         )
                                     "
@@ -2138,10 +2144,7 @@ const areaCls =
                                     }}
                                 </span>
                             </div>
-                            <p
-                                v-if="r.duplicate"
-                                class="text-xs text-amber-800 dark:text-amber-300"
-                            >
+                            <p v-if="r.duplicate" class="text-xs text-warning">
                                 {{ r.duplicate }}
                             </p>
                             <p
@@ -2183,7 +2186,7 @@ const areaCls =
                         <li
                             v-for="r in plan.rows"
                             :key="r.id"
-                            class="flex flex-col gap-1 p-2.5"
+                            class="flex flex-col gap-1 p-3"
                         >
                             <div class="flex flex-wrap items-center gap-2">
                                 <ClipThumb
@@ -2208,7 +2211,7 @@ const areaCls =
                                 <span
                                     :class="
                                         cn(
-                                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                                            'rounded-md px-2 py-0.5 text-xs font-medium',
                                             chip(
                                                 r.result === 'done'
                                                     ? 'ok'
@@ -2230,7 +2233,7 @@ const areaCls =
                             </div>
                             <p
                                 v-if="r.error"
-                                class="text-xs text-red-600 dark:text-red-400"
+                                class="text-xs text-destructive-text"
                             >
                                 {{ r.error }}
                             </p>

@@ -9,11 +9,7 @@ import ConfirmRetryDialog from '@/components/fork/auto/ConfirmRetryDialog.vue';
 import type { FailedRow, RecentRow } from '@/components/fork/auto/types';
 import CoverThumb from '@/components/fork/shared/CoverThumb.vue';
 import SourceBadge from '@/components/fork/shared/SourceBadge.vue';
-import {
-    cardCls,
-    fmtCompact,
-    toneClasses,
-} from '@/components/fork/shared/status';
+import { cardCls, fmtCompact } from '@/components/fork/shared/status';
 import { openVideo } from '@/components/fork/viewer';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -85,9 +81,7 @@ const when = (iso: string | null) => {
         <header
             class="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3"
         >
-            <h2
-                class="font-heading text-[0.9375rem] font-semibold tracking-[-0.01em]"
-            >
+            <h2 class="text-[0.9375rem] font-semibold">
                 Vừa đăng
             </h2>
             <Link
@@ -105,13 +99,11 @@ const when = (iso: string | null) => {
             <li
                 v-for="f in failed"
                 :key="f.id"
-                class="flex items-start gap-3 bg-red-50/50 px-4 py-3 dark:bg-red-950/20"
+                class="flex items-start gap-3 bg-critical-subtle/40 px-4 py-3"
                 :data-testid="`fork-auto-failed-${f.id}`"
             >
                 <IconAlertCircle
-                    :class="
-                        cn('mt-0.5 size-4 shrink-0', toneClasses.danger.text)
-                    "
+                    class="mt-0.5 size-4 shrink-0 text-destructive-text"
                 />
                 <div class="min-w-0 flex-1">
                     <div class="flex min-w-0 items-center gap-1.5">
@@ -126,7 +118,7 @@ const when = (iso: string | null) => {
                     </div>
                     <p
                         v-if="f.error"
-                        class="line-clamp-2 text-[0.7812rem] text-red-700 dark:text-red-300"
+                        class="line-clamp-2 text-[0.7812rem] text-destructive-text"
                     >
                         {{ f.error }}
                     </p>
@@ -141,7 +133,7 @@ const when = (iso: string | null) => {
                     v-if="f.can_retry"
                     size="sm"
                     variant="outline"
-                    class="h-7 shrink-0 px-2 text-[0.7812rem]"
+                    class="h-7 shrink-0 px-3 text-[0.7812rem]"
                     :disabled="retrying !== null"
                     :data-testid="`fork-auto-retry-${f.id}`"
                     @click="retry(f.id)"
@@ -154,7 +146,7 @@ const when = (iso: string | null) => {
                     v-else-if="f.can_confirm_retry"
                     size="sm"
                     variant="outline"
-                    class="h-7 shrink-0 px-2 text-[0.7812rem]"
+                    class="h-7 shrink-0 px-3 text-[0.7812rem]"
                     :disabled="retrying !== null"
                     :data-testid="`fork-auto-confirm-retry-${f.id}`"
                     @click="confirming = f"
@@ -184,7 +176,7 @@ const when = (iso: string | null) => {
             v-if="!recent.length"
             class="px-4 py-8 text-center text-[0.8125rem] text-muted-foreground"
         >
-            Chưa có bài nào lên TikTok.
+            Chưa có bài nào lên TikTok
         </p>
 
         <ul
@@ -194,14 +186,14 @@ const when = (iso: string | null) => {
             <li v-for="r in recent.slice(0, limit)" :key="r.id">
                 <button
                     type="button"
-                    class="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
+                    class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-ring"
                     :data-testid="`fork-auto-recent-${r.id}`"
                     @click="open(r.id)"
                 >
                     <CoverThumb
                         :id="r.id"
                         :fallback="r.product_image"
-                        class="h-[50px] w-[28px] rounded"
+                        class="h-12.5 w-7 rounded"
                     />
                     <div class="min-w-0 flex-1">
                         <div class="flex min-w-0 items-center gap-1.5">

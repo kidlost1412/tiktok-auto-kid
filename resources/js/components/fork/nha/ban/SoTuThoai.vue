@@ -45,12 +45,12 @@ const dong = computed(() =>
         data-testid="nha-tu-thoai"
     >
         <p
-            class="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            class="text-xs font-medium text-muted-foreground"
         >
             Đang nghĩ gì
         </p>
         <p v-if="!dong.length" class="mt-1.5 text-sm text-muted-foreground">
-            Chưa có việc gì để lẩm bẩm.
+            Chưa có việc gì để lẩm bẩm
         </p>
         <ul v-else class="mt-1.5 flex max-h-44 flex-col gap-1 overflow-y-auto">
             <li
@@ -63,8 +63,8 @@ const dong = computed(() =>
                         : 'text-muted-foreground'
                 "
             >
-                <span class="min-w-0 break-words">💭 {{ l.text }}</span>
-                <span class="shrink-0 text-[0.6875rem] text-muted-foreground">{{
+                <span class="min-w-0 break-words">{{ l.text }}</span>
+                <span class="shrink-0 text-xs text-muted-foreground tabular-nums">{{
                     l.luc
                 }}</span>
             </li>

@@ -6,6 +6,7 @@ import { Link, router } from '@inertiajs/vue3';
 import {
     IconBrandChrome,
     IconBrandTelegram,
+    IconAlertTriangle,
     IconCalendarCheck,
     IconCopy,
     IconHistory,
@@ -532,7 +533,7 @@ const chromeOnlyCandidates = computed(() => {
             <div
                 v-for="s in stats"
                 :key="s.label"
-                class="flex items-center gap-3.5 rounded-[14px] border border-border bg-card px-5 py-4 shadow-card"
+                class="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-card"
             >
                 <span
                     class="fk-chip"
@@ -542,7 +543,7 @@ const chromeOnlyCandidates = computed(() => {
                 </span>
                 <div class="min-w-0">
                     <b
-                        class="block text-[1.625rem] leading-none font-semibold tracking-[-0.025em] tabular-nums"
+                        class="block text-[1.625rem] leading-none font-semibold tabular-nums"
                         >{{ s.value }}</b
                     >
                     <span
@@ -575,7 +576,7 @@ const chromeOnlyCandidates = computed(() => {
                 </template>
 
                 <div
-                    class="grid gap-4 rounded-xl border border-border bg-muted p-4 sm:grid-cols-2"
+                    class="grid gap-4 rounded-xl border border-border bg-muted p-4 2xl:grid-cols-2"
                     data-testid="fork-chrome-connect-info"
                 >
                     <div class="min-w-0">
@@ -586,7 +587,7 @@ const chromeOnlyCandidates = computed(() => {
                         </p>
                         <div class="mt-1.5 flex flex-wrap items-center gap-2">
                             <code
-                                class="text-xl font-semibold tracking-tight break-all"
+                                class="text-xl font-semibold whitespace-nowrap"
                                 >{{
                                     serverUrl || 'http://localhost:8010'
                                 }}</code
@@ -620,8 +621,8 @@ const chromeOnlyCandidates = computed(() => {
                             :key="c.id"
                             :class="
                                 extensionOutdated(c.ext_version)
-                                    ? 'mt-0.5 text-sm text-amber-800 dark:text-amber-300'
-                                    : 'mt-0.5 text-sm text-success-text'
+                                    ? 'mt-0.5 text-sm text-warning'
+                                    : 'mt-0.5 text-sm text-muted-foreground'
                             "
                         >
                             {{ c.label }}: đang chạy v{{ c.ext_version
@@ -636,7 +637,7 @@ const chromeOnlyCandidates = computed(() => {
 
                 <div
                     v-if="paired && !pairActive"
-                    class="flex flex-wrap items-center gap-3 rounded-xl border border-success-text/30 bg-success-subtle p-4 text-sm text-foreground"
+                    class="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted p-4 text-sm text-foreground"
                     data-testid="fork-chrome-paired"
                 >
                     <span class="fk-pill is-green">Đã ghép nối</span>
@@ -659,10 +660,10 @@ const chromeOnlyCandidates = computed(() => {
                 </div>
                 <div
                     v-if="pairActive && pair"
-                    class="flex flex-wrap items-center gap-4 rounded-xl border border-primary-strong/30 bg-primary-subtle p-4"
+                    class="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-muted p-4"
                 >
                     <code
-                        class="text-3xl font-semibold tracking-[0.3em] text-primary-text tabular-nums"
+                        class="border-l-2 border-primary pl-3 font-mono text-3xl font-semibold tracking-[0.3em] text-foreground tabular-nums"
                         data-testid="fork-chrome-code"
                         >{{ pair.code }}</code
                     >
@@ -767,8 +768,24 @@ const chromeOnlyCandidates = computed(() => {
                             <IconBrandChrome />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[0.9375rem] font-semibold">
+                            <p
+                                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.9375rem] font-semibold"
+                            >
                                 {{ client.label }}
+                                <span
+                                    class="fk-pill font-medium"
+                                    :class="
+                                        pillTone(
+                                            clientStatus[client.status]
+                                                ?.variant,
+                                        )
+                                    "
+                                >
+                                    {{
+                                        clientStatus[client.status]?.label ??
+                                        client.status
+                                    }}
+                                </span>
                             </p>
                             <p class="text-sm text-muted-foreground">
                                 {{
@@ -780,17 +797,6 @@ const chromeOnlyCandidates = computed(() => {
                                 {{ fromNow(client.last_seen_at) }}
                             </p>
                         </div>
-                        <span
-                            class="fk-pill"
-                            :class="
-                                pillTone(clientStatus[client.status]?.variant)
-                            "
-                        >
-                            {{
-                                clientStatus[client.status]?.label ??
-                                client.status
-                            }}
-                        </span>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -804,10 +810,15 @@ const chromeOnlyCandidates = computed(() => {
 
                         <p
                             v-if="client.status === 'offline'"
-                            class="w-full text-sm text-amber-800 dark:text-amber-300"
+                            class="flex w-full items-start gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
                             data-testid="fork-chrome-offline-hint"
                         >
-                            {{ offlineHint(client) }}
+                            <IconAlertTriangle
+                                class="mt-0.5 size-4 shrink-0 text-warning"
+                            />
+                            <span class="min-w-0">{{
+                                offlineHint(client)
+                            }}</span>
                         </p>
                         <p
                             v-if="
@@ -959,12 +970,13 @@ const chromeOnlyCandidates = computed(() => {
                     tone="amber"
                 >
                     <div
-                        class="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                        class="flex flex-col gap-3 rounded-xl border border-border bg-muted p-4 text-sm"
                         data-testid="fork-chrome-background-hint"
                     >
                         <p v-if="backgroundModeOff">
-                            Trợ lý đọc thấy cài đặt này đang <b>TẮT</b> trong
-                            trình duyệt của anh.
+                            Trợ lý đọc thấy cài đặt này đang
+                            <b class="text-warning">tắt</b> trong trình duyệt
+                            của anh.
                         </p>
                         <p v-else>
                             Chưa xác định được cài đặt này trên máy (trợ lý chưa
@@ -1072,7 +1084,7 @@ const chromeOnlyCandidates = computed(() => {
                     <li
                         v-for="account in accounts"
                         :key="account.id"
-                        class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 text-sm transition-colors hover:bg-accent/60"
+                        class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm transition-colors hover:bg-accent/60"
                     >
                         <div class="min-w-0 flex-1">
                             <p class="text-[0.9375rem] font-semibold">
@@ -1167,9 +1179,7 @@ const chromeOnlyCandidates = computed(() => {
                 v-if="jobs.length"
                 class="-mt-2 flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground"
             >
-                <IconCalendarCheck
-                    class="size-4 shrink-0 text-amber-700 dark:text-amber-300"
-                />
+                <IconCalendarCheck class="size-4 shrink-0" />
                 Bài có biểu tượng này đã được hẹn giờ trên TikTok: muốn đổi thì
                 sửa/huỷ trong TikTok Studio.
             </p>
@@ -1254,7 +1264,7 @@ const chromeOnlyCandidates = computed(() => {
                                         title="Đã hẹn trên TikTok — muốn đổi thì sửa/huỷ trong TikTok Studio."
                                         data-testid="fork-chrome-job-scheduled"
                                         ><IconCalendarCheck
-                                            class="size-4 text-amber-700 dark:text-amber-300" /></span
+                                            class="size-4 text-muted-foreground" /></span
                                     >{{ job.caption || '(không có chú thích)' }}
                                 </p>
                                 <p

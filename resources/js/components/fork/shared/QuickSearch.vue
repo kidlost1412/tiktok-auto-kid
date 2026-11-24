@@ -243,8 +243,8 @@ const onKey = (e: KeyboardEvent) => {
                     "
                     autocomplete="off"
                     spellcheck="false"
-                    placeholder="Tìm trang hoặc việc cần làm…"
-                    class="h-12 w-full bg-transparent text-[0.9375rem] outline-none placeholder:text-muted-foreground"
+                    placeholder="Tìm trang hoặc việc cần làm"
+                    class="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                     data-testid="quick-search-input"
                     @keydown="onKey"
                 />
@@ -257,7 +257,7 @@ const onKey = (e: KeyboardEvent) => {
             >
                 <template v-for="g in groups" :key="g.name">
                     <div
-                        class="px-2 pt-2 pb-1 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase"
+                        class="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground"
                     >
                         {{ g.name }}
                     </div>
@@ -271,7 +271,7 @@ const onKey = (e: KeyboardEvent) => {
                         :data-active="r.idx === active"
                         :class="
                             cn(
-                                'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[0.875rem]',
+                                'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm',
                                 r.idx === active
                                     ? 'bg-accent text-accent-foreground'
                                     : 'hover:bg-accent/60',
@@ -282,21 +282,21 @@ const onKey = (e: KeyboardEvent) => {
                     >
                         <span>{{ r.item.label }}</span>
                         <span
-                            class="truncate text-[0.75rem] text-muted-foreground"
+                            class="truncate text-xs text-muted-foreground"
                             >{{ r.item.href }}</span
                         >
                     </button>
                 </template>
                 <p
                     v-if="!results.length"
-                    class="px-3 py-8 text-center text-[0.8125rem] text-muted-foreground"
+                    class="px-3 py-8 text-center text-sm text-muted-foreground"
                     data-testid="quick-search-empty"
                 >
-                    Không có gì khớp “{{ query.trim() }}”.
+                    Không có gì khớp “{{ query.trim() }}”
                 </p>
             </div>
             <div
-                class="flex items-center gap-3 border-t px-4 py-2 text-[0.7188rem] text-muted-foreground"
+                class="flex items-center gap-3 border-t px-4 py-2 text-xs text-muted-foreground"
             >
                 <span>↑ ↓ để chọn</span>
                 <span>Enter để mở</span>

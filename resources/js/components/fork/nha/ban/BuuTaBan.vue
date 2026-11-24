@@ -228,7 +228,7 @@ const onRetried = () => {
 
 const tileCls = cn(cardCls, 'flex min-w-0 flex-col gap-1 px-4 py-3.5');
 const labelCls =
-    'text-xs font-medium tracking-[0.02em] text-muted-foreground uppercase';
+    'text-xs font-medium text-muted-foreground';
 </script>
 
 <template>
@@ -248,9 +248,9 @@ const labelCls =
         <!-- Đang tải lần đầu -->
         <template v-else-if="!p && loading">
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-[14px]" />
+                <Skeleton v-for="i in 4" :key="i" class="h-24 rounded-xl" />
             </div>
-            <Skeleton class="h-[420px] rounded-[14px]" />
+            <Skeleton class="h-[420px] rounded-xl" />
         </template>
 
         <template v-else-if="p">

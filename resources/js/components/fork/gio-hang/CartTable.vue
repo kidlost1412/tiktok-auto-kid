@@ -619,17 +619,17 @@ const statTiles = computed(() => [
     {
         label: 'Sẵn sàng đăng',
         value: readyRows.value.length,
-        dot: 'bg-emerald-500',
+        dot: 'bg-success',
     },
     {
         label: `Chưa chọn giỏ · ${needVideos.value} video chờ`,
         value: needRows.value.length,
-        dot: 'bg-amber-500',
+        dot: 'bg-warning',
     },
     {
         label: 'Có vấn đề / tạm dừng',
         value: problemRows.value.length,
-        dot: 'bg-red-500',
+        dot: 'bg-destructive',
     },
 ]);
 
@@ -648,19 +648,19 @@ const filters = computed(() => [
         key: 'need' as const,
         label: 'Chưa chọn giỏ',
         count: needRows.value.length,
-        dot: 'bg-amber-500',
+        dot: 'bg-warning',
     },
     {
         key: 'bad' as const,
         label: 'Có vấn đề',
         count: problemRows.value.length,
-        dot: 'bg-red-500',
+        dot: 'bg-destructive',
     },
     {
         key: 'ok' as const,
         label: 'Sẵn sàng',
         count: readyRows.value.length,
-        dot: 'bg-emerald-500',
+        dot: 'bg-success',
     },
 ]);
 
@@ -790,7 +790,7 @@ defineExpose({
             data-testid="fork-gio-hang-empty"
         >
             <Button as-child size="sm">
-                <Link href="/settings#chrome">Kết nối Chrome →</Link>
+                <Link href="/settings#chrome">Kết nối Chrome</Link>
             </Button>
         </EmptyState>
 
@@ -889,7 +889,7 @@ defineExpose({
 
                 <div
                     v-if="syncState === 'waiting'"
-                    class="border-t bg-sky-50/60 px-5 py-3 dark:bg-sky-950/20"
+                    class="border-t bg-muted/40 px-5 py-3"
                     data-testid="fork-gio-hang-sync-waiting"
                 >
                     <template v-if="syncProgress">
@@ -912,7 +912,7 @@ defineExpose({
                     </template>
                     <p
                         v-if="sync?.chrome"
-                        class="mb-1.5 text-[0.8125rem] font-medium text-amber-800 dark:text-amber-300"
+                        class="mb-1.5 text-[0.8125rem] font-medium text-foreground"
                         data-testid="fork-gio-hang-sync-chrome"
                     >
                         {{ sync.chrome }}
@@ -1036,7 +1036,7 @@ defineExpose({
                     <span :class="cn('size-2.5 rounded-full', t.dot)" />
                     <div class="min-w-0">
                         <div
-                            class="font-heading text-[1.375rem] leading-tight font-[650] tracking-[-0.02em] tabular-nums"
+                            class="font-heading text-[1.375rem] leading-tight font-semibold tabular-nums"
                         >
                             {{ t.value }}
                         </div>
@@ -1055,7 +1055,7 @@ defineExpose({
                 data-testid="fork-gio-hang-rows"
             >
                 <header
-                    class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5"
+                    class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3"
                 >
                     <div
                         class="flex flex-wrap items-center gap-1"
@@ -1072,7 +1072,7 @@ defineExpose({
                                 cn(
                                     'flex h-8 items-center gap-2 rounded-lg px-3 text-[0.8125rem] font-medium transition-colors disabled:opacity-40',
                                     filter === f.key
-                                        ? 'bg-foreground text-background'
+                                        ? 'bg-accent text-foreground'
                                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                                 )
                             "
@@ -1096,8 +1096,12 @@ defineExpose({
                             >
                         </button>
                     </div>
-                    <div class="flex min-w-0 flex-wrap items-center gap-3">
-                        <div class="relative w-full sm:w-64">
+                    <div
+                        class="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 xl:w-auto"
+                    >
+                        <div
+                            class="relative w-full min-w-48 flex-1 xl:w-64 xl:flex-none"
+                        >
                             <IconSearch
                                 class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                             />
@@ -1112,7 +1116,7 @@ defineExpose({
                             <button
                                 v-if="search"
                                 type="button"
-                                class="absolute top-1/2 right-1.5 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                                class="absolute top-1/2 right-1.5 flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                                 aria-label="Xoá tìm kiếm"
                                 title="Xoá tìm kiếm"
                                 @click="search = ''"
@@ -1144,10 +1148,10 @@ defineExpose({
                 <div
                     :class="
                         cn(
-                            'hidden border-b bg-muted/40 py-2 text-[0.7188rem] font-medium tracking-[0.04em] text-muted-foreground uppercase lg:grid',
+                            'hidden border-b bg-muted/40 py-2 text-xs font-medium text-muted-foreground lg:grid',
                             embedded
                                 ? 'gap-x-3 px-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_76px]'
-                                : 'px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.75fr)_84px] lg:gap-x-3 xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)_minmax(170px,0.7fr)_84px] xl:gap-x-5',
+                                : 'px-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1.5fr)_44px_84px] lg:gap-x-3 xl:grid-cols-[minmax(200px,1fr)_minmax(240px,1.3fr)_minmax(260px,1.4fr)_minmax(170px,0.8fr)_84px] xl:gap-x-5',
                         )
                     "
                     aria-hidden="true"
@@ -1155,7 +1159,13 @@ defineExpose({
                     <span class="pl-5">Sản phẩm</span>
                     <span class="pl-1.5">Sản phẩm TikTok Shop</span>
                     <span>Tên giỏ trên video</span>
-                    <span class="pl-1.5">Bìa &amp; hashtag</span>
+                    <span class="pl-1.5"
+                        ><span :class="embedded ? 'hidden' : 'xl:hidden'"
+                            >Bìa</span
+                        ><span :class="embedded ? '' : 'hidden xl:inline'"
+                            >Bìa &amp; hashtag</span
+                        ></span
+                    >
                     <span />
                 </div>
 
@@ -1234,7 +1244,7 @@ defineExpose({
                 v-if="dirtyRows.length"
                 :class="
                     cn(
-                        'sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3 shadow-[0_12px_32px_-8px_rgba(0,0,0,.28)]',
+                        'sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3 shadow-card-md',
                         embedded && 'bottom-0',
                     )
                 "

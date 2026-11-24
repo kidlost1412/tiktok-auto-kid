@@ -264,8 +264,8 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
             <span
                 :class="
                     cn(
-                        'rounded-full px-2.5 py-1 text-[1rem] leading-none font-bold text-white tabular-nums shadow-lg',
-                        drop.tooSoon ? 'bg-red-600' : 'bg-primary',
+                        'rounded-md px-2.5 py-1 text-[1rem] leading-none font-semibold text-white tabular-nums shadow-lg',
+                        drop.tooSoon ? 'bg-destructive' : 'bg-primary',
                     )
                 "
                 >{{ dropLabel
@@ -275,7 +275,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                 :class="
                     cn(
                         'h-0.5 flex-1 rounded-full',
-                        drop.tooSoon ? 'bg-red-600' : 'bg-primary',
+                        drop.tooSoon ? 'bg-destructive' : 'bg-primary',
                     )
                 "
             />
@@ -291,10 +291,10 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
         >
             <IconCalendarOff class="size-7 text-muted-foreground/60" />
             <div v-if="filtered" class="text-[0.9375rem] font-medium">
-                Không có bài khớp bộ lọc.
+                Không có bài khớp bộ lọc
             </div>
             <div v-else-if="noChannelOn" class="text-[0.9375rem] font-medium">
-                Chưa bật kênh nào — bật kênh ở cột bên phải.
+                Chưa bật kênh nào — bật kênh ở cột bên phải
             </div>
             <template v-else>
                 <div class="text-[0.9375rem] font-medium">
@@ -337,8 +337,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                 <span
                     :class="
                         cn(
-                            'flex size-6 items-center justify-center rounded-full',
-                            toneClasses.success.chip,
+                            'flex size-6 items-center justify-center rounded-md bg-secondary text-muted-foreground',
                         )
                     "
                 >
@@ -450,8 +449,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 compact
                                     ? 'mx-2 grid-cols-[46px_30px_minmax(0,1fr)_auto] gap-2.5 py-1.5'
                                     : 'mx-3 grid-cols-[58px_38px_minmax(0,1fr)_auto] gap-3 py-2',
-                                e.state === 'failed' &&
-                                    'bg-red-50/60 dark:bg-red-950/20',
+                                e.state === 'failed' && 'bg-critical-subtle/40',
                                 compact &&
                                     e.state === 'posted' &&
                                     'opacity-70 hover:opacity-100',
@@ -479,7 +477,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             aria-hidden="true"
                             :class="
                                 cn(
-                                    'absolute inset-y-2 left-0 w-[3px] rounded-full',
+                                    'absolute inset-y-2 left-0 w-0.5 rounded-full',
                                     channelColor(e.color).dot,
                                 )
                             "
@@ -491,7 +489,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             :aria-label="`Đổi giờ ${dayjs(e.at).format('HH:mm')}`"
                             :class="
                                 cn(
-                                    'justify-self-end rounded-md px-1 text-right font-semibold tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
+                                    'justify-self-end rounded-md px-1 text-right font-medium tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:bg-accent hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-ring',
                                     compact
                                         ? '-mr-1 text-[0.9375rem]'
                                         : '-mr-1 text-[1rem]',
@@ -514,7 +512,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             v-else
                             :class="
                                 cn(
-                                    'text-right font-semibold tabular-nums',
+                                    'text-right font-medium tabular-nums',
                                     compact
                                         ? 'text-[0.9375rem]'
                                         : 'text-[1rem]',
@@ -532,8 +530,8 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             :class="
                                 cn(
                                     compact
-                                        ? 'h-[52px] w-[30px] rounded'
-                                        : 'h-[68px] w-[38px] rounded-md',
+                                        ? 'h-13 w-7.5 rounded'
+                                        : 'h-17 w-9.5 rounded-md',
                                     e.state === 'projected' && 'opacity-70',
                                 )
                             "
@@ -565,8 +563,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                     v-if="multi"
                                     :class="
                                         cn(
-                                            'max-w-[9rem] shrink-0 truncate rounded px-1.5 text-[0.75rem] leading-[1.125rem] font-medium',
-                                            channelColor(e.color).chip,
+                                            'max-w-36 shrink-0 truncate rounded-md bg-secondary px-1.5 text-[0.75rem] leading-[1.125rem] font-medium text-muted-foreground',
                                         )
                                     "
                                     >@{{ e.username }}</span
@@ -574,24 +571,14 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             </div>
                             <p
                                 v-if="e.error"
-                                :class="
-                                    cn(
-                                        'truncate text-[0.8125rem]',
-                                        toneClasses.danger.text,
-                                    )
-                                "
+                                :class="'truncate text-[0.8125rem] text-destructive-text'"
                                 :title="e.error_full ?? e.error"
                             >
                                 {{ e.error }}
                             </p>
                             <p
                                 v-else-if="e.cart_warn"
-                                :class="
-                                    cn(
-                                        'flex min-w-0 items-start gap-1 text-[0.8125rem] font-medium',
-                                        toneClasses.danger.text,
-                                    )
-                                "
+                                :class="'flex min-w-0 items-start gap-1 text-[0.8125rem] font-medium text-destructive-text'"
                                 :title="e.cart_warn"
                                 :data-testid="`fork-auto-cart-warn-${e.id}`"
                             >
@@ -604,12 +591,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                             </p>
                             <p
                                 v-else-if="e.note"
-                                :class="
-                                    cn(
-                                        'line-clamp-2 text-[0.8125rem]',
-                                        toneClasses.warn.text,
-                                    )
-                                "
+                                :class="'line-clamp-2 text-[0.8125rem] text-warning'"
                                 :title="e.note"
                             >
                                 {{ e.note }}
@@ -641,8 +623,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 v-if="isLate(e)"
                                 :class="
                                     cn(
-                                        'rounded-full px-2 py-0.5 text-[0.75rem] font-medium',
-                                        toneClasses.warn.chip,
+                                        'rounded-md bg-warning/15 px-2 py-0.5 text-[0.75rem] font-medium text-warning',
                                     )
                                 "
                                 title="Đã quá giờ hẹn mà chưa đăng xong"
@@ -703,7 +684,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 type="button"
                                 :class="
                                     cn(
-                                        'flex items-center justify-center rounded-md text-muted-foreground opacity-60 group-hover:opacity-100 hover:bg-accent hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
+                                        'flex items-center justify-center rounded-md text-muted-foreground opacity-60 group-hover:opacity-100 hover:bg-accent hover:text-destructive-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring',
                                         compact ? 'size-6' : 'size-7',
                                     )
                                 "
@@ -733,9 +714,7 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                 </a>
                                 <IconBolt
                                     v-if="e.state === 'projected' && e.direct"
-                                    :class="
-                                        cn('size-3.5', toneClasses.violet.text)
-                                    "
+                                    class="size-3.5 text-muted-foreground"
                                     title="Dự kiến · trong khung đăng thẳng"
                                     aria-label="Dự kiến, đăng thẳng"
                                 />
@@ -757,20 +736,31 @@ const timeW = computed(() => (props.compact ? 'w-[46px]' : 'w-[58px]'));
                                     v-else
                                     :status="lichStatus(e.state)"
                                     :icon-only="ICON_ONLY.includes(e.state)"
-                                    class="h-5 gap-1 px-1.5 text-[0.75rem] [&_svg]:size-3"
+                                    :class="
+                                        cn(
+                                            'h-5 gap-1 rounded-md px-1.5 text-[0.75rem] [&_svg]:size-3',
+                                            e.state === 'direct' &&
+                                                'bg-secondary text-muted-foreground dark:bg-secondary dark:text-muted-foreground',
+                                        )
+                                    "
                                 />
                             </template>
                             <template v-else>
                                 <StatusChip
                                     :status="lichStatus(e.state)"
-                                    class="h-6 px-2 text-[0.8125rem] max-sm:hidden"
+                                    :class="
+                                        cn(
+                                            'h-6 rounded-md px-2 text-[0.8125rem] max-sm:hidden',
+                                            e.state === 'direct' &&
+                                                'bg-secondary text-muted-foreground dark:bg-secondary dark:text-muted-foreground',
+                                        )
+                                    "
                                 />
                                 <span
                                     v-if="e.state === 'projected' && e.direct"
                                     :class="
                                         cn(
-                                            'inline-flex items-center gap-1 text-[0.8125rem] max-sm:hidden',
-                                            toneClasses.violet.text,
+                                            'inline-flex items-center gap-1 text-[0.8125rem] text-muted-foreground max-sm:hidden',
                                         )
                                     "
                                     title="Giờ dự kiến trong khung đăng thẳng: tới giờ Chrome đăng luôn"

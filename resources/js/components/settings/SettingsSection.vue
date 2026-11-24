@@ -15,7 +15,7 @@ withDefaults(
 
 <template>
     <section
-        class="flex min-w-0 flex-col gap-5 rounded-[14px] border border-border bg-card p-5 shadow-card sm:p-6"
+        class="flex min-w-0 flex-col gap-5 rounded-xl border border-border bg-card p-5 shadow-card sm:p-6"
     >
         <div class="flex items-start gap-3.5">
             <span
@@ -27,9 +27,7 @@ withDefaults(
                 <component :is="icon" />
             </span>
             <div class="min-w-0 flex-1">
-                <h2
-                    class="text-lg leading-snug font-semibold tracking-[-0.015em] text-foreground"
-                >
+                <h2 class="text-lg leading-snug font-semibold text-foreground">
                     {{ title }}
                 </h2>
                 <p
