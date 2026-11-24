@@ -226,6 +226,9 @@ def clean_data(loai, d, hop=None):
         if len(items) < 2:
             return None
         d["items"] = items
+        # tích xanh = "tốt" trong mắt người xem; danh sách bệnh/lỗi mà tích xanh là sai nghĩa (Kid 23/11) → dấu cảnh báo đỏ
+        d["xau"] = bool(re.search(r"\b(bị|bệnh|lỗi|sai|đừng|tránh|dấu hiệu|thiếu|hư|rụng|vàng lá|thối|sâu|nấm|rệp|bọ trĩ)\b",
+                                  " ".join([str(d.get("tieu_de") or "")] + items).lower()))
     elif loai == "so_dem":
         n = _so(d.get("so"))
         if n is None or not n[1] or not _so_ok(n[0], d.get("don_vi"), hop):       # số thập phân: khối đếm chỉ nhận số nguyên → xep_khoi đổi sang chu_so
@@ -468,7 +471,7 @@ def khung_tron(doan, blocks, nguong=0.4, toi_thieu=1.2):
     out = []
     for d in doan or []:
         t0, t1 = float(d["t0"]), float(d["t1"])
-        if d.get("bo_cuc") not in ("day", "day_zoom") or t1 - t0 < toi_thieu:
+        if (d.get("bo_cuc") not in ("day", "day_zoom") and not d.get("chu_lon")) or t1 - t0 < toi_thieu:   # chu_lon: aff đứng 1 mình cần chữ to
             continue
         ev = sorted((max(a, t0), min(b, t1)) for a, b in nb if b > t0 and a < t1)
         phu, cuoi = 0.0, t0

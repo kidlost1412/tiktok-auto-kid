@@ -190,7 +190,8 @@ class CanhQuaTest(unittest.TestCase):
         segs = self._segs("005", bo_cuc="khung_mo", phu=None)
         segs2 = self._segs("Q-sp2-1", bo_cuc="pip_troi")
         self.assertEqual([p["id"] for p in segs2[-1]["phu_shots"]], ["Q-sp2-1"])
-        self.assertFalse(segs[-1]["phu_shots"] and str(segs[-1]["phu_shots"][0]["id"]).startswith("Q-"))
+        self.assertTrue(str(segs[-1]["phu_shots"][0]["id"]).startswith("Q-"))      # Kid 24/11: chốt chưa có quà mà kho có → máy thêm ô quà thật
+        self.assertEqual(segs[-1]["bo_cuc"], "chia_ngang")
 
     def test_may_kiem_ap_dung_ca_khi_loi_im(self):
         s = sents()                                       # câu chốt "Đặt chai trong giỏ hàng ngay": không nhắc quà

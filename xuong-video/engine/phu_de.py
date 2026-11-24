@@ -141,7 +141,8 @@ def _cam_cat(ws):
 
 
 def _cat_doan(ws, cam, lo, hi):
-    """Chia ws (không có dấu câu giữa chừng) thành các cụm ≤ hi từ, cân đối, tránh cắt chỗ cấm."""
+    """Chia ws (không có dấu câu giữa chừng) thành các cụm ≤ hi từ, cân đối, tránh cắt chỗ cấm.
+    Ngắt ngay sau chữ số bị phạt nặng: "một nắp pha một | bình" đọc hỏng nghĩa (Kid 23/11), "một nắp pha | một bình" mới đúng."""
     n = len(ws)
     if n <= hi:
         return [(0, n)]
@@ -153,7 +154,7 @@ def _cat_doan(ws, cam, lo, hi):
             if best[i] >= INF or (i > 0 and cam[i]):
                 continue
             sz = j - i
-            c = best[i] + (sz - ly_tuong) ** 2 + (1000 if sz > hi else 0) + (300 if sz < lo else 0)
+            c = best[i] + (sz - ly_tuong) ** 2 + (1000 if sz > hi else 0) + (300 if sz < lo else 0) + (400 if j < n and _la_so(ws[j - 1]) else 0)
             if c < best[j]:
                 best[j], tr[j] = c, i
     out, j = [], n
@@ -162,11 +163,14 @@ def _cat_doan(ws, cam, lo, hi):
     return out[::-1]
 
 
-def cat_cum(ws, lo=2, hi=5):
-    """Chia danh sách từ hiển thị thành cụm lo–hi từ: ngắt ở dấu câu trước, rồi cân đối; không cắt tên riêng / số."""
+def cat_cum(ws, lo=2, hi=5, cam_them=None):
+    """Chia danh sách từ hiển thị thành cụm lo–hi từ: ngắt ở dấu câu trước, rồi cân đối; không cắt tên riêng / số.
+    cam_them[i] = True: thêm chỗ cấm ngắt giữa ws[i-1] và ws[i] (vd. tên hàng viết thường, "mi li")."""
     if not ws:
         return []
     cam = _cam_cat(ws)
+    if cam_them:
+        cam = [a or bool(b) for a, b in zip(cam, cam_them)]
     doan, a = [], 0
     for i, w in enumerate(ws):
         if re.search(r"[,;:…!?.]$", w) and i + 1 < len(ws):
@@ -216,6 +220,10 @@ def loc_phu_de(lines, blocks, nguong=0.6):
     return out
 
 
+def _bo_dau_cuoi(s):
+    return re.sub(r"[,;:.…]+$", "", str(s).rstrip())
+
+
 def chia_dong(text, dong_ai, words, emph_keys=(), tu_min=2, tu_max=5):
     plain = re.sub(r"\[[^\]]*\]\s*", "", text).strip()
     dung_ai = bool(dong_ai and _toks(" ".join(dong_ai)) == _toks(plain))
@@ -227,7 +235,8 @@ def chia_dong(text, dong_ai, words, emph_keys=(), tu_min=2, tu_max=5):
         ws = words[a:b]
         if not ws:
             continue
-        out.append({"text": ln, "f0": int(round(ws[0]["s"] * FPS)), "f1": int(round(ws[-1]["e"] * FPS)),
-                    "words": [{"w": w["w"], "f0": int(round(w["s"] * FPS)), "f1": int(round(w["e"] * FPS)),
-                               "emph": any(k in w["w"].lower() for k in keys)} for w in ws]})
+        # dấu phẩy/chấm cuối dòng chiếm chỗ bên phải → cụm chữ trông lệch trái (căn theo mắt, Kid 23/11); giữ ? !
+        out.append({"text": _bo_dau_cuoi(ln), "f0": int(round(ws[0]["s"] * FPS)), "f1": int(round(ws[-1]["e"] * FPS)),
+                    "words": [{"w": _bo_dau_cuoi(w["w"]) if i == len(ws) - 1 else w["w"], "f0": int(round(w["s"] * FPS)), "f1": int(round(w["e"] * FPS)),
+                               "emph": any(k in w["w"].lower() for k in keys)} for i, w in enumerate(ws)]})
     return out, dung_ai

@@ -1,7 +1,7 @@
 """NÉ NHÃN CHAI: biết chai nằm đâu trên màn hình (AI soát đánh dấu khung quanh chai ở từng cảnh) → dời khối chữ / mũi tên
 giỏ hàng sang chỗ trống. Editor cao cấp: chữ đặt vào khoảng trống, KHÔNG BAO GIỜ che sản phẩm."""
 W, H, FPS = 1080, 1920, 30
-RECT = {"khung_mo": (82, 200, 900, 1350), "khung_nho": (160, 260, 760, 1140), "chia_doi": (32, 170, 1000, 740),
+RECT = {"khung_mo": (56, 180, 968, 1430), "khung_nho": (160, 260, 760, 1140), "chia_doi": (32, 170, 1000, 740),
         "chia_ngang": (24, 330, 508, 1080), "luoi_4": (36, 170, 490, 720)}
 CAO = {"checklist": 380, "so_sanh": 360, "bang_qua": 430, "so_dem": 200, "hop_qua": 230, "nut_gio_hang": 170, "the_qua": 230,
        "canh_bao": 170, "dai_chay": 130, "hook_tung_tu": 300,
@@ -61,7 +61,7 @@ def dat_khoi(blocks, doan):
         mac_dinh = 250
         ung = [mac_dinh, 1060, 860, 560]            # y ≥ 230: không lên sát mép trên
         def diem(top):
-            khung = (60, top, 940, top + cao)
+            khung = (100, top, 980, top + cao)      # khớp Zone trong Blocks.tsx (căn giữa)
             phat = sum(_chong(khung, h) for h in hops) / (880 * cao)
             if top + cao > VUNG_PHU_DE[0]:
                 phat += 1        # không đè phụ đề

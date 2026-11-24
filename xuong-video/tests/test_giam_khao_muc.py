@@ -43,9 +43,10 @@ class DiemTest(unittest.TestCase):
     def test_hop_nhat_diem_dat_va_loi(self):
         r = km.hop_nhat(muc_ai(), [])
         self.assertEqual((r["diem"], r["dat"], r["loi"]), (10.0, True, []))
-        r = km.hop_nhat(muc_ai(hook=(False, "mở đầu nhạt", 0.5), khoang_tho=(False, "nhồi chữ", 6.0), da_dang_bo_cuc=(False, "lặp khung", None),
+        r = km.hop_nhat(muc_ai(hook=(False, "mở đầu nhạt", 0.5), hinh_hop_loi=(False, "lệch lời", 6.0), nhan_ro=(False, "nhãn mờ", None),
                                khong_lap=(False, "lặp", 2.0)), [])
-        self.assertEqual(r["diem"], round(10 * (len(km.MUC) - 4) / len(km.MUC), 1))
+        n = len(km.AI_HOI) + len(km.CHI_MAY)                         # 3 mục cảm tính đã bỏ (Kid 23/11)
+        self.assertEqual(r["diem"], round(10 * (n - 4) / n, 1))
         self.assertFalse(r["dat"])                                    # móc câu là mục nặng: trượt thì không đạt dù điểm ≥ 7
         self.assertEqual(len(r["loi"]), 3); self.assertTrue(r["loi"][0].startswith("0.5s móc câu"))
         r2 = km.hop_nhat(muc_ai(khong_lap=(False, "lặp", 2.0)), [])
@@ -55,7 +56,8 @@ class DiemTest(unittest.TestCase):
         may = [{"muc": "khong_che_nhan", "nguoi_sua": "may", "giay": 3.0, "chi_tiet": "phụ đề đè nhãn lúc 3s", "sua": ""}]
         ai = muc_ai(); ai["muc"] = [m for m in ai["muc"] if m["id"] != "khong_che_nhan"]               # AI bỏ qua đúng mục máy đã bắt
         r = km.hop_nhat(ai, may)
-        self.assertEqual(r["diem"], round(10 * (len(km.MUC) - 1) / len(km.MUC), 1))
+        n = len(km.AI_HOI) + len(km.CHI_MAY)
+        self.assertEqual(r["diem"], round(10 * (n - 1) / n, 1))
         m = [x for x in r["muc"] if x["id"] == "khong_che_nhan"][0]
         self.assertEqual((m["dat"], m["nguon"], m["nguoi_sua"]), (False, "may", "may"))
         self.assertTrue(r["loi"][0].startswith("[máy] "))
@@ -161,11 +163,11 @@ class TachBaiHocTest(unittest.TestCase):
         for tu in ("nhãn", "phụ đề", "lớp màu", "quà"):                              # lỗi máy / dữ liệu thì KHÔNG
             self.assertNotIn(tu, hoc)
         dong = [json.loads(l) for l in (self.hub / "lich-su" / "loi-may.jsonl").read_text(encoding="utf-8").splitlines()]
-        self.assertEqual({x["muc"] for x in dong}, {"khong_che_nhan", "hinh_sach", "chot_qua"})
+        self.assertEqual({x["muc"] for x in dong}, {"khong_che_nhan", "chot_qua"})        # "hình sạch" AI không còn chấm (Kid 23/11)
         for x in dong:
             self.assertEqual(set(x) , {"luc", "san_pham", "video", "muc", "nguon", "giay", "chi_tiet"})
             self.assertEqual((x["san_pham"], x["video"]), ("sp1", "v1-0"))
-        self.assertEqual(n_may, 3)
+        self.assertEqual(n_may, 2)
         # đạo diễn chỉ đọc bài học, không bao giờ đọc loi-may
         self.assertNotIn("đè nhãn", dd.bai_hoc_cho("sp1"))
 
@@ -246,7 +248,8 @@ class ChamBangAiTest(unittest.TestCase):
         self.assertIn("MÁY ĐÃ KIỂM", log[0]["prompt"])
         truot = {x["id"] for x in kq["muc"] if x["dat"] is False}
         self.assertEqual(truot, {"chot_chai", "hook"})
-        self.assertEqual(kq["diem"], round(10 * (len(km.MUC) - 2) / len(km.MUC), 1)); self.assertFalse(kq["dat"])
+        n = len(km.AI_HOI) + len(km.CHI_MAY)
+        self.assertEqual(kq["diem"], round(10 * (n - 2) / n, 1)); self.assertFalse(kq["dat"])
         self.assertTrue(kq["may"] and kq["may"][0]["muc"] == "chot_chai")
 
     def test_antigravity_dong_thi_roi_ve_claude(self):
@@ -297,8 +300,10 @@ class ChamBangAiTest(unittest.TestCase):
     def test_prompt_co_danh_sach_kiem(self):
         ctx = dd.ctx_giam_khao(self.SP, self.SENTS, {"khoi": []}, [{"muc": "hook"}])
         p = prompt_mau.dien("giam-khao", **ctx)
-        for k in km.TEN_MUC:
+        for k in km.AI_HOI:
             self.assertIn(f'"{k}"', p)
+        for k in km.CHI_MAY | {"nguoi_noi", "hinh_sach", "khoang_tho"}:          # máy tự đo / đã bỏ → không hỏi AI
+            self.assertNotIn(f'"{k}"', p)
         self.assertEqual(p.count("MÁY ĐÃ KIỂM: TRƯỢT"), 1 + (1 if "MÁY ĐÃ KIỂM: TRƯỢT" in prompt_mau.doc("giam-khao")[0] else 0))
 
 

@@ -13,6 +13,7 @@ HÌNH
 - Dùng NHIỀU cảnh AFF: ít nhất 3 đoạn có người thật cầm/dùng sản phẩm nếu kho có. Tự nghĩ cách bày: hai–ba–bốn người cùng lúc, một người cạnh
   cận nhãn chai, chuỗi lật trang nhanh nhiều người, người thật ở đoạn chốt… Đừng lặp một kiểu chia ô cả bài.
 - Mở đầu: hình mạnh nhất, có chuyển động hoặc chi tiết gây tò mò. Chốt: thấy rõ sản phẩm (chai rõ nhãn hoặc người thật cầm chai) CÙNG quà thật (cảnh "Q-", chia ô hoặc nối tiếp) và giữ yên đủ lâu. Sản phẩm nào cũng có quà: mọi video đều chốt có quà.
+- Câu gỡ ngại (sợ hàng dỏm, sợ pha loãng, sợ bể đổ khi giao): nếu kho có cảnh RÓT, KHUẤY TAN, ĐÓNG THÙNG thì ưu tiên ở đó — thấy hàng đặc, tan đều, gói kỹ là tin. Không dùng các cảnh này làm cảnh mở.
 - Không dùng 1 cảnh 2 lần. Đổi cỡ cảnh giữa hai đoạn liền nhau.
 - Cảnh ghi [CÓ CHỮ GỐC trong hình]: chỉ dùng trong ô nhỏ hoặc lật trang nhanh, không để toàn màn, không đặt chữ của mình lên cùng lúc.
 
@@ -35,9 +36,10 @@ Danh mục khối chữ:
 
 ÂM THANH
 - Mỗi khối chữ máy đã có tiếng mặc định hợp kiểu chuyển động của nó. Chỉ ghi "am" khi bạn muốn đổi (tên nhóm bên dưới) hoặc tắt ("khong").
-- "am_mo": tiếng mở đầu trong giây đầu để giữ chân (tên nhóm) hoặc "khong". Chỉ dùng khi hợp hình và chữ mở: chữ đập → tiếng trầm;
-  chữ gõ máy → tiếng phím, không bao giờ tiếng nổ; hình nhẹ nhàng → thôi.
-- Ít mà đúng: cú nhấn mạnh chỉ một hai lần cả bài; vật thật có tiếng thật; cắt thẳng thì im.
+- "am_mo": tiếng mở đầu trong giây đầu để giữ chân (tên nhóm) hoặc "khong". Không ghi thì máy mở bằng rít đĩa. Chọn theo hình và chữ mở:
+  chữ đập → flash máy ảnh hoặc rít đĩa; chữ gõ máy → tiếng phím, không bao giờ tiếng nổ; hình nhẹ nhàng → vút nhẹ.
+- Giọng luôn rõ nhất: tiếng trầm, tiếng nổ đè lên lời thì mất thoại, chỉ để ở khoảng lặng và rất hiếm.
+- Chữ mạnh nào cũng có tiếng, tiếng phải nghe rõ; đa dạng theo vai (mỗi vai một họ tiếng, xoay biến thể); vật thật có tiếng thật; cắt thẳng thì im.
 Nhóm âm đang có:
 {{am}}
 
@@ -61,7 +63,7 @@ LỜI ĐỌC ĐÁNH SỐ TỪNG TỪ (dùng số này để canh điểm cắt c
 {{tu}}
 
 === CẢNH ỨNG VIÊN ===
-Xem tờ ảnh (số vàng = id; mỗi ô viền vàng là MỘT cảnh, gồm các khung 1→2→3 = đầu, giữa, cuối đoạn dùng được của cảnh đó theo thời gian — xem cả ba khung rồi mới chọn). {{ds}}
+Xem tờ ảnh (số vàng = id; mỗi ô viền vàng là MỘT cảnh, gồm các khung 1→2→3→4 rải đều từ đầu đến cuối đoạn dùng được của cảnh đó theo thời gian; có thể ít hơn 4 nếu cấu hình khác — xem hết các khung rồi mới chọn; cảnh nhoè/rung/mất nét ở bất kỳ khung nào thì KHÔNG chọn). {{ds}}
 id bắt đầu "Q-" = QUÀ TẶNG THẬT (dùng ở đoạn chốt và câu nhắc quà); id bắt đầu "V-" = KHO PHỤ (b-roll, không quá ~30% số cảnh).
 CẢNH AFF (người thật cầm/dùng/nói về sản phẩm) đang có: {{aff}} — đây là bằng chứng "người khác cũng mua", quý nhất trong kho.
 Miệng họ không khớp lời đọc KHÔNG phải vấn đề. Dùng được toàn màn, trong ô, chia nhiều ô, hay lật trang nhanh nhiều người liên tiếp.

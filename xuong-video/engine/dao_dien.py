@@ -44,9 +44,9 @@ BO_CUC_MO_TA = {
 KHO_NHO = 80              # kho riêng < 80 cảnh dùng được = "kho nhỏ": hạn mức ứng viên chặt hơn, kho chung được thêm rộng hơn
 TOI_DA_MOI_CAU = 10       # mặc định ứng viên mỗi câu (gồm cả cảnh kho chung); config dao_dien.ung_vien_moi_cau, trần TRAN_MOI_CAU
 TRAN_MOI_CAU = 14
-KHUNG_MOI_CANH = 3        # mặc định số khung/ô ứng viên (đầu–giữa–cuối đoạn dùng được); config dao_dien.khung_moi_canh, 1 = ảnh _khung cũ
-TRAN_KHUNG = 4
-TOI_DA_TO_SHEET = 4       # tối đa 4 tờ ảnh ứng viên
+KHUNG_MOI_CANH = 6        # mặc định số khung/ô ứng viên (rải đều đầu→cuối đoạn dùng được; Kid 24/11: 3→4→6, ô 778×228, 12 ô/tờ, ~2,9k token/tờ); config dao_dien.khung_moi_canh, 1 = ảnh _khung cũ
+TRAN_KHUNG = 10
+TOI_DA_TO_SHEET = 6       # tối đa 6 tờ ảnh ứng viên (6 khung/ô: 72 ứng viên như 4 tờ × 18 ô cũ)
 TRAN_KHO_NHO = 0.60       # kho nhỏ: tổng ứng viên riêng của 1 video ≤ 60% kho
 TY_BO_MET = 0.35          # bỏ tối đa 35% cảnh MỆT NHẤT khỏi ứng viên (miễn mọi vai trò của cảnh còn đủ cảnh thay)
 W_MET = 1.5               # 1 đơn vị mệt = trừ 1,5 điểm liên quan
@@ -502,8 +502,8 @@ def khung_canh(ma, sid, sh, k, dir_cache=None):
 
 
 def to_ung_vien(ma, ids, out, cols=None, k=None):
-    """Tờ ảnh ứng viên cho đạo diễn. k = số khung/ô (mặc định config dao_dien.khung_moi_canh = 3): mỗi ô gồm k khung liền nhau theo thời gian
-    (đầu → giữa → cuối đoạn dùng được của cảnh, cắt từ video gốc, có cache); k=1 hoặc thiếu video gốc → ảnh _khung cũ. Tờ ≤ 1560 px mỗi chiều,
+    """Tờ ảnh ứng viên cho đạo diễn. k = số khung/ô (mặc định config dao_dien.khung_moi_canh = 6): mỗi ô gồm k khung liền nhau theo thời gian
+    (rải đều đầu → cuối đoạn dùng được của cảnh, cắt từ video gốc, có cache); k=1 hoặc thiếu video gốc → ảnh _khung cũ. Tờ ≤ 1560 px mỗi chiều,
     tối đa TOI_DA_TO_SHEET tờ. Trả LIST đường dẫn tờ (tờ 1 = out, tờ 2 = <out>-2.jpg); id rỗng → []. Thiếu cả ảnh → ô xám có số id (không sập)."""
     k = khung_moi_canh() if k is None else max(1, int(k))
     tw, th, c, r = bo_cuc_to(k)
@@ -657,7 +657,7 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
         total=total, nhan=script.get("nhan_tu", []),
         ds=COT_DS + "\n" + "\n".join(dong_ds(i, chon[i]) for i in ids),
         goi_y=json.dumps({k: v for k, v in enumerate(per)}),
-        bo_cuc=chr(10).join(f"- {k}: {v['mo_ta']} (cảnh phụ: {v['phu']}" + (f"–{v['phu_toi_da']}" if v['phu_toi_da'] != v['phu'] else "") + ")" for k, v in BC.mo_ta_bo_cuc().items()),
+        bo_cuc=chr(10).join(f"- {k}: {v['mo_ta']} (cảnh phụ: {v['phu']}" + (f"–{v['phu_toi_da']}" if v['phu_toi_da'] != v['phu'] else "") + ")" for k, v in BC.mo_ta_bo_cuc().items()) + _goi_y_dac_biet(),
         tu=tu_danh_so(sents), khoi_mo_ta=khoi_cho_dao_dien(), am=am_cho_dao_dien(),
         aff=json.dumps(boi.get("aff") or [], ensure_ascii=False), don_ban=(script.get("don_ban") or "(biên kịch không ghi)"),
         ct=json.dumps({k: {"ten": r["ten"], "mo": r["mo"], "giua": r["giua"], "chot": r["chot"], "phu_de": r.get("phu_de"), "sfx": r.get("sfx")}
@@ -775,6 +775,7 @@ def segs_tu_bang(edl, sents, total, shots):
                       bo_cuc=bc, phu_shots=qua_giu[:BC.so_phu_toi_da(bc)])
             sua.append("câu chốt: đổi sang cảnh chai rõ" + (", giữ cảnh quà làm ô phụ" if cu["phu_shots"] else ""))
     sua += _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh)
+    sua += _chot_co_qua(segs, shots, used)
     segs, sua2 = _bu_bo_cuc(segs, shots, used, met)
     own = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-")))
     segs, sua3 = gioi_han_kho_them(segs, shots, used, None if own >= KHO_NHO else TY_KHO_THEM_NHO)   # kho riêng nhỏ: kho chung được nhiều hơn
@@ -788,6 +789,31 @@ def _dat_canh(sg, moi):
     sg["shot"] = moi
     if sg["bo_cuc"] in ("pip_troi", "pip_giua") and la_chai(moi):
         sg["bo_cuc"] = "khung_mo"; sg["phu_shots"] = []
+
+
+def _goi_y_dac_biet():
+    """Kid 24/11: kiểu dựng đặc biệt do đạo diễn tự quyết, video sau khác video trước."""
+    gan = BC.kieu_gan()
+    return ("\nKIỂU ĐẶC BIỆT (" + ", ".join(BC.DAC_BIET) + "): bạn TỰ chọn 1–2 kiểu cho đoạn aff/người dài ở giữa bài (không câu đầu/cuối, không 2 đoạn liền nhau),"
+            " chọn theo nội dung câu (khoe nhiều người dùng → dải trôi/băng chuyền; giữ một người nói lâu → thẻ hiện lên/hiện rồi mất)."
+            " Cảnh phụ các kiểu này: aff/người khác cầm sản phẩm, mỗi cảnh một file khác nhau; máy tự bù nếu thiếu."
+            + (f" Các video gần đây đã dùng: {', '.join(gan[-6:])} — ưu tiên kiểu KHÁC để mỗi video một vẻ." if gan else ""))
+
+
+def _chot_co_qua(segs, shots, used):
+    """Kid 24/11: video nào cũng khép bằng QUÀ THẬT — đoạn chốt chưa có cảnh quà (Q-) mà kho có → chia đôi: hàng chính | chai quà."""
+    if not segs:
+        return []
+    la_q = lambda s: str(s.get("id", "")).startswith("Q-")
+    cu = segs[-1]
+    if la_q(cu["shot"]) or any(la_q(p) for p in cu.get("phu_shots") or []) or cu["dur"] < 1.5:
+        return []
+    q = sorted([s for s in shots if la_q(s) and not bad(s, chinh=False) and s["id"] not in used], key=lambda z: -((z.get("soat") or {}).get("dep") or 3))
+    if not q:
+        return []
+    used.add(q[0]["id"]); cu.pop("bo_cuc_may", None)
+    cu.update(bo_cuc="chia_ngang", phu_shots=[q[0]])
+    return ["câu chốt: thêm ô cảnh quà thật " + q[0]["id"]]
 
 
 def _doi_mo_chot_anh_em(segs, shots, used, met, mo_gan, chot_gan, anh):
@@ -843,6 +869,8 @@ def _bu_bo_cuc(segs, shots, used, met=None):
             pool = [s for s in ds if s["file"] != sg["shot"]["file"] and s["id"] not in used]
             if la_chai(sg["shot"]):
                 pool = [s for s in pool if not la_chai(s)] or pool
+            if sg.get("bo_cuc") != "lat_trang":       # ô phụ nằm trong ô hẹp/nhỏ: ưu tiên cảnh vừa khung (không người toàn/trung)
+                pool = [s for s in pool if BC.vua_o_hep(s, sg.get("bo_cuc"))] or pool
             if not pool:
                 break
             x = min(pool, key=lambda s: met.get(s["id"], 0) + rng.random() * 2)

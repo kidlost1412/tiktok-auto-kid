@@ -41,15 +41,18 @@ class Nen(unittest.TestCase):
         SFX.dung_lai()
 
     def lich(self, blocks, cuts=(), total=20.0, muc="vua", seed=3, **kw):
+        """giu_mo=False: bỏ âm mở MẶC ĐỊNH (chọn từ thực đơn) để các test ánh xạ chỉ nhìn tiếng của khối (test riêng ở TestHookMacDinh)."""
         kw.setdefault("trans", "cat")
-        return SFX.len_lich(muc, blocks, list(cuts), total, random.Random(seed), kw.pop("pops", None), **kw)
+        giu = kw.pop("giu_mo", False) or "am_mo" in kw or "st" in kw
+        ev = SFX.len_lich(muc, blocks, list(cuts), total, random.Random(seed), kw.pop("pops", None), **kw)
+        return ev if giu else [e for e in ev if e["nguon"] != "mo"]
 
 
 class TestDanhMuc(Nen):
     def test_goi_moi_du_va_da_do_san(self):
         dm = SFX.danh_muc()
         moi = [e for e in dm.values() if e["goc"] == "moi"]
-        self.assertEqual(len(moi), 38)
+        self.assertEqual(len(moi), 40)                                     # 45 file đóng gói − 5 file chói bị CAM (ting/xèng 8,5–9 kHz, tách bật lửa, 2 máy đánh chữ)
         for e in moi:
             for k in ("nhom", "vai", "mo_ta", "dai", "dinh_db", "t_dinh", "t_bat", "tan_cong"):
                 self.assertIn(k, e, e["file"])
@@ -95,10 +98,15 @@ class TestDanhMuc(Nen):
 
     def test_mo_ta_am(self):
         d = SFX.mo_ta_am()
-        for k in ("dap", "go_phim", "tick", "con_dau", "tien", "sai", "khong"):
+        for k in ("dap", "go_phim", "tick", "con_dau", "tien", "khong"):
             self.assertIn(k, d)
             self.assertTrue(d[k].strip())
         self.assertIn("gõ máy", d["go_phim"])
+        for k in ("no_lon", "vo_tay"):                                                    # nổ meme / vỗ tay: không mời đạo diễn chọn
+            self.assertNotIn(k, d)
+        for k in ("chup", "sai"):                                                         # màn trập / còi sai: trả lại, kèm điều kiện dùng trong mô tả
+            self.assertIn(k, d)
+            self.assertIn("CHỈ", d[k])
         self.assertNotIn("nen_vuon", d)                                                  # kho cũ không cài thì nhóm không có file bị bỏ
 
     def test_nhom_moi_nhan_dang_file_nguoi_dung(self):
@@ -111,7 +119,7 @@ class TestAnhXa(Nen):
         ev = self.lich([kh("hook_go_may", 0.5, 4.0, text="NẤM TRĨ HẠI BÔNG")], total=8)
         self.assertGreaterEqual(len(ev), 3)
         self.assertEqual({e["nhom"] for e in ev}, {"go_phim"})
-        self.assertTrue(all(e["vai"] == "typing" and e["db"] <= -18 for e in ev))
+        self.assertTrue(all(e["vai"] == "typing" and e["db"] <= -12 for e in ev))
         self.assertTrue(all(e["t"] >= 0.5 - 0.03 for e in ev))
         self.assertEqual(len({e["cum"] for e in ev}), 1)                              # cả lúc gõ = 1 cử chỉ
 
@@ -119,15 +127,39 @@ class TestAnhXa(Nen):
         ev = self.lich([kh("hook_go_may", 1.0, 5.0, text="x" * 40, cps=10)], total=8)
         self.assertGreater(max(e["t_neo"] for e in ev) - min(e["t_neo"] for e in ev), 2.5)
 
-    def test_mat_na_hook_dap_la_nhat_tram(self):
-        ev = self.lich([kh("hook_dap", 3.0, 5.0)], total=8)
+    def test_hook_dap_la_nhat_tram_nhe_khong_phai_man_trap(self):
+        ev = self.lich([kh("hook_dap", 3.0, 5.0)], total=8)                         # 24/11 chủ hàng: bỏ màn trập; nhát trầm nhẹ, ngắn ≤ 0,5 s
         self.assertEqual([e["nhom"] for e in ev], ["dap"])
         self.assertEqual(ev[0]["vai"], "hit")
+        self.assertLessEqual(ev[0]["dai"], 0.5)
 
     def test_canh_bao_la_am_bao_khong_phai_chuong_tien(self):
         ev = self.lich([kh("canh_bao", 2.0, 4.0)], total=8)
-        self.assertEqual({e["nhom"] for e in ev}, {"sai"})
+        self.assertEqual({e["nhom"] for e in ev}, {"dap"})                          # không còi sai kiểu game show
+        self.assertEqual(ev[0]["vai"], "hit")
+
+    def test_sai_chi_khi_loi_neu_cai_sai(self):
+        wb = lambda text, f0=1.0, **kw: kh("loi_slam", f0, f0 + 1.5, vai="warn", text=text, **kw)
+        ev = self.lich([wb("SAI LẦM PHỔ BIẾN")], total=8)
+        self.assertEqual([e["nhom"] for e in ev], ["sai"])
         self.assertEqual(ev[0]["vai"], "alert")
+        for t in ("ĐỪNG PHUN BUỔI TRƯA", "lỗi thường gặp", "tốn tiền", "phí thuốc", "không nên", "NHẦM"):
+            self.assertEqual([e["nhom"] for e in self.lich([wb(t)], total=8)], ["sai"], t)
+        for t in ("MẤT MÙA", "PHUY 200 LÍT", "CÂY RỤNG LÁ", "SAIGON"):    # warn trung tính / từ chứa "sai" không phải từ nguyên
+            self.assertNotIn("sai", {e["nhom"] for e in self.lich([wb(t)], total=8)}, t)
+        ev = self.lich([wb("SAI"), wb("LỖI", 4.0), wb("ĐỪNG", 7.0)], total=12)
+        self.assertEqual(sum(e["nhom"] == "sai" for e in ev), 1)                       # tối đa 1 lần/video
+        self.assertNotIn("sai", {e["nhom"] for e in self.lich([kh("loi_slam", 1, 2.5, vai="val", text="SAI")], total=8)})   # không phải warn
+        self.assertEqual({e["nhom"] for e in self.lich([kh("canh_bao", 2, 4, text="lỗi thường gặp")], total=8)}, {"sai"})
+        self.assertEqual({e["nhom"] for e in self.lich([kh("canh_bao", 2, 4, text="chú ý")], total=8)}, {"dap"})
+
+    def test_chup_chi_khi_hinh_loe_trang(self):
+        ev = self.lich([kh("loi_hook_flash", 0.0, 2.0, text="BỌ TRĨ")], total=8)
+        self.assertEqual([e["nhom"] for e in ev if e["nguon"] != "mo"], ["chup"])
+        self.assertEqual([e["nhom"] for e in self.lich([kh("loi_hook_drop", 0.0, 2.0, text="BỌ TRĨ")], total=8)], ["dap"])
+        for b in (kh("loi_slam", 1, 2.5, vai="warn", text="MẤT 30%"), kh("loi_slam", 1, 2.5, vai="val", text="200 LÍT")):
+            self.assertNotIn("chup", {e["nhom"] for e in self.lich([b], total=8)})
+        self.assertEqual([e["nhom"] for e in self.lich([kh("truoc_sau", 2, 4)], total=8)], ["chup"])
 
     def test_tem_la_cai_thich_khong_phai_man_trap(self):
         ev = self.lich([kh("hook_tem", 2.0, 4.0)], total=8)
@@ -170,7 +202,7 @@ class TestAnhXa(Nen):
         la = [e for e in ev if abs(e["t_neo"] - 5.05) < 0.01]
         self.assertEqual(len(la), 1)
         self.assertEqual(la[0]["vai"], "ui")
-        self.assertLessEqual(la[0]["db"], -17.5)
+        self.assertLessEqual(la[0]["db"], -12.5)
         self.assertEqual(self.lich([kh("khoi_la", 0, 2)], total=5)[0]["vai"], "ui")
 
     def test_khoi_loi_khong_lam_hong_lich(self):
@@ -181,8 +213,12 @@ class TestAnhXa(Nen):
 
 class TestGhiDe(Nen):
     def test_am_ghi_de_ho_va_khong(self):
-        ev = self.lich([kh("hook_dap", 2, 4, am="chup")], total=8)
+        ev = self.lich([kh("hook_dap", 2, 4, am="chup")], total=8)                         # đạo diễn chọn màn trập thì được
         self.assertEqual([e["nhom"] for e in ev], ["chup"])
+        ev = self.lich([kh("hook_dap", 2, 4, am="no_lon")], total=8)                       # nổ meme bị đổi sang "dap"
+        self.assertEqual([e["nhom"] for e in ev], ["dap"])
+        ev = self.lich([kh("hook_dap", 2, 4, am="ting")], total=8)
+        self.assertEqual([e["nhom"] for e in ev], ["ting"])
         self.assertEqual(self.lich([kh("hook_dap", 2, 4, am="khong")], total=8), [])
         ev = self.lich([kh("hook_dap", 2, 4, am="nhom_khong_co")], total=8)               # tên lạ → quay về ánh xạ mặc định
         self.assertEqual([e["nhom"] for e in ev], ["dap"])
@@ -219,10 +255,10 @@ class TestAmMo(Nen):
         self.assertEqual([e["nhom"] for e in ev if e["nguon"] == "mo"], ["ting"])
 
     def test_am_mo_khong_bo_nhat_tu_dong_cua_khoi_dau(self):
-        ev = self.lich([kh("hook_dap", 0, 2.5), kh("canh_bao", 6, 8)], total=10, am_mo="khong")
-        self.assertEqual([e["nhom"] for e in ev], ["sai"])
-        ev2 = self.lich([kh("hook_dap", 0, 2.5), kh("canh_bao", 6, 8)], total=10)
-        self.assertEqual([e["nhom"] for e in ev2][0], "dap")                             # khối đầu tự ánh xạ ra nhát thì vẫn có
+        ev = self.lich([kh("hook_tung_tu", 0, 2.5), kh("canh_bao", 6, 8)], total=10, am_mo="khong")
+        self.assertEqual([e["nhom"] for e in ev], ["dap"])                              # vút tự động của khối đầu bị bỏ, không rít đĩa
+        ev2 = self.lich([kh("hook_dap", 0, 2.5), kh("canh_bao", 6, 8)], total=10, giu_mo=True)
+        self.assertEqual([e["nhom"] for e in ev2], ["dap", "thong_bao"])                 # nhát nặng thứ 2 hạ xuống tiếng nhẹ (≤ 1/3 cử chỉ); # khối đầu tự có tiếng giây đầu → không thêm rít đĩa
 
     def test_am_mo_ten_la_bi_bo_qua(self):
         ev = self.lich([kh("hook_mat_na", 0, 2.5)], total=10, am_mo="khong_co_nhom_nay")
@@ -248,8 +284,8 @@ class TestChuyenCanh(Nen):
         self.assertEqual(sorted(round(e["t_neo"] - 0.14) for e in ev), [4, 8, 12])
 
     def test_khong_theo_xac_suat(self):
-        a = [e["t_neo"] for e in self.vut(trans="slideleft")]
-        b = [e["t_neo"] for s in range(5) for e in self.lich([kh("canh_bao", 0.5, 1.5)], cuts=self.CUTS, total=14, seed=s, trans="slideleft")
+        a = [e["t_neo"] for e in self.vut(trans="slideleft", am_mo="khong")]      # am_mo="khong": âm mở ngẫu nhiên theo seed không được làm đổi mật độ
+        b = [e["t_neo"] for s in range(5) for e in self.lich([kh("canh_bao", 0.5, 1.5)], cuts=self.CUTS, total=14, seed=s, trans="slideleft", am_mo="khong")
              if e["nguon"] == "chuyen"]
         self.assertEqual(len(b), 5 * len(a))
 
@@ -273,17 +309,17 @@ class TestChuyenCanh(Nen):
 class TestHanChe(Nen):
     def test_mat_do_toi_da(self):
         bl = [kh("khoi_la", 0.5 + 0.8 * k, 1.2 + 0.8 * k) for k in range(12)] + [kh("canh_bao", 9.9, 10)]
-        for muc, cap in (("gon", 4), ("vua", 6), ("soi_dong", 8)):
+        for muc, cap in (("gon", 6), ("vua", 9), ("soi_dong", 12)):
             ev = self.lich(bl, total=10.5, muc=muc)
             self.assertLessEqual(KA.chi_so_lich(ev, 10.5)["cu_chi_toi_da_10s"], cap, muc)
-            self.assertTrue([e for e in ev if e["nhom"] == "sai"], "ưu tiên cao (khối cuối) phải còn")
+            self.assertTrue([e for e in ev if e["nhom"] in ("dap", "thong_bao")], "ưu tiên cao (khối cuối) phải còn")
 
     def test_bo_tieng_thap_truoc(self):
         bl = [kh("canh_bao", 1, 2), kh("khoi_la", 2.5, 3), kh("khoi_la", 3.5, 4), kh("khoi_la", 4.5, 5), kh("canh_bao", 6, 7), kh("khoi_la", 7.5, 8),
               kh("hook_dap", 8.5, 9.5)]
         ev = self.lich(bl, total=10, muc="gon")
-        self.assertEqual({e["nhom"] for e in ev if e["uu"] <= 1}, {"sai", "dap"})
-        self.assertLessEqual(len(ev), 4)
+        self.assertEqual({e["nhom"] for e in ev if e["uu"] <= 1}, {"dap", "thong_bao"})
+        self.assertLessEqual(len(ev), 6)
 
     def test_file_dung_toi_da_2_lan(self):
         bl = [kh("hook_mat_na", 3.2 * k, 3.2 * k + 2) for k in range(14)]
@@ -311,13 +347,13 @@ class TestHanChe(Nen):
         bl = [kh("canh_bao", 2.0, 3.0), kh("the_qua", 2.1, 3.0), kh("khoi_la", 2.2, 3.0)]
         ev = self.lich(bl, total=6)
         self.assertEqual(KA.chi_so_lich(ev, 6)["va_cham"], [])
-        self.assertEqual([e["nhom"] for e in ev if e["uu"] == 1 or e["uu"] == 0].count("sai"), 1)
+        self.assertEqual([e["nhom"] for e in ev if e["uu"] == 1 or e["uu"] == 0].count("dap"), 1)
 
 
 class TestMucVaGain(Nen):
     def test_gain_ve_dinh_theo_vai(self):
         ev = self.lich([kh("hook_dap", 3, 5), kh("canh_bao", 6, 8), kh("hook_go_may", 9, 11, text="abc" * 10), kh("so_dem", 12, 14)], total=16)
-        goc = {"hit": -6, "alert": -16, "typing": -18, "ui": -16, "bell": -15}
+        goc = {"whoosh": -9, "hit": -9, "foley": -8, "alert": -10, "typing": -13, "ui": -11, "bell": -10}   # hit −3 dB: nhát trầm nhẹ
         for e in ev:
             m = SFX.dac_tinh(e["file"])
             self.assertAlmostEqual(e["db"], goc[e["vai"]], delta=1.6, msg=e["nhom"])
@@ -327,9 +363,15 @@ class TestMucVaGain(Nen):
         ev = self.lich([kh("hook_dap", 3, 5), kh("canh_bao", 8, 10)], total=12)
         d = {e["nhom"]: e for e in ev}
         m = SFX.dac_tinh(d["dap"]["file"])
-        self.assertAlmostEqual(d["dap"]["t"] + m["t_dinh"], d["dap"]["t_neo"], delta=0.002)           # nhát: ĐỈNH rơi vào mốc
-        m = SFX.dac_tinh(d["sai"]["file"])
-        self.assertAlmostEqual(d["sai"]["t"] + m["t_bat"], d["sai"]["t_neo"], delta=0.002)            # chuông/báo: lúc bắt đầu nghe
+        self.assertAlmostEqual(d["dap"]["t"] + m["t_bat"], d["dap"]["t_neo"], delta=0.002)           # chữ đập (neo="bat"): LÚC BẮT ĐẦU rơi đúng khung chữ chạm
+        ev = self.lich([kh("hook_dap", 3, 5, am="dap"), kh("canh_bao", 8, 10)], total=12)
+        d = {e["nhom"]: e for e in ev}
+        m = SFX.dac_tinh(d["dap"]["file"])
+        self.assertAlmostEqual(d["dap"]["t"] + m["t_dinh"], d["dap"]["t_neo"], delta=0.002)           # nhát trầm do đạo diễn chọn: ĐỈNH rơi vào mốc
+        ev = self.lich([kh("so_dem", 3, 5)], total=8)
+        d = {e["nhom"]: e for e in ev}
+        m = SFX.dac_tinh(d["ting"]["file"])
+        self.assertAlmostEqual(d["ting"]["t"] + m["t_bat"], d["ting"]["t_neo"], delta=0.002)          # chuông: lúc bắt đầu nghe
 
     def test_muc_chi_doi_so_luong_va_to_khong_doi_cap_am_hinh(self):
         bl = [kh("hook_dap", 1, 3), kh("canh_bao", 5, 7), kh("hook_mat_na", 9, 11), kh("so_dem", 13, 15), kh("nut_gio_hang", 17, 19)]
@@ -417,6 +459,62 @@ class TestKiemAm(unittest.TestCase):
         r2 = KA.kiem_am(self.lang, ev, 11.0)
         self.assertTrue(any(v.startswith("lặng") for v in r2["van_de"]))
         self.assertTrue(any("lặng" in m["gi"] for m in r2["nghe_thu"]))
+
+
+class TestHookMacDinh(Nen):
+    """23/11 Kid (bọ trĩ v10): hook phải có tiếng; tiếng trầm/đe chói bị loại; file lệch 1 kênh đưa về giữa."""
+    def mo(self, loi_dau, seed, **kw):
+        ev = self.lich([kh("hook_tung_tu", 1.0, 3.0), kh("canh_bao", 6, 8)], total=10, seed=seed, giu_mo=True, loi_dau=loi_dau, **kw)
+        return [e for e in ev if e["nguon"] == "mo"]
+
+    def test_thuc_don_am_mo_theo_loi_mo(self):
+        tp = {m[0]["nhom"] for m in (self.mo("Cùng là bọ trĩ mà sao vườn anh sạch", k) for k in range(40)) if m}
+        self.assertIn("rit_dia", tp)                                                      # tương phản → rít đĩa được phép
+        self.assertLessEqual(tp, {"rit_dia", "dap", "vut_nhe"})
+        for loi in ("Phuy 200 lít chỉ 350 nghìn", "Giá chỉ ba trăm nghìn"):
+            so = {m[0]["nhom"] for m in (self.mo(loi, k) for k in range(40)) if m}
+            self.assertIn("ting", so)                                                     # mở bằng số/giá → chuông
+            self.assertNotIn("rit_dia", so)
+        tt = [self.mo("Bọ trĩ hại bông rất nhanh", k) for k in range(60)]
+        self.assertTrue(any(not m for m in tt), "thỉnh thoảng không có âm mở")
+        thuong = {m[0]["nhom"] for m in tt if m}
+        self.assertEqual(thuong, {"dap", "vut_nhe"})                                      # lời thường: không rít đĩa, không chuông
+        self.assertEqual(self.mo("Cùng là bọ trĩ", 5), self.mo("Cùng là bọ trĩ", 5))     # cùng lời + cùng seed → cùng âm
+
+    def test_am_mo_khong_ca_video_chung_mot_am(self):
+        dung = {tuple(e["nhom"] for e in self.mo(l, k)) for l in ("Tưởng là hết", "Giá 99 nghìn", "Bọ trĩ hại bông") for k in range(30)}
+        self.assertGreaterEqual(len(dung), 4)
+
+    def test_boom_mo_khong_de_loi(self):
+        for k in range(30):
+            for e in self.mo("Bọ trĩ hại bông", k, giong_t0=0.6):
+                if e["nhom"] == "dap":
+                    m = SFX.dac_tinh(e["file"])
+                    self.assertLessEqual(e["t"] + m["t_dinh"], 0.6, "đỉnh boom trước từ đầu tiên")
+                    self.assertLessEqual(e["t"] + e["dai"], 0.6 + 0.12 + 0.01, "đuôi boom hết trước/sát lúc giọng vào")
+                    self.assertLessEqual(e["db"], -9.0, "boom hạ nhỏ hơn nhát thường (−6 dB)")
+        for e in self.mo("Bọ trĩ hại bông", 1, giong_t0=0.0) + self.mo("Bọ trĩ hại bông", 2, giong_t0=0.0):
+            if e["nhom"] == "dap":
+                self.assertLessEqual(e["dai"], 0.5)                                       # giọng vào ngay: boom cắt ngắn
+
+    def test_dao_dien_tat_hoac_chon_khac(self):
+        bl = [kh("hook_tung_tu", 1.0, 3.0)]
+        self.assertNotIn("rit_dia", {e["nhom"] for e in self.lich(bl, total=6, am_mo="khong")})
+        self.assertEqual([e["nhom"] for e in self.lich(bl, total=6, am_mo="ting") if e["nguon"] == "mo"], ["ting"])
+
+    def test_tieng_bi_cam_khong_bao_gio_duoc_chon(self):
+        with mock.patch.dict(SFX.KHO, {"chup": ["opener/anvil-loud.mp3", "x/transition-windy-swoosh.wav"]}):
+            self.assertEqual(SFX._chon_file(["chup"], {}, random.Random(1)), (None, None))
+
+    def test_file_lech_kenh_dua_ve_giua_va_dim_xi(self):
+        ev = self.lich([kh("hook_dap", 1, 3)], total=5)
+        with mock.patch.object(SFX, "lech_kenh", lambda p: 160.0):
+            fc = SFX.tron_lenh(ev, 1, "0:a", "a", 5)[1]
+        self.assertIn("pan=stereo|c0=c0|c1=c0", fc[0])
+        with mock.patch.object(SFX, "lech_kenh", lambda p: 0.5):
+            fc = SFX.tron_lenh(ev, 1, "0:a", "a", 5)[1]
+        self.assertNotIn("pan=stereo", fc[0])
+        self.assertIn("highshelf=f=7000", fc[0])
 
 
 class TestChiSoLich(unittest.TestCase):

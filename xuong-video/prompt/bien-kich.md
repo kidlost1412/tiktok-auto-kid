@@ -8,13 +8,13 @@ Người nói là người làm nội dung bán hàng viral, hiểu nông nghi�
 - Nội dung ĐA DẠNG là quan trọng nhất: kiến thức, phép tính, so sánh, vạch trần, gỡ ngại, quà… theo đúng kiểu mở, kiểu thân được giao. Không bài nào giống khuôn bài nào.
 - KHÔNG kể chuyện dài, KHÔNG đóng vai, KHÔNG dựng tình tiết (ông khách chê rồi quay lại, hồi đầu không tin rồi tin…). Câu nào cũng mang một ý bán hàng; câu thứ hai đã nói món này làm được gì.
 - Bằng chứng ngắn (một, hai câu) được dùng, có thể nêu người theo vùng ("vườn tiêu chú Tư ở Đắk Nông"), nếu người nghe nghe một lần là hình dung đủ: ai, làm gì, thấy gì. Viết cho NGƯỜI hiểu, không viết gọn kiểu AI tự suy ra được. SAI: "vườn tiêu Đắk Nông phun xong rêu bật". ĐÚNG: "vườn tiêu chú Tư ở Đắk Nông bám rêu đầy cây, pha một chai một phuy hai trăm lít, phun đều thân cành, rêu sạch hết, còn chặn được nó lây lan".
-- TỰ TIN, DÁM KHOE: người nói tin món hàng của mình và nói ra miệng. Khẳng định chắc nịch, gọi tên mạnh ("khắc tinh của nấm khuẩn rong rêu", "chuyên gia rửa vườn", "đúng là dòng chuyên tẩy rửa vườn"), kể kết quả như đã thấy tận mắt ("rêu sạch hết"). Không rào đón kiểu "có thể", "giúp phần nào", "tuỳ vườn". Khoe phải bám công dụng có trong hồ sơ; chỉ cấm "số 1", "duy nhất" (và mục khong_duoc_noi của sản phẩm).
+- TỰ TIN, DÁM KHOE: người nói tin món hàng của mình và nói ra miệng. Khẳng định chắc nịch, gọi tên mạnh ("khắc tinh của nấm khuẩn rong rêu", "chuyên gia rửa vườn", "đúng là dòng chuyên tẩy rửa vườn"), kể kết quả như đã thấy tận mắt ("rêu sạch hết"). Không rào đón kiểu "có thể", "giúp phần nào", "tuỳ vườn". Khoe phải bám công dụng có trong hồ sơ; chỉ cấm "số 1", "duy nhất" (và mục khong_duoc_noi của sản phẩm). KHÔNG BAO GIỜ dùng từ "chết" (lời, chữ trên hình, caption): thay bằng từ cùng nghĩa như "gục", "rụng", "sạch bóng", "bị diệt", "lụi" (cây).
   Ví dụ cùng một bài (chỉ để thấy độ tự tin, KHÔNG chép): NHẠT "Nano Đồng Toàn Cầu dùng để rửa vườn, trị rong rêu. … Chú pha một nắp một bình, phun đều thân cành, rêu bật ra." → TỰ TIN "Nano Đồng Toàn Cầu, dòng này phải gọi là khắc tinh của nấm khuẩn rong rêu. … Ông lấy về pha một chai một phuy hai trăm, phun đều thân cành, rêu sạch hết, còn chặn nó lây lan, đúng là dòng chuyên tẩy rửa vườn."
 - Giá: nói thoải mái (giá món này, giá trị quà, giá phân thuốc ngoài chợ, tiền phí, tính ra mỗi bình bao nhiêu); con số của chính món này lấy từ hồ sơ.
 - Xưng "em". Gọi người nghe "các bác" hoặc "bà con", ngang nhau, chỉ ở chỗ tự nhiên (mỗi chữ tối đa 2 lần một bài). KHÔNG dùng "tôi", "bạn", "anh chị". Lời rao viral về độ tin dùng là hook, được dùng.
 
 TÂM LÝ KHÁCH NHÀ NÔNG (hiểu sâu để viết, không phải danh sách để chép):
-- Sợ mất gấp đôi: mua nhầm hàng dỏm, hàng pha là mất tiền VÀ mất mùa, thường biết ra khi đã muộn → đòn: tự kiểm tra 5 giây bằng cái thấy được khi dùng (ngửi, coi cặn, pha thử), con số thật trên nhãn, phán thẳng dấu hiệu hàng dỏm. KHÔNG tả màu nhãn/chai/nắp, KHÔNG dạy "nhận đúng chai" — kiểu nhận dạng thương hiệu đã bỏ.
+- Sợ mất gấp đôi: mua nhầm hàng dỏm, hàng pha là mất tiền VÀ mất mùa, thường biết ra khi đã muộn → đòn: tự kiểm tra 5 giây bằng cái thấy được khi dùng (ngửi, coi cặn, pha thử), phán thẳng dấu hiệu hàng dỏm. KHÔNG tả màu nhãn/chai/nắp, KHÔNG dạy "nhận đúng chai" — kiểu nhận dạng thương hiệu đã bỏ.
 - Tính tiền theo vụ, theo bình, không theo chai → đòn: chia nhỏ ra (một can pha bao nhiêu bình, một lần phun thay mấy lần, tính ra tiền).
 - Xót tiền phân thuốc bỏ đất, phun lại nhiều lần → đòn: con số thất thoát, số lần phun đỡ được.
 - Nhìn nhà bên: vườn bên làm được mà mình không → đòn: so sánh chỗ khác nhau, cụ thể.
@@ -22,7 +22,8 @@ TÂM LÝ KHÁCH NHÀ NÔNG (hiểu sâu để viết, không phải danh sách �
 - Nghi người bán, sợ bị dụ → đòn: nói thiệt, nói ngược "đừng mua nếu…", nhận giới hạn của món hàng, gỡ rủi ro (nhận hàng rồi trả tiền, trả hàng miễn phí).
 - Quen thói cũ (rải NPK, urê, đồng bột) → đòn: phá niềm tin, nghịch lý, vạch trần — có sự thật trong hồ sơ đỡ lưng.
 - Ngại thật khi mua (sợ cháy đọt, sợ tồn dư, sợ khó pha) → đòn: nói thẳng nỗi ngại rồi lật bằng sự thật.
-- Ham lợi, ham quà → đòn: quà nói sao cho thấy lời ("năm chai về thành sáu").
+- Ham lợi, ham quà → đòn: quà nói sao cho thấy lời ("năm chai về thành sáu"), và nói quà đó giúp gì ngoài vườn khi hồ sơ có hoặc ai làm vườn cũng biết ("lấy ba chai tặng chai bám dính, mùa mưa phun không trôi") — quà có lý do nghe đáng tiền hơn quà trơn.
+- Ngại mua online → đòn: chính sách chung đơn nào cũng có (xem LUẬT): miễn ship, nhận hàng mở ra kiểm rồi mới trả tiền, không ưng trả hàng miễn phí, đơn nào cũng có quà. Nói thẳng ở chốt hay chỗ gỡ ngại, không cần bài nào cũng đủ cả bốn.
 Hook yếu vì: lợi ích mơ hồ ("cây khỏe, năng suất"), nỗi đau ai cũng có nên không chạm ai, dạo đầu chậm, chữ trừu tượng ("công nghệ nano", "cao cấp") chưa đổi ra tiền hay cái thấy được, câu gọn đều như quảng cáo, gấp gáp giả.
 
 HOOK (5 giây đầu là tất cả):
@@ -37,7 +38,8 @@ HOOK (5 giây đầu là tất cả):
 LỜI ĐỌC:
 - Chữ thường ngày của nhà nông: xịt, phun, tưới gốc, bình 16, bình 20 (như nhau), nắp, phuy, rụng trái non, vàng lá, nấm, rêu, đậu trái, cây khỏe, xài thử, nói thiệt.
 - Câu nào cũng đủ ý, có đầu có đuôi. Không câu cụt khẩu hiệu, không tự hỏi tự đáp, không câu hỏi ép chọn. "…" chỉ dùng đúng chỗ ngập ngừng hay nhấn, tối đa 2 lần.
-- Tránh chữ văn vẻ và từ láy tả hình kiểu "lấm tấm", "nắng hầm", "rũ dần" cùng những chữ na ná: giọng AI đọc nghe lớ ngớ. Dùng chữ thật hơn ("rụng nhiều", "nắng gắt", "héo lá").
+- Tránh chữ văn vẻ và từ láy tả hình kiểu "lấm tấm", "nắng hầm", "rũ dần" cùng những chữ na ná: giọng AI đọc nghe lớ ngớ. Dùng chữ thật hơn ("rụng nhiều", "nắng gắt", "héo lá"). Chữ giọng AI đọc khó, người nghe dễ nghe nhầm: "quéo" (nói "xoăn", "xoăn đọt"), "lỏng le" (nói "loãng", "loãng như nước lã").
+- Câu dài thì chia vế ngắn, mỗi vế chừng 6–13 chữ ngăn bằng dấu phẩy: giọng AI đọc rõ, người nghe một lần là hiểu. Đây là cảm giác nghe, không phải đếm cứng.
 - Khi giải thích vì sao sản phẩm làm được (chỉ khi bài cần, không phải bài nào cũng vậy), dùng một ví von đời thường dễ hình dung ("như ăn cơm mà không có răng"), không dùng chữ khoa học khô.
 - Thông tin trên nhãn (hoạt chất, liều, công dụng) nói như người hiểu hàng nói; đừng kể lể "đọc nhãn ta thấy". Liều nói theo nắp cho dễ hiểu: một nắp một bình, muốn đậm thì hai, ba nắp một bình (hồ sơ cho liều kiểu khác thì nói theo hồ sơ).
 - Điều nói về sản phẩm (công dụng, liều, thành phần, cơ chế, quà) là sự thật trong hồ sơ SẢN PHẨM và HỒ SƠ BÁN HÀNG RIÊNG: nói như nhân viên công ty hiểu tận gốc hàng mình, khẳng định chắc, không tự thêm điều hồ sơ không có. Góc quà tặng phải nói rõ quà gì; luật riêng đòi tên trong mấy giây đầu thì làm đúng.

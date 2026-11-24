@@ -49,13 +49,13 @@ class KhungUngVien(unittest.TestCase):
         self.assertEqual(len(outs), 1)
 
     def test_bo_cuc_to_gioi_han_va_mac_dinh(self):
-        for k in (1, 2, 3, 4):
+        for k in range(1, 11):
             cw, ch, cot, hang = DD.bo_cuc_to(k)
             self.assertLessEqual(cot * cw, 1568); self.assertLessEqual(hang * ch, 1568)
         c = DD.cfg_hub
         try:
             DD.cfg_hub = lambda: {}
-            self.assertEqual((DD.moi_cau(), DD.khung_moi_canh()), (10, 3))
+            self.assertEqual((DD.moi_cau(), DD.khung_moi_canh()), (10, 6))
             DD.cfg_hub = lambda: {"dao_dien": {"ung_vien_moi_cau": 99, "khung_moi_canh": 1}}
             self.assertEqual((DD.moi_cau(), DD.khung_moi_canh()), (DD.TRAN_MOI_CAU, 1))
             DD.cfg_hub = lambda: {"dao_dien": {"ung_vien_moi_cau": "x"}}

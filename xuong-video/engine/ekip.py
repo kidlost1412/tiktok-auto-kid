@@ -186,6 +186,25 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     qua = {k: v for k, v in ((k, [s for s in v if not mat(s)]) for k, v in qua.items()) if v}
     if n0 > len(shots) + len(chung) + sum(map(len, qua.values())):
         log(f"  ⚠ bỏ {n0 - len(shots) - len(chung) - sum(map(len, qua.values()))} cảnh vì không còn file gốc (thư mục kho đổi tên/xoá?) — kiểm lại đường dẫn kho trong app")
+    try:                                  # Kid 24/11: bỏ cảnh NHOÈ trước khi đạo diễn/máy chọn (đo OpenCV, cache bền; thiếu cảnh thì giữ cảnh ít nhoè nhất)
+        from do_net import loc_nhoe
+        from soat_kho import bad as _bad
+        n1 = len(shots) + len(chung)
+        tot = lambda ds, kho: (lambda ok: [s for s in ds if _bad(s) or id(s) in ok])({id(s) for s in loc_nhoe([s for s in ds if not _bad(s)], kho)})      # cảnh đã "bad" để nguyên (luật cũ lo)
+        shots = tot(shots, sp["kho_video"]); chung = tot(chung, None)
+        if n1 > len(shots) + len(chung):
+            log(f"  bỏ {n1 - len(shots) - len(chung)} cảnh nhoè (đo độ nét)")
+    except Exception as e:
+        log(f"  ⚠ không đo được độ nét cảnh: {e}")
+    try:                                  # Kid 24/11: bỏ cảnh dính CHỮ/ĐỒ HOẠ LẠ của shop khác (sticker giá, caption, bình luận…; chữ trên nhãn sản phẩm không tính)
+        from loc_chu_la import loc_chu_la
+        n1 = len(shots) + len(chung)
+        tot2 = lambda ds, kho: (lambda ok: [s for s in ds if _bad(s) or id(s) in ok])({id(s) for s in loc_chu_la([s for s in ds if not _bad(s)], kho)})
+        shots = tot2(shots, sp["kho_video"]); chung = tot2(chung, None)
+        if n1 > len(shots) + len(chung):
+            log(f"  bỏ {n1 - len(shots) - len(chung)} cảnh dính chữ lạ")
+    except Exception as e:
+        log(f"  ⚠ không dò được chữ lạ trong cảnh: {e}")
     if qua:
         log(f"  cảnh quà tặng thật: " + ", ".join(f"{k} ({len(v)})" for k, v in qua.items()))
     per = CFG["lo"]["video_moi_giong"]
@@ -226,6 +245,12 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     # ---- giọng + danh sách việc. GIỌNG MUA "VỪA ĐỦ DÙNG": mỗi đợt (≈6 video = 6/per lời) mới thu giọng ngay trước khi đạo diễn dựng đợt đó,
     # và ngừng mua hẳn khi đã báo hết hạn mức Claude (trước đây mua giọng cả lô trước khi có đạo diễn nào chạy xong)
     tasks, n_gu = [], 0
+    ti_le = float(CFG.get("ti_le_chu_theo_loi", 0.5))      # Kid 23/11: một nửa số video dựng khung "chữ theo lời" (v10)
+    lech = random.random()
+    khung_thu = lambda i: "chu_theo_loi" if int((i + 1) * ti_le + lech) - int(i * ti_le + lech) == 1 else "the_do_hoa"
+    import chu_theo_loi as _CTL
+    bang_xoay = random.sample(sorted(_CTL.BANG_MAU), len(_CTL.BANG_MAU))     # Kid 24/11: mỗi video một bảng màu, các video liền nhau không trùng
+    bang_thu = lambda i: bang_xoay[i % len(bang_xoay)]
     stamp0 = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     het_han = {"v": False}
     het_credit = {"v": False}                        # ElevenLabs báo hết credit → dừng cả đợt giọng, không thử từng lời
@@ -284,7 +309,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                     break
                 gu = gu_keys[(n_gu + random.randint(0, 99)) % len(gu_keys)] if j == 0 else gu_keys[(gu_keys.index(tasks[-1]["gu"]) + 1) % len(gu_keys)]
                 n_gu += 1
-                t = {"sc": sc, "voice": voice, "gu": gu, "rng": random.Random(f"{vname}-{j}"), "j": j,
+                t = {"sc": sc, "voice": voice, "gu": gu, "rng": random.Random(f"{vname}-{j}"), "j": j, "khung": khung_thu(len(tasks)), "bang": bang_thu(len(tasks)),
                      "work": tam / f"{vname}-{j}", "vname": vname}
                 tasks.append(t); moi.append(t)
             cau_moi = [x.strip() for x in re.split(r"(?<=[.!?])\s+", re.sub(r"\[[^\]]*\]", "", sc["text"]).strip()) if x.strip()]
@@ -322,6 +347,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         if voice is None:
             log(f"  bỏ làm lại {Path(ll['file']).name}: không còn lời đọc"); continue
         tasks.append({"sc": sc, "voice": voice, "gu": meta.get("dao_dien") if meta.get("dao_dien") in GU else random.choice(gu_keys),
+                      "khung": meta.get("khung_dung") or khung_thu(len(tasks)), "bang": bang_thu(len(tasks)),
                       "rng": random.Random(f"{ll['file']}-{time.time()}"), "j": 0, "work": tam / f"lamlai-{i}", "vname": vname,
                       "gop_y": "CHỦ HÀNG KHÔNG ƯNG BẢN TRƯỚC, GÓP Ý (bắt buộc làm theo): " + (ll.get("gop_y") or "dựng lại đẹp hơn, đa dạng hơn"),
                       "lam_lai_tu": str(ll["file"])})
@@ -381,6 +407,8 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         st["_qua"] = sp.get("qua_tang", [])
         st["_so_that"] = sp.get("su_that_duoc_noi", [])           # số to (so_dem) chỉ nhận số có trong sự thật của chính sản phẩm
         t.update(edl=edl, st=st, sua=sua)
+        st["khung_dung"] = t.get("khung", "the_do_hoa")
+        st["loi_bang"] = t.get("bang")
         t["plan"] = {"seed": t["rng"].randint(1, 10**9), "phong_cach": st, "canh": t["sc"].get("canh", []), "dong": t["sc"].get("dong"),
                      "ten_thuong_hieu": (sp.get("ten_ngan") or sp["ten_goi"]).upper(), "edl_segs": segs,
                      "vmin": khung_giay(sp, CFG)[0]}
@@ -610,7 +638,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 kem(t["job"]["out"], ".txt", ghi=True).write_text(
                     (cap_cua(t) + "\n" + " ".join(t["sc"].get("hashtag", []))).strip() + "\n", encoding="utf-8")
                 meta = {"id": Path(t["job"]["out"]).stem, "ma": ma_sp, "quy_cach": t["sc"].get("quy_cach"), "goc": t["sc"]["goc"],
-                        "dang": t["sc"].get("dang"), "mo": t["sc"].get("mo"), "chot": t["sc"].get("chot"), "vai": t["sc"].get("vai"), "giong": t["sc"]["giong"], "dao_dien": t["gu"], "cong_thuc": info.get("cong_thuc"),
+                        "dang": t["sc"].get("dang"), "mo": t["sc"].get("mo"), "chot": t["sc"].get("chot"), "vai": t["sc"].get("vai"), "giong": t["sc"]["giong"], "dao_dien": t["gu"], "khung_dung": t.get("khung"), "cong_thuc": info.get("cong_thuc"),
                         "nhac": t["music"]["ten"] if t.get("music") else None, "diem": gk.get("diem"), "caption": cap_cua(t),
                         "giam_khao": {"nguon": gk.get("nguon"), "muc": [{k: m.get(k) for k in ("id", "dat", "ly_do", "giay", "nguon")} for m in gk.get("muc") or []]} if gk.get("muc") else None,
                         "hashtag": t["sc"].get("hashtag", []), "loi_doc": re.sub(r"\[[^\]]*\]\s*", "", t["sc"]["text"]),
@@ -620,10 +648,13 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "don_ban", "nhan_tu", "captions", "caption",
                                                                  "hashtag", "dang", "quy_cach", "mo", "than", "chot", "vai", "chu_mo")},
                         "lam_lai_tu": t.get("lam_lai_tu"),
+                        "sfx_lich": [{k: str(e.get(k)) if k == "file" else e.get(k) for k in ("t", "t_neo", "nhom", "vai", "db", "file", "nguon")} for e in t["job"].get("sfx") or []],
+                        "punch": t["job"].get("punch"),
                         "token": so_token_video(t.get("token"), so_loi, len(scripts), per)}
                 kem(t["job"]["out"], ".json", ghi=True).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
                 SK.noi_them(da_dung_f, " ".join(sg["shot"]["id"] for sg in (t["plan"].get("edl_segs") or [])) + "\n", giu_dong=600, toi_da_byte=120_000)
                 ghi_lich_su_canh(ma_sp, t["plan"].get("edl_segs") or [], f'{t["vname"]}-{t["j"]}')
+                __import__("bo_cuc").ghi_kieu([sg.get("bo_cuc") or "day" for sg in t["plan"].get("edl_segs") or []])     # video sau tránh kiểu đặc biệt video trước đã dùng
                 made += 1
                 log(f"  [{made}/{tong_vd}] {t['fname']}  ({gk.get('diem')}/10)")
                 SK.ghi("kho", "luu", f"Đã lưu video {made}/{tong_vd}", video=f'{t["vname"]}-{t["j"]}', so=made, tong=tong_vd, diem=gk.get("diem"),

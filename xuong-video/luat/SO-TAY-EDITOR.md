@@ -32,9 +32,15 @@ mỗi video một ý dựng riêng, mỗi khung hình có lý do tồn tại. Kh
 - Sau một đoạn dày chữ và tiếng, cho mắt nghỉ một nhịp. Đổi cỡ cảnh giữa hai đoạn liền nhau.
 
 ## 7. Âm thanh có nghĩa
-- Tiếng phải khớp thứ đang hiện: chữ gõ máy đi với tiếng phím (gõ chữ mà tiếng nổ là sai nặng); chữ đập đi với tiếng trầm; thẻ trượt đi với tiếng lướt;
-  con số đi với tiếng tick/ting; quà đi với một tiếng quà; vật thật (rót, phun) đi với tiếng thật.
-- Cú nhấn mạnh chỉ một hai lần cả bài. Cắt thẳng thì im. Giọng đọc luôn rõ nhất.
+- Tiếng phải khớp thứ đang hiện, rơi đúng khung chữ hiện hay nhát cắt: chữ gõ máy đi với tiếng phím (gõ chữ mà tiếng nổ là sai nặng);
+  chữ to đập xuống, con số, tên hàng lóe ra đi với tiếng flash máy ảnh gọn, giòn; thẻ trượt đi với tiếng lướt; con số đếm đi với tick/ting;
+  kết quả tốt đi với tiếng ding; lỗi, mất mùa đi với còi sai; giỏ hàng đi với tiếng tính tiền; quà đi với một tiếng quà; vật thật (rót, phun) đi với tiếng thật.
+- Giọng đọc luôn nghe rõ nhất. Tiếng trầm, tiếng nổ đè lên lời là làm mất thoại: chỉ dùng ở khoảng lặng, và rất hiếm.
+- Chữ mạnh, chữ dậm nào cũng nên có tiếng. Tiếng phải nghe rõ chứ không lí nhí. Một video 20 giây tầm 18–25 tiếng là vừa,
+  nhưng mỗi tiếng phải có lý do, đừng rải cho đủ số.
+- Giây đầu có một tiếng mở giữ chân (rít đĩa, vút) trước hoặc đúng lúc chữ hook hiện.
+- Đa dạng mà không tạp nham: mỗi vai một họ tiếng (chữ đập một họ, đổi đoạn một họ, kết quả một họ), xoay biến thể trong họ,
+  đừng lấy một hai tiếng dùng đi dùng lại. Tiếng vút chỉ ở nhát cắt đổi ý; cắt thẳng trong cùng ý thì im.
 
 ## 8. Bố cục có chủ đích
 - Chia ô khi có lý do: nhiều người cùng dùng, sản phẩm cạnh kết quả, trước cạnh sau, chi tiết cận của thứ đang nói.

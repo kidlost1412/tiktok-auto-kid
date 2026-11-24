@@ -6,12 +6,14 @@
   "1.2.19": "Biên kịch có thêm phần \"Nói như người thật\": bớt dấu \"…\", bỏ kiểu tự hỏi tự đáp, câu cụt khẩu hiệu, câu hỏi ép chọn, nói quá hồ sơ. Vẫn giữ chuyện kể theo vai và tiếng địa phương. Máy cũng tự loại bản dính các tật này rồi bắt viết lại.",
   "1.2.30": "Giọng nói là người làm nội dung bán hàng am hiểu nông nghiệp và sản phẩm (xưng em), tự tin, dám khoe món hàng; bỏ kể chuyện dài, đóng vai, chỉ giữ bằng chứng ngắn một hai câu. Hook là hook bán hàng đánh vào tâm lý khách: cụ thể (con số thật, tiền, cái mất thấy được), dứt khoát, phán thẳng; mỗi bài thử 3 hook và tự chấm theo thang 10 điểm. Được nói giá. Gọi \"các bác\" hoặc \"bà con\" ở chỗ tự nhiên, bỏ \"tôi\", \"bạn\", \"anh chị\".",
   "1.2.37": "Bỏ hẳn kiểu kịch bản \"nhận dạng thương hiệu\" (tả nhãn trắng chữ đỏ, nắp màu gì, dạy nhận đúng chai): không còn góc này, ví dụ mẫu cũng bỏ câu tả nhãn. Máy tự loại bản nào còn tả màu bao bì rồi bắt viết lại.",
-  "1.2.44": "Biên kịch nói như nhân viên công ty hiểu tận gốc món hàng: khẳng định thẳng, không rào \"chủ hàng nói\" hay \"theo nhãn\". Giá và giá trị quà nói thoải mái; chỉ cấm \"số 1\", \"duy nhất\". Liều nói theo nắp (1 nắp 1 bình, đậm thì 2–3 nắp)."
+  "1.2.44": "Biên kịch nói như nhân viên công ty hiểu tận gốc món hàng: khẳng định thẳng, không rào \"chủ hàng nói\" hay \"theo nhãn\". Giá và giá trị quà nói thoải mái; chỉ cấm \"số 1\", \"duy nhất\". Liều nói theo nắp (1 nắp 1 bình, đậm thì 2–3 nắp).",
+  "1.2.45": "Không bao giờ dùng từ \"chết\" trong video: biên kịch viết từ cùng nghĩa (gục, rụng, sạch bóng, bị diệt, lụi); máy tự loại bản có chữ này, chữ trên hình và caption cũng tự đổi. Quà nói kèm lý do dùng ngoài vườn (\"ba chai tặng bám dính, mùa mưa phun không trôi\"); chốt nhắc chính sách đơn nào cũng có: miễn ship, mở kiểm rồi trả tiền, trả hàng miễn phí, có quà; tránh chữ giọng AI đọc khó (\"quéo\" → \"xoăn\", \"lỏng le\" → \"loãng\"); câu dài chia vế ngắn; bỏ ý \"con số trên nhãn\"."
  },
  "luat-san-xuat": {
   "1.2.13": "Biên kịch học thêm 15 kiểu mở đầu, 11 kiểu thân bài, 7 kiểu chốt và 5 vai người nói; viết theo cảnh kho đang có; thoại tự nhiên hơn. Kiểu TVC cũ vẫn còn, là một trong các kiểu.",
   "1.2.30": "Lời đọc theo giọng người làm nội dung am hiểu nông nghiệp, tự tin khẳng định công dụng, không kể chuyện dài; hook bán hàng cụ thể, dứt khoát, không mở bằng tiếng gọi; được nói giá; xưng hô \"các bác\"/\"bà con\" ngang nhau; điều nói về sản phẩm lấy ở hồ sơ và hồ sơ bán hàng riêng.",
-  "1.2.44": "Liều nói theo nắp; lời rao viral càng mạnh càng tốt, chỉ cấm \"số 1\", \"duy nhất\"; nói sự thật sản phẩm bằng giọng tự tin của người trong công ty."
+  "1.2.44": "Liều nói theo nắp; lời rao viral càng mạnh càng tốt, chỉ cấm \"số 1\", \"duy nhất\"; nói sự thật sản phẩm bằng giọng tự tin của người trong công ty.",
+  "1.2.45": "Thêm chính sách chung mọi sản phẩm: miễn ship, mở kiểm rồi trả tiền, trả hàng miễn phí, đơn nào cũng có quà; không nhắc bảo hộ, cách ly, giấy tờ nhãn mác."
  },
  "dien-phieu": {
   "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng.",
@@ -21,15 +23,18 @@
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
   "1.2.15": "Đạo diễn được nghĩ như editor: tự chọn bố cục (thêm 3 ô, 3 dải, lật trang nhanh), đặt chữ lớn theo đúng từ trong lời đọc, chọn tiếng theo nghĩa, và dùng nhiều cảnh người thật cầm sản phẩm. Máy không còn tự đổi lựa chọn của đạo diễn.",
   "1.2.42": "Đạo diễn giờ xem mỗi cảnh qua 3 khung (đầu, giữa, cuối đoạn dùng được) thay vì 1 ảnh, và được chọn trong nhiều cảnh hơn mỗi câu, nên ít chọn nhầm cảnh có ảnh đại diện không đúng với clip thật.",
-  "1.2.44": "Mọi video đều chốt có quà thật của món đó; khối chốt ghi đúng một mức quà và đổi cách viết, kiểu khối giữa các video thay vì luôn \"QUÀ TẶNG THEO ĐƠN\"."
+  "1.2.44": "Mọi video đều chốt có quà thật của món đó; khối chốt ghi đúng một mức quà và đổi cách viết, kiểu khối giữa các video thay vì luôn \"QUÀ TẶNG THEO ĐƠN\".",
+  "1.2.45": "Âm thanh theo bản mẫu bọ trĩ anh đã duyệt: không ghi tiếng mở thì máy mở bằng rít đĩa; chữ đập dùng flash máy ảnh thay tiếng trầm (trầm đè lời mất thoại); chữ mạnh nào cũng có tiếng, nghe rõ hơn, đa dạng theo vai. Câu gỡ ngại ưu tiên cảnh rót, khuấy tan, đóng thùng nếu kho có."
  },
  "so-tay-editor": {
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
-  "1.2.15": "Sổ tay viết lại theo cách nghĩ thay vì khuôn: người thật cầm hàng là bằng chứng mạnh nhất, khung trơn phải có chữ lớn, tiếng phải khớp thứ đang hiện, phụ đề chỉ là lớp phụ."
+  "1.2.15": "Sổ tay viết lại theo cách nghĩ thay vì khuôn: người thật cầm hàng là bằng chứng mạnh nhất, khung trơn phải có chữ lớn, tiếng phải khớp thứ đang hiện, phụ đề chỉ là lớp phụ.",
+  "1.2.45": "Mục âm thanh viết lại theo bản mẫu bọ trĩ anh đã duyệt: giọng luôn rõ nhất, tiếng trầm chỉ ở khoảng lặng; chữ mạnh nào cũng có tiếng nghe rõ (video 20 giây tầm 18–25 tiếng); giây đầu có tiếng mở; đa dạng theo vai, không dùng đi dùng lại một hai tiếng."
  },
  "giam-khao": {
   "1.2.13": "Giám khảo chấm thêm móc câu (hai khung đầu có giữ người xem không) và khoảng thở của bản dựng.",
-  "1.2.15": "Giám khảo không chấm cảm tính 1–10 nữa mà trả lời một danh sách kiểm cố định (móc câu, nhãn rõ, chốt có chai/quà, không che nhãn…): điểm = 10 × số mục đạt / số mục nên không còn dồn ở 5–6. Máy tự đo trước những gì đo được (chữ đè nhãn, người nói full màn, lặp cảnh, thiếu cảnh quà). Lỗi do máy dựng/kho không còn thành bài học cho đạo diễn."
+  "1.2.15": "Giám khảo không chấm cảm tính 1–10 nữa mà trả lời một danh sách kiểm cố định (móc câu, nhãn rõ, chốt có chai/quà, không che nhãn…): điểm = 10 × số mục đạt / số mục nên không còn dồn ở 5–6. Máy tự đo trước những gì đo được (chữ đè nhãn, người nói full màn, lặp cảnh, thiếu cảnh quà). Lỗi do máy dựng/kho không còn thành bài học cho đạo diễn.",
+  "1.2.45": "Giám khảo chỉ xem 6 mục cần mắt người (móc câu, nhãn rõ, chốt có chai, chốt có quà, hình hợp lời, không lặp cảnh); vị trí chữ, nút giỏ, che nhãn, bố cục để máy đo; bỏ 3 mục cảm tính (người thật, hình sạch, khoảng thở) hay chấm oan."
  },
  "kien-thuc-ban-hang": {
   "1.2.15": "Tài liệu MỚI: kiến thức bán hàng cho biên kịch (bán cái vườn sau khi dùng, nói mình khác ở đâu, tâm lý mua, giúp nhớ thương hiệu, người quanh mình đang dùng). Là cách nghĩ chứ không phải khuôn; bạn sửa được như các tài liệu luật khác.",

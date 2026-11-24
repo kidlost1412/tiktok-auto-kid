@@ -36,6 +36,10 @@ TEN_NGAN = {"hook": "móc câu", "nhan_ro": "nhãn rõ", "chot_chai": "chốt c�
             "nut_gio": "nút giỏ hàng", "khong_che_nhan": "không che nhãn", "nguoi_noi": "người nói", "hinh_sach": "hình sạch",
             "khoang_tho": "khoảng thở", "da_dang_bo_cuc": "đa dạng bố cục", "khong_lap": "nhịp/không lặp", "vung_an_toan": "vùng an toàn"}
 TEN_MUC = [m[0] for m in MUC]
+# Kid 23/11: thống kê 313 video Kid đều duyệt đạt — AI đánh trượt oan nhiều nhất ở mục vị trí/độ sạch (code đặt cố định, AI nhìn ảnh đoán),
+# "người thật" chưa trượt lần nào. Nay AI chỉ hỏi 6 mục cần mắt; 4 mục máy tự đo (không bắt lỗi = đạt); 3 mục cảm tính bỏ hẳn.
+AI_HOI = ["hook", "nhan_ro", "chot_chai", "chot_qua", "hinh_hop_loi", "khong_lap"]
+CHI_MAY = {"nut_gio", "khong_che_nhan", "vung_an_toan", "da_dang_bo_cuc"}
 MUC_NANG = {m[0] for m in MUC if m[3]}
 NGUONG_DAT = 7.0
 TOI_THIEU_AI = 0.6           # AI phải trả lời ≥ 60% số mục được hỏi, ít hơn = trả lời hỏng
@@ -58,7 +62,7 @@ def danh_sach_cau_hoi(may_truot=()):
     """Văn bản danh sách kiểm gửi giám khảo ({{muc}}). Mục máy đã bắt trượt được ghi rõ để AI bỏ qua."""
     truot = set(may_truot)
     out = []
-    for i, (k, hoi, _, _) in enumerate(MUC, 1):
+    for i, (k, hoi, _, _) in enumerate([m for m in MUC if m[0] in AI_HOI], 1):
         out.append(f'{i}. "{k}" — {hoi}' + ("  [MÁY ĐÃ KIỂM: TRƯỢT — bỏ qua mục này, không đưa vào kết quả]" if k in truot else ""))
     return "\n".join(out)
 
@@ -111,7 +115,7 @@ def _khoi_chu(props):
     for b in (props or {}).get("blocks") or []:
         try:
             top = float(b.get("top", 250)); cao = ne_nhan.CAO.get(b.get("loai"), 260)
-            out.append((b["f0"], b["f1"], (60.0, top, 940.0, top + cao), b.get("loai")))
+            out.append((b["f0"], b["f1"], (100.0, top, 980.0, top + cao), b.get("loai")))
         except Exception:
             continue
     return out
@@ -246,10 +250,10 @@ def hop_nhat(kq_ai, may, co_canh_qua=True):
     may_theo_muc = {}
     for f in may or []:
         may_theo_muc.setdefault(f["muc"], []).append(f)
-    hoi = [k for k in TEN_MUC if k not in may_theo_muc]
+    hoi = [k for k in AI_HOI if k not in may_theo_muc]
     ai = {}
     for m in (kq_ai or {}).get("muc") or []:
-        if isinstance(m, dict) and m.get("id") in TEN_MUC and m["id"] not in may_theo_muc:
+        if isinstance(m, dict) and m.get("id") in AI_HOI and m["id"] not in may_theo_muc:
             ai[m["id"]] = m
     if hoi and len(ai) < TOI_THIEU_AI * len(hoi):
         return None
@@ -268,6 +272,8 @@ def hop_nhat(kq_ai, may, co_canh_qua=True):
                 g = None
             muc.append({"id": k, "dat": d, "ly_do": str(m.get("ly_do") or "")[:160], "giay": g, "nguon": "ai",
                         "nguoi_sua": chu_so_huu(k, co_canh_qua)})
+        elif k in CHI_MAY:
+            muc.append({"id": k, "dat": True, "ly_do": "", "giay": None, "nguon": "may", "nguoi_sua": chu_so_huu(k, co_canh_qua)})
     diem, _, _ = tinh_diem(muc)
     truot = [m for m in muc if m["dat"] is False]
     nang = any(m["id"] in MUC_NANG for m in truot)

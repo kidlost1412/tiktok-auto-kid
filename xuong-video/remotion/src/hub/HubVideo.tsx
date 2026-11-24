@@ -7,9 +7,15 @@ import {Video} from '@remotion/media';
 import {AbsoluteFill, Audio, Easing, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Caption as Caption3, CapCfg, CapLine} from './Caption';
 import {Atmos, Block, Blocks} from './Blocks';
+import {ChuTheoLoi, Loi} from './ChuTheoLoi';
 
 const FONT = 'DT Phudu';
 loadFont({family: FONT, url: staticFile('DTPhudu-Black.otf'), weight: '900'});
+// 23/11 font phối theo khối (đã thử đủ dấu tiếng Việt ở kol-vip2; cùng giấy phép SIL OFL của Google Fonts)
+loadFont({family: 'Montserrat BI', url: staticFile('Montserrat-BlackItalic.ttf'), weight: '900'});
+loadFont({family: 'Unbounded', url: staticFile('Unbounded-VF.ttf'), weight: '200 900'});
+loadFont({family: 'Paytone One', url: staticFile('PaytoneOne-Regular.ttf'), weight: '900'});
+loadFont({family: 'BVP Medium', url: staticFile('BeVietnamPro-Medium.ttf'), weight: '500'});
 
 export type HubClip = {src: string; f0: number; f1: number; motion: 'zoom_in' | 'zoom_out' | 'pan_left' | 'pan_right' | 'still' | 'punch'};
 export type HubWord = {w: string; f0: number; f1: number; s: number; emph?: boolean};
@@ -29,6 +35,7 @@ export type HubProps = {
   cta: {kind: string; line1: string; line2: string; f0: number; header?: string};
   arrow: {f0: number; label: string};
   progress_bar: boolean;
+  loi?: Loi;                      // khung "chữ theo lời" (v10): thay thẻ + phụ đề
 };
 
 // ---------------------------------------------------------------- CLIPS + CHUYỂN CẢNH
@@ -123,7 +130,7 @@ const Caption: React.FC<{p: HubProps}> = ({p}) => {
     st === 'hop_xanh' ? {background: p.colors.brand_green, borderRadius: 22, padding: '10px 26px', boxShadow: '0 10px 30px rgba(0,0,0,0.35)'} :
     st === 'hop_do' ? {background: p.colors.brand_red, borderRadius: 22, padding: '10px 26px', boxShadow: '0 10px 30px rgba(0,0,0,0.35)'} : {};
   const plainText = st === 'hop_den' || st === 'hop_xanh' || st === 'hop_do' ? {} : {textShadow: STROKE(5)};
-  return <div style={{position: 'absolute', left: 70, width: 870, top: p.caption.center_y, transform: `translateY(-50%) scale(${0.86 + 0.14 * enter})`,
+  return <div style={{position: 'absolute', left: 105, width: 870, top: p.caption.center_y,   // căn đúng x=540 transform: `translateY(-50%) scale(${0.86 + 0.14 * enter})`,
     opacity: Math.min(1, enter * 1.6), display: 'flex', justifyContent: 'center'}}>
     <div style={{...box, textAlign: 'center', maxWidth: 870}}>
       <div style={{fontFamily: FONT, fontWeight: 900, fontSize: size, lineHeight: 1.12, color: p.colors.text, ...plainText}}>
@@ -212,10 +219,14 @@ const Progress: React.FC<{p: HubProps}> = ({p}) => {
 };
 
 // Lớp chữ trong suốt: FFmpeg dựng nền video, rồi ghép lớp này lên trên.
-export const HubOverlay: React.FC<HubProps> = (p) => p.blocks ? <AbsoluteFill style={{backgroundColor: 'transparent'}}>
+export const HubOverlay: React.FC<HubProps> = (p) => p.loi ? <AbsoluteFill style={{backgroundColor: 'transparent'}}>
+  {p.atmos && <Atmos {...p.atmos}/>}
+  <ChuTheoLoi loi={p.loi}/>
+</AbsoluteFill> : p.blocks ? <AbsoluteFill style={{backgroundColor: 'transparent'}}>
   {p.atmos && <Atmos {...p.atmos}/>}
   <Progress p={p}/>
-  <Blocks blocks={p.blocks} th={{font: FONT, accent: p.colors.accent, red: p.colors.brand_red, green: p.colors.brand_green, text: p.colors.text}}/>
+  <Blocks blocks={p.blocks} th={{font: FONT, accent: p.colors.accent, red: p.colors.brand_red, green: p.colors.brand_green, text: p.colors.text,
+    day: p.lines?.length && p.cap && p.cap.bat !== false ? p.cap.center_y - 80 : undefined}}/>
   {p.lines && p.cap && <Caption3 lines={p.lines} cfg={p.cap} font={FONT} accent={p.colors.accent} text={p.colors.text}/>}
   <Arrow p={p}/>
 </AbsoluteFill> : <AbsoluteFill style={{backgroundColor: 'transparent'}}>

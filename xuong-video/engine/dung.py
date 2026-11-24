@@ -2,6 +2,7 @@
 Mọi lựa chọn phong cách nằm trong MENU; AI chọn tổ hợp khác nhau cho từng video."""
 import random, re, subprocess
 import bo_cuc as BC
+import tim_mat
 from pathlib import Path
 
 import sys as _s0; from pathlib import Path as _P0
@@ -134,6 +135,14 @@ def render(plan, voice, shots, kho, out_path, music=None):
     td = 0.0 if trans == "cat" else 0.28
     # đoạn ngắn hơn 3× thời gian chuyển → cắt thẳng (xfade đè lên cả đoạn gây nháy); tds[i] = chuyển cảnh giữa đoạn i và i+1
     tds = [0.0 if (td == 0 or segs[i]["dur"] < 3 * td or segs[i + 1]["dur"] < 3 * td) else td for i in range(len(segs) - 1)]
+    # 23/11 (kiểu kol-vip2 Kid duyệt): chuyển cảnh chỉ ở chỗ ĐỔI Ý (câu mới bắt đầu sát nhát cắt); giữa một ý thì cắt thẳng
+    try:
+        dau_cau = [s["s"] for s in sentence_times(voice["text"], voice["words"])[1:]]
+    except Exception:
+        dau_cau = None
+    if dau_cau is not None:
+        moc = [sum(sg["dur"] for sg in segs[:i + 1]) for i in range(len(segs) - 1)]
+        tds = [x if any(abs(c - t) < 0.35 for t in dau_cau) else 0.0 for x, c in zip(tds, moc)]
     cmd = ["ffmpeg", "-v", "error", "-y"]
     # chống reup: gán bố cục cho từng đoạn (toàn màn / ô trên trời / khung mờ / chia đôi / lưới 4)
     ghi_bc = []
@@ -141,7 +150,8 @@ def render(plan, voice, shots, kho, out_path, music=None):
     layouts = [sg.get("bo_cuc") or L for sg, L in zip(segs, layouts)]
     used_phu = {(sg["shot"]["file"], int(sg["shot"]["tu"])) for sg in segs}
     if not plan.get("khong_bo_cuc"):       # trần/sàn bố cục áp lên mọi lựa chọn (đạo diễn hay máy) — xem bo_cuc.ep_bo_cuc
-        layouts, ghi_bc = BC.ep_bo_cuc(segs, layouts, rng, lambda sg, n: [p["shot"] for p in BC.chon_phu(sg, n, shots, rng, used_phu)])
+        layouts, ghi_bc = BC.ep_bo_cuc(segs, layouts, rng, lambda sg, n: [p["shot"] for p in BC.chon_phu(sg, n, shots, rng, used_phu)],
+                                       khung=(plan.get("phong_cach") or {}).get("khung_dung"), kho_canh=shots, used=used_phu)
     # ghi_bc: ghi chú những gì máy đã đổi/sửa ở bố cục và lý do (cho nhật ký của bên gọi)
     vien = (st.get("vien") or "white")           # MỘT kiểu viền cho cả video, lấy từ phương án (không ngẫu nhiên mỗi đoạn)
     fc, used_motion, nin, pops, acc0, clips, chuyen_doi, lat_all = [], [], 0, [], 0.0, [], [], []
@@ -160,6 +170,8 @@ def render(plan, voice, shots, kho, out_path, music=None):
         else:
             doc = d + 0.05
             v = float(opt.get("toc_do") or 1.0)      # cảnh còn dài hơn cần → đổi tốc độ 0,92–1,08 (khác nhịp với đoạn cùng cảnh ở video khác)
+            if sg.get("tua_nhanh") and L in BC.DON_O:  # aff đứng 1 mình (bo_cuc._aff_don): tua nhanh chống reup
+                v = float(sg["tua_nhanh"])
             if v != 1.0 and con >= d * v + 0.1:
                 opt["cham"] = round(1 / v, 3); doc = d * v + 0.05
         scmd += ["-threads", "2", "-ss", str(sg["src_start"]), "-t", f"{doc:.3f}", "-i", str(Path(kho) / sg["shot"]["file"])]
@@ -180,7 +192,12 @@ def render(plan, voice, shots, kho, out_path, music=None):
         if kind == "dung" and L in BC.NEN_RO and d > 1.8:     # toàn màn mà đứng yên >1,8 s → trôi/zoom chậm (chống "khung tĩnh kéo quá lâu")
             kind, mf = motion_filter(rng.choice(["zoom_vao", "lia_trai", "lia_phai"]), d, rng)
         used_motion.append(kind)
-        lines, times = BC.loc(i, L, d, main_idx, phu_idx, mask_idx, grade, mf, opt, sg["shot"], [ph["shot"] for ph in phu],
+        def _co_mat(sh, t0, dai):       # ô hẹp có người → dò tâm mặt để canh ô (bản sao: cùng cảnh ở đoạn khác có mặt chỗ khác)
+            if L not in BC.HOP_MO or not BC.la_nguoi(sh):
+                return sh
+            return dict(sh, _mat=tim_mat.tam_mat(Path(kho) / sh["file"], t0, dai, sh.get("crop")))
+        lines, times = BC.loc(i, L, d, main_idx, phu_idx, mask_idx, grade, mf, opt, _co_mat(sg["shot"], sg["src_start"], doc),
+                              [_co_mat(ph["shot"], ph["src_start"], d) for ph in phu],
                               an_tu=(tds[i - 1] + 0.05) if i > 0 and tds[i - 1] else 0.0)
         clip = seg_dir / f"d{i:02d}.mp4"
         scmd += ["-filter_threads", "2", "-filter_complex", ";".join(lines), "-map", f"[v{i}]", "-t", f"{d:.3f}", "-an",
@@ -219,12 +236,13 @@ def render(plan, voice, shots, kho, out_path, music=None):
                 fc.append(f"[{prev}][v{i}]xfade=transition={t}:duration={tds[i - 1]}:offset={off:.4f}[{outl}]")
             prev, acc = outl, acc + segs[i]["dur"]
     fc.append(f"[vc]tpad=stop_mode=clone:stop_duration=3,trim=duration={total}[vout]")   # chỉ dựng nền; chữ do Remotion làm rồi ghép sau
+    tach = bool(music) and bool(plan.get("khong_chu"))      # dựng nền cho Remotion: ghi thêm 2 file âm riêng (giọng, nhạc)
     if music:
         mdb = CFG["nhac"]["thap_hon_giong_db"]
         fc.append(f"[{vi_audio+1}:a]atrim=0:{total},asetpts=PTS-STARTPTS,loudnorm=I=-14:TP=-2,volume=-{mdb}dB,"
                   f"afade=t=in:d=0.5,afade=t=out:st={total-1.2:.2f}:d=1.2[m]")
-        fc.append(f"[{vi_audio}:a]apad=whole_dur={total},asplit=2[v][key]")
-        fc.append("[m][key]sidechaincompress=threshold=0.03:ratio=4:attack=20:release=300[md]")
+        fc.append(f"[{vi_audio}:a]apad=whole_dur={total},asplit={3 if tach else 2}[v][key]{'[vg]' if tach else ''}")
+        fc.append(f"[m][key]sidechaincompress=threshold=0.03:ratio=4:attack=20:release=300{',asplit=2[md][mg]' if tach else '[md]'}")
         fc.append("[v][md]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89[aout]")
     else:
         fc.append(f"[{vi_audio}:a]apad=whole_dur={total}[aout]")
@@ -232,6 +250,9 @@ def render(plan, voice, shots, kho, out_path, music=None):
     cmd += ["-filter_threads", "2", "-filter_complex", ";".join(fc), "-map", "[vout]", "-map", "[aout]", "-t", str(total), "-threads", "4",
             "-c:v", "libx264", *enc, "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out_path)]
+    if tach:   # 23/11 Kid "tiếng bị nhạc nền đè": để riêng giọng + nhạc → sfx.tron_am cho nhạc né cả tiếng hiệu ứng
+        for nhan, ten in (("[vg]", ".giong.wav"), ("[mg]", ".nhac.wav")):
+            cmd += ["-map", nhan, "-t", str(total), "-c:a", "pcm_s16le", str(Path(out_path).with_name(Path(out_path).stem + ten))]
     _ffmpeg(cmd)
     frames = int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries",
                                  "stream=nb_read_packets", "-of", "csv=p=0", str(out_path)], capture_output=True, text=True).stdout.strip() or 0)
@@ -244,5 +265,5 @@ def render(plan, voice, shots, kho, out_path, music=None):
     return {"thoi_luong": total, "chuyen_canh": trans, "chuyen_dong": mot, "mau": st.get("mau"), "cuts": cuts, "pops": pops,
             "bo_cuc": [s["bo_cuc"] for s in segs], "td": td, "tds": tds, "doi_zoomin": chuyen_doi, "ghi_bo_cuc": ghi_bc, "lat_trang": lat_all, "vien": vien,
             "doan": [{"t0": s["t0"], "t1": s["t0"] + s["dur"], "bo_cuc": s["bo_cuc"], "opt": s.get("opt"),
-                      "nhan": BC.nhan_hieu_dung(s["bo_cuc"], s.get("opt"), (s["shot"].get("soat") or {}).get("nhan")), "lat": s.get("lat")} for s in segs],
+                      "nhan": BC.nhan_hieu_dung(s["bo_cuc"], s.get("opt"), (s["shot"].get("soat") or {}).get("nhan")), "lat": s.get("lat"), "chu_lon": bool(s.get("can_chu_lon"))} for s in segs],
             "canh": [f"{s['shot']['file'][:24]}@{s['src_start']}+{s['dur']:.1f}" for s in segs]}

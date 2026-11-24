@@ -77,7 +77,7 @@ class VaoCungLucTest(unittest.TestCase):
 
 class DaoDienChonTest(unittest.TestCase):
     def test_giu_nguyen_lua_chon_dao_dien(self):
-        ban = ["khung_mo", "khung_mo", "khung_mo", "chia_doi", "chia_doi", "chia_doi", "khung_nho", "khung_nho", "khung_nho", "khung_mo"]
+        ban = ["khung_mo", "khung_mo", "khung_mo", "chia_doi", "khung_nho", "khung_nho", "chia_3", "khung_nho", "khung_nho", "khung_mo"]
         segs = [doan(i, k, phu=BC.SO_PHU[k]) for i, k in enumerate(ban)]
         L, ghi = BC.ep_bo_cuc(segs, ban, random.Random(1), lambda sg, n: [])
         self.assertEqual(L, ban); self.assertEqual(ghi, [])             # không ép trần 45% / sàn 35% / ≤ 2 liền

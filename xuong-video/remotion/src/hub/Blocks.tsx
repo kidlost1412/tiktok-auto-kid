@@ -3,11 +3,16 @@
 import {LightLeak} from '@remotion/light-leaks';
 import {Star} from '@remotion/shapes';
 import React from 'react';
-import {ChuDap, ChuGach, ChuMatNa, ChuNghieng, ChuSo, ChuTang, chiaDong} from './ChuLon';
+import {ChuDap, ChuGach, ChuMatNa, ChuNghieng, ChuSo, ChuTang, Kim, chiaDong} from './ChuLon';
 import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 
-export type Block = {loai: string; f0: number; f1: number; data: Record<string, any>; top?: number; zone?: string; vi_tri?: string; am?: string};
-export type Theme = {font: string; accent: string; red: string; green: string; text: string};
+// kieu / font: Python chọn RIÊNG cho từng khối (dung_remotion.gan_kieu_chu) để không "1 màu" — 23/11 Kid: chữ không cố định, không chỗ nào cũng vàng kim
+export type Block = {loai: string; f0: number; f1: number; data: Record<string, any>; top?: number; zone?: string; vi_tri?: string; am?: string;
+  kieu?: 'kim' | 'o' | 'mau' | 'cum' | 're'; font?: 'ph' | 'mi' | 'un' | 'pt'};
+// kieu: cách tô chữ nhấn/số của khối (kim vàng kim · o ô màu · mau chữ màu · cum cụm nhiều cỡ · re số rè); day: đáy vùng chữ lớn (trên dòng phụ đề)
+export type Theme = {font: string; accent: string; red: string; green: string; text: string; kieu?: string; day?: number};
+// font đã thử đủ dấu tiếng Việt (kol-vip2 22/11); Lobster/Pacifico/Bungee hỏng dấu → không có ở đây
+export const FONT_KHOI: Record<string, string> = {ph: 'DT Phudu', mi: 'Montserrat BI', un: 'Unbounded', pt: 'Paytone One'};
 
 const STROKE = (px: number, c = '#000') => ({WebkitTextStroke: `${px}px ${c}`, paintOrder: 'stroke fill' as const});
 const SHADOW = '0 14px 36px rgba(0,0,0,0.38)';
@@ -22,7 +27,8 @@ const useLife = (b: Block, outLen = 8) => {
 };
 
 const Zone: React.FC<{top: number; children: React.ReactNode; style?: React.CSSProperties}> = ({top, children, style}) =>
-  <div style={{position: 'absolute', top, left: 60, width: 880, display: 'flex', justifyContent: 'center', ...style}}>{children}</div>;
+  // căn đúng giữa khung (lề hai bên bằng nhau): lệch trái 40 px "để né nút TikTok" thì mắt thấy lệch (Kid 23/11)
+  <div style={{position: 'absolute', top, left: 100, width: 880, display: 'flex', justifyContent: 'center', ...style}}>{children}</div>;
 
 // ---------------------------------------------------------------- CÂU MỞ (HOOK)
 const HookDap: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // chữ to đập vào màn hình
@@ -34,7 +40,13 @@ const HookDap: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // chữ to
   return <AbsoluteFill style={{opacity: out, justifyContent: 'center', alignItems: 'center'}}>
     <div style={{width: 900, textAlign: 'center', transform: `translate(${shake}px, -180px) scale(${2.2 - 1.2 * s})`, fontFamily: th.font, fontSize: 118,
       lineHeight: 1.25, color: th.text, ...STROKE(16), filter: `drop-shadow(${SHADOW})`}}>
-      {words.map((w, i) => <span key={i} style={i === hi ? {color: '#111', background: th.accent, padding: '0 14px', borderRadius: 12, WebkitTextStroke: '0px'} : {}}>{w} </span>)}
+      {/* dòng bẻ cân đối (không để 1 chữ mồ côi như "XÓ"), khoảng cách giữa chữ bằng gap chứ không bằng dấu cách cuối chữ → cụm căn đúng giữa theo mắt (Kid 23/11) */}
+      {chiaDong(words.join(' '), 14).map((ln, k) => <div key={k} style={{display: 'flex', justifyContent: 'center', gap: '0.28em', whiteSpace: 'nowrap'}}>
+        {ln.map(({w, i}) => i === hi && th.kieu === 'kim'
+          ? <Kim key={i} vien={18}>{w}</Kim>
+          : <span key={i} style={i !== hi ? {} : th.kieu === 'mau' ? {color: th.accent}
+            : {color: '#111', background: th.accent, padding: '0 14px', borderRadius: 12, WebkitTextStroke: '0px'}}>{w}</span>)}
+      </div>)}
     </div>
   </AbsoluteFill>;
 };
@@ -51,6 +63,10 @@ const HookTungTu: React.FC<{b: Block; th: Theme}> = ({b, th}) => {   // từng c
     })}
   </Zone>;
 };
+
+// bẻ dòng cân đối theo cụm (không để trình duyệt tự rớt 1 chữ cuối xuống dòng — Kid 23/11 "SAU / MƯA")
+const Dongs: React.FC<{text: unknown; maxC?: number}> = ({text, maxC = 14}) =>
+  <>{chiaDong(String(text || ''), maxC).map((ln, k) => <div key={k} style={{whiteSpace: 'nowrap'}}>{ln.map(x => x.w).join(' ')}</div>)}</>;
 
 const HookGoMay: React.FC<{b: Block; th: Theme}> = ({b, th}) => {    // gõ máy
   const {t, out, inn} = useLife(b);
@@ -71,7 +87,7 @@ const HookMatNa: React.FC<{b: Block; th: Theme}> = ({b, th}) => {    // lộ ch�
   const bar = interpolate(t, [0, 10, 20], [0, 1, 0], {extrapolateRight: 'clamp'});
   return <Zone top={(b as any).top ?? 280} style={{opacity: out}}>
     <div style={{position: 'relative', fontFamily: th.font, fontSize: 92, lineHeight: 1.25, color: th.text, textAlign: 'center', ...STROKE(12),
-      padding: '14px 12px', clipPath: `inset(0 ${100 - p * 100}% 0 0)`}}>{String(b.data.text || '').toUpperCase()}
+      padding: '14px 12px', clipPath: `inset(0 ${100 - p * 100}% 0 0)`}}><Dongs text={b.data.text}/>
       <div style={{position: 'absolute', top: 0, bottom: 0, left: `${p * 100 - 6}%`, width: '6%', background: th.accent, opacity: bar}}/>
     </div>
   </Zone>;
@@ -82,8 +98,8 @@ const HookTem: React.FC<{b: Block; th: Theme}> = ({b, th}) => {      // tem đó
   const s = spring({frame: t, fps, config: {damping: 10, stiffness: 300}});
   return <Zone top={(b as any).top ?? 250} style={{opacity: out}}>
     <div style={{transform: `rotate(${-8 + (1 - s) * -20}deg) scale(${2.4 - 1.4 * s})`, border: `10px solid ${th.red}`, color: th.red, fontFamily: th.font,
-      fontSize: 76, padding: '10px 36px', borderRadius: 16, background: 'rgba(255,255,255,0.92)', boxShadow: SHADOW, letterSpacing: 2}}>
-      {String(b.data.text || '').toUpperCase()}</div>
+      fontSize: 76, padding: '10px 36px', borderRadius: 16, background: 'rgba(255,255,255,0.92)', boxShadow: SHADOW, letterSpacing: 2, textAlign: 'center'}}>
+      <Dongs text={b.data.text}/></div>
   </Zone>;
 };
 
@@ -114,6 +130,10 @@ const Tick: React.FC<{p: number; color: string}> = ({p, color}) =>
   <svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill={color}/>
     <path d="M17 33 L28 44 L48 22" fill="none" stroke="#fff" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"
       strokeDasharray="50" strokeDashoffset={50 - 50 * p}/></svg>;
+const Cross: React.FC<{p: number; color: string}> = ({p, color}) =>
+  <svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill={color}/>
+    <path d="M21 21 L43 43 M43 21 L21 43" fill="none" stroke="#fff" strokeWidth="8" strokeLinecap="round"
+      strokeDasharray="64" strokeDashoffset={64 - 64 * p}/></svg>;
 
 const Checklist: React.FC<{b: Block; th: Theme}> = ({b, th}) => {
   const {t, fps, inn, out, dur} = useLife(b);
@@ -125,8 +145,10 @@ const Checklist: React.FC<{b: Block; th: Theme}> = ({b, th}) => {
       {b.data.tieu_de && <div style={{fontFamily: th.font, fontSize: 46, color: th.red, marginBottom: 8}}>{String(b.data.tieu_de).toUpperCase()}</div>}
       {items.map((it, i) => {
         const s = spring({frame: t - 4 - i * gap, fps, config: {damping: 13}});
-        return <div key={i} style={{display: 'flex', alignItems: 'center', gap: 18, margin: '8px 0', opacity: s, transform: `translateX(${(1 - s) * 80}px)`}}>
-          <Tick p={Math.min(1, s * 1.2)} color={th.green}/>
+        // ô lớn dần theo từng ý (không để khung trắng trống chờ ý sau); danh sách bệnh/lỗi dùng dấu ✗ đỏ, không tích xanh
+        return <div key={i} style={{display: 'flex', alignItems: 'center', gap: 18, margin: `${8 * Math.min(1, s)}px 0`, opacity: s, transform: `translateX(${(1 - s) * 80}px)`,
+          maxHeight: 76 * Math.min(1, s * 1.5), overflow: 'hidden'}}>
+          {b.data.xau ? <Cross p={Math.min(1, s * 1.2)} color={th.red}/> : <Tick p={Math.min(1, s * 1.2)} color={th.green}/>}
           <span style={{fontFamily: th.font, fontSize: 52, color: '#111'}}>{it}</span>
         </div>;
       })}
@@ -309,7 +331,9 @@ const NutGioHang: React.FC<{b: Block; th: Theme}> = ({b, th}) => {   // nút gi�
   const {f, inn, out} = useLife(b, 4);
   const pulse = 1 + 0.06 * Math.sin(f / 3.5);
   return <Zone top={(b as any).top ?? 250} style={{opacity: out * inn, flexDirection: 'column', alignItems: 'center'}}>
-    {b.data.dong1 && <div style={{fontFamily: th.font, fontSize: 56, color: th.text, ...STROKE(10), marginBottom: 14}}>{String(b.data.dong1).toUpperCase()}</div>}
+    {/* dòng quà là thông tin chính của đoạn chốt: chữ vàng trên nền tối, đọc được cả khi nền là can trắng (thử đen trắng, Kid 23/11) */}
+    {b.data.dong1 && <div style={{fontFamily: th.font, fontSize: 60, color: th.accent, background: 'rgba(0,0,0,0.78)', padding: '8px 26px', borderRadius: 16,
+      marginBottom: 16, boxShadow: SHADOW, textAlign: 'center', maxWidth: 860}}>{String(b.data.dong1).toUpperCase()}</div>}
     <div style={{transform: `scale(${pulse})`, background: `linear-gradient(180deg, ${th.red}, #A3141B)`, color: '#fff', fontFamily: th.font, fontSize: 70,
       padding: '18px 56px', borderRadius: 999, boxShadow: `0 0 0 ${8 + 6 * Math.sin(f / 3.5)}px rgba(255,255,255,0.35), ${SHADOW}`}}>
       🛒 {String(b.data.text || 'BẤM GIỎ HÀNG').toUpperCase()}</div>
@@ -358,6 +382,13 @@ export const Blocks: React.FC<{blocks: Block[]; th: Theme}> = ({blocks, th}) => 
   const f = useCurrentFrame();
   return <>{blocks.filter(b => f >= b.f0 && f < b.f1 && REGISTRY[b.loai]).map((b, i) => {
     const C = REGISTRY[b.loai];
-    return <C key={`${b.loai}-${b.f0}-${i}`} b={b} th={th}/>;
+    const thK = {...th, font: (b.font && FONT_KHOI[b.font]) || th.font, kieu: b.kieu ?? th.kieu};
+    // nền sau chữ sáng/rối (Python đo) → vùng tối mờ loang phía sau, giữ nguyên kiểu chữ (chữ trắng đọc được nhờ nền tối hơn)
+    const top = (b as any).top ?? 250, mo = Math.min(1, (f - b.f0) / 6, (b.f1 - f) / 6);
+    return <React.Fragment key={`${b.loai}-${b.f0}-${i}`}>
+      {(b as any).nen_toi && <div style={{position: 'absolute', left: 0, width: 1080, top: top - 70, height: 400, opacity: mo,
+        background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,0,0,0.55), rgba(0,0,0,0.28) 60%, rgba(0,0,0,0) 100%)'}}/>}
+      <C b={b} th={thK}/>
+    </React.Fragment>;
   })}</>;
 };

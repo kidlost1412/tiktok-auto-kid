@@ -492,5 +492,89 @@
   "t_dinh": 0.247,
   "t_bat": 0.13,
   "tan_cong": 0.117
+ },
+ {
+  "nhom": "rit_dia",
+  "id": "sfx-20e94d9d55",
+  "ten": "Record Scratch 01",
+  "file": "rit_dia/meme-record-scratch-01.mp3",
+  "mo_ta": "Rít đĩa than ngắn, khô, giật tai; hợp giây đầu giữ chân trước câu nói đầu. Đã duyệt ở video mẫu bọ trĩ.",
+  "dai": 0.94,
+  "dinh_db": -0.0,
+  "t_dinh": 0.233,
+  "t_bat": 0.045,
+  "tan_cong": 0.188
+ },
+ {
+  "nhom": "rit_dia",
+  "id": "sfx-8e3e9a502d",
+  "ten": "Vinyl Scratch 02",
+  "file": "rit_dia/meme-vinyl-scratch-02.wav",
+  "mo_ta": "Rít đĩa rất ngắn có dâng nhẹ; bản ngắn hơn cho hook nhanh.",
+  "dai": 1.253,
+  "dinh_db": -0.7,
+  "t_dinh": 0.133,
+  "t_bat": 0.0,
+  "tan_cong": 0.133
+ },
+ {
+  "nhom": "chup",
+  "id": "sfx-3fb49434dc",
+  "ten": "Camera Flash 01",
+  "file": "chup/foley-camera-flash-01.mp3",
+  "mo_ta": "Flash máy ảnh gọn, giòn, không trầm; hợp chữ to đập xuống, con số, tên hàng lóe ra. Đã duyệt ở video mẫu bọ trĩ.",
+  "dai": 1.75,
+  "dinh_db": -0.5,
+  "t_dinh": 0.242,
+  "t_bat": 0.18,
+  "tan_cong": 0.062
+ },
+ {
+  "nhom": "chup",
+  "id": "sfx-19441d718f",
+  "ten": "Camera Flash 02",
+  "file": "chup/foley-camera-flash-02.mp3",
+  "mo_ta": "Flash máy ảnh biến thể 2, sáng hơn chút; xoay vòng với bản 01.",
+  "dai": 2.02,
+  "dinh_db": -1.2,
+  "t_dinh": 0.177,
+  "t_bat": 0.115,
+  "tan_cong": 0.062
+ },
+ {
+  "nhom": "tien",
+  "id": "sfx-e304d22871",
+  "ten": "Cash Register Cha-Ching 01",
+  "file": "tien/money-cash-register-cha-ching-01.mp3",
+  "mo_ta": "Máy tính tiền cha-ching; hợp nút giỏ hàng, chốt đơn. Đã duyệt ở video mẫu bọ trĩ.",
+  "dai": 2.142,
+  "dinh_db": -2.8,
+  "t_dinh": 0.647,
+  "t_bat": 0.175,
+  "tan_cong": 0.472
+ },
+ {
+  "nhom": "go_phim",
+  "id": "sfx-fa40c01127",
+  "ten": "Typewriter Soft 01",
+  "file": "go_phim/ui-typewriter-soft-01.wav",
+  "mo_ta": "Phím máy đánh chữ nhẹ; rải theo chữ gõ máy, khác chất phím cơ.",
+  "dai": 0.219,
+  "dinh_db": -5.8,
+  "t_dinh": 0.107,
+  "t_bat": 0.105,
+  "tan_cong": 0.002
+ },
+ {
+  "nhom": "go_phim",
+  "id": "sfx-e141c70324",
+  "ten": "Typewriter Hard 01",
+  "file": "go_phim/ui-typewriter-hard-01.wav",
+  "mo_ta": "Phím máy đánh chữ chắc tay; rải theo chữ gõ máy.",
+  "dai": 0.333,
+  "dinh_db": -0.1,
+  "t_dinh": 0.142,
+  "t_bat": 0.125,
+  "tan_cong": 0.017
  }
 ]

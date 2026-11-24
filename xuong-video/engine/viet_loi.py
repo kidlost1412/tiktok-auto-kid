@@ -64,7 +64,16 @@ def _so_lieu(ma):
     return _tom_tat(ma) if _cong_so_lieu(ma) else ""
 
 
-CAM_CHU = ["số 1", "số một", "nhất thị trường", "duy nhất"]    # chủ quyết định: nội dung TikTok không giới hạn, chỉ cấm các tuyên bố này
+CAM_CHU = ["số 1", "số một", "nhất thị trường", "duy nhất", "chết"]    # chủ quyết định: nội dung TikTok không giới hạn, chỉ cấm các tuyên bố này; 23/11 Kid: không bao giờ "chết"
+_THAY_CHET = [(r"cây\s+chết", "cây lụi"), (r"chết\s+cây", "lụi cây"), (r"chết\s+sạch", "sạch bóng"), (r"chết", "gục")]
+
+
+def bo_chet(t):
+    """23/11 Kid: không bao giờ dùng từ "chết" trong video → thay từ cùng nghĩa (giữ HOA nếu chữ gốc viết hoa)."""
+    t = str(t or "")
+    for a, b in _THAY_CHET:
+        t = re.sub(r"(?<!\w)" + a + r"(?!\w)", lambda m, b=b: b.upper() if m.group(0).isupper() else (b[:1].upper() + b[1:] if m.group(0)[:1].isupper() else b), t, flags=re.I)
+    return t
 VAN_MAU_YEU = ["tham khảo", "xem chi tiết", "tìm hiểu thêm", "đáng cân nhắc", "theo hướng dẫn của", "quy cách rõ ràng",
                "đúng nhu cầu", "giải pháp toàn diện", "hiệu quả vượt trội", "chất lượng hàng đầu"]
 BANNED = CAM_CHU + VAN_MAU_YEU
@@ -857,7 +866,7 @@ def viet(ma_sp, so_ban, log=print):
             def gon(c, n=90):                          # luật caption ≤ 90 ký tự, cắt ở ranh giới từ
                 c = re.sub(r"\s+", " ", str(c)).strip()
                 return c if len(c) <= n else c[:n].rsplit(" ", 1)[0].rstrip(",;:–-") + "…"
-            it["captions"] = [gon(c) for c in (cap if isinstance(cap, list) else [cap]) if str(c).strip()] or [""]
+            it["captions"] = [gon(bo_chet(c)) for c in (cap if isinstance(cap, list) else [cap]) if str(c).strip()] or [""]
             it["caption"] = it["captions"][0]
             for ax in ("goc", "mo", "chot", "vai"):
                 _them_so(f"{ax}-{ma_sp}.txt", t[ax])

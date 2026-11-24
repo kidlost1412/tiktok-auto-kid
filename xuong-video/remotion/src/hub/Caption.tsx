@@ -3,7 +3,7 @@ import React from 'react';
 import {spring, useCurrentFrame, useVideoConfig} from 'remotion';
 
 export type CapWord = {w: string; f0: number; f1: number; emph?: boolean};
-export type CapLine = {text: string; f0: number; f1: number; words: CapWord[]};
+export type CapLine = {text: string; f0: number; f1: number; words: CapWord[]; nen?: boolean};   // nen: Python đo nền sau chữ sáng/rối → lót dải tối
 export type CapStyle = 'to_dan' | 'mo_sang' | 'o_nhay' | 'gach_chay' | 'nhich_len' | 'hop_mo' | 'quet_mau' | 'vien_day';
 export type CapCfg = {style: CapStyle; center_y: number; upper: boolean; max_px?: number; co?: number; bat?: boolean};
 
@@ -28,7 +28,8 @@ export const Caption: React.FC<{lines: CapLine[]; cfg: CapCfg; font: string; acc
     transform: `translateY(calc(-50% + ${(1 - enter) * 16}px))`, opacity: Math.min(1, enter * 1.4)}}>
     <div style={{maxWidth: MAX_W, textAlign: 'center', fontFamily: font, fontWeight: 900, fontSize: px, lineHeight: 1.18, color: text,
       whiteSpace: 'normal',
-      ...(st === 'hop_mo' ? {background: 'rgba(0,0,0,0.58)', borderRadius: 18, padding: '8px 22px'} : {}),
+      ...(st === 'hop_mo' ? {background: 'rgba(0,0,0,0.58)', borderRadius: 18, padding: '8px 22px'}
+        : ln.nen ? {background: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: '6px 20px'} : {}),
       textShadow: st === 'hop_mo' ? 'none' : '0 4px 14px rgba(0,0,0,0.45)'}}>
       {ln.words.map((w, j) => {
         const word = cfg.upper ? w.w.toUpperCase() : w.w;
