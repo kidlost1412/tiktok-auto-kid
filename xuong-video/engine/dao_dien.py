@@ -966,7 +966,7 @@ def _gk_cau_hinh():
         han = max(30, int(c.get("han_s") or GK_HAN_S))
     except Exception:
         han = GK_HAN_S
-    return {"may": "claude" if may == "claude" else "gemini", "model": str(c.get("model") or GK_MODEL), "song_song": n, "han_s": han}
+    return {"may": "gemini", "model": str(c.get("model") or GK_MODEL), "song_song": n, "han_s": han}
 
 
 def _gk_sem(n):
@@ -979,7 +979,29 @@ def _gk_sem(n):
 def _gk_bao_mot_lan(khoa, msg):
     if khoa not in _GK_DA_BAO:
         _GK_DA_BAO.add(khoa)
-        print(f"  (giám khảo: {msg} → chuyển sang chấm bằng Claude)")
+        print(f"  (giám khảo: {msg})")
+
+
+_GK_MO_KHOA = threading.Lock()
+
+
+def _gk_mo_agy(hc, cho_s=90):
+    """Antigravity chưa mở → tự mở rồi chờ dịch vụ lên (Kid 25/11: chỉ chấm bằng Antigravity, không rơi sang Claude). → True nếu đã sẵn sàng."""
+    import time
+    if hc.trang_thai_agy().get("mo"):
+        return True
+    with _GK_MO_KHOA:                         # 2 luồng chấm cùng thấy chưa mở: chỉ 1 luồng mở
+        if hc.trang_thai_agy().get("mo"):
+            return True
+        print("  (giám khảo: Antigravity chưa mở → tự mở)")
+        if not hc.mo_antigravity().get("ok"):
+            return False
+        for _ in range(cho_s // 3):
+            time.sleep(3)
+            if hc.trang_thai_agy().get("mo"):
+                time.sleep(5)                 # dịch vụ vừa lên: chờ thêm cho chắc nhận việc
+                return True
+    return False
 
 
 def _gk_json(txt):
@@ -996,7 +1018,7 @@ def cham_gemini(p, anh, work, cfgg, runner=None, video=None):
     tối đa cfgg['song_song'] cuộc cùng lúc. Gemini xem được video và nghe được tiếng nên được đưa cả file video; Claude thì chỉ có ảnh."""
     import hoc_canh as hc
     if runner is None:
-        if not hc.trang_thai_agy().get("mo"):
+        if not _gk_mo_agy(hc):
             raise hc.ChuaMo(hc._msg_chua_mo())
         runner = hc.hoi_mot_lan
     import uuid, shutil
@@ -1042,17 +1064,6 @@ def _gk_ket(tho, may, co_canh_qua):
     return kiem_may.hop_nhat_cu(tho, may) if tho.get("diem") is not None else None
 
 
-def cham_claude(p, anh, hop_le=lambda kq: True):
-    """Chấm bằng Claude (cách cũ): trả sai định dạng → hỏi lại 1 lần. → dict JSON thô hợp lệ hoặc None."""
-    for lan in range(2):
-        txt, _ = goi("giám khảo", p, anh=[anh])
-        kq = _gk_json(txt)
-        if kq is not None and hop_le(kq):
-            return kq
-        p += "\n\nNHẮC: chỉ trả về đúng 1 đối tượng JSON theo mẫu (có mảng \"muc\"), không chữ nào khác."
-    return None
-
-
 def giam_khao(sp, video, sents, edl, work, segs=None, info=None, props_f=None, co_canh_qua=False, runner=None):
     """Chấm 1 video: (1) máy kiểm trước (kiem_may.kiem, cần segs), (2) AI trả lời danh sách kiểm — mặc định Gemini qua Antigravity, không được thì Claude,
     (3) gộp thành {diem, dat, loi, sua, muc, may, nguon}. diem = 10 × số mục đạt / số mục xét."""
@@ -1071,18 +1082,15 @@ def giam_khao(sp, video, sents, edl, work, segs=None, info=None, props_f=None, c
     anh, _ = to_ban_dung(video, sents, Path(work) / "ban-dung.jpg")
     p = prompt_mau.dien("giam-khao", **ctx_giam_khao(sp, sents, edl, may))
     cg = _gk_cau_hinh()
-    kq, nguon = None, "claude"
-    if cg["may"] == "gemini":
+    kq, nguon = None, "gemini"
+    for lan in range(2):                      # chỉ Antigravity chấm (Kid 25/11); hỏng/quá hạn → thử lại 1 lần, vẫn hỏng → để chưa chấm
         try:
             kq = _gk_ket(_gk_json(cham_gemini(p, anh, work, cg, runner, video=video)), may, co_canh_qua)
-            if kq is None:
-                _gk_bao_mot_lan("sai-dinh-dang", "Gemini trả sai định dạng / thiếu mục kiểm")
-            else:
-                nguon = "gemini"
+            if kq is not None:
+                break
+            _gk_bao_mot_lan("sai-dinh-dang", "Gemini trả sai định dạng / thiếu mục kiểm")
         except Exception as e:
             _gk_bao_mot_lan(type(e).__name__, f"Antigravity không chấm được ({str(e)[:90]})")
-    if kq is None:
-        kq = _gk_ket(cham_claude(p, anh, lambda k: _gk_ket(k, may, co_canh_qua) is not None), may, co_canh_qua)
     if kq is None:
         return {"diem": None, "dat": None, "loi": ["giám khảo chưa chấm được"], "sua": "", "muc": [], "may": may, "nguon": nguon}
     kq["nguon"] = nguon

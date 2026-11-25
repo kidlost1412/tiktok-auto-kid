@@ -73,16 +73,8 @@ class VideoChoGeminiTest(unittest.TestCase):
             thay["mp4"] = Path(re.search(r"VIDEO THẬT[^\n]*: (\S+\.mp4)", prompt).group(1))
             raise hc.LoiTam("quá hạn")
         kq = self.cham(runner=hong)
-        self.assertEqual(kq["nguon"], "claude")                                    # rơi về Claude
+        self.assertIsNone(kq["diem"]); self.assertEqual(self.claude, [])           # không rơi sang Claude (Kid 25/11)
         self.assertFalse(thay["mp4"].exists()); self.assertEqual(list((self.hub / "lich-su" / "_giam-khao").iterdir()), [])
-
-    def test_claude_chi_nhan_anh(self):
-        def hong(model, prompt, out_file, **kw):
-            raise hc.LoiTam("x")
-        self.cham(runner=hong)
-        self.assertEqual(len(self.claude), 1)
-        self.assertNotIn("VIDEO THẬT", self.claude[0]["prompt"]); self.assertNotIn(".mp4", self.claude[0]["prompt"])
-        self.assertEqual(len(self.claude[0]["anh"]), 1)
 
     def test_khong_co_file_video_thi_nhu_cu(self):
         thay = {}

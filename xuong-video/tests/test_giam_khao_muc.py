@@ -252,29 +252,49 @@ class ChamBangAiTest(unittest.TestCase):
         self.assertEqual(kq["diem"], round(10 * (n - 2) / n, 1)); self.assertFalse(kq["dat"])
         self.assertTrue(kq["may"] and kq["may"][0]["muc"] == "chot_chai")
 
-    def test_antigravity_dong_thi_roi_ve_claude(self):
-        with mock.patch.object(hc, "trang_thai_agy", lambda: {"mo": False, "vo": False}), mock.patch.object(hc, "_msg_chua_mo", lambda: "chưa mở"):
-            kq = self.cham()
-            kq2 = self.cham()
-        self.assertEqual(kq["nguon"], "claude"); self.assertEqual(len(self.claude), 2)
-        self.assertEqual(kq["diem"], kq2["diem"]); self.assertIn("hook", {x["id"] for x in kq["muc"] if x["dat"] is False})
-        self.assertEqual(len(dd._GK_DA_BAO), 1)                                                     # chỉ báo 1 lần
+    def test_antigravity_dong_thi_tu_mo_khong_dung_claude(self):
+        trang = {"mo": False}
+        def mo():
+            trang["mo"] = True
+            return {"ok": True}
+        log = []
+        with mock.patch.object(hc, "trang_thai_agy", lambda: dict(trang)), mock.patch.object(hc, "mo_antigravity", mo), mock.patch("time.sleep"):
+            self.assertTrue(dd._gk_mo_agy(hc))
+        self.assertTrue(trang["mo"])
+        kq = self.cham(runner=gia_runner(lambda p: muc_ai(), log))
+        self.assertEqual(kq["nguon"], "gemini"); self.assertEqual(self.claude, [])
 
-    def test_loi_hoac_het_gio_roi_ve_claude(self):
+    def test_mo_khong_duoc_thi_chua_cham(self):
+        with mock.patch.object(hc, "trang_thai_agy", lambda: {"mo": False, "vo": False}), mock.patch.object(hc, "_msg_chua_mo", lambda: "chưa mở"),                 mock.patch.object(hc, "mo_antigravity", lambda: {"ok": False}):
+            kq = self.cham()
+        self.assertIsNone(kq["diem"]); self.assertEqual(self.claude, [])                           # Kid 25/11: không rơi sang Claude
+
+    def test_loi_hoac_het_gio_thu_lai_roi_chua_cham(self):
+        n = []
         def hong(model, prompt, out_file, **kw):
+            n.append(1)
             raise hc.LoiTam("Antigravity không trả kết quả trong 120 giây.")
         kq = self.cham(runner=hong)
-        self.assertEqual(kq["nguon"], "claude"); self.assertEqual(len(self.claude), 1)
+        self.assertIsNone(kq["diem"]); self.assertEqual(len(n), 2); self.assertEqual(self.claude, [])
 
-    def test_gemini_tra_sai_dinh_dang_roi_ve_claude(self):
+    def test_lan_hai_cham_duoc(self):
+        n = []
+        def runner(model, prompt, out_file, **kw):
+            n.append(1)
+            if len(n) == 1:
+                raise hc.LoiTam("quá hạn")
+            return json.dumps(muc_ai(), ensure_ascii=False)
+        kq = self.cham(runner=runner)
+        self.assertEqual(kq["nguon"], "gemini"); self.assertIsNotNone(kq["diem"])
+
+    def test_gemini_tra_sai_dinh_dang_chua_cham(self):
         kq = self.cham(runner=gia_runner(lambda p: {"muc": [{"id": "hook", "dat": True}]}))
-        self.assertEqual(kq["nguon"], "claude")
+        self.assertIsNone(kq["diem"]); self.assertEqual(self.claude, [])
 
-    def test_cau_hinh_claude_khong_goi_antigravity(self):
+    def test_cau_hinh_claude_van_cham_antigravity(self):
         self.cfg["giam_khao"]["may"] = "claude"
-        goi_ag = mock.Mock(side_effect=AssertionError("không được gọi Antigravity"))
-        kq = self.cham(runner=goi_ag)
-        self.assertEqual(kq["nguon"], "claude"); goi_ag.assert_not_called()
+        kq = self.cham(runner=gia_runner(lambda p: muc_ai()))
+        self.assertEqual(kq["nguon"], "gemini"); self.assertEqual(self.claude, [])
 
     def test_ca_hai_deu_hong_de_trong_diem(self):
         self.txt_claude = "không phải json"
