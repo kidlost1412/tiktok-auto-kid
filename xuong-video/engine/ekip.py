@@ -645,7 +645,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         "thoi_luong": info.get("thoi_luong"), "ngay_lam": day, "luc_lam": datetime.datetime.now().isoformat(timespec="seconds"),
                         "ma_viec": f'{t["vname"]}-{t["j"]}', "ky_tu_giong": t["voice"].get("ky_tu") or len(t["voice"].get("text", "")),
                         "giong_file": t["voice"].get("meta"), "dung_chung_giong": per,          # 1 giọng dùng cho `per` video
-                        "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "don_ban", "nhan_tu", "captions", "caption",
+                        "kich_ban": {k: t["sc"].get(k) for k in ("goc", "giong", "text", "dong", "y_canh", "y_hinh", "don_ban", "nhan_tu", "captions", "caption",
                                                                  "hashtag", "dang", "quy_cach", "mo", "than", "chot", "vai", "chu_mo")},
                         "lam_lai_tu": t.get("lam_lai_tu"),
                         "sfx_lich": [{k: str(e.get(k)) if k == "file" else e.get(k) for k in ("t", "t_neo", "nhom", "vai", "db", "file", "nguon")} for e in t["job"].get("sfx") or []],

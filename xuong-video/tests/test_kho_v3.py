@@ -1,0 +1,241 @@
+"""Kho cảnh kiểu 3 (phiếu v3.1): kiểm phiếu, luật cấm chung, khóa cũ đúng nghĩa, nạp kho sau cờ, giữ id theo IoU, bộ đếm id bền,
+bảng nối id cho lịch sử, bản chụp + quay lui. Không gọi AI. Chạy:  python -m unittest tests.test_kho_v3 -v"""
+import copy, json, os, sys, tempfile, unittest
+from pathlib import Path
+
+TMP = tempfile.mkdtemp(prefix="xv-v3-")
+os.environ.setdefault("XUONG_DATA", TMP)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
+import phieu_v3 as p3  # noqa: E402
+import kho_canh as kc  # noqa: E402
+import dao_dien as dd  # noqa: E402
+import soat_kho  # noqa: E402
+
+
+def _doan(tu, den, **k):
+    d = {"tu": tu, "den": den, "hinh": "Tay cầm chai TC01", "viec": [{"ma": "cam_xem", "vat": "v1", "dich": None}],
+         "vat_thay": [{"id": "v1", "mat": "truoc", "ten_doc": "TC 01", "so_luong": 1}], "cay": None, "dau_hieu": [], "sinh_vat": [],
+         "so_sanh": None, "dich_thay": "", "nguoi": {"kieu": "tay", "mat_ro": False, "noi_vao_may": False}, "loi": [], "chu_dan": [],
+         "gia_qua": {"chu_dan": [], "tren_vat": [], "loi": []}, "nguon": "quay_that",
+         "khung": {"co_canh": "can", "chu_the_o": "giua", "net": 3, "rung": False, "toi": False, "dep": 3}}
+    d.update(k)
+    return d
+
+
+def _video(doan, bo_qua=(), vat=None):
+    return {"tom_tat": "hình cho thấy chai", "kieu_video": "huong_dan", "bo_qua": list(bo_qua), "doan": doan,
+            "vat": vat or [{"id": "v1", "loai": "chai", "chu_doc": "TC 01", "la": "sp_chinh"},
+                           {"id": "v2", "loai": "can", "chu_doc": "ĐẠM CÁ", "la": "sp_khac:Đạm cá"}]}
+
+
+class KiemPhieuV3Test(unittest.TestCase):
+    def test_hop_le(self):
+        self.assertEqual(p3.kiem_video(_video([_doan(0, 4), _doan(4, 9.1)]), 9.0), [])
+
+    def test_v3_vat_la_khong_phai_id(self):
+        v = _video([_doan(0, 4, viec=[{"ma": "lat_la", "vat": "la", "dich": "mat_duoi_la"}])])
+        self.assertEqual(p3.kiem_video(v, 4), [])
+
+    def test_v3_id_ngoai_video_va_id_trung(self):
+        v = _video([_doan(0, 4, vat_thay=[{"id": "v9", "mat": "truoc", "ten_doc": None, "so_luong": 1}])])
+        self.assertTrue(any("v9" in e for e in p3.kiem_video(v, 4)))
+        v = _video([_doan(0, 4)], vat=[{"id": "v1", "loai": "chai", "chu_doc": None, "la": "sp_chinh"}] * 2)
+        self.assertTrue(any("trùng" in e for e in p3.kiem_video(v, 4)))
+
+    def test_v3_doan_chong_che_lo_hong(self):
+        self.assertTrue(any("hở" in e for e in p3.kiem_video(_video([_doan(0, 4), _doan(5, 9)]), 9)))
+        self.assertTrue(any("chồng" in e for e in p3.kiem_video(_video([_doan(0, 5), _doan(4, 9)]), 9)))
+        self.assertTrue(any("hở cuối" in e for e in p3.kiem_video(_video([_doan(0, 4)]), 9)))
+        self.assertEqual(p3.kiem_video(_video([_doan(0.2, 4), _doan(4.25, 9)], bo_qua=[]), 9.2), [])     # trong dung sai mép
+
+    def test_v3_moc_loi_gia_tai_ngoai_doan(self):
+        v = _video([_doan(0, 4, loi=[{"tu": 3, "den": 6, "chu_de": "gia", "tom": "giá 100k"}])])
+        self.assertTrue(any("lời" in e for e in p3.kiem_video(v, 4)))
+        v = _video([_doan(0, 4, dau_hieu=[{"ma": "la_vang", "tai": 7}])])
+        self.assertTrue(any("tai" in e for e in p3.kiem_video(v, 4)))
+
+    def test_enum_quyet_dinh_cam_la_bi_bac(self):
+        v = _video([_doan(0, 4, chu_dan=[{"noi_dung": "-25%", "loai": "giam_gia", "vi_tri": "tren", "che_chu_the": False}])])
+        self.assertTrue(p3.kiem_video(v, 4))
+        v = _video([_doan(0, 4, viec=[{"ma": "khac:nhúng cành", "vat": "canh", "dich": None}])])
+        self.assertEqual(p3.kiem_video(v, 4), [])                         # enum mở khác: giữ
+
+    def test_null_khac_mang_rong(self):
+        v = _video([_doan(0, 4, loi=None)])
+        self.assertEqual(p3.kiem_video(v, 4), [])
+        self.assertIsNone(p3.mo_ta(v, "a.mp4", 4)["nghe_duoc"])
+        self.assertFalse(p3.mo_ta(_video([_doan(0, 4)]), "a.mp4", 4)["nghe_duoc"])
+
+
+class CamTest(unittest.TestCase):
+    vat = _video([])["vat"]
+
+    def test_gia_in_trich_null_cam_gia_chi_noi_duoc(self):
+        hinh = _doan(0, 4, gia_qua={"chu_dan": [{"tu": 1, "den": 2, "trich": None}], "tren_vat": [], "loi": []})
+        noi = _doan(0, 4, gia_qua={"chu_dan": [], "tren_vat": [], "loi": [{"tu": 1, "den": 2, "trich": "100k"}]})
+        self.assertIn("gia_qua", p3.cam(hinh, self.vat))
+        self.assertEqual(p3.cam(noi, self.vat), [])
+
+    def test_ten_phu_sp_chinh_va_sp_khac_doc_duoc(self):
+        self.assertEqual(p3.cam(_doan(0, 4), self.vat), [])
+        khac = _doan(0, 4, vat_thay=[{"id": "v2", "mat": "truoc", "ten_doc": "ĐẠM CÁ", "so_luong": 1}])
+        self.assertIn("sp_khac", p3.cam(khac, self.vat))
+        mo = _doan(0, 4, vat_thay=[{"id": "v2", "mat": "truoc", "ten_doc": None, "so_luong": 1}])
+        self.assertEqual(p3.cam(mo, self.vat), [])
+
+    def test_chu_che_chi_cam_khi_khong_quay_that(self):
+        cd = [{"noi_dung": "x", "loai": "tieu_de", "vi_tri": "giua", "che_chu_the": True}]
+        self.assertEqual(p3.cam(_doan(0, 4, chu_dan=cd), self.vat), [])
+        self.assertIn("chu_che", p3.cam(_doan(0, 4, chu_dan=cd, nguon="ghep"), self.vat))
+
+    def test_bad_va_canh_bad_dung_chung_cam(self):
+        import viet_loi
+        s = {"cam": ["gia_qua"], "soat": {"mat": 0, "chu_muc": 0, "dep": 5}}
+        self.assertTrue(soat_kho.bad(s)); self.assertTrue(viet_loi._canh_bad(s))
+        s["cam"] = []
+        self.assertFalse(soat_kho.bad(s)); self.assertFalse(viet_loi._canh_bad(s))
+
+
+class KhoaCuTest(unittest.TestCase):
+    vat = _video([])["vat"]
+
+    def test_khoa_cu_dung_nghia(self):
+        x = p3.shot_cu(_doan(2, 8, loi=[{"tu": 2, "den": 4, "chu_de": "cong_dung", "tom": "ra rễ nhanh"}]), self.vat)
+        self.assertEqual(x["dep"], [3.0, 7.0])                              # cặp giây
+        self.assertIsInstance(x["soat"]["dep"], int)
+        self.assertEqual(x["noi"], "ra rễ nhanh")                           # chuỗi
+        self.assertIn("chai_ro", x["vai_tro"]); self.assertEqual(x["loai"], "chai_ro")
+        self.assertEqual(x["soat"]["mat"], 0)                               # chỉ thấy tay
+        self.assertTrue(x["nhan_can_hop"]); self.assertIsNone(x["soat"]["nhan"])
+
+    def test_rot_la_pha_rot_va_noi_vao_may(self):
+        r = p3.shot_cu(_doan(0, 4, viec=[{"ma": "rot", "vat": "v1", "dich": "binh_phun"}]), self.vat)
+        self.assertIn("pha_rot", r["vai_tro"])
+        n = p3.shot_cu(_doan(0, 4, viec=[{"ma": "noi_vao_may", "vat": None, "dich": None}, {"ma": "cam_xem", "vat": "v1", "dich": None}],
+                             nguoi={"kieu": "dung_noi", "mat_ro": True, "noi_vao_may": True}), self.vat)
+        self.assertEqual(n["loai"], "nguoi_noi"); self.assertEqual(n["soat"]["mat"], 2); self.assertTrue(n["noi_ghi"])
+
+    def test_cay_tieu_doi_ten_cu(self):
+        x = p3.shot_cu(_doan(0, 4, cay={"ten": "tieu", "bo_phan": ["la"], "giai_doan": None}), self.vat)
+        self.assertEqual(x["cay"], ["ho_tieu"])
+
+
+class NapKhoV3Test(unittest.TestCase):
+    def setUp(self):
+        self.hub = Path(tempfile.mkdtemp(dir=TMP)); self.kho = Path(tempfile.mkdtemp(dir=TMP))
+        self._hub, self._dhub = kc.HUB, dd.HUB
+        kc.HUB = dd.HUB = self.hub
+        self.sp = self.hub / "san-pham" / "tc"; self.sp.mkdir(parents=True)
+        (self.kho / "_mo-ta").mkdir()
+        for n in ("a.mp4", "b.mp4"):
+            (self.kho / n).write_bytes(b"x")
+        self._sp({"kho_v3": False})
+        for n, cq in (("a.mp4", [(0, 3.0), (3.0, 7.0)]), ("b.mp4", [(0, 5.0)])):     # mô tả cũ kiểu 1
+            (self.kho / "_mo-ta" / f"{n}.mo-ta.json").write_text(json.dumps({"video": n, "cay_trong": [], "canh_quay": [
+                {"tu_s": a, "den_s": b, "diem": 4, "hinh": "vườn", "the": []} for a, b in cq]}), encoding="utf-8")
+
+    def tearDown(self):
+        kc.HUB, dd.HUB = self._hub, self._dhub
+
+    def _sp(self, them):
+        d = {"ten_goi": "TC01", "kho_video": str(self.kho)}
+        d.update(them)
+        (self.sp / "san-pham.json").write_text(json.dumps(d), encoding="utf-8")
+
+    def _v3(self, n, doan, dai):
+        v = _video(doan)
+        (self.kho / "_mo-ta" / f"{n}{p3.DUOI}").write_text(json.dumps(p3.mo_ta(v, n, dai), ensure_ascii=False), encoding="utf-8")
+
+    def _canh(self):
+        return json.loads((self.sp / "canh.json").read_text(encoding="utf-8"))
+
+    def test_co_tat_y_nhu_cu(self):
+        kc.nap("tc")
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 7)], 7)
+        kc.nap("tc")
+        self.assertTrue(all("kieu" not in x for x in self._canh()))
+        self.assertFalse((self.sp / "_ban-chup").exists())
+
+    def test_nap_uu_tien_v3_giu_id_va_bo_dem(self):
+        cu = {(x["file"], x["tu"]): x["id"] for x in kc.nap("tc")[0]}
+        self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc")
+        c = self._canh()
+        a = sorted([x for x in c if x["file"] == "a.mp4"], key=lambda x: x["tu"])
+        self.assertTrue(all(x["kieu"] == 3 for x in a)); self.assertEqual(len(a), 4)
+        self.assertEqual(a[0]["id"], cu[("a.mp4", 0.3)])                     # IoU cao → giữ id
+        self.assertNotIn(a[2]["id"], cu.values())                           # đoạn mới → id mới
+        self.assertEqual([x["id"] for x in c if x["file"] == "b.mp4"], [cu[("b.mp4", 0.3)]])   # video không có v3: giữ nguyên
+        noi = json.loads((self.sp / "canh-id-noi.json").read_text(encoding="utf-8"))
+        self.assertEqual(noi[cu[("a.mp4", 3.0)]], [a[1]["id"], a[2]["id"], a[3]["id"]])  # cảnh cũ 3–7 tách thành 3
+        self.assertTrue(list((self.sp / "_ban-chup").iterdir()))
+
+    def test_nap_hai_lan_khong_doi_id_va_bang_noi(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc"); c1 = self._canh(); n1 = (self.sp / "canh-id-noi.json").read_text(encoding="utf-8")
+        kc.nap("tc")
+        self.assertEqual([x["id"] for x in self._canh()], [x["id"] for x in c1])
+        self.assertEqual((self.sp / "canh-id-noi.json").read_text(encoding="utf-8"), n1)
+
+    def test_khong_tai_cap_id_da_xoa(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc"); ids1 = {x["id"] for x in self._canh()}
+        self._v3("a.mp4", [_doan(0, 7)], 7)                                  # học lại gộp → bỏ bớt id
+        kc.nap("tc")
+        self._v3("a.mp4", [_doan(0, 1.5), _doan(1.5, 4), _doan(4, 7)], 7)
+        kc.nap("tc")
+        bo = ids1 - {x["id"] for x in self._canh()}
+        moi = {x["id"] for x in self._canh()} - ids1
+        self.assertFalse(bo & moi)
+        self.assertTrue(all(int(i) > max(int(j) for j in ids1) for i in moi))
+
+    def test_phieu_v3_hong_dung_mo_ta_cu(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(4, 7)], 7)                   # hở 3,1–4
+        s, _k = kc.nap("tc")
+        self.assertTrue(all(x.get("kieu") != 3 for x in s))
+
+    def test_toan_bo_qua_khong_con_canh(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("b.mp4", [], 5)
+        p = self.kho / "_mo-ta" / f"b.mp4{p3.DUOI}"
+        d = json.loads(p.read_text(encoding="utf-8")); d["phieu_v3"]["bo_qua"] = [{"tu": 0, "den": 5, "ly_do": "den"}]
+        p.write_text(json.dumps(d), encoding="utf-8")
+        kc.nap("tc")
+        self.assertEqual([x for x in self._canh() if x["file"] == "b.mp4"], [])
+
+    def test_lich_su_noi_id_giu_ngay_phu_mo_chot(self):
+        cu = {(x["file"], x["tu"]): x["id"] for x in kc.nap("tc")[0]}
+        old = cu[("a.mp4", 3.0)]
+        ls_dir = self.hub / "lich-su"; ls_dir.mkdir()
+        (ls_dir / "canh-da-dung-tc.jsonl").write_text(json.dumps({"ngay": "2026-11-20", "ids": [old, cu[("b.mp4", 0.3)]], "phu": [old]}) + "\n",
+                                                      encoding="utf-8")
+        (ls_dir / "canh-da-dung-tc.txt").write_text(f"{old} Q-0001\n" + f"{old} {cu[('b.mp4', 0.3)]}\n", encoding="utf-8")
+        self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc")
+        moi = sorted([x for x in self._canh() if x["file"] == "a.mp4"], key=lambda x: x["tu"])
+        ls = dd.doc_lich_su("tc", self.hub)
+        self.assertEqual(ls[0]["ids"], [moi[1]["id"], moi[2]["id"], moi[3]["id"], "Q-0001"])          # Q- giữ nguyên, thứ tự giữ
+        self.assertEqual(str(ls[1]["ngay"]), "2026-11-20")
+        self.assertEqual(ls[1]["phu"], [moi[1]["id"], moi[2]["id"], moi[3]["id"]])
+        met = dd.tinh_met(ls, today=__import__("datetime").date(2026, 11, 21))
+        self.assertGreater(met.get(moi[1]["id"], 0), 0)
+
+    def test_rollback_sau_khi_da_dung_canh_moi(self):
+        c0 = [x["id"] for x in kc.nap("tc")[0]]
+        self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc")
+        kc.quay_lui("tc")
+        self.assertFalse(json.loads((self.sp / "san-pham.json").read_text(encoding="utf-8"))["kho_v3"])
+        self.assertEqual([x["id"] for x in self._canh()], c0)
+        kc.nap("tc")                                                         # nạp lại sau quay lui: về mô tả cũ, id cũ
+        self.assertEqual(sorted(x["id"] for x in self._canh()), sorted(c0))
+
+
+if __name__ == "__main__":
+    unittest.main()

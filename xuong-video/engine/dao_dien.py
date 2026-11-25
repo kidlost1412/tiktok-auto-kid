@@ -115,7 +115,27 @@ def doc_lich_su(ma, hub=None):
     f = d / f"canh-da-dung-{ma}.txt"
     if f.exists():
         dong = [l.split() for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
-    return [{"ngay": None, "ids": x, "phu": []} for x in dong[:max(0, len(dong) - len(moi))]] + moi
+    ls = [{"ngay": None, "ids": x, "phu": []} for x in dong[:max(0, len(dong) - len(moi))]] + moi
+    return _noi_id(ls, Path(hub or HUB) / "san-pham" / ma / "canh-id-noi.json")
+
+
+def _noi_id(ls, f_noi):
+    """Kho học lại kiểu 3 đổi mốc → cảnh cũ có id mới (kho_canh._gop_v3 ghi bảng {id cũ: [id mới chồng lên]}).
+    Đổi id LÚC ĐỌC (không sửa sổ): cảnh mới kế thừa độ mệt của cảnh cũ; nhiều id cũ gộp về một id → chỉ tính một lần mỗi video.
+    Id Q-/V- thuộc kho khác → giữ nguyên."""
+    try:
+        bang = json.loads(f_noi.read_text(encoding="utf-8"))
+    except Exception:
+        return ls
+
+    def giai(i, da=()):
+        if i not in bang or i in da or not bang[i]:
+            return [i]
+        return [z for j in bang[i] for z in giai(j, da + (i,))]
+
+    def doi(ids):
+        return list(dict.fromkeys(z for i in ids for z in giai(i)))
+    return [{**r, "ids": doi(r["ids"]), "phu": doi(r["phu"])} for r in ls]
 
 
 def id_canh_chinh(segs):

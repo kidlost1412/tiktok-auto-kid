@@ -82,6 +82,8 @@ def soat(ma):
 def bad(s, chinh=True):
     """Cảnh KHÔNG dùng: chữ chèn nhiều/to (chu_muc 2), hàng khác, quá xấu.
     Kid 10/11: cảnh có người nói vẫn tốt → giữ (máy dựng sẽ đặt vào khung/ô để không lộ lệch khẩu hình); chữ chèn ít thì vẫn dùng."""
+    if s.get("cam"):                                          # kho kiểu 3: luật cấm chung phieu_v3.cam (giá/quà trên hình, SP khác đọc được tên, mờ, chữ che)
+        return True
     x = s.get("soat") or {}
     chu = x.get("chu_muc", 2 if x.get("chu") else 0)
     return bool(chu >= 2 or (x.get("dep") or 3) <= 1)        # Kid 14/11: có hàng hãng khác làm nền vẫn dùng (chỉ không làm cảnh chai chốt — xem bo_cuc.la_chai)

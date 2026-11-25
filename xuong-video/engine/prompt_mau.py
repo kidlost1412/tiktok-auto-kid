@@ -257,6 +257,11 @@ HOP_DONG = {
         {"khi_thieu": '"don_ban"',
          "noi_dung": 'THÊM MỘT TRƯỜNG (bắt buộc) vào mỗi phần tử: "don_ban": "<một câu tiếng Việt ≤ 20 từ nói đòn bán chính của bài: vì sao người này nên mua món này, lúc này>". '
                      'Trước khi viết, mỗi bài chọn MỘT đòn bán chính (theo phần kiến thức bán hàng nếu có) và bài phải trả lời được câu đó.'},
+        {"khi_thieu": '"y_hinh"',
+         "noi_dung": 'THÊM MỘT TRƯỜNG (bắt buộc) vào mỗi phần tử: '
+                     '"y_hinh": [{"muc":"truc_tiep|minh_hoa","viec":[mã việc],"dich":[],"cay":[],"bo_phan":[],"dau_hieu":[],"can_sp":"doc_ten|thay|khong",'
+                     '"can_nguoi_noi":true|false|null,"tu_khoa":["2–5 cụm hình, tiếng Việt có dấu"],"giay":<số giây đọc câu>}, ...] — yêu cầu hình có cấu trúc, '
+                     'ĐÚNG 1 phần tử cho mỗi câu, cùng thứ tự với "y_canh". Chỉ ghi điều câu thật sự cần thấy; chưa rõ thì để null hoặc []; không bịa sự thật về sản phẩm.'},
     ],
     "dao-dien": [
         {"khi_thieu": '"doan"',

@@ -411,7 +411,7 @@ def _canh_bad(s):
     """Cảnh KHÔNG dùng (cùng luật soat_kho.bad): chữ chèn nhiều, hàng khác, quá xấu."""
     x = s.get("soat") or {}
     chu = x.get("chu_muc", 2 if x.get("chu") else 0)
-    return bool(chu >= 2 or x.get("hang_khac") or (x.get("dep") or 3) <= 1)
+    return bool(s.get("cam") or chu >= 2 or x.get("hang_khac") or (x.get("dep") or 3) <= 1)
 
 
 CAY_DU = 30          # Kid 24/11: kho đạm cá có 17 cảnh sầu riêng (2 video gốc) mà biên kịch vẫn viết bài sầu riêng → hình toàn cà phê
@@ -605,6 +605,38 @@ def gon_don_ban(x, toi_da_tu=20):
     if len(tu) > toi_da_tu:
         t = " ".join(tu[:toi_da_tu]).rstrip(" ,;:–-") + "…"
     return t
+
+
+_Y_HINH_DS = ("viec", "dich", "cay", "bo_phan", "dau_hieu", "tu_khoa")
+_Y_HINH_KHOA = _Y_HINH_DS + ("muc", "can_sp", "can_nguoi_noi", "giay")
+
+
+def gon_y_hinh(x, n_cau):
+    """Yêu cầu hình có cấu trúc, đúng 1 phần tử/câu theo thứ tự câu GỐC (kể cả câu sau này bị sentence_times bỏ: khi dùng phải dóng theo chỉ số câu gốc, đừng nén mảng).
+    Không phải mảng → None (coi như vắng). Sai độ dài → giữ phần đầu, đệm/cắt bằng {}. Phần tử hỏng → {}. Giá trị enum lạ giữ nguyên chuỗi. Không bao giờ ném lỗi."""
+    if not isinstance(x, list):
+        return None
+    out = []
+    for e in x[:n_cau]:
+        d = {}
+        if isinstance(e, dict):
+            for k in _Y_HINH_DS:
+                v = e.get(k)
+                if isinstance(v, str):
+                    v = [v]
+                if isinstance(v, list):
+                    d[k] = [re.sub(r"\s+", " ", i).strip() for i in v if isinstance(i, str) and i.strip()]
+            for k in ("muc", "can_sp"):
+                if isinstance(e.get(k), str) and e[k].strip():
+                    d[k] = e[k].strip()
+            if e.get("can_nguoi_noi") is None or isinstance(e.get("can_nguoi_noi"), bool):
+                if "can_nguoi_noi" in e:
+                    d["can_nguoi_noi"] = e["can_nguoi_noi"]
+            g = e.get("giay")
+            if isinstance(g, (int, float)) and not isinstance(g, bool) and 0 <= g < 120:
+                d["giay"] = round(float(g), 1)
+        out.append(d)
+    return out + [{} for _ in range(max(0, n_cau - len(out)))]
 
 
 def build_prompt(sp, n, angles, used, styles, dang=None, mo_dau=None, qc=None, hieu_qua="", truc=None, loi_truoc=None, sp_day=None):
@@ -855,6 +887,7 @@ def viet(ma_sp, so_ban, log=print):
             it["dang"] = t["than"]
             it["chu_mo"] = gon_chu_mo(it.get("chu_mo"))
             it["don_ban"] = gon_don_ban(it.get("don_ban"))
+            it["y_hinh"] = gon_y_hinh(it.get("y_hinh"), len(sents))       # hỏng/thiếu thì thôi, không làm hỏng bản
             it["hook_thu"] = gon_hook_thu(it.get("hook_thu"))
             ten_qc = qc[i_it] if qc and i_it < len(qc) else None
             it["quy_cach"] = next((q["ma"] for q in sp.get("quy_cach") or [] if q["ten"] == ten_qc), None)
