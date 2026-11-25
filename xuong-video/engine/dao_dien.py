@@ -42,7 +42,7 @@ BO_CUC_MO_TA = {
 
 # ---------------------------------------------------------------- mệt cảnh (chống lặp cảnh qua video)
 KHO_NHO = 80              # kho riêng < 80 cảnh dùng được = "kho nhỏ": hạn mức ứng viên chặt hơn, kho chung được thêm rộng hơn
-TOI_DA_MOI_CAU = 10       # mặc định ứng viên mỗi câu (gồm cả cảnh kho chung); config dao_dien.ung_vien_moi_cau, trần TRAN_MOI_CAU
+TOI_DA_MOI_CAU = 6        # Kid 25/11: 10 → 6 (đỡ token đạo diễn, máy lọc kỹ hơn); mặc định ứng viên mỗi câu (gồm cả cảnh kho chung); config dao_dien.ung_vien_moi_cau, trần TRAN_MOI_CAU
 TRAN_MOI_CAU = 14
 KHUNG_MOI_CANH = 6        # mặc định số khung/ô ứng viên (rải đều đầu→cuối đoạn dùng được; Kid 24/11: 3→4→6, ô 778×228, 12 ô/tờ, ~2,9k token/tờ); config dao_dien.khung_moi_canh, 1 = ảnh _khung cũ
 TRAN_KHUNG = 10
