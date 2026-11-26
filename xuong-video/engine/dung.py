@@ -182,7 +182,10 @@ def render(plan, voice, shots, kho, out_path, music=None):
             phu += BC.chon_phu(sg, BC.SO_PHU[L] - len(phu), shots, rng, used_phu)
         phu_idx = []
         for ph in phu:
-            scmd += ["-threads", "2", "-ss", str(ph["src_start"]), "-t", f"{d + 0.05:.3f}", "-i", str(Path(kho) / ph["shot"]["file"])]
+            t_phu = d + 0.05
+            if ph["shot"].get("kieu") == 3:   # kho kiểu 3: mép đoạn sát cảnh cấm (giá bật lên…) → không đọc lố quá cuối đoạn; overlay giữ khung cuối
+                t_phu = max(0.3, min(t_phu, float(ph["shot"]["den"]) - float(ph["src_start"])))
+            scmd += ["-threads", "2", "-ss", str(ph["src_start"]), "-t", f"{t_phu:.3f}", "-i", str(Path(kho) / ph["shot"]["file"])]
             phu_idx.append(k); k += 1
         mask_idx = []
         for (mw, mh) in BC.mask_sizes(L, opt):

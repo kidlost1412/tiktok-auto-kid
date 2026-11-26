@@ -247,6 +247,8 @@ def nap(ma):
             shot = {"id": None, "file": f, "tu": round(a + dau, 2), "den": round(b, 2), "dai": round(b - a - dau, 2), "goc": [a, b],
                     "crop": sp.get("cat_khung", {}).get(f), "kieu": 3, **phieu_v3.shot_cu(g, vat, sp),
                     "v3": g, "vat": [x for x in vat if x.get("id") in dung]}
+            if shot["cam"]:          # cảnh cấm (giá/quà trên hình, hàng khác đọc được tên, mờ, chữ che) KHÔNG vào kho → đạo diễn, máy dự phòng, ô phụ, giám khảo sửa đều không lấy được
+                bo["v3_cam"] = bo.get("v3_cam", 0) + 1; continue
             v3_shots.append(shot)
     f_id = sp_dir / "canh-id.json"
     try:

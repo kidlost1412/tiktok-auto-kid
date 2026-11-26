@@ -192,6 +192,15 @@ class NapKhoV3Test(unittest.TestCase):
         self.assertFalse(bo & moi)
         self.assertTrue(all(int(i) > max(int(j) for j in ids1) for i in moi))
 
+    def test_canh_cam_khong_vao_kho(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        gia = {"chu_dan": [{"tu": 3.5, "den": 4.5, "trich": None}], "tren_vat": [], "loi": []}
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 5, gia_qua=gia), _doan(5, 7)], 7)
+        s, _k = kc.nap("tc")
+        a = [x for x in s if x["file"] == "a.mp4"]
+        self.assertEqual(len(a), 2)
+        self.assertFalse(any(3.1 < x["tu"] < 5 for x in a))
+
     def test_phieu_v3_hong_dung_mo_ta_cu(self):
         kc.nap("tc"); self._sp({"kho_v3": True})
         self._v3("a.mp4", [_doan(0, 3.1), _doan(4, 7)], 7)                   # hở 3,1–4
