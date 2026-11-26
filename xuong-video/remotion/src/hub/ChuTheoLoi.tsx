@@ -43,9 +43,12 @@ const TuChinh: React.FC<{b: LoiKhoi; px: number; t: number}> = ({b, px, t}) => {
   const base: React.CSSProperties = {fontFamily: b.font, fontWeight: 900, fontSize: px, lineHeight: LH, whiteSpace: 'nowrap', ...matChu(b)};
   if (t < 0) return <div style={{...base, opacity: 0}}>{b.key}</div>;
   if (b.mode === 'type') {             // từng chữ cái bật ra trái → phải (~1 chữ/khung), chữ mới nhỏ nhô lên rồi hạ
-    return <div style={base}>{Array.from(b.key).map((c, i) => {
+    // Mặt chữ đặt trên TỪNG chữ cái: chữ bóng (background-clip:text) đặt ở khối cha + chữ con có transform → Chrome dồn các chữ thành một cục (lỗi Kid 26/11)
+    const {backgroundImage, WebkitBackgroundClip, backgroundClip, WebkitTextFillColor, filter, color, textShadow, ...khung} = base;
+    const mat = {backgroundImage, WebkitBackgroundClip, backgroundClip, WebkitTextFillColor, filter, color, textShadow};
+    return <div style={khung}>{Array.from(b.key).map((c, i) => {
       const u = clamp((t - i) / 3, 0, 1);
-      return <span key={i} style={{display: 'inline-block', opacity: t >= i ? 1 : 0, transform: `translateY(${(1 - u) * -px * 0.12}px) scale(${0.7 + 0.3 * u})`,
+      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i ? 1 : 0, transform: `translateY(${(1 - u) * -px * 0.12}px) scale(${0.7 + 0.3 * u})`,
         whiteSpace: 'pre'}}>{c}</span>;
     })}</div>;
   }
