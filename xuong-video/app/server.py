@@ -579,7 +579,7 @@ def kho_trang_thai(ma):
         for _g, dirnames, filenames in os.walk(kho, onerror=lambda e: None):
             dirnames[:] = [n for n in dirnames if n not in ("_tam", "_mo-ta")]
             so_video += sum(1 for n in filenames if n.lower().endswith((".mp4", ".mov", ".mkv", ".webm")))
-    so_mo_ta = len({x.name.replace(".mo-ta.json", "").lower().removesuffix(".mp4") for x in (kho / "_mo-ta").rglob("*.mo-ta.json") if not any(q.startswith("_") for q in x.relative_to(kho / "_mo-ta").parts[:-1])})         if kho and (kho / "_mo-ta").exists() else 0          # đếm theo tên video (bỏ bản trùng ở thư mục con / sao lưu)
+    so_mo_ta = len({x.name.replace(".mo-ta-v3.json", "").replace(".mo-ta.json", "").lower().removesuffix(".mp4") for g in ("*.mo-ta.json", "*.mo-ta-v3.json") for x in (kho / "_mo-ta").rglob(g) if not any(q.startswith("_") for q in x.relative_to(kho / "_mo-ta").parts[:-1])})         if kho and (kho / "_mo-ta").exists() else 0          # đếm theo tên video (bỏ bản trùng ở thư mục con / sao lưu; phiếu kiểu 3 cũng tính)
     j = KHO_JOB.get(ma)
     log = (LS / f"kho-{ma}.log")
     dong = log.read_text(encoding="utf-8", errors="replace").splitlines() if log.exists() else []
@@ -752,7 +752,7 @@ def hoc_canh_trang_thai(ma):
     return {"agy": agy, "agy_thong_bao": hoc_canh.MSG_AGY_VO if agy.get("vo") else "", "model": hoc_canh.doc_model(),
             "models": [{"v": k, "t": t} for k, t in hoc_canh.MODELS.items()],
             "job": j, "hoc_khac": khac, "toi_da_sp": hoc_canh.doc_toi_da_sp(),
-            "dang_chay_lo": bool(dang_chay()), "quyen": quyen, "kho_cho": ma in KHO_CHO}
+            "dang_chay_lo": bool(dang_chay()), "quyen": quyen, "kho_cho": ma in KHO_CHO, "kho_v3": hoc_canh.co_kho_v3(ma)}
 
 
 def hoc_canh_quyen(ma):
@@ -1730,6 +1730,8 @@ class H(BaseHTTPRequestHandler):
                 sp["kho_video"] = b["kho"].strip().strip('"')
             if "tron_mac_dinh" in b:
                 sp["tron_mac_dinh"] = bool(b["tron_mac_dinh"])
+            if "kho_v3" in b:                                               # "Phiếu kiểu mới (thử)": học + nạp kho bằng phiếu kiểu 3 (tắt = chạy như cũ)
+                sp["kho_v3"] = bool(b["kho_v3"])
             if re.fullmatch(r"[0-9]{1,32}", str(b.get("shop_product_id") or "")):
                 sp["shop_product_id"] = str(b["shop_product_id"])
             if "ten_gio" in b:

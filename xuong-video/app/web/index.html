@@ -926,13 +926,15 @@ details.kt-tech .stat{margin-top:12px}
           <div class="row hc-act"><button class="btn go big" id="btnHoc"><svg class="i"><use href="#i-cap"/></svg>Học cảnh</button>
             <button class="btn ghost" id="btnHcXem"><svg class="i"><use href="#i-eye"/></svg>Máy đã học được gì</button></div>
           <div id="hcLai" class="hc-lai hidden"><button class="btn ghost sm" id="btnHcLai"></button>
-            <span class="note">Bản mô tả cũ được cất trong thư mục sao lưu, kho vẫn dùng bình thường trong lúc học lại.</span></div>
+            <span class="note" id="hcLaiGhiChu">Bản mô tả cũ được cất trong thư mục sao lưu, kho vẫn dùng bình thường trong lúc học lại.</span></div>
           <div id="hocCanhBao"></div>
           <div id="hocQuyen" class="hidden"></div>
           <details id="hocLoiBox" class="hc-loi hidden"></details>
           <details class="hc-tuy"><summary>Tuỳ chọn</summary>
             <div class="hc-tuy-b">
               <div><label for="hsModel">Máy xem video dùng bản AI</label><select id="hsModel" style="max-width:320px"></select></div>
+              <div><label class="tg"><input type="checkbox" id="hsV3" class="sw"> Phiếu kiểu mới (thử)</label>
+                <div class="note">Máy xem trọn video, tự chia đoạn và ghi phiếu chi tiết hơn; kho nạp cảnh theo phiếu này. Tắt đi là chạy lại như cũ — mô tả cũ không bị xoá.</div></div>
               <div class="row" style="gap:8px"><button class="btn ghost sm" id="btnKho"><svg class="i"><use href="#i-layers"/></svg>Nạp lại cảnh vào kho</button>
                 <button class="btn ghost sm" id="btnKiem"><svg class="i"><use href="#i-shield"/></svg>Kiểm tra file mô tả</button>
                 <a href="#" id="linkTay" class="note">Làm tay bằng Antigravity</a></div>
@@ -2359,6 +2361,10 @@ function hcLich() { clearTimeout(HC_T); HC_T = setTimeout(async () => { try { aw
 hcLich();
 const HC_LOAI = {chai_ro: 'Chai rõ nhãn', nhan_sau: 'Mặt sau nhãn', pha_rot: 'Pha, rót', phun_tuoi: 'Phun, tưới', re_goc: 'Rễ, gốc', cay_benh: 'Cây bệnh',
   ket_qua: 'Cây khoẻ, kết quả', vuon_rong: 'Toàn cảnh vườn', nguoi_lam: 'Người làm vườn', nguoi_noi: 'Người nói vào máy', kho_hang: 'Kho hàng', khac: 'Khác'};
+const HC_VIEC = {cam_xem: 'Cầm xem', xoay_nhan: 'Xoay nhãn', mo_nap: 'Mở nắp', rot: 'Rót', khuay: 'Khuấy', lac: 'Lắc', phun: 'Phun', tuoi: 'Tưới', rai: 'Rải',
+  trong_cay: 'Trồng cây', giam_canh: 'Giâm cành', bung_cay: 'Bứng cây', cam_re: 'Cầm rễ', chi_vao: 'Chỉ vào', lat_la: 'Lật lá', lau_la: 'Lau lá', dap_la: 'Đập lá',
+  vuot_la: 'Vuốt lá', di_xem: 'Đi xem vườn', noi_vao_may: 'Nói vào máy', mo_thung: 'Mở thùng', xep_hang: 'Xếp hàng', thu_hoach: 'Thu hoạch', khong: 'Chỉ có cảnh'};
+const HC_CAM = {gia_qua: 'Có giá/quà trên hình', sp_khac: 'Hàng khác đọc được tên', mo: 'Hình mờ', chu_che: 'Chữ che chủ thể'};
 const HC_CO = {toan: 'Toàn cảnh', toan_canh: 'Toàn cảnh', trung: 'Trung cảnh', trung_canh: 'Trung cảnh', can: 'Cận cảnh', can_canh: 'Cận cảnh'};
 const hcTen = x => String(x || '').split(/[\/\\]/).pop();
 const hcGio = s => { s = Math.max(0, Math.round(Number(s) || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -2440,8 +2446,14 @@ function hcVe() {
     dong = 'Kho chưa có video nào — anh bỏ video vào thư mục kho nhé.'; tat = true;
   } else {
     const cl = S.tong ? S.tong.chua_hoc : 0, t = S.tong || {};
-    dong = cl > 0 ? `Còn ${cl} video chưa học.` : `Kho đã học đủ: ${t.kieu1 + t.kieu2} video · ${t.canh_tong} cảnh.`;
-    if (t.kieu1 > 0) { lai = true; $('#btnHcLai').textContent = `Học lại kiểu mới (${t.kieu1} video)`; }
+    const v3 = !!h.kho_v3, k3 = t.kieu3 || 0, nc = t.nang_cap || 0, chuaV3 = t.video_tong - k3;
+    dong = v3 ? (chuaV3 > 0 ? `Còn ${chuaV3} video chưa có phiếu kiểu mới.` : `Kho đã học đủ phiếu kiểu mới: ${k3} video · ${t.canh_tong} cảnh.`)
+      : cl > 0 ? `Còn ${cl} video chưa học.` : `Kho đã học đủ: ${t.kieu1 + t.kieu2 + k3} video · ${t.canh_tong} cảnh.`;
+    if (nc > 0 && (v3 || t.kieu1 > 0)) {                       // kho toàn kiểu 2 cũng nâng cấp được (trước đây chỉ hiện khi còn kiểu 1)
+      lai = true; $('#btnHcLai').textContent = v3 ? `Học lại bằng phiếu kiểu mới (${nc} video)` : `Học lại kiểu mới (${t.kieu1} video)`;
+      $('#hcLaiGhiChu').textContent = v3 ? 'Mô tả kiểu cũ vẫn giữ nguyên trong thư mục kho (tắt "Phiếu kiểu mới" là dùng lại được); máy chỉ học các video chưa có phiếu kiểu mới.'
+        : 'Bản mô tả cũ được cất trong thư mục sao lưu, kho vẫn dùng bình thường trong lúc học lại.';
+    }
   }
   if (!chay && !dung && j && j.thong_bao && !(nap || cho || nho)) {   // lời nhắn thật của lần học vừa rồi (dừng / hết lượt / lỗi / xong)
     if (['dung', 'het_luot', 'loi'].includes(j.trang_thai) || (j.trang_thai === 'can_mo' && !mo)) { phu = j.thong_bao; xau = j.trang_thai !== 'dung'; }
@@ -2474,6 +2486,7 @@ function hcVe() {
   if (sel.dataset.m !== h.model || !sel.options.length) {
     sel.innerHTML = (h.models || []).map(m => `<option value="${esc(m.v)}">${esc(m.t)}</option>`).join(''); sel.value = h.model; sel.dataset.m = h.model;
   }
+  const ck3 = $('#hsV3'); if (!HOC.v3Bam) ck3.checked = !!h.kho_v3; ck3.disabled = chay || nap || HOC.v3Bam;
   const bk = $('#btnKho'); bk.disabled = nap || !k.so_mo_ta;
   $('#khoLog').textContent = k.log.join('\n') || '(chưa chạy)';
 }
@@ -2513,6 +2526,13 @@ $('#hocQuyen').onclick = async e => {
   const r = await api('/api/hoc-canh-quyen/' + $('#spSua').value, {}); toast(r.ok ? 'Đã bật tự duyệt — nếu Antigravity còn hỏi, đóng rồi mở lại Antigravity 1 lần' : (r.loi || 'Không bật được')); taiHoc();
 };
 $('#linkTay').onclick = async e => { e.preventDefault(); const r = await api('/api/lenh-gemini/' + $('#spSua').value); try { await navigator.clipboard.writeText(r.lenh); toast('Đã chép lệnh — dán vào Antigravity, làm xong bấm Nạp lại cảnh vào kho'); } catch (x) { toast('Không chép được — thử lại'); } };
+$('#hsV3').onchange = async () => {                          // bật/tắt phiếu kiểu mới của sản phẩm (lưu ngay, không cần bấm Lưu thay đổi)
+  const ma = HOC.ma, v = $('#hsV3').checked; if (!ma || HOC.v3Bam) return;
+  HOC.v3Bam = true; hcVe();
+  try { const r = await api('/api/san-pham/' + ma, {kho_v3: v}); toast(r.ok ? (v ? 'Đã bật phiếu kiểu mới — bấm Học cảnh để học, rồi Nạp lại cảnh vào kho' : 'Đã tắt phiếu kiểu mới — kho dùng lại mô tả cũ sau khi nạp lại') : (r.loi || 'Không lưu được')); }
+  catch (e) { toast('Không lưu được — thử lại'); }
+  HOC.v3Bam = false; hcTaiTong(); taiHoc();
+};
 $('#hsModel').onchange = async () => { const r = await api('/api/hoc-canh-model', {model: $('#hsModel').value}); toast(r.ok ? 'Đã lưu model' : r.loi); };
 
 // ---------- "Máy đã học được gì": tổng, loại cảnh còn thiếu, từng video và từng cảnh
@@ -2532,7 +2552,7 @@ async function hcXemTai() {
   HCX.ma = ma; HCX.d = r; hcXemVe();
 }
 function hcXemVe() {
-  const d = HCX.d, t = d.tong, tl = d.theo_loai || {}, hoc = t.kieu1 + t.kieu2;
+  const d = HCX.d, t = d.tong, tl = d.theo_loai || {}, k3 = t.kieu3 || 0, hoc = t.kieu1 + t.kieu2 + k3;
   let loai;
   if (t.kieu2 > 0) {
     const it = Object.keys(HC_LOAI).filter(l => (tl[l] || 0) <= 2);
@@ -2542,10 +2562,10 @@ function hcXemVe() {
   } else loai = '<div class="note">Chưa có video nào học theo kiểu mới nên chưa chia được loại cảnh.</div>';
   const loc = (v, ten, n) => `<button class="btn ghost sm${HCX.loc === v ? ' on' : ''}" data-loc="${v}">${ten} (${n})</button>`;
   $('#hcXem').innerHTML = `<div class="hc-tong"><div><b>${t.video_tong}</b><span>video trong kho</span></div>
-      <div><b>${hoc}</b><span>video đã học${t.kieu1 ? ` · ${t.kieu2} kiểu mới, ${t.kieu1} kiểu cũ` : ''}</span></div>
+      <div><b>${hoc}</b><span>video đã học${k3 || t.kieu1 ? ` · ${k3 ? k3 + ' phiếu kiểu 3, ' : ''}${t.kieu2} kiểu 2${t.kieu1 ? ', ' + t.kieu1 + ' kiểu cũ' : ''}` : ''}</span></div>
       <div><b>${t.canh_tong}</b><span>cảnh</span></div>${t.chua_hoc ? `<div><b>${t.chua_hoc}</b><span>chưa học</span></div>` : ''}</div>
     ${loai}
-    <div class="hc-loc hc-loc-nut">${loc('', 'Tất cả', t.video_tong)}${loc('2', 'Đã học', t.kieu2)}${t.kieu1 ? loc('1', 'Kiểu cũ', t.kieu1) : ''}${t.chua_hoc ? loc('0', 'Chưa học', t.chua_hoc) : ''}
+    <div class="hc-loc hc-loc-nut">${loc('', 'Tất cả', t.video_tong)}${k3 ? loc('3', 'Phiếu kiểu 3', k3) : ''}${loc('2', 'Đã học', t.kieu2)}${t.kieu1 ? loc('1', 'Kiểu cũ', t.kieu1) : ''}${t.chua_hoc ? loc('0', 'Chưa học', t.chua_hoc) : ''}
       <input type="text" id="hcTim" placeholder="Tìm theo tên video" value="${esc(HCX.tim)}"></div>
     <div id="hcDs" style="display:flex;flex-direction:column;gap:12px"></div>`;
   hcXemDs();
@@ -2562,7 +2582,7 @@ function hcXemDs() {
   document.querySelectorAll('#hcXem .hc-loc-nut [data-loc]').forEach(b => b.classList.toggle('on', b.dataset.loc === HCX.loc));
 }
 function hcVideoHtml(v, i) {
-  const badge = v.kieu === 2 ? '<span class="pill g">Đã học</span>' : v.kieu === 1 ? '<span class="pill y">Kiểu cũ</span>' : '<span class="pill">Chưa học</span>';
+  const badge = v.kieu === 3 ? '<span class="pill g">Phiếu kiểu 3</span>' : v.kieu === 2 ? '<span class="pill g">Đã học</span>' : v.kieu === 1 ? '<span class="pill y">Kiểu cũ</span>' : '<span class="pill">Chưa học</span>';
   const thu = HOC.chay || !(HOC.h && HOC.h.agy.mo);
   const mac = v.kieu === 0 ? 'Học video này' : 'Học lại video này';
   const th = v.video.includes('/') ? `<span class="note">${esc(v.video.slice(0, v.video.lastIndexOf('/')))}</span>` : '';
@@ -2582,6 +2602,8 @@ function hcCanhHtml(v) {
       <div class="hc-c-b"><div class="hc-c-h"><b>${hcGio(c.tu)}–${hcGio(c.den)}</b>
         ${c.loai ? `<span class="pill p">${esc(HC_LOAI[c.loai] || c.loai)}</span>` : ''}${co ? `<span class="note">${co}</span>` : ''}
         ${c.loi ? `<span class="pill y">Khuyết điểm: ${esc(c.loi)}</span>` : ''}
+        ${c.viec ? `<span class="pill b">${esc(HC_VIEC[c.viec] || c.viec)}</span>` : ''}
+        ${(c.cam || []).map(x => `<span class="pill r" title="Đoạn này không được dùng làm cảnh hình">${esc(HC_CAM[x] || x)}</span>`).join('')}
         ${c.dep != null ? `<span class="pill${c.dep >= 4 ? ' g' : c.dep < 3 ? ' y' : ''}">Điểm ${esc(c.dep)}/5</span>` : ''}</div>
         <div>${esc(c.ta)}</div>${c.noi ? `<div class="note">Đang nói về: ${esc(c.noi)}</div>` : ''}</div></div>`;
   }).join('');

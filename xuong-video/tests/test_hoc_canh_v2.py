@@ -252,17 +252,17 @@ class HocKhoV2Test(unittest.TestCase):
         r = self._chay(gia.runner_gia(log))
         self.assertEqual((r["da_hoc"], r["canh"], r["loi"], r["tat_ca_xong"]), (2, 6, [], True), r)
         self.assertEqual(len(log), 1)                                                   # 2 video × 3 cảnh = 1 lô
-        self.assertEqual(log[0]["model"], "gemini-4-hydrogen-high")
+        self.assertEqual(log[0]["model"], "gemini-4-neon-high")
         self.assertEqual(log[0]["kw"]["han"], 150 * 2 + 60)
         self.assertIn("Có 2 video", log[0]["prompt"]); self.assertIn("đánh số 1 đến 6", log[0]["prompt"]); self.assertIn("cảnh 6: từ giây", log[0]["prompt"])
         self.assertIn("to-1.jpg", log[0]["prompt"]); self.assertIn("phieu.json", log[0]["prompt"])
         d = self._mo_ta("v0.mp4")
-        self.assertEqual((d["kieu"], d["model"], len(d["canh_quay"])), (2, "gemini-4-hydrogen-high", 3))
+        self.assertEqual((d["kieu"], d["model"], len(d["canh_quay"])), (2, "gemini-4-neon-high", 3))
         self.assertEqual(d["canh_quay"][0]["hinh"], "Cảnh số 1 tay vạch tán lá xanh"); self.assertEqual(d["canh_quay"][0]["diem"], 5)
         self.assertEqual(self._mo_ta("v1.mp4")["canh_quay"][0]["hinh"], "Cảnh số 4 tay vạch tán lá xanh")          # số cảnh đánh liên tục trong lô
         self.assertEqual(d["cay_trong"], ["ot"]); self.assertEqual(d["loi_hay"], ["Câu hay số một."])
         self.assertEqual(hc.JOB["trang_thai"], "xong"); self.assertEqual(hc.JOB["thong_bao"], "Học xong 2 video (6 cảnh).")
-        self.assertEqual((hc.JOB["giai_doan"], hc.JOB["model"], hc.JOB["canh_tong"], hc.JOB["xong"], hc.JOB["tong"]), ("", "gemini-4-hydrogen-high", 6, 2, 2))
+        self.assertEqual((hc.JOB["giai_doan"], hc.JOB["model"], hc.JOB["canh_tong"], hc.JOB["xong"], hc.JOB["tong"]), ("", "gemini-4-neon-high", 6, 2, 2))
         self.assertFalse((self.kho / "_tam" / "hoc-canh").exists())
         tt = json.loads((hc.LS / "hoc-canh-job.json").read_text(encoding="utf-8"))
         e = tt["jobs"][str(self.kho)]                                                   # file giờ chứa job của mọi sản phẩm (khoá = mã/đường dẫn kho)
@@ -441,13 +441,13 @@ class HocKhoV2Test(unittest.TestCase):
         self.assertIn("Antigravity", hc.JOB["thong_bao"]); self.assertIn("còn 1 video chưa học", hc.JOB["thong_bao"])
         for cu in ("flash", "pro", "flash_lite", "gemini-2.5-pro", "", None):
             with mock.patch.object(hc, "doc_cau_hinh", lambda cu=cu: {"model": cu}):
-                self.assertEqual(hc.doc_model(), "gemini-4-hydrogen-high", cu)
+                self.assertEqual(hc.doc_model(), "gemini-4-neon-high", cu)
         with mock.patch.object(hc, "doc_cau_hinh", lambda: {"model": "gemini-3.8-flash-medium"}):
             self.assertEqual(hc.doc_model(), "gemini-3.8-flash-medium")
-        self.assertEqual(list(hc.MODELS)[0], "gemini-4-hydrogen-high"); self.assertEqual(len(hc.MODELS), 4)
+        self.assertEqual(list(hc.MODELS)[0], "gemini-4-neon-high"); self.assertEqual(len(hc.MODELS), 6)
         self._videos(1)
         r = self._chay(gia.runner_gia(log), model="flash")
-        self.assertEqual(log[-1]["model"], "gemini-4-hydrogen-high")                        # cấu hình cũ → mặc định
+        self.assertEqual(log[-1]["model"], "gemini-4-neon-high")                        # cấu hình cũ → mặc định
 
 
 class KhoiPhucTest(unittest.TestCase):
@@ -586,7 +586,7 @@ class KetQuaKhoTest(unittest.TestCase):
         cu = {"video": "b.mp4", "thoi_luong_s": 40.0, "tom_tat": "cũ", "canh_quay": [{"tu_s": 1.0, "den_s": 5.0, "hinh": "cũ", "diem": 3, "co_canh": "trung"}]}
         km.ghi_mo_ta(kho / "_mo-ta" / "b.mp4.mo-ta.json", cu)
         r = hc.ket_qua_kho(kho)
-        self.assertEqual(r["tong"], {"video_tong": 3, "kieu2": 1, "kieu1": 1, "chua_hoc": 1, "canh_tong": 5})
+        self.assertEqual(r["tong"], {"video_tong": 3, "kieu2": 1, "kieu1": 1, "chua_hoc": 1, "canh_tong": 5, "kieu3": 0, "nang_cap": 2})
         self.assertEqual([v["kieu"] for v in r["video"]], [2, 1, 0])
         a = r["video"][0]
         self.assertEqual((a["model"], a["hoc_luc"], a["loi_hay"]), ("gemini-4-hydrogen-high", "2026-11-14T10:00:00", ["Câu hay một."]))

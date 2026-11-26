@@ -20,6 +20,9 @@
   "1.2.13": "Lời nhắc mới cho Học cảnh kiểu mới: máy tự cắt cảnh và đo độ nét/độ rung, Antigravity chỉ xem video rồi điền phiếu cố định cho từng cảnh. Vai này là MỚI nên không thay đổi gu nào bạn đang dùng.",
   "1.2.15": "Điền phiếu nhận đúng hơn cảnh người thật đang nói về sản phẩm (kể cả khi họ cúi xuống làm việc, không nhìn máy), để đạo diễn tìm được nhiều cảnh AFF hơn."
  },
+ "dien-phieu-v3": {
+  "2.0.2": "Lời nhắc MỚI cho Học cảnh kiểu 3 (phiếu đoạn cảnh, chỉ chạy khi anh bật \"Phiếu kiểu mới (thử)\" ở sản phẩm): Antigravity xem trọn video, tự chia đoạn và ghi phiếu chi tiết cho từng đoạn. Vai này là MỚI nên không thay đổi gu nào anh đang dùng."
+ },
  "dao-dien": {
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",
   "1.2.15": "Đạo diễn được nghĩ như editor: tự chọn bố cục (thêm 3 ô, 3 dải, lật trang nhanh), đặt chữ lớn theo đúng từ trong lời đọc, chọn tiếng theo nghĩa, và dùng nhiều cảnh người thật cầm sản phẩm. Máy không còn tự đổi lựa chọn của đạo diễn.",

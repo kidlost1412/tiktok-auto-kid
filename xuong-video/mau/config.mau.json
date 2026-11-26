@@ -58,7 +58,7 @@
     "bo_duoi": 0
   },
   "hoc_canh": {
-    "model": "flash",
+    "model": "gemini-4-neon-high",
     "song_song": 2
   },
   "phu_de": {

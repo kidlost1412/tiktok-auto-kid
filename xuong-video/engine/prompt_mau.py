@@ -164,6 +164,17 @@ VAI = {
         },
         "bat_buoc": ["ds_video", "ds_to", "ra"],
     },
+    "dien-phieu-v3": {
+        "ten": "Học cảnh kiểu 3 — phiếu đoạn cảnh (Antigravity)",
+        "mo_ta": "Học cảnh kiểu mới (bật \"Phiếu kiểu mới (thử)\" ở sản phẩm): KHÔNG cắt cảnh trước. Antigravity xem trọn video (có tiếng), tự chia đoạn rồi ghi một phiếu cho mỗi đoạn (vật, việc, cây, dấu hiệu, lời, chữ dán, giá/quà, khung hình). Máy kiểm phiếu rất chặt (đoạn phải nối liền, mốc nằm trong đoạn, id vật có thật) nên đừng đổi tên trường hay danh sách giá trị.",
+        "file": "dien-phieu-v3.md",
+        "bien": {
+            "n": "Số video trong lô (tối đa 3)",
+            "ds": "Danh sách video: mã, tên sản phẩm chính + các tên in trên nhãn của cùng sản phẩm, độ dài đo bằng máy, đường dẫn file (kèm lỗi lần trước nếu làm lại)",
+            "out": "File Antigravity phải ghi kết quả vào",
+        },
+        "bat_buoc": ["ds", "out"],
+    },
     "lenh-gemini": {
         "ten": "Lệnh dán cho Gemini (kho video)",
         "mo_ta": "Câu lệnh để anh dán vào Gemini khi muốn nó tự xem cả thư mục kho video và ghi mô tả cảnh theo đúng mẫu hub đang đọc.",
@@ -226,6 +237,14 @@ HOP_DONG = {
         {"khi_thieu": "chỉ JSON thuần",
          "noi_dung": "ĐỊNH DẠNG FILE (bắt buộc): file kết quả chỉ chứa JSON thuần (bắt đầu bằng { kết thúc bằng }), UTF-8, không ```, không giải thích; "
                      "\"canh\" đủ mọi số cảnh đã đánh số, giữ ĐÚNG tên trường theo khung phiếu, loai chỉ chọn trong danh sách đã cho."},
+    ],
+    "dien-phieu-v3": [
+        {"khi_thieu": "KHÔNG chạy lệnh terminal",
+         "noi_dung": "AN TOÀN (bắt buộc): CHỈ dùng công cụ XEM các video đã nêu và công cụ GHI đúng 1 file kết quả. "
+                     "TUYỆT ĐỐI KHÔNG chạy lệnh terminal/PowerShell/script, không cài gì, không tìm web, không tạo kế hoạch/ghi chú/artifact, không đọc hay ghi file nào khác, không hỏi lại."},
+        {"khi_thieu": "chỉ JSON thuần",
+         "noi_dung": "ĐỊNH DẠNG FILE (bắt buộc): file kết quả chỉ chứa JSON thuần (bắt đầu bằng { kết thúc bằng }), UTF-8, không ```, không giải thích; "
+                     "khoá ngoài cùng là mã video đã giao, mỗi video đủ các khoá tom_tat, kieu_video, vat, bo_qua, doan; mọi đoạn đủ khoá theo mẫu."},
     ],
     "gom-bai-hoc": [
         {"khi_thieu": "RIENG:",
@@ -716,6 +735,12 @@ def _ctx_xem_thu(key, ma):
                  "canh": [{"so": 1, "tu": 2.0, "den": 6.0}, {"so": 2, "tu": 7.5, "den": 11.5}]},
                 {"rel": "ten-video-2.mp4", "dai": 7.0, "src": str(kv / "ten-video-2.mp4"), "canh": [{"so": 3, "tu": 1.0, "den": 5.0}]}]
         return hoc_canh.ctx_dien_phieu(viec, [kv / "_tam" / "hoc-canh" / "lo" / "to-1.jpg"], kv / "_tam" / "hoc-canh" / "lo" / "phieu.json", ten_sp=hoc_canh.ten_sp_cho_phieu(ma)), "Xem thử dùng 2 video mẫu."
+    if key == "dien-phieu-v3":
+        import hoc_canh
+        kv = Path(sp.get("kho_video", "D:\\kho"))
+        viec = [{"ma": "V1", "src": str(kv / "ten-video-1.mp4"), "dai": 12.5},
+                {"ma": "V2", "src": str(kv / "ten-video-2.mp4"), "dai": 7.0, "sai": ["hở 3,1–4s giữa đoạn 1 và đoạn 2 (ví dụ lỗi lần trước)"]}]
+        return hoc_canh.ctx_dien_phieu_v3(viec, kv / "_tam" / "hoc-canh" / "lo" / "phieu.json", ten_sp=hoc_canh.ten_sp_cho_phieu(ma)), "Xem thử dùng 2 video mẫu (video 2 có ví dụ lỗi lần trước)."
     if key == "lenh-gemini":
         return {"kho_video": sp.get("kho_video", "<thư mục kho>"),
                 "duong_dan_mo_ta": str(duong_dan_hieu_luc("mo-ta-gemini"))}, ""
