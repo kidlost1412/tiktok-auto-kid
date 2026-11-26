@@ -8,7 +8,7 @@ from pathlib import Path
 from ai import HetHanMuc, VIEC
 from viet_loi import viet
 from giong import tao_giong
-from dao_dien import GU, dao_dien, segs_tu_bang, giam_khao, canh_qua, canh_them, ung_vien, ghi_lich_su_canh, id_canh_chinh, id_canh_phu
+from dao_dien import GU, dao_dien, segs_tu_bang, giam_khao, canh_qua, canh_them, ung_vien, ghi_lich_su_canh, id_canh_chinh, id_canh_phu, ghi_bong_v3
 from dung import kiem_chop
 from kho_chung import kho_them_cua, la_kho_chung
 from dung_remotion import chuan_bi, dung_lo
@@ -652,6 +652,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                         "punch": t["job"].get("punch"),
                         "token": so_token_video(t.get("token"), so_loi, len(scripts), per)}
                 kem(t["job"]["out"], ".json", ghi=True).write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")   # hồ sơ video (cổng TryPost đọc)
+                ghi_bong_v3((edl or {}).get("_bong_v3"), t["job"]["out"])      # chạy bóng bộ lọc kiểu 3 (chỉ SP kho_v3): file so sánh, không ảnh hưởng gì khác
                 SK.noi_them(da_dung_f, " ".join(sg["shot"]["id"] for sg in (t["plan"].get("edl_segs") or [])) + "\n", giu_dong=600, toi_da_byte=120_000)
                 ghi_lich_su_canh(ma_sp, t["plan"].get("edl_segs") or [], f'{t["vname"]}-{t["j"]}')
                 __import__("bo_cuc").ghi_kieu([sg.get("bo_cuc") or "day" for sg in t["plan"].get("edl_segs") or []])     # video sau tránh kiểu đặc biệt video trước đã dùng

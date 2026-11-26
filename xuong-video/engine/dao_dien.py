@@ -1,23 +1,24 @@
 """Ê-kíp AI: ĐẠO DIỄN (lên bảng dựng từng câu, NHÌN ảnh cảnh) + GIÁM KHẢO (xem bản dựng, chấm, yêu cầu sửa).
 Máy dựng (dung.py / dung_remotion.py) chỉ làm theo bảng dựng; mọi lựa chọn AI đều được máy kiểm lại."""
-import datetime, json, math, re, subprocess, threading
+import datetime, json, math, re, subprocess, threading, zlib
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from ai import goi, lay_json
 import prompt_mau
+import loc_v3
 from bo_cuc import SO_PHU, la_chai, ep_bo_cuc
 import bo_cuc as BC
 import cong_thuc as CT
 import sfx as SFX
 from cong_thuc import RECIPES, DATA_SPEC, ct_cho_dao_dien
-from dung import sentence_times, MENU as MENU_NEN
+from dung import sentence_times, split_sentences, MENU as MENU_NEN
 from soat_kho import bad, nguoi_noi
 import kiem_may
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
-from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay
+from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, kem
 FPS = 30
 SO_TAY = lambda: prompt_mau.doc_luat("SO-TAY-EDITOR.md")   # sổ tay editor cao cấp — mọi vai dựng/chấm đọc
 
@@ -78,6 +79,59 @@ def moi_cau():
 
 def khung_moi_canh():
     return _cfg_dd("khung_moi_canh", KHUNG_MOI_CANH, 1, TRAN_KHUNG)
+
+
+# ---------------------------------------------------------------- CHẠY BÓNG bộ lọc kiểu 3 (loc_v3): chỉ so sánh, KHÔNG đổi cảnh nào được chọn hay dựng
+TOP_V3 = 6                # số cảnh/câu của bộ lọc mới khi chạy bóng
+
+
+def nguong_loc_v3():
+    """(ngưỡng ĐÚNG, sàn MINH HỌA) theo config dao_dien.loc_v3_dung / loc_v3_minh_hoa (thang 0–100). Không phải số hoặc sai 0 ≤ mh < dung ≤ 100 → 70/50 cả cặp."""
+    try:
+        c = cfg_hub().get("dao_dien") or {}
+        return loc_v3.chuan_nguong((c.get("loc_v3_dung", loc_v3.MAC_DINH[0]), c.get("loc_v3_minh_hoa", loc_v3.MAC_DINH[1])))
+    except Exception:
+        return loc_v3.MAC_DINH
+
+
+def chi_so_goc(text, sents):
+    """Chỉ số câu GỐC (split_sentences của lời đã bỏ thẻ […]) của từng câu trong sents. sentence_times bỏ câu không dóng được giờ nên sents có thể THƯA:
+    dóng tuần tự theo nội dung, không nén mảng — y_hinh/y_canh của biên kịch đánh số theo câu gốc."""
+    goc = split_sentences(re.sub(r"\[[^\]]*\]", "", text or ""))
+    out, p = [], 0
+    for st in sents:
+        while p < len(goc) and goc[p] != st["text"]:
+            p += 1
+        if p >= len(goc):
+            raise ValueError("câu không khớp lời gốc")
+        out.append(p); p += 1
+    return out
+
+
+def bong_v3(ma, sp, voice, script, sents, shots, per, met=None):
+    """Chạy bóng loc_v3.ung_vien_v3 trên cùng các câu + so với ứng viên cũ `per`. → dict để ghi JSON; None khi sản phẩm chưa bật kho_v3 (không làm gì thêm).
+    Không đụng bộ sinh số ngẫu nhiên của video (seed riêng), không sửa per/shots, không bao giờ ném lỗi (lỗi ghi vào khóa "loi")."""
+    if not (isinstance(sp, dict) and sp.get("kho_v3")):
+        return None
+    try:
+        text = (voice or {}).get("text") or ""
+        dung, mh = nguong_loc_v3()
+        return loc_v3.bong(sents, chi_so_goc(text, sents), (script or {}).get("y_hinh"), (script or {}).get("y_canh") or [], shots, per, met, (dung, mh),
+                           TOP_V3, zlib.crc32(f"{ma}|{text}".encode("utf-8")), ma)
+    except Exception as e:
+        return {"ban": 1, "ten": ma, "loi": f"{type(e).__name__}: {str(e)[:160]}"}
+
+
+def ghi_bong_v3(bong, mp4):
+    """Ghi <video>.bong-loc-v3.json vào _kem/ cạnh các file đi kèm khác của video. Lỗi nuốt hết: chạy bóng không bao giờ làm hỏng job."""
+    if not bong:
+        return None
+    try:
+        f = kem(mp4, ".bong-loc-v3.json", ghi=True)
+        f.write_text(json.dumps(bong, ensure_ascii=False, indent=1), encoding="utf-8")
+        return f
+    except Exception:
+        return None
 
 
 FW, FH, GAP, CAO_TO = 128, 228, 2, 1560        # nhiều khung/ô: mỗi khung 128×228, ô = k khung liền nhau, tờ ≤ 1560 px mỗi chiều
@@ -676,6 +730,9 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
     per, chon, boi = chon_ung_vien(ma, sents, script.get("y_canh", []), shots, rng, tranh, anh_em, qua, chung)
     if not chon:
         raise ValueError("kho không có cảnh dùng được để đưa đạo diễn")
+    bong = bong_v3(ma, sp, voice, script, sents, shots, per, boi.get("met"))      # chạy bóng (chỉ SP bật kho_v3): so sánh, không đổi per/chon
+    if bong:
+        boi["bong_v3"] = bong
     if ra_boi is not None:
         ra_boi.update(boi)
     ids = list(chon)
@@ -725,6 +782,8 @@ def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=()
     edl["gu"] = gu_key
     edl["_boi"] = {"met": {i: v for i, v in boi.get("met", {}).items() if v > 0}, "mo": boi.get("mo", []), "chot": boi.get("chot", []),
                    "anh_em": boi.get("anh_em", [])}          # segs_tu_bang dùng lại để chọn/đổi cảnh theo cùng độ mệt
+    if boi.get("bong_v3"):
+        edl["_bong_v3"] = boi["bong_v3"]                  # ekip ghi ra <video>.bong-loc-v3.json (khóa "_" không gửi giám khảo)
     return edl, sents, total
 
 
