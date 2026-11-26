@@ -10,9 +10,10 @@ import {Kim} from './ChuLon';
 loadFont({family: 'BVP Bold', url: staticFile('BeVietnamPro-Bold.ttf'), weight: '700'});
 loadFont({family: 'Anton', url: staticFile('Anton-Regular.ttf'), weight: '400'});
 
-type Dan = {w: string; f: number};
+type Dan = {w: string; f: number; m?: string};     // m: màu riêng của chữ dẫn mang nghĩa nặng (héo, thối…) hoặc con số
 export type LoiKhoi = {f0: number; f1: number; dan: Dan[]; key: string; kf: number; duoi?: string; vai: string; mau: string; co: number;
-  mode: 'slam' | 'type' | 'fade'; deco?: 'shake' | 'under' | null; font: string; look: 'flat' | 'gloss'; icon?: 'gio' | null; vt: 'tren' | 'duoi'; y: number};
+  mode: 'slam' | 'type' | 'fade' | 'dau' | 'nay' | 'quet' | 'glitch' | 'roi'; deco?: 'shake' | 'under' | null; font: string;
+  look: 'flat' | 'gloss' | 'hop' | 'vien'; icon?: 'gio' | null; vt: 'tren' | 'duoi'; y: number; nghieng?: number};
 export type Loi = {khoi: LoiKhoi[]; hook?: {text: string; f0: number; f1: number; kieu: 'flicker' | 'flash' | 'drop'; top?: number;
   nguoi?: {dir: string; n: number; f0: number}} | null;     // nguoi: chuỗi PNG người đã tách (public/<dir>/frame_000001.png…) vẽ ĐÈ lên chữ khổng lồ → chữ nằm sau người
   qua?: {text: string; f0: number; f1: number; y: number; mau: string} | null; dan_mau: string};
@@ -31,21 +32,68 @@ const toi = (hex: string, k: number) => {           // làm tối màu hex (mặ
 const vua = (text: string, font: string, weight: string, toiDa: number, rong = RONG) =>
   Math.min(toiDa, fitText({text, withinWidth: rong, fontFamily: font, fontWeight: weight}).fontSize * 0.96);
 
-const matChu = (b: LoiKhoi): React.CSSProperties => b.look === 'gloss'
-  ? {backgroundImage: `linear-gradient(180deg,#FFFFFF 0%,${b.mau} 52%,${toi(b.mau === '#FFFFFF' ? '#C9D3DD' : b.mau, 0.72)} 100%)`,
-    WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
-    filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 7px 12px rgba(0,0,0,0.6))'}
-  : {color: b.mau, textShadow: BONG};
+const rgba = (hex: string, a: number) => {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
 
-// TỪ CHÍNH — 3 kiểu hiện của v10
+// Mặt chữ: gloss = bóng kim loại (tên hàng); hop = nhãn dán (nền màu, chữ tối); vien = chữ rỗng viền màu rồi đổ đầy; flat = màu trơn + bóng tối
+const matChu = (b: LoiKhoi, px: number, t: number): React.CSSProperties => {
+  if (b.look === 'gloss') return {backgroundImage: `linear-gradient(180deg,#FFFFFF 0%,${b.mau} 52%,${toi(b.mau === '#FFFFFF' ? '#C9D3DD' : b.mau, 0.72)} 100%)`,
+    WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 7px 12px rgba(0,0,0,0.6))'};
+  if (b.look === 'hop') return {color: '#151515', background: b.mau, padding: `${px * 0.02}px ${px * 0.2}px ${px * 0.06}px`, borderRadius: px * 0.12,
+    boxShadow: '0 8px 22px rgba(0,0,0,0.45)'};
+  if (b.look === 'vien') return {color: rgba(b.mau, clamp((t - 8) / 7, 0, 1)), WebkitTextStroke: `${Math.max(3, px * 0.035)}px ${b.mau}`,
+    paintOrder: 'stroke fill', textShadow: BONG};
+  return {color: b.mau, textShadow: BONG};
+};
+
+const MAT_KEYS = ['backgroundImage', 'WebkitBackgroundClip', 'backgroundClip', 'WebkitTextFillColor', 'filter', 'color', 'textShadow', 'WebkitTextStroke', 'paintOrder'] as const;
+const tachMat = (base: React.CSSProperties) => {          // mặt chữ → đặt trên TỪNG chữ cái (kiểu gõ/rơi); hộp nền (hop) ở lại khối cha
+  const khung: Record<string, unknown> = {...base}, mat: Record<string, unknown> = {};
+  for (const k of MAT_KEYS) {
+    if (k in base) { mat[k] = (base as Record<string, unknown>)[k]; delete khung[k]; }
+  }
+  return {khung: khung as React.CSSProperties, mat: mat as React.CSSProperties};
+};
+
+// TỪ CHÍNH — kiểu hiện: slam / type / fade (v10) + dau (đóng dấu) / nay (nảy) / quet (quét mở) / glitch (nhiễu màu) / roi (rơi từng chữ) — Kid 26/11
 const TuChinh: React.FC<{b: LoiKhoi; px: number; t: number}> = ({b, px, t}) => {
   const {fps} = useVideoConfig();
-  const base: React.CSSProperties = {fontFamily: b.font, fontWeight: 900, fontSize: px, lineHeight: LH, whiteSpace: 'nowrap', ...matChu(b)};
+  const base: React.CSSProperties = {fontFamily: b.font, fontWeight: 900, fontSize: px, lineHeight: LH, whiteSpace: 'nowrap', ...matChu(b, px, t)};
   if (t < 0) return <div style={{...base, opacity: 0}}>{b.key}</div>;
+  if (b.mode === 'roi') {              // từng chữ cái rơi từ trên xuống, nảy nhẹ khi chạm (2 khung/chữ)
+    const {khung, mat} = tachMat(base);
+    return <div style={khung}>{Array.from(b.key).map((c, i) => {
+      const s = spring({frame: t - i * 2, fps, config: {damping: 11, stiffness: 210}});
+      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i * 2 ? clamp(s * 1.6, 0, 1) : 0, transform: `translateY(${(1 - s) * -px * 0.55}px)`,
+        whiteSpace: 'pre'}}>{c}</span>;
+    })}</div>;
+  }
+  if (b.mode === 'dau') {              // đóng dấu: lao từ to + nghiêng, đập xuống nghiêng nhẹ, khung viền như con dấu
+    const sc = interpolate(t, [0, 4], [2.3, 1], {extrapolateRight: 'clamp', easing: Easing.in(Easing.quad)});
+    const rung = t >= 4 && t < 10 ? Math.sin(t * 3.1) * 5 * (1 - (t - 4) / 6) : 0;
+    const vien = b.look === 'hop' ? {} : {border: `${Math.max(5, px * 0.05)}px solid ${b.mau}`, borderRadius: px * 0.14, padding: `0 ${px * 0.16}px`};
+    return <div style={{...base, ...vien, opacity: clamp(t / 2, 0, 1),
+      transform: `translate(${rung}px, ${rung * 0.4}px) rotate(${-7 + 3 * clamp(t / 4, 0, 1)}deg) scale(${sc})`}}>{b.key}</div>;
+  }
+  if (b.mode === 'nay') {              // nảy: bung từ nhỏ, vượt quá rồi về (lò xo lỏng)
+    const s = spring({frame: t, fps, config: {damping: 7, stiffness: 230, mass: 0.8}});
+    return <div style={{...base, opacity: clamp(t / 2, 0, 1), transform: `scale(${s})`}}>{b.key}</div>;
+  }
+  if (b.mode === 'quet') {             // quét mở trái → phải, chữ hơi xiên rồi đứng thẳng
+    const p = interpolate(t, [0, 8], [0, 1], {extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic)});
+    return <div style={{...base, clipPath: `inset(-20% ${(1 - p) * 100}% -20% -5%)`, transform: `skewX(${(1 - p) * -14}deg)`}}>{b.key}</div>;
+  }
+  if (b.mode === 'glitch') {           // nhiễu màu đỏ/xanh giật vài khung rồi đứng yên — chỉ dùng cho chữ nêu cái xấu
+    const lech = t < 10 ? [9, -7, 12, -4, 8, -10, 5, -3, 2, 0][t] : 0;
+    const bong = lech ? `${lech}px 0 rgba(255,40,60,0.85), ${-lech}px 0 rgba(40,220,255,0.85), ${BONG}` : base.textShadow;
+    return <div style={{...base, textShadow: bong, opacity: t < 10 && t % 4 === 1 ? 0.55 : 1, transform: `translateX(${lech * 0.6}px)`}}>{b.key}</div>;
+  }
   if (b.mode === 'type') {             // từng chữ cái bật ra trái → phải (~1 chữ/khung), chữ mới nhỏ nhô lên rồi hạ
     // Mặt chữ đặt trên TỪNG chữ cái: chữ bóng (background-clip:text) đặt ở khối cha + chữ con có transform → Chrome dồn các chữ thành một cục (lỗi Kid 26/11)
-    const {backgroundImage, WebkitBackgroundClip, backgroundClip, WebkitTextFillColor, filter, color, textShadow, ...khung} = base;
-    const mat = {backgroundImage, WebkitBackgroundClip, backgroundClip, WebkitTextFillColor, filter, color, textShadow};
+    const {khung, mat} = tachMat(base);
     return <div style={khung}>{Array.from(b.key).map((c, i) => {
       const u = clamp((t - i) / 3, 0, 1);
       return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i ? 1 : 0, transform: `translateY(${(1 - u) * -px * 0.12}px) scale(${0.7 + 0.3 * u})`,
@@ -88,7 +136,8 @@ const Khoi: React.FC<{b: LoiKhoi; danMau: string}> = ({b, danMau}) => {
   const top = b.y - hDan - px * LH / 2;
   const t = f - b.kf;
   const lac = b.deco === 'shake' && t >= 0 ? Math.sin(t * 1.7) * 16 * Math.exp(-t / 9) : 0;
-  return <div style={{position: 'absolute', left: (1080 - RONG) / 2 - 40, width: RONG + 80, top, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+  return <div style={{position: 'absolute', left: (1080 - RONG) / 2 - 40, width: RONG + 80, top, display: 'flex', flexDirection: 'column', alignItems: 'center',
+    transform: b.nghieng ? `rotate(${b.nghieng}deg)` : undefined}}>
     <div style={{position: 'absolute', left: -60, right: -60, top: -50, bottom: -60, zIndex: -1,          // lót tối rất mềm: chữ sáng luôn có nền tối hơn (thử ảnh xám)
       background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0) 72%)'}}/>
     {pdan > 0 && <div style={{fontFamily: 'BVP Bold', fontWeight: 700, fontSize: pdan, lineHeight: 1.25, color: danMau, textShadow: BONG, whiteSpace: 'nowrap',
@@ -96,7 +145,7 @@ const Khoi: React.FC<{b: LoiKhoi; danMau: string}> = ({b, danMau}) => {
       {b.dan.map((d, i) => {
         const u = clamp((f - d.f) / 3, 0, 1);     // "nhấc lên": nhỏ, lệch phải-dưới rồi vào dòng 0,1 s
         return <span key={i} style={{display: 'inline-block', opacity: f >= d.f ? 1 : 0, transform: `translate(${(1 - u) * 10}px, ${(1 - u) * 12}px) scale(${0.82 + 0.18 * u})`,
-          marginRight: i < b.dan.length - 1 ? '0.26em' : 0}}>{d.w}</span>;
+          marginRight: i < b.dan.length - 1 ? '0.26em' : 0, ...(d.m ? {color: d.m} : {})}}>{d.w}</span>;
       })}
     </div>}
     <div style={{position: 'relative', display: 'flex', alignItems: 'center', gap: px * 0.18, transform: `translateX(${lac}px)`}}>

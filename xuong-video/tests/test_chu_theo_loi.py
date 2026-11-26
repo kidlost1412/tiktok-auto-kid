@@ -99,6 +99,47 @@ class TaoKhoi(unittest.TestCase):
         self.assertEqual(SFX._khoi({"loai": "loi_fade", "f0": 30, "f1": 60, "vai": "warn"}, ctx), [])
 
 
+class KieuChuMoi(unittest.TestCase):
+    """Kid 26/11: chữ nặng (héo…) không được trắng trơn dù nằm sau tên hàng; nhiều kiểu hiện hơn, có trần, không lặp liền kề."""
+    def _L(self, seed):
+        t = ("Cây con tưới Kích rễ TC01, bứng lên là thấy chùm rễ trắng, bụi nở to hẳn. Mà nhiều vườn sai ba chỗ. "
+             "Một, rễ chưa bén đã rải phân, cây không có rễ để ăn. Hai, đợi cây héo mới lo tới rễ. "
+             "Ba, xài loại chỉ kích mà không nuôi. Lấy năm chai trong giỏ hàng, em tặng sáu gói siêu kali bo.")
+        ws = [{"w": w, "s": i * .3, "e": i * .3 + .25} for i, w in enumerate(t.split())]
+        s = sentence_times(t, ws)
+        return C.tao_khoi(s, [], "KÍCH RỄ TC01", ws[-1]["e"] + 1, random.Random(seed))
+
+    def test_chu_nang_sau_ten_hang_mau_canh_bao(self):
+        for seed in range(6):
+            L = self._L(seed); m = C.BANG_MAU[L["bang"]]
+            for x in L["khoi"]:
+                if x["vai"] != "brand" and C.XAU.search(x["key"].lower()):
+                    self.assertEqual(x["mau"], m["warn"], x["key"])
+                for d in x["dan"]:
+                    if C.XAU.fullmatch(C._sach(d["w"])):
+                        self.assertEqual(d.get("m"), m["warn"], d["w"])
+
+    def test_kieu_hien_tran_va_khong_lap(self):
+        thay = set()
+        for seed in range(30):
+            ks = self._L(seed)["khoi"]
+            md = [x["mode"] for x in ks]
+            thay |= set(md) | {x["look"] for x in ks}
+            self.assertTrue(all(a != b for a, b in zip(md, md[1:])))
+            for m, n in C.TRAN_MODE.items():
+                self.assertLessEqual(md.count(m), n)
+            self.assertLessEqual(sum(x["look"] == "hop" for x in ks), 2)
+            self.assertTrue(all(x["look"] == "gloss" for x in ks if x["vai"] == "brand"))
+            self.assertTrue(all(x["nghieng"] == 0 for x in ks if x["vai"] == "brand" or x["mode"] == "dau"))
+        self.assertTrue({"dau", "nay", "quet", "glitch", "roi", "hop", "vien"} <= thay, thay)
+
+    def test_tieng_kieu_moi(self):
+        ctx = {"rng": random.Random(1), "ui": "tick"}
+        self.assertEqual(SFX._khoi({"loai": "loi_quet", "f0": 30, "f1": 60, "vai": "res"}, ctx)[0]["nhom"], ["vut_nhe"])
+        self.assertEqual(SFX._khoi({"loai": "loi_dau", "f0": 30, "f1": 60, "vai": "brand"}, ctx)[0]["nhom"], ["roi_phep"])
+        self.assertTrue(SFX._khoi({"loai": "loi_glitch", "f0": 30, "f1": 60, "vai": "warn", "text": "HÉO"}, ctx))
+
+
 class CayNoiTiep(unittest.TestCase):
     def test_cau_noi_ve_bo_phan_giu_cay_cau_chung_de_trong(self):
         import dao_dien as DD

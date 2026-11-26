@@ -415,6 +415,9 @@ def _khoi(b, ctx):
         return [_sp("tien", float(b.get("t_am") or t0 + 0.02), 1, 1.0, "nút giỏ hàng → tiếng tính tiền đúng lúc nói từ chốt", "bat", chinh=True)]
     if L.startswith("loi_"):     # khung "chữ theo lời" (v10 Kid duyệt): tiếng theo NGHĨA + kiểu hiện, mốc = lúc từ chính hiện
         vai, deco, so = b.get("vai"), b.get("deco"), bool(re.search(r"\d", str(b.get("text") or "")))
+        if L == "loi_quet" and vai != "brand":
+            return [S("vut_nhe", 0.0, uu=3, ddb=-2, chinh=True, ly="chữ quét mở trái → phải → lướt nhẹ (ưu tiên thấp)")]
+        L = {"loi_dau": "loi_slam", "loi_nay": "loi_slam", "loi_glitch": "loi_slam", "loi_roi": "loi_slam"}.get(L, L)   # chữ chạm/đập (Kid 26/11) → tiếng như slam
         if L.startswith("loi_hook_"):            # rít đĩa mở ở 0 s → tiếng chữ khổng lồ rơi đúng lúc chữ đứng hẳn
             if L.endswith("flicker"):
                 return [S(["dap", "lap_lanh"], 0.30, uu=0, ddb=-3, chinh=True, neo="bat", dai_max=0.5, ly="chữ khổng lồ chớp xong, đứng hẳn → nhát trầm nhẹ")]

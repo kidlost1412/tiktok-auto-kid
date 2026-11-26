@@ -27,6 +27,7 @@ BANG_MAU = {
     "vang_chanh":{"warn": "#FF9F1C", "val": "#F4F269", "res": "#FFFFFF", "brand": "#FFFDE0", "dan": "#FFFDF0"},
 }
 TOI_DA_GO = 3
+TRAN_MODE = {"type": TOI_DA_GO, "glitch": 1, "dau": 2, "roi": 2}     # gõ phím dày thành ồn (v10); nhiễu/đóng dấu là gia vị, ít mới mạnh
 FONT_CHINH = ("Unbounded", "DT Phudu", "Montserrat BI")     # đã thử đủ dấu tiếng Việt viết hoa
 
 SO = re.compile(r"\d|^(một|hai|ba|bốn|năm|sáu|bảy|tám|chín|mười|mươi|lăm|mốt|trăm|nghìn|ngàn|triệu|nửa|rưỡi|chục)$", re.I)
@@ -34,6 +35,7 @@ DON_VI = {"lít", "ml", "mi", "li", "nắp", "bình", "phuy", "can", "chai", "g�
           "%", "phần", "trăm", "đồng", "tuần", "tháng", "giờ", "phút", "tấn", "tạ", "hũ", "lọ", "thùng"}
 XAU = re.compile(r"\b(vẫn|trễ|lỡ|muộn|khô|cháy|rụng|xoăn|vàng|thối|hư|sâu|bệnh|mất|tốn|phí|còi|cọc|héo|gục|nấm|rệp|trĩ|lụi|chậm|yếu|đói)\b", re.I)
 NOI = {"là", "thì", "mà", "rồi", "nha", "nhé", "nhá", "á", "ạ", "đó", "luôn", "vậy", "và", "nên", "cho", "để", "khi", "với"}     # từ nối cuối cụm: đọc thì có, chữ trên hình bỏ
+TOT = re.compile(r"\b(xanh|bung|nở|mập|khỏe|khoẻ|trắng|dày|bóng|mướt|sạch|lớn|to|đậu|sai trái|ra rễ|ra hoa|đẻ nhánh|phục hồi)\b", re.I)
 GIA_TRI = re.compile(r"\b(giỏ|tặng|quà|miễn|nắp|pha|lít|bình|phuy|đặt|mua|chốt|ship|kéo dài|bền|nhanh)\b", re.I)
 
 
@@ -124,6 +126,12 @@ def _tu_chinh(ws, keys, ten):
         r = _tim(ws, [_sach(x) for x in k])
         if r and r[1] - r[0] <= 4:
             return r[0], r[1], None
+    for i in range(n):                            # Kid 26/11: chữ nặng ("héo", "thối rễ") là từ chính, to + màu cảnh báo — không chìm trong chữ dẫn
+        if XAU.fullmatch(s[i]) and s[i] != "vẫn":
+            b = i + 1
+            while b < n and b - i < 3 and (s[b] in BO_PHAN or XAU.fullmatch(s[b])):
+                b += 1
+            return i, b, "nang"
     if n <= 3:
         a = 1 if n > 1 and s[0] in NOI else 0
         return a, n, None
@@ -267,9 +275,9 @@ def tao_khoi(sents, keys, ten_hang, total, rng, bang=None, do_mat=None, nhan_o=N
     mau = BANG_MAU[bang]
     fchinh = rng.choice(FONT_CHINH)
     ften = rng.choice([f for f in FONT_CHINH if f != fchinh])
-    out, truoc_mode, lap, deco, tail_dung, tren = [], None, 0, {"shake": 0, "under": 0}, 0, None
+    out, truoc_mode, _lap, deco, tail_dung, tren = [], None, 0, {"shake": 0, "under": 0}, 0, None
     kb = next((k for k, kh in enumerate(khoi) if _tu_chinh(kh["ws"], keys, ten)[2] == "brand"), None)
-    n_type = 0
+    dem_mode, dem_look = {}, {"hop": 0, "vien": 0}
     for k, kh in enumerate(khoi):
         ws, si = kh["ws"], kh["si"]
         a, b, vr = _tu_chinh(ws, keys, ten)
@@ -280,6 +288,8 @@ def tao_khoi(sents, keys, ten_hang, total, rng, bang=None, do_mat=None, nhan_o=N
         if b < e:
             if e - b <= 3 and not tail_dung:
                 tail_dung = 1
+            elif vr == "nang" and e - b <= 5:            # chữ nặng giữ làm từ chính, phần sau thành dòng đuôi nhỏ
+                pass
             elif vr != "brand":
                 a, b = (len(ws) - min(3, len(ws)), len(ws))
                 e = len(ws)
@@ -304,30 +314,51 @@ def tao_khoi(sents, keys, ten_hang, total, rng, bang=None, do_mat=None, nhan_o=N
         else:
             vai = "res"
         so = bool(SO.search(key.lower()))
-        uu = ["type", "slam"] if so else ["slam"] if vai in ("brand", "res") else ["slam", "fade"] if vai == "warn" else ["fade", "type", "slam"]
-        mode = rng.choice(uu)
-        if mode == truoc_mode:
-            lap += 1
-            if lap >= 2:
-                mode = rng.choice([m for m in ("slam", "type", "fade") if m != truoc_mode])
-                lap = 0
+        # Kid 26/11: màu theo NGHĨA của từ chính, không chỉ theo đoạn: chữ nặng (héo, thối, gục…) luôn màu cảnh báo dù nằm sau tên hàng;
+        # chữ kết quả tốt (xanh, bung, rễ trắng…) mang màu giá trị thay vì trắng trơn.
+        nang = vai != "brand" and bool(XAU.search(key.lower()))
+        tot = vai == "res" and bool(TOT.search(key.lower()))
+        mau_k = mau["warn"] if nang else mau["val"] if tot else mau[vai]
+        if vai == "brand":
+            uu = ["type", "slam", "nay", "roi"] if so else ["slam", "nay", "quet"]
+        elif nang:
+            uu = ["dau", "glitch", "slam"]
+        elif so:
+            uu = ["type", "slam", "nay", "roi"]
+        elif vai == "warn":
+            uu = ["slam", "fade", "quet"]
+        elif vai == "val":
+            uu = ["fade", "type", "slam", "quet", "nay"]
         else:
-            lap = 0
-        if mode == "type" and n_type >= TOI_DA_GO:      # gõ từng chữ kèm tiếng gõ phím: ≤ 3 lần/video (v10), dày hơn thành ồn
-            mode = "slam" if truoc_mode != "slam" else "fade"
-        n_type += mode == "type"
+            uu = ["slam", "fade", "quet", "nay"]
+        con = [m for m in uu if dem_mode.get(m, 0) < TRAN_MODE.get(m, 99) and m != truoc_mode]     # không lặp kiểu liền kề, có trần mỗi kiểu
+        mode = rng.choice(con or [m for m in ("slam", "fade") if m != truoc_mode])
+        dem_mode[mode] = dem_mode.get(mode, 0) + 1
         truoc_mode = mode
         d = None
-        if vai == "warn" and XAU.search(txt) and deco["shake"] < 1 and rng.random() < 0.6:
+        if (vai == "warn" or nang) and XAU.search(txt) and mode not in ("dau", "glitch") and deco["shake"] < 1 and rng.random() < 0.6:
             d = "shake"
         elif vai == "val" and not so and deco["under"] < 1 and k > 2 and rng.random() < 0.5:
             d = "under"
         if d:
             deco[d] += 1
+        look = "gloss" if vai == "brand" else "flat"
+        if look == "flat" and mode not in ("glitch", "dau") and not d:          # nhãn dán / chữ rỗng: điểm nhấn, ≤ 2 lần mỗi kiểu
+            if (vai == "val" or tot or so) and dem_look["hop"] < 2 and rng.random() < 0.4:
+                look = "hop"
+            elif vai in ("res", "warn") and mode in ("fade", "slam", "quet") and dem_look["vien"] < 2 and rng.random() < 0.3:
+                look = "vien"
+            dem_look[look] = dem_look.get(look, 0) + 1
+        nghieng = rng.choice([-4, -3, 3, 4]) if vai != "brand" and mode != "dau" and rng.random() < 0.3 else 0
+        for x in dan:                                     # chữ dẫn: từ nặng / con số đổi màu riêng
+            if XAU.fullmatch(_sach(x["w"])):
+                x["m"] = mau["warn"]
+            elif re.search(r"\d", x["w"]):
+                x["m"] = mau["val"]
         f0 = max(0, int(round(ws[0]["s"] * FPS)) - 2)
         out.append({"f0": f0, "dan": dan, "key": key, "kf": max(f0, int(round(ws[a]["s"] * FPS)) - 2) if a < len(ws) else f0, "duoi": duoi,
-                    "vai": vai, "mau": mau[vai], "co": min(_co(key), 132) if vai == "brand" else _co(key), "mode": mode, "deco": d,
-                    "font": ften if vai == "brand" else fchinh, "look": "gloss" if vai == "brand" else "flat",
+                    "vai": vai, "mau": mau_k, "co": min(_co(key), 132) if vai == "brand" else _co(key), "mode": mode, "deco": d,
+                    "font": ften if vai == "brand" else fchinh, "look": look, "nghieng": nghieng,
                     "icon": "gio" if "GIỎ" in key else None, "t_cau": sents[si]["s"]})
     for i, x in enumerate(out):                    # cắt cứng: khối hiện tới lúc khối sau vào
         x["f1"] = out[i + 1]["f0"] if i + 1 < len(out) else int(round(total * FPS))
