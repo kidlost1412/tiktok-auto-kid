@@ -6,7 +6,7 @@ language_server.exe agentapi (new-conversation) với 2 biến môi trường AN
 trong <kho>/_tam/hoc-canh/<lô>/ và hub chờ file đó (ổn định 2 lần kiểm). Mỗi lô ≤ 24 cảnh (2 tờ ảnh) và ≤ 5 video. Mỗi lần chạy kiểm lại kho nên bấm lại là làm tiếp.
 Trạng thái việc học + mã cuộc trò chuyện đang mở được ghi ở lich-su/hoc-canh-job.json: hub khởi động lại giữa chừng thì khoi_phuc() huỷ gọn việc dở.
 agentapi không cho đọc trạng thái lỗi/hết lượt (metadata chỉ có cấu hình) → quá hạn chờ thì báo lỗi; 2 lô liền không có phiếu thì dừng cả việc."""
-import collections.abc, contextvars, ctypes, hashlib, json, os, shutil, socket, subprocess, sys, threading, time, urllib.request, uuid
+import calendar, collections.abc, contextvars, copy, ctypes, hashlib, json, os, shutil, socket, subprocess, sys, threading, time, urllib.request, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -338,6 +338,203 @@ def xoa_cuoc_tro_chuyen(cid):
     return False
 
 
+# --- Tài khoản / hạn mức / model THỰC của Antigravity (chỉ ĐỌC, không tạo/xoá/gửi gì) ---------------------------------------------
+# GetUserStatus → userStatus.{email, userTier{id,name}, planStatus.planInfo.planName}; RetrieveUserQuotaSummary → response.groups[].buckets[]
+# {bucketId, window, remainingFraction, resetTime}; GetAvailableModels → response.models{<id>: {displayName, model (enum), quotaInfo}};
+# GetCascadeTrajectoryGeneratorMetadata → generatorMetadata[].chatModel{model (enum), responseModel, usage{inputTokens, outputTokens,
+# thinkingOutputTokens}, retryInfos[], customMetadata.model_enum} + plannerConfig.modelName (model được yêu cầu). Chỉ lấy email + tên gói:
+# phản hồi còn chứa token/ảnh đại diện — KHÔNG trả ra, KHÔNG ghi log.
+TRANG_THAI_NHO_S = 60
+_TT_NHO = {"t": 0.0, "ttl": 0, "v": None}
+_TT_LOCK = threading.Lock()
+_ENUM_NHO = {"t": 0.0, "m": {}}
+_HAU_MUC = {"low", "medium", "high", "xhigh", "max", "trial", "tiered", "thinking"}      # hậu tố mức nghĩ/biến thể — không phải họ model
+_MODEL_THUC = contextvars.ContextVar("hoc_canh_model_thuc", default=None)               # danh sách hứng kết quả kiem_model_cuoc của lô đang chạy
+GIAM_KHAO_MODEL_CUOI = {}                                                                 # kết quả kiem_model_cuoc của lần chấm giám khảo gần nhất
+NGUONG_QUOTA_THAP = 0.05
+
+
+def _so(x):
+    try:
+        return None if x is None or isinstance(x, bool) else float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def _so_nguyen(x):
+    try:
+        return int(float(x))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _giay_utc(s):
+    """'2026-11-26T12:02:22Z' → giây unix (UTC) hoặc None."""
+    try:
+        return int(calendar.timegm(time.strptime(str(s)[:19], "%Y-%m-%dT%H:%M:%S")))
+    except Exception:
+        return None
+
+
+def _ho_model(m):
+    """Họ model: bỏ hậu tố mức nghĩ/biến thể. 'gemini-4-hydrogen-high' → 'gemini-4-hydrogen'; 'gemini-4-argon-trial' → 'gemini-4-argon'."""
+    p = str(m or "").strip().lower().split("-")
+    while len(p) > 1 and p[-1] in _HAU_MUC:
+        p.pop()
+    return "-".join(p)
+
+
+def _doc_quota(timeout=8):
+    """RetrieveUserQuotaSummary → [{nhom, cua_so, con, reset, ma}] hoặc None nếu không gọi được."""
+    r = _goi_ls("RetrieveUserQuotaSummary", {}, timeout=timeout)
+    if r is None:
+        return None
+    ra = []
+    for g in ((r.get("response") or {}).get("groups") or []):
+        for b in (g.get("buckets") or []):
+            ra.append({"nhom": str(g.get("displayName") or ""), "cua_so": str(b.get("window") or ""), "con": _so(b.get("remainingFraction")),
+                       "reset": _giay_utc(b.get("resetTime")), "ma": str(b.get("bucketId") or "")})
+    return ra
+
+
+def _thanh_dung(q):
+    """Một ô hạn mức → {pct (đã dùng 0..1), pct_dung, con, reset} cùng dạng thanh của Claude; None nếu thiếu số liệu."""
+    if not q or q.get("con") is None:
+        return None
+    dung = round(min(1.0, max(0.0, 1.0 - q["con"])), 4)
+    return {"pct": dung, "pct_dung": dung, "con": q["con"], "reset": q.get("reset")}
+
+
+def _doc_models(timeout=8):
+    """GetAvailableModels → {id: {displayName, model, quotaInfo}} hoặc None. Nhớ luôn bảng id → enum (cho kiem_model_cuoc)."""
+    r = _goi_ls("GetAvailableModels", {}, timeout=timeout)
+    if r is None:
+        return None
+    ms = (r.get("response") or {}).get("models")
+    if not isinstance(ms, dict):
+        return None
+    _ENUM_NHO.update(t=time.time(), m={k: (v or {}).get("model") for k, v in ms.items() if isinstance(v, dict)})
+    return ms
+
+
+def _enum_cua(model_id, timeout=4):
+    """Enum (vd MODEL_PLACEHOLDER_M528) của id model; bảng nhớ 10 phút. Không biết → None."""
+    if not _ENUM_NHO["m"] or time.time() - _ENUM_NHO["t"] > 600:
+        _doc_models(timeout)
+    return _ENUM_NHO["m"].get(str(model_id or ""))
+
+
+def trang_thai_agy_day_du(timeout=8, nho=True):
+    """Tài khoản + hạn mức + model của Antigravity (chỉ đọc), nhớ 60 giây. Không có tên `trang_thai_agy` vì hàm đó đã có (mo/phien_ban/vo) và nhiều nơi dùng.
+    → {mo, email, goi, quota: [{nhom, cua_so, con, reset, ma}], gemini_5h, gemini_tuan: {pct, pct_dung, con, reset} | None,
+       models: [{id, ten, con}] (các id trong MODELS), cap_nhat, loi}. Antigravity đóng → mo=False, không lỗi."""
+    bay_gio = time.time()
+    with _TT_LOCK:
+        if nho and _TT_NHO["v"] is not None and bay_gio - _TT_NHO["t"] < _TT_NHO["ttl"]:
+            return copy.deepcopy(_TT_NHO["v"])
+    v = {"mo": False, "email": None, "goi": None, "quota": [], "gemini_5h": None, "gemini_tuan": None, "models": [], "cap_nhat": int(bay_gio), "loi": None}
+    ttl = 5                                                                            # đóng / lỗi: nhớ ngắn để mở lên là thấy ngay
+    try:
+        if tim_hub() is not None:
+            v["mo"] = True
+            u = _goi_ls("GetUserStatus", {}, timeout=timeout)
+            us = (u or {}).get("userStatus") or {}
+            em = us.get("email")
+            v["email"] = em if isinstance(em, str) and em else None
+            tier, plan = us.get("userTier") or {}, ((us.get("planStatus") or {}).get("planInfo") or {})
+            goi = tier.get("name") or tier.get("id") or plan.get("planName")
+            v["goi"] = str(goi) if goi else None
+            q = _doc_quota(timeout)
+            v["quota"] = q or []
+            gem = [x for x in (q or []) if x["ma"].lower().startswith("gemini") or "gemini" in x["nhom"].lower()]
+            v["gemini_5h"] = _thanh_dung(next((x for x in gem if x["cua_so"] == "5h"), None))
+            v["gemini_tuan"] = _thanh_dung(next((x for x in gem if x["cua_so"] == "weekly"), None))
+            ms = _doc_models(timeout)
+            for k in dict.fromkeys([*MODELS, MODEL_GIAM_KHAO]):
+                m = (ms or {}).get(k) or {}
+                v["models"].append({"id": k, "ten": m.get("displayName") or MODELS.get(k, k), "con": _so((m.get("quotaInfo") or {}).get("remainingFraction"))})
+            if u is None and q is None and ms is None:
+                v["loi"] = "Antigravity không trả lời."
+            else:
+                ttl = TRANG_THAI_NHO_S
+    except Exception as e:
+        v["loi"] = f"{type(e).__name__}: {str(e)[:120]}"
+    with _TT_LOCK:
+        _TT_NHO.update(t=bay_gio, ttl=ttl, v=copy.deepcopy(v))
+    return v
+
+
+def canh_bao_quota_thap(timeout=4):
+    """Hạn mức Gemini 5 giờ còn dưới 5% → câu cảnh báo, ngược lại None. Dùng số đã nhớ nếu còn mới, không thì chỉ hỏi hạn mức (nhẹ). Không bao giờ ném lỗi."""
+    try:
+        with _TT_LOCK:
+            v = _TT_NHO["v"] if (_TT_NHO["v"] is not None and time.time() - _TT_NHO["t"] < _TT_NHO["ttl"]) else None
+        if v is not None:
+            g = v.get("gemini_5h")
+        else:
+            q = _doc_quota(timeout) or []
+            g = _thanh_dung(next((x for x in q if x["cua_so"] == "5h" and (x["ma"].lower().startswith("gemini") or "gemini" in x["nhom"].lower())), None))
+        if g and g["con"] < NGUONG_QUOTA_THAP:
+            return f"Hạn mức Gemini 5 giờ của Antigravity chỉ còn {round(g['con'] * 100)}% — việc học có thể bị chậm hoặc dừng giữa chừng."
+    except Exception:
+        pass
+    return None
+
+
+def kiem_model_cuoc(cid, model_yeu_cau, timeout=5):
+    """Antigravity THẬT SỰ chạy model nào cho cuộc trò chuyện `cid` (GetCascadeTrajectoryGeneratorMetadata, chỉ đọc)? Họ model (bỏ -low/-medium/-high/-xhigh/-max/-trial)
+    của responseModel mỗi bước phải trùng họ model được yêu cầu, hoặc enum model trùng enum của model yêu cầu (GetAvailableModels). Có bước khác họ (vd flash) → khop False.
+    → {yeu_cau, chay: [tên model thực, không trùng], khop: True/False/None (None = không đọc được), token: {vao, ra, nghi} cộng cả cuộc, thu_lai: số lần thử lại}."""
+    kq = {"yeu_cau": str(model_yeu_cau or ""), "chay": [], "khop": None, "token": {"vao": 0, "ra": 0, "nghi": 0}, "thu_lai": 0}
+    if not cid:
+        return kq
+    try:
+        r = _goi_ls("GetCascadeTrajectoryGeneratorMetadata", {"cascadeId": str(cid)}, timeout=timeout)
+        gm = (r or {}).get("generatorMetadata")
+        if not isinstance(gm, list) or not gm:
+            return kq
+        ho_yc, enum_yc, da_hoi = _ho_model(model_yeu_cau), None, False
+        co, tat_ca = False, True
+        for e in gm:
+            cm = (e or {}).get("chatModel") or {}
+            if not cm:
+                continue
+            u = cm.get("usage") or {}
+            kq["token"]["vao"] += _so_nguyen(u.get("inputTokens")); kq["token"]["ra"] += _so_nguyen(u.get("outputTokens"))
+            kq["token"]["nghi"] += _so_nguyen(u.get("thinkingOutputTokens"))
+            kq["thu_lai"] += len(cm.get("retryInfos") or [])
+            enum = cm.get("model") or (cm.get("customMetadata") or {}).get("model_enum")
+            ten = cm.get("responseModel") or cm.get("modelDisplayName") or enum
+            if not ten:
+                continue
+            if ten not in kq["chay"]:
+                kq["chay"].append(ten)
+            co = True
+            ok = _ho_model(ten) == ho_yc
+            if not ok and enum:
+                if not da_hoi:
+                    enum_yc, da_hoi = _enum_cua(model_yeu_cau), True
+                ok = bool(enum_yc) and enum == enum_yc
+            tat_ca = tat_ca and ok
+        kq["khop"] = tat_ca if co else None
+    except Exception:
+        kq["khop"] = None
+    return kq
+
+
+def _kiem_truoc_xoa(kiem, cid, model, **them):
+    """Gọi kiem(cid, model) TRƯỚC khi xoá chat; mọi lỗi → kết quả khop=None. Kết quả được đẩy vào danh sách hứng của lô đang chạy (nếu có). Không bao giờ ném lỗi."""
+    try:
+        kq = dict(kiem(cid, model))
+    except Exception:
+        kq = {"yeu_cau": str(model or ""), "chay": [], "khop": None, "token": {"vao": 0, "ra": 0, "nghi": 0}, "thu_lai": 0}
+    kq.update(them)
+    sink = _MODEL_THUC.get()
+    if sink is not None:
+        sink.append(kq)
+    return kq
+
+
 # --- Dọn bù chat của app còn sót trong Antigravity -----------------------------------------------------------------------------
 # Xoá ngay sau mỗi lần hỏi có thể trượt (Antigravity bận / đóng giữa chừng, gửi việc lỗi trước khi có mã chat, chat có từ trước bản
 # biết tự xoá) → chat nằm lại mãi. Dọn bù: CHỈ những chat thuộc Project do chính hub tạo (id = uuid5 của thư mục, xem
@@ -622,7 +819,7 @@ def loi_nhac_lo(viec):
 
 # ----------------------------------------------------------------------------------------------- 1 cuộc trò chuyện = 1 lô: gửi + chờ từng file (có thể thay bằng giả khi thử)
 def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=None, project=None, han_moi_video=HAN_MOI_VIDEO_S,
-            huy=None, huy_cuoc=None, xoa_cuoc=None):
+            huy=None, huy_cuoc=None, xoa_cuoc=None, kiem_cuoc=None):
     """Gửi 1 lần cho Antigravity rồi chờ MỖI file trong `outs` xuất hiện và ổn định (kích thước không đổi 2 lần kiểm liền).
     Mỗi file xong thì gọi khi_co(path, nội dung chữ) ngay. Quá hạn (= han_moi_video × số video, tối đa HAN_LO_TOI_DA_S) thì thôi.
     Anh bấm Dừng (`huy` được đặt) → huỷ ngay cuộc trò chuyện ở Antigravity, xoá file đầu ra dở dang, trả về phần đã xong. Quá hạn cũng huỷ.
@@ -630,6 +827,7 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     run = _run_hien()
     huy = huy or run["huy"]
     xoa_cuoc = xoa_cuoc or (xoa_cuoc_tro_chuyen if (huy_cuoc is None and gui is gui_hoi) else None)     # thử với gui/huy giả thì không xoá chat thật
+    kiem_cuoc = kiem_cuoc or (kiem_model_cuoc if (huy_cuoc is None and gui is gui_hoi) else None)    # kiểm model thật: thử với gui/huy giả thì không hỏi Antigravity
     huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
     ngu = ngu or (lambda giay: huy.wait(giay))
     outs = [Path(o) for o in outs]
@@ -677,6 +875,8 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
                     on[o] = 0
                 cu[o] = n
     finally:
+        if cid and kiem_cuoc and not huy.is_set():           # trước khi huỷ/xoá chat: Antigravity thật sự chạy model nào + bao nhiêu token (lỗi → khop None)
+            _kiem_truoc_xoa(kiem_cuoc, cid, model)
         if len(xong) < len(outs):                            # dừng / quá hạn: Antigravity còn đang làm thì huỷ, rồi dọn file dở
             if cid:
                 huy_cuoc(cid)
@@ -700,13 +900,14 @@ def chay_lo(model, prompt, outs, tieu_de, khi_co, han=None, gui=gui_hoi, ngu=Non
     return xong
 
 
-def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy_cuoc=None, ngu=None, huy=None, tieu_de="Giám khảo", xoa_cuoc=None):
+def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy_cuoc=None, ngu=None, huy=None, tieu_de="Giám khảo", xoa_cuoc=None, kiem_cuoc=None):
     """Hỏi Antigravity MỘT câu rồi chờ 1 file kết quả (JSON do AI ghi ra `out_file`) — dùng cho tiến trình KHÔNG thuộc việc học nào (vd. lô sản xuất
     chấm video). KHÔNG đụng job/run của Học cảnh và KHÔNG ghi hoc-canh-job.json (file đó của tiến trình hub). Chờ file có chữ và ổn định 2 lần kiểm
     liền (kích thước không đổi). Luôn huỷ rồi XOÁ cuộc trò chuyện sau khi xong/lỗi/quá hạn (xoa_cuoc_tro_chuyen) và xoá file kết quả. → nội dung chữ của file.
     Lỗi: ChuaMo (Antigravity chưa mở), LoiTam (không nhận việc / quá hạn `han` giây), Huy (`huy` được đặt)."""
     huy = huy or threading.Event()
     xoa_cuoc = xoa_cuoc or (xoa_cuoc_tro_chuyen if (huy_cuoc is None and gui is gui_hoi) else None)
+    kiem_cuoc = kiem_cuoc or (kiem_model_cuoc if (huy_cuoc is None and gui is gui_hoi) else None)
     huy_cuoc = huy_cuoc or huy_cuoc_tro_chuyen
     ngu = ngu or (lambda giay: huy.wait(giay))
     out = Path(out_file)
@@ -747,6 +948,9 @@ def hoi_mot_lan(model, prompt, out_file, han=120, project=None, gui=gui_hoi, huy
         raise LoiTam(f"Antigravity không trả kết quả trong {han} giây.")
     finally:
         if cid:
+            if kiem_cuoc and not huy.is_set():               # trước khi huỷ/xoá chat: giám khảo có chạy đúng model không (lưu ở GIAM_KHAO_MODEL_CUOI)
+                GIAM_KHAO_MODEL_CUOI.clear()
+                GIAM_KHAO_MODEL_CUOI.update(_kiem_truoc_xoa(kiem_cuoc, cid, model, vai="giam_khao", luc=time.time()))
             try:
                 huy_cuoc(cid)
             except Exception:
@@ -854,7 +1058,8 @@ def ghi_v3(kho, rel, form, dai, model):
 # ----------------------------------------------------------------------------------------------- tiến độ + trạng thái lưu bền
 def _job_rong():
     return {"dang_chay": False, "ma": None, "tong": 0, "xong": 0, "hien_tai": "", "loi": [], "trang_thai": "nghi", "thong_bao": "",
-            "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": "", "giai_doan": "", "model": "", "canh_tong": 0, "canh_xong": 0, "cho": 0}
+            "bat_dau": None, "dung": False, "dang_dung": False, "canh_bao": "", "giai_doan": "", "model": "", "canh_tong": 0, "canh_xong": 0, "cho": 0,
+            "model_thuc": []}          # mỗi lô: {lo, lan, yeu_cau, chay, khop, token, thu_lai} — model Antigravity THẬT SỰ chạy (kiem_model_cuoc)
 
 
 _JOB_RONG = _job_rong()          # job khi chưa có sản phẩm nào học
@@ -1293,7 +1498,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
 
     def cap(**kw):
         job.update(**kw); _luu()
-    kq = {"ok": True, "da_hoc": 0, "loi": [], "tat_ca_xong": False, "chi_tiet": [], "lo": 0, "project": None, "canh": 0, "model": model, "kieu3": v3}
+    kq = {"ok": True, "da_hoc": 0, "loi": [], "tat_ca_xong": False, "chi_tiet": [], "lo": 0, "project": None, "canh": 0, "model": model, "kieu3": v3, "model_thuc": []}
     st = {"qua_han_lien": 0, "dung_vi": None, "lo_dang": 0, "kieu1_ghi": 0}
     kl = threading.Lock()
     dang = {}                     # tên video đang xem → số lô
@@ -1349,6 +1554,26 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         else:
             xong_video(v, False, giay, ly + " — bấm Học cảnh để thử lại.")
 
+    def them_canh_bao(c):
+        with kl:
+            cu = str(job.get("canh_bao") or "")
+            if c not in cu:
+                job["canh_bao"] = (cu + " " + c).strip()
+        _luu()
+
+    def ghi_model_thuc(sink, so, lan, yeu_cau):
+        """Ghi model Antigravity thật sự chạy của lô vào kq/job; chạy khác model yêu cầu → cảnh báo. Không bao giờ làm hỏng lô."""
+        try:
+            for r in sink:
+                m = {"lo": so, "lan": lan, "yeu_cau": r.get("yeu_cau") or yeu_cau, "chay": list(r.get("chay") or []), "khop": r.get("khop"),
+                     "token": dict(r.get("token") or {}), "thu_lai": int(r.get("thu_lai") or 0)}
+                with kl:
+                    kq["model_thuc"].append(m); job.setdefault("model_thuc", []).append(m)
+                if m["khop"] is False:
+                    them_canh_bao(f"Antigravity đã chạy model {', '.join(m['chay']) or '(không rõ)'} thay vì {m['yeu_cau']} (lô {so}).")
+        except Exception:
+            pass
+
     def vao_lo(lo, so):
         """Xếp vào chạy: đang làm video thì chỉ 1 lô một lúc (nhường máy). → False nếu đã Dừng / đã có lý do dừng cả việc."""
         while True:
@@ -1401,7 +1626,12 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             with TT.viec("hoc-canh", f"Antigravity đang điền phiếu lô {so}/{tong_lo}" + ("" if lan == 1 else " (làm lại cảnh lỗi)"), sp=ten,
                          buoc=f"Lô {so}/{tong_lo}", video=", ".join(Path(v["rel"]).name for v, _ in lo)) as tt_hc:
                 tt_hc.cap(chi_tiet={"canh": dem, "video": len(lo), "han_s": int(han)})
-                nhan = runner(model, loi_nhac_phieu(viec, to, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+                sink = []; tk = _MODEL_THUC.set(sink)
+                try:
+                    nhan = runner(model, loi_nhac_phieu(viec, to, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+                finally:
+                    _MODEL_THUC.reset(tk)
+                    ghi_model_thuc(sink, so, lan, model)
                 if huy.is_set():
                     return
                 text = ket.get("text")
@@ -1506,7 +1736,12 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             with TT.viec("hoc-canh", f"Antigravity đang điền phiếu kiểu 3 lô {so}/{tong_lo}" + lam_lai, sp=ten,
                          buoc=f"Lô {so}/{tong_lo}", video=", ".join(Path(v["rel"]).name for v in vids)) as tt_hc:
                 tt_hc.cap(chi_tiet={"video": len(vids), "han_s": int(han)})
-                nhan = runner(model, loi_nhac_phieu_v3(viec_ai, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+                sink = []; tk = _MODEL_THUC.set(sink)
+                try:
+                    nhan = runner(model, loi_nhac_phieu_v3(viec_ai, ra, ten_sp), [ra], tieu_de, khi_co, han=han, **kw)
+                finally:
+                    _MODEL_THUC.reset(tk)
+                    ghi_model_thuc(sink, so, lan, model)
                 if huy.is_set():
                     return
                 text = ket.get("text")
@@ -1592,6 +1827,10 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         if not _cho_luot(khoa, run):                                        # xếp hàng nếu đang có đủ sản phẩm học cùng lúc
             raise Huy()
         cap(thong_bao="Đang kiểm kho…", giai_doan="cat")
+        if runner is chay_lo:                                                # chạy thật: hạn mức Gemini 5 giờ sắp hết thì báo (không chặn); thử với runner giả thì bỏ qua
+            c = canh_bao_quota_thap()
+            if c:
+                them_canh_bao(c)
         def _td(i, n, ten_f):
             if huy.is_set():
                 raise Huy()

@@ -1022,12 +1022,40 @@ details.kt-tech .stat{margin-top:12px}
   <div class="grid g2e top">
     <div class="card" style="grid-column:1/-1">
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-key"/></svg></span>
-        <div class="t"><h2>Tài khoản Claude</h2><p class="sub">Hub tự chuyển sang tài khoản còn dư hạn mức.</p></div>
-        <div class="act"><button class="btn ghost" id="btnKiemTk"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnThemTk"><svg class="i"><use href="#i-plus"/></svg>Thêm tài khoản</button></div></div>
-      <div id="tkChiTiet" class="note">Đang kiểm…</div>
-      <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
-        Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
-        tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi mọi tài khoản đều hết.</p>
+        <div class="t"><h2>Tài khoản AI</h2><p class="sub">Mỗi bên quản lý riêng: Claude, ChatGPT, Antigravity.</p></div></div>
+      <div class="subtabs" id="aiTabs" role="tablist" style="margin-top:4px">
+        <button type="button" data-ai="cl" class="on" role="tab" aria-selected="true">Claude</button>
+        <button type="button" data-ai="gpt" role="tab" aria-selected="false">ChatGPT</button>
+        <button type="button" data-ai="agy" role="tab" aria-selected="false">Antigravity</button>
+      </div>
+      <div id="aiCl">
+        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">Biên kịch, đạo diễn, soát kho. Hub tự chuyển sang tài khoản còn dư hạn mức.</p>
+          <div class="row" style="gap:8px"><button class="btn ghost" id="btnKiemTk"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnThemTk"><svg class="i"><use href="#i-plus"/></svg>Thêm tài khoản</button></div></div>
+        <div id="tkChiTiet" class="note">Đang kiểm…</div>
+        <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện → chọn mục 1 (tài khoản có gói) → đăng nhập trên trình duyệt → gõ <b>/exit</b> → bấm Làm mới.
+          Hạn mức tự kiểm mỗi ~7 phút (mỗi lần tốn 1 câu rất ngắn, bỏ qua khi đang chạy lô và với tài khoản có cửa sổ 5 giờ đã reset/chưa dùng — tránh mở cửa sổ mới vô ích) và cũng cập nhật sau mỗi lần hub gọi AI; bấm "Kiểm hạn mức" để xem ngay. Hub luôn dùng tài khoản còn dư nhiều nhất;
+          tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi mọi tài khoản đều hết.</p>
+      </div>
+      <div id="aiGpt" class="hidden">
+        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">ChatGPT qua Codex CLI. Bật "AI làm video = ChatGPT" thì biên kịch, đạo diễn, soát kho dùng ChatGPT thay Claude.</p>
+          <div class="row" style="gap:8px"><button class="btn ghost" id="btnKiemGpt"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnThemGpt"><svg class="i"><use href="#i-plus"/></svg>Thêm tài khoản</button></div></div>
+        <div class="grid g2e" style="gap:16px;margin-bottom:16px">
+          <div><label for="gptNao">AI làm video</label><select id="gptNao"><option value="claude">Claude (mặc định)</option><option value="gpt">ChatGPT</option></select></div>
+          <div><label for="gptDung">Chạy bằng tài khoản ChatGPT</label><select id="gptDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
+          <div><label for="gptModel">Model ChatGPT</label><select id="gptModel"></select></div>
+          <div><label for="gptEffort">Độ suy nghĩ</label><select id="gptEffort"><option value="low">Thấp</option><option value="medium">Vừa</option><option value="high">Cao</option><option value="xhigh">Rất cao</option><option value="max">Tối đa</option></select></div>
+        </div>
+        <div id="gptChiTiet" class="note">Đang kiểm…</div>
+        <p class="help" style="margin-top:16px">Mỗi tài khoản đăng nhập riêng: bấm <b>Đăng nhập</b> → cửa sổ đen hiện và mở trình duyệt → đăng nhập ChatGPT → thấy "Successfully logged in" thì đóng cửa sổ đen. Mỗi lần chỉ đăng nhập 1 tài khoản.
+          Danh sách model lấy thẳng từ gói của tài khoản. Codex chạy sai model thì báo lỗi chứ không tự đổi model khác. Hạn mức ChatGPT không tốn câu hỏi để kiểm.</p>
+      </div>
+      <div id="aiAgy" class="hidden">
+        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">Học cảnh và giám khảo chạy bằng Antigravity (Gemini). Đăng nhập trong chính app Antigravity.</p>
+          <div class="row" style="gap:8px"><button class="btn ghost" id="btnKiemAgy"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnMoAgy"><svg class="i"><use href="#i-play"/></svg>Mở Antigravity</button></div></div>
+        <div id="agyChiTiet" class="note">Đang kiểm…</div>
+        <p class="help" style="margin-top:16px">Muốn đổi tài khoản: mở Antigravity → đăng xuất → đăng nhập tài khoản khác → bấm Làm mới. Không dùng nhiều tài khoản xoay vòng: Google cấm và có thể khoá tài khoản.
+          Sau mỗi lô học cảnh, hub đọc lại model Antigravity thực sự đã chạy; lệch model so với model đã chọn thì báo ngay ở phần Học cảnh.</p>
+      </div>
     </div>
     <div class="card" style="grid-column:1/-1"><div class="ch"><span class="chip a"><svg class="i"><use href="#i-music"/></svg></span>
       <div class="t"><h2>Nhạc &amp; âm thanh</h2><p class="sub">Kho mặc định + thư mục nhạc / SFX của anh</p></div></div>
@@ -1146,7 +1174,7 @@ details.kt-tech .stat{margin-top:12px}
 const $ = s => document.querySelector(s);
 // Gọi hub. Lỗi mạng / quá thời gian / trả lời không phải JSON → ném ApiLoi (không còn thất bại im lặng); hub trả {ok:false, loi} thì vẫn trả về như cũ.
 class ApiLoi extends Error { constructor(m, mang) { super(m); this.mang = !!mang; } }
-const API_DAI = /\/api\/(doc-nhan|tai-khoan|giong|anh-khung|anh-sp|kiem-dinh|thu-muc|shop|prompt\/xem-thu|nhac-tai|chuan-bi-kho|video)/;   // việc vốn lâu (AI đọc nhãn, kiểm hạn mức…): chờ tới 2 phút
+const API_DAI = /\/api\/(doc-nhan|tai-khoan|gpt-|agy-tk|giong|anh-khung|anh-sp|kiem-dinh|thu-muc|shop|prompt\/xem-thu|nhac-tai|chuan-bi-kho|video)/;   // việc vốn lâu (AI đọc nhãn, kiểm hạn mức…): chờ tới 2 phút
 async function api(u, b, ms) {
   const ac = new AbortController(), tg = setTimeout(() => ac.abort(), ms || (API_DAI.test(u) ? 120000 : 20000));
   let res, r;
@@ -1853,6 +1881,83 @@ async function taiTk(moi) {
     const r = await api('/api/tai-khoan-bo/' + b.dataset.bo, {}); if (r.ok && ST.tai_khoan_dung === b.dataset.bo) ST.tai_khoan_dung = 'tu_dong';
     toast(r.ok ? 'Đã bỏ tài khoản' : r.loi); taiTk(true); });
 }
+// ---- Tài khoản AI: 3 tab riêng (Claude / ChatGPT / Antigravity) ----
+function aiTab(k) {
+  document.querySelectorAll('#aiTabs [data-ai]').forEach(b => { b.classList.toggle('on', b.dataset.ai === k); b.setAttribute('aria-selected', b.dataset.ai === k); });
+  $('#aiCl').classList.toggle('hidden', k !== 'cl'); $('#aiGpt').classList.toggle('hidden', k !== 'gpt'); $('#aiAgy').classList.toggle('hidden', k !== 'agy');
+  lsSet('xv.ai.tab', k);
+  if (k === 'gpt') taiGpt().catch(() => {}); if (k === 'agy') taiAgy().catch(() => {});
+}
+document.querySelectorAll('#aiTabs [data-ai]').forEach(b => b.onclick = () => aiTab(b.dataset.ai));
+const EFF_TEN = {low: 'Thấp', medium: 'Vừa', high: 'Cao', xhigh: 'Rất cao', max: 'Tối đa', ultra: 'Cực đại'};
+let _gptDn = null;
+async function taiGpt(moi) {
+  const r = await api('/api/gpt-ds' + (moi ? '?moi=1' : '')), ds = r.ds || [];
+  const the = t => {
+    const het = t.het || (t.het_den && t.het_den * 1000 > Date.now());
+    const tt = !t.dang_nhap ? '<span class="pill r dot">Chưa đăng nhập</span>' : het ? '<span class="pill r dot">Hết hạn mức</span>' : '<span class="pill g dot">Sẵn sàng</span>';
+    const dangDung = r.dung === t.ma;
+    return `<div class="acc">
+      <div class="hd"><div class="who"><span class="av">${esc((String(t.ten || '?').trim()[0] || '?').toUpperCase())}</span><div style="min-width:0"><b>${esc(t.ten)}</b>
+        <div class="note" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.email || '—')}${t.goi ? ' · gói ' + esc(t.goi) : ''}</div></div></div>${tt}</div>
+      ${t.dang_nhap ? vach(t.five_hour, 'Phiên 5 giờ') + vach(t.seven_day, 'Cả tuần') : ''}
+      <div class="note" style="margin:8px 0 0;font-size:12px">${t.loi && t.dang_nhap ? 'Chưa đọc được hạn mức · ' : ''}${t.cap_nhat ? 'Cập nhật lúc ' + new Date(t.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'Chưa cập nhật'}${t.models && t.models.length ? ' · ' + t.models.filter(m => !m.an).length + ' model' : ''}</div>
+      <div class="btns">
+        ${dangDung ? `<button class="btn ghost sm" data-gdung="tu_dong">${ic('check')}Đang dùng · bỏ ghim</button>` : `<button class="btn ghost sm" data-gdung="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${ic('play')}Dùng TK này</button>`}
+        <button class="btn ghost sm" data-gdn="${t.ma}">${ic('login')}Đăng nhập</button>
+        <button class="btn ghost sm" data-gkiem="${t.ma}">${ic('gauge')}Kiểm hạn mức</button>
+        <button class="btn ghost sm dz" style="margin-left:auto" data-gbo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
+  };
+  setH($('#gptChiTiet'), ds.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.'));
+  $('#gptNao').value = r.nao === 'gpt' ? 'gpt' : 'claude';
+  setH($('#gptDung'), '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)}${!t.dang_nhap ? ' — chưa đăng nhập' : ''}</option>`).join(''));
+  $('#gptDung').value = [...$('#gptDung').options].some(o => o.value === r.dung) ? r.dung : 'tu_dong';
+  const tk = ds.find(t => t.ma === r.dung) || ds.find(t => t.dang_nhap && t.models && t.models.length) || ds[0] || {};
+  const ms = (tk.models || []).filter(m => !m.an);
+  const ds_m = ms.length ? ms : [{id: r.model, ten: r.model}];
+  if (!ds_m.some(m => m.id === r.model)) ds_m.unshift({id: r.model, ten: r.model + ' (gói không có)'});
+  setH($('#gptModel'), ds_m.map(m => `<option value="${esc(m.id)}">${esc(m.ten || m.id)}${m.mac_dinh ? ' · mặc định' : ''}</option>`).join(''));
+  $('#gptModel').value = r.model;
+  const m = ms.find(x => x.id === r.model), ef = m && m.effort && m.effort.length ? m.effort : ['low', 'medium', 'high', 'xhigh', 'max'];
+  setH($('#gptEffort'), ef.filter(e => EFF_TEN[e]).map(e => `<option value="${e}">${EFF_TEN[e]}</option>`).join(''));
+  $('#gptEffort').value = ef.includes(r.effort) ? r.effort : (m && m.effort_mac_dinh) || ef[0];
+  document.querySelectorAll('[data-gdung]').forEach(b => b.onclick = async () => { await api('/api/gpt-cai-dat', {dung: b.dataset.gdung});
+    toast(b.dataset.gdung === 'tu_dong' ? 'Hub tự chọn tài khoản ChatGPT còn dư' : 'Hub sẽ chạy ChatGPT bằng tài khoản này'); taiGpt(); });
+  document.querySelectorAll('[data-gdn]').forEach(b => b.onclick = async () => { const x = await api('/api/gpt-dang-nhap/' + b.dataset.gdn, {});
+    if (x.ok === false) return toast(x.loi || 'Không mở được cửa sổ đăng nhập', 'loi');
+    toast('Đã mở cửa sổ đăng nhập ChatGPT — xong thì thẻ này tự cập nhật'); theoDoiGpt(); });
+  document.querySelectorAll('[data-gkiem]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'Đang kiểm…';
+    const x = await api('/api/gpt-kiem/' + b.dataset.gkiem, {}); toast(x.ok ? 'Đã cập nhật hạn mức' : x.loi, x.ok ? undefined : 'loi'); $('#gptChiTiet')._h = null; taiGpt(); });
+  document.querySelectorAll('[data-gbo]').forEach(b => b.onclick = async () => { if (!await hoi({tieuDe: 'Bỏ "' + b.dataset.ten + '" khỏi hub?', noiDung: 'Phiên đăng nhập ChatGPT của tài khoản này sẽ được cất đi; thêm lại thì phải đăng nhập lại.', nutCo: 'Bỏ tài khoản', nguyHiem: true})) return;
+    const x = await api('/api/gpt-bo/' + b.dataset.gbo, {}); toast(x.ok ? 'Đã bỏ tài khoản' : x.loi, x.ok ? undefined : 'loi'); taiGpt(true); });
+}
+function theoDoiGpt() { clearInterval(_gptDn); let n = 0;
+  _gptDn = setInterval(() => { if (++n > 22) return clearInterval(_gptDn); if (!document.hidden) taiGpt(true).catch(() => {}); }, 8000); }
+$('#btnKiemGpt').onclick = () => taiGpt(true);
+$('#btnThemGpt').onclick = async () => { const ten = await hoi({tieuDe: 'Thêm tài khoản ChatGPT', noiDung: 'Đặt tên để dễ nhận ra (vd. ChatGPT 2).', oNhap: true, goiY: 'ChatGPT 2', nutCo: 'Thêm'}); if (ten === null) return;
+  const r = await api('/api/gpt-them', {ten}); if (!r.ok) return toast(r.loi || 'Không thêm được', 'loi');
+  toast('Đã thêm — đang mở cửa sổ đăng nhập cho tài khoản mới'); await taiGpt(true);
+  await api('/api/gpt-dang-nhap/' + r.ma, {}); theoDoiGpt(); };
+$('#gptNao').onchange = async () => { const v = $('#gptNao').value; await api('/api/gpt-cai-dat', {nao: v});
+  toast(v === 'gpt' ? 'Từ lô sau: biên kịch, đạo diễn, soát kho dùng ChatGPT' : 'Từ lô sau: dùng lại Claude'); };
+$('#gptDung').onchange = async () => { await api('/api/gpt-cai-dat', {dung: $('#gptDung').value}); toast('Đã lưu'); taiGpt(); };
+$('#gptModel').onchange = async () => { await api('/api/gpt-cai-dat', {model: $('#gptModel').value}); toast('Đã đổi model ChatGPT'); $('#gptChiTiet')._h = null; taiGpt(); };
+$('#gptEffort').onchange = async () => { await api('/api/gpt-cai-dat', {effort: $('#gptEffort').value}); toast('Đã đổi độ suy nghĩ'); };
+async function taiAgy(moi) {
+  const a = await api('/api/agy-tk' + (moi ? '?moi=1' : ''));
+  if (!a.mo) return setH($('#agyChiTiet'), rong('user', 'Antigravity đang tắt', 'Bấm "Mở Antigravity" rồi Làm mới để xem tài khoản và hạn mức.'));
+  const md = (a.models || []).map(m => `<div class="lr"><span>${esc(m.ten || m.id)}</span><b>${m.con == null ? '—' : 'còn ' + Math.round(m.con * 100) + '%'}</b></div>`).join('');
+  setH($('#agyChiTiet'), `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+    <div class="acc"><div class="hd"><div class="who"><span class="av">G</span><div style="min-width:0"><b>Tài khoản Google</b>
+      <div class="note" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.email || '—')}${a.goi ? ' · ' + esc(a.goi) : ''}</div></div></div>
+      ${a.email ? '<span class="pill g dot">Đã đăng nhập</span>' : '<span class="pill r dot">Chưa rõ</span>'}</div>
+      ${vach(a.gemini_5h, 'Gemini · phiên 5 giờ')}${vach(a.gemini_tuan, 'Gemini · cả tuần')}
+      <div class="note" style="margin:8px 0 0;font-size:12px">${a.loi ? esc(a.loi) + ' · ' : ''}${a.cap_nhat ? 'Cập nhật lúc ' + new Date(a.cap_nhat * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : ''}</div></div>
+    <div class="acc"><div class="hd"><b>Model hub dùng</b><span class="note">hạn mức còn lại</span></div>${md || '<div class="note">Chưa đọc được danh sách model</div>'}</div></div>`);
+}
+$('#btnKiemAgy').onclick = () => taiAgy(true);
+$('#btnMoAgy').onclick = async () => { const r = await api('/api/agy-mo', {}); toast(!r.ok ? (r.loi || 'Không mở được') : r.da_mo ? 'Antigravity đã mở sẵn' : 'Đang mở Antigravity — chờ vài giây rồi bấm Làm mới', r.ok ? undefined : 'loi'); if (r.da_mo) taiAgy(true); };
+{ const k = lsGet('xv.ai.tab'); if (k && ['cl', 'gpt', 'agy'].includes(k)) aiTab(k); }
 let _dnTimer = null;
 function theoDoiDangNhap() {        // sau khi mở cửa sổ đăng nhập: kiểm lại mỗi 8 giây trong 3 phút để thẻ đổi sang email mới ngay
   clearInterval(_dnTimer); let n = 0;

@@ -1456,6 +1456,14 @@ class H(BaseHTTPRequestHandler):
                                "cho_duyet": so_cho_duyet()})
         if u.path == "/api/tai-khoan-ds":
             return self._json(tai_khoan_ds("moi" in parse_qs(u.query)))
+        if u.path == "/api/gpt-ds":                     # tài khoản ChatGPT (Codex CLI): đăng nhập, gói, hạn mức 5 giờ/tuần, model gói cho dùng
+            sys.path.insert(0, str(CODE / "engine")); import tk_gpt
+            c = cfg(); g = c.get("gpt") or {}
+            return self._json({"ds": tk_gpt.ds("moi" in q), "dung": c.get("tai_khoan_gpt_dung") or "tu_dong", "nao": c.get("ai_nao") or "claude",
+                               "model": g.get("model") or "gpt-6.2-sol", "effort": g.get("effort") or "high"})
+        if u.path == "/api/agy-tk":                     # Antigravity: tài khoản đang đăng nhập + hạn mức Gemini (chỉ đọc)
+            sys.path.insert(0, str(CODE / "engine")); import hoc_canh
+            return self._json(hoc_canh.trang_thai_agy_day_du(nho="moi" not in q))
         if u.path == "/api/tai-khoan":
             return self._json(auth(force="moi" in q))
         if u.path == "/api/ngay":
@@ -1679,6 +1687,38 @@ class H(BaseHTTPRequestHandler):
             return self._json(tai_khoan_them(b.get("ten", "")))
         if u.path.startswith("/api/tai-khoan-bo/"):
             return self._json(tai_khoan_bo(u.path.split("/")[-1]))
+        if u.path.startswith("/api/gpt-"):              # ChatGPT: thêm / bỏ / đăng nhập / kiểm hạn mức / chọn bộ não + model
+            sys.path.insert(0, str(CODE / "engine")); import tk_gpt
+            p = u.path.split("/")[-1]
+            if u.path == "/api/gpt-them":
+                with _TK_LOCK:
+                    c = cfg(); ma = tk_gpt.them(c, b.get("ten", "")); luu_cfg(c)
+                return self._json({"ok": True, "ma": ma})
+            if u.path.startswith("/api/gpt-bo/"):
+                with _TK_LOCK:
+                    c = cfg(); r = tk_gpt.bo(c, p)
+                    if r.get("ok"):
+                        luu_cfg(c)
+                return self._json(r)
+            if u.path.startswith("/api/gpt-dang-nhap/"):
+                return self._json(tk_gpt.mo_dang_nhap(p))
+            if u.path.startswith("/api/gpt-kiem/"):
+                try:
+                    return self._json({"ok": True, "trang_thai": tk_gpt.lam_moi(p)})
+                except Exception as e:
+                    return self._json({"ok": False, "loi": str(e)[:200]})
+            if u.path == "/api/gpt-cai-dat":
+                c = cfg()
+                if b.get("nao") in ("claude", "gpt"):
+                    c["ai_nao"] = b["nao"]
+                if "dung" in b:
+                    c["tai_khoan_gpt_dung"] = str(b["dung"])
+                if b.get("model"):
+                    c.setdefault("gpt", {})["model"] = str(b["model"])[:60]
+                if b.get("effort") in ("low", "medium", "high", "xhigh", "max", "ultra"):
+                    c.setdefault("gpt", {})["effort"] = b["effort"]
+                luu_cfg(c); return self._json({"ok": True})
+            return self._json({"ok": False, "loi": "không rõ lệnh"}, 404)
         if u.path.startswith("/api/tai-khoan-kiem/"):
             sys.path.insert(0, str(CODE / "engine"))
             import ai

@@ -348,27 +348,60 @@ def nao_ai():
     return "gpt" if v in ("gpt", "chatgpt", "codex", "openai") else "claude"
 
 
+class GptChuaDangNhap(HetHanMuc):
+    pass
+
+
 def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
-    """Gọi ChatGPT qua `codex exec` (đăng nhập ChatGPT sẵn của máy): cùng lời dặn hệ thống + đề bài + ảnh (-i). Không công cụ, không ghi file.
+    """Gọi ChatGPT qua `codex exec`, nhiều tài khoản (tk_gpt): chọn tài khoản còn dư nhất; hết hạn mức / mất đăng nhập → thử tài khoản kế tiếp 1 lần.
     config "gpt": {"model": "gpt-6.2-sol", "effort": "high"}; effort vai truyền vào (vd. "low" cho gom bài học) được giữ. → (text, usage kiểu Claude)."""
-    import shutil, tempfile
-    import truc_tiep as TT
+    import tk_gpt
     g = cfg().get("gpt") or {}
     model = str(g.get("model") or "gpt-6.2-sol")
-    effort = str(effort if effort in ("low", "medium", "high", "xhigh", "max") and effort != "high" else (g.get("effort") or "high"))
-    codex = cfg().get("duong_dan", {}).get("codex") or shutil.which("codex") or "codex"
-    full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai_he_thong(vai)}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
+    effort = str(effort if effort in ("low", "medium", "high", "xhigh", "max", "ultra") and effort != "high" else (g.get("effort") or "high"))
+    da_thu = []
+    while True:
+        try:
+            tk = tk_gpt.chon(bo_qua=da_thu)
+        except HetHanMuc as e:
+            raise HetHanMuc(str(e) + (f" (đã thử: {', '.join(da_thu)})" if da_thu else ""))
+        ds_model = [m["id"] for m in (tk_gpt.doc_trang_thai().get(tk["ma"], {}).get("models") or []) if m.get("id")]
+        if ds_model and model not in ds_model:
+            raise RuntimeError(f"Tài khoản ChatGPT {tk['ma']} không có model \"{model}\" (có: {', '.join(ds_model)}) — đổi model trong Cài đặt")
+        try:
+            return _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout)
+        except GptChuaDangNhap:
+            tk_gpt.mark_chua_dang_nhap(tk["ma"])
+            da_thu.append(tk["ma"])
+            if len(da_thu) >= 2:
+                raise
+        except HetHanMuc:
+            tk_gpt.mark_het(tk["ma"])
+            tk_gpt.lam_moi_nen(tk["ma"], 0)               # đọc giờ mở lại thật của tài khoản này
+            da_thu.append(tk["ma"])
+            if len(da_thu) >= 2:
+                raise
+
+
+def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
+    import tempfile
+    import truc_tiep as TT
+    import tk_gpt
+    codex = tk_gpt.codex_exe()
+    full =(f"=== LỜI DẶN HỆ THỐNG (vai: {vai_he_thong(vai)}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
             + (("Ảnh đính kèm theo thứ tự: " + " ".join(f"{i}) {Path(str(a)).name}" for i, a in enumerate(anh, 1)) + "\n\n") if anh else "")
             + "Trả lời thẳng bằng nội dung đề bài yêu cầu. Không dùng công cụ, không chạy lệnh, không đọc/ghi file.\n")
     t0 = datetime.datetime.now()
     with tempfile.TemporaryDirectory(prefix="xv-gpt-") as td:
         cmd = [codex, "exec", "-m", model, "-c", f'model_reasoning_effort="{effort}"', "-c", "notify=[]", "--skip-git-repo-check",
                "-s", "read-only", "--ephemeral", "--json", "-C", td]
+        if tk.get("thu_muc"):
+            cmd[2:2] = ["-c", tk_gpt.STORE_FILE]          # thư mục đăng nhập riêng: lưu đăng nhập dạng file (không dùng kho khoá chung của máy)
         for a in anh or []:
             cmd += ["-i", str(a)]
         cmd.append("-")
         pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                              errors="replace", cwd=td)
+                              errors="replace", cwd=td, env=tk_gpt.env(tk))
         try:
             out, err = pr.communicate(full, timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -400,17 +433,23 @@ def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
     import su_kien as _sk
     _sk.noi_them(HUB / "lich-su" / "token.csv", _sk.dong_csv([
         t0.strftime("%Y-%m-%d %H:%M:%S"), vai, model, effort, round((datetime.datetime.now() - t0).total_seconds(), 1),
-        usage["input_tokens"], 0, usage["cache_read_input_tokens"], usage["output_tokens"], 0, 1, len(anh or []), "chatgpt",
+        usage["input_tokens"], 0, usage["cache_read_input_tokens"], usage["output_tokens"], 0, 1, len(anh or []), "gpt:" + tk["ma"],
         getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
         dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
     _ghi_so(usage)
     txt = loi + " " + (err or "")[-500:]
+    if not msg and re.search(r"not supported when using codex with a chatgpt account", txt, re.I):
+        raise RuntimeError(f"Model \"{model}\" không dùng được với tài khoản ChatGPT {tk['ma']}: {loi[:200]} — đổi model trong Cài đặt")
     if not msg and re.search(r"usage limit|rate limit|limit reached|quota|too many requests", txt, re.I):
-        raise HetHanMuc("ChatGPT đã hết hạn mức: " + loi[:200])
+        raise HetHanMuc(f"ChatGPT ({tk['ma']}) đã hết hạn mức: " + loi[:200])
     if not msg and re.search(r"login|not logged in|unauthorized|401|auth", txt, re.I):
-        raise HetHanMuc("ChatGPT chưa đăng nhập (mở Codex/ChatGPT đăng nhập lại): " + loi[:200])
+        raise GptChuaDangNhap(f"ChatGPT ({tk['ma']}) chưa đăng nhập (bấm Đăng nhập ở tab tài khoản): " + loi[:200])
     if not msg:
-        raise RuntimeError(f"ChatGPT lỗi ({vai}): {(loi or err or out)[-300:]}")
+        raise RuntimeError(f"ChatGPT lỗi ({vai}, {tk['ma']}): {(loi or err or out)[-300:]}")
+    m = re.search(r"^model:\s*(\S+)", err or "", re.M | re.I)
+    if m and m.group(1) != model:                      # codex không được âm thầm đổi model (giá/chất lượng khác) → báo lỗi
+        raise RuntimeError(f"ChatGPT ({tk['ma']}) chạy model \"{m.group(1)}\" thay vì \"{model}\" — không chấp nhận, kiểm tra Cài đặt model")
+    tk_gpt.lam_moi_nen(tk["ma"])                       # cập nhật hạn mức nền (tối đa 5 phút / lần)
     return msg, usage
 
 
