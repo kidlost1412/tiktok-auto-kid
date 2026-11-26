@@ -239,7 +239,11 @@ class NapKhoV3Test(unittest.TestCase):
         self._sp({"kho_v3": True})
         self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
         kc.nap("tc")
+        self.assertTrue((self.sp / "canh-id-noi.json").exists())
+        for _ in range(12):                                                  # nạp nhiều lần: bản chụp trước kiểu 3 vẫn còn
+            kc.nap("tc")
         kc.quay_lui("tc")
+        self.assertFalse((self.sp / "canh-id-noi.json").exists())            # bảng nối của kiểu 3 bỏ theo
         self.assertFalse(json.loads((self.sp / "san-pham.json").read_text(encoding="utf-8"))["kho_v3"])
         self.assertEqual([x["id"] for x in self._canh()], c0)
         kc.nap("tc")                                                         # nạp lại sau quay lui: về mô tả cũ, id cũ

@@ -81,11 +81,14 @@ def _ban_chup(sp_dir, giu=10):
     co = [sp_dir / n for n in ("canh.json", "canh-id.json", "canh-id-noi.json") if (sp_dir / n).exists()]
     if not co:
         return None
-    d = sp_dir / "_ban-chup" / datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    d.mkdir(parents=True, exist_ok=True)
+    ten = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    d, i = sp_dir / "_ban-chup" / ten, 0
+    while d.exists():                                   # đồng hồ Windows thô → 2 lần nạp sát nhau trùng tên: không ghi đè bản cũ
+        i += 1; d = sp_dir / "_ban-chup" / f"{ten}-{i:02d}"
+    d.mkdir(parents=True)
     for f in co:
         shutil.copy2(f, d / f.name)
-    for cu in sorted((sp_dir / "_ban-chup").iterdir())[:-giu]:
+    for cu in sorted((sp_dir / "_ban-chup").iterdir())[1:-giu]:      # bản đầu tiên (trước khi bật kiểu 3) luôn giữ để quay lui
         shutil.rmtree(cu, ignore_errors=True)
     return d
 
@@ -104,6 +107,8 @@ def quay_lui(ma, ban=None):
         for n in ("canh.json", "canh-id-noi.json"):
             if (d / n).exists():
                 shutil.copy2(d / n, sp_dir / n)
+            else:
+                (sp_dir / n).unlink(missing_ok=True)   # bản cũ chưa có bảng nối → bỏ, kẻo lịch sử đổi sang id không còn
         for f in (sp_dir / "_khung").glob("*.jpg") if (sp_dir / "_khung").exists() else []:
             f.unlink()                                  # ảnh khung theo id → cắt lại cho đúng bản cũ
     return str(d) if d else None
