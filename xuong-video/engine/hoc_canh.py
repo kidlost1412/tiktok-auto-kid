@@ -1092,7 +1092,7 @@ def doc_model():
 
 def doc_song_song():
     try:
-        return max(1, min(4, int(doc_cau_hinh().get("song_song") or SONG_SONG_MAC_DINH)))
+        return max(1, min(8, int(doc_cau_hinh().get("song_song") or SONG_SONG_MAC_DINH)))   # Kid 26/11: tới 8 phiên Antigravity cùng lúc
     except Exception:
         return SONG_SONG_MAC_DINH
 
