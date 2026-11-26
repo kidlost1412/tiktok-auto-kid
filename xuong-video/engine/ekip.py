@@ -141,6 +141,8 @@ def segs_may_dung(voice, sc, sp, shots, tranh, rng):
 def _ten_nao():
     """Tên bộ não AI đang dùng cho nhật ký lô."""
     from ai import nao_ai
+    if nao_ai() == "agy":
+        return f"Antigravity {(CFG.get('agy') or {}).get('model') or 'gemini-4-neon-high'}"
     if nao_ai() == "gpt":
         g = CFG.get("gpt") or {}
         return f"ChatGPT {g.get('model') or 'gpt-6.2-sol'} {g.get('effort') or 'high'}"
@@ -259,7 +261,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     def co_tai_khoan():
         try:
             from ai import chon_tai_khoan, nao_ai
-            if nao_ai() == "gpt":
+            if nao_ai() in ("gpt", "agy"):
                 return True                           # ChatGPT: hết hạn mức thì lượt gọi báo HetHanMuc, không có danh sách tài khoản để đọc
             return chon_tai_khoan() is not None       # chỉ đọc trạng thái tài khoản, không gọi AI
         except Exception:

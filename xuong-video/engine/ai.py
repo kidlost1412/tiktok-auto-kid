@@ -345,7 +345,83 @@ def goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
 def nao_ai():
     """Bộ não AI của mọi vai đang gọi Claude: "claude" (mặc định) hoặc "gpt" (ChatGPT qua Codex CLI). Biến môi trường XUONG_AI (thử 1 lô) > config "ai_nao"."""
     v = (os.environ.get("XUONG_AI") or cfg().get("ai_nao") or "claude").strip().lower()
+    if v in ("agy", "antigravity", "gemini"):
+        return "agy"
     return "gpt" if v in ("gpt", "chatgpt", "codex", "openai") else "claude"
+
+
+def agy_exe():
+    p = (cfg().get("duong_dan") or {}).get("agy") or os.path.expandvars(r"%LOCALAPPDATA%\agy\bin\agy.exe")
+    return p if Path(p).exists() else "agy"
+
+
+def _goi_agy(vai, prompt, anh=None, timeout=1200):
+    """Gọi Gemini qua Antigravity CLI (`agy`, 1 tài khoản Google của máy — Google cấm xoay tài khoản).
+    config "agy": {"model": "gemini-4-neon-high"} (độ suy nghĩ nằm trong tên model). Ảnh: agy chỉ nhận chữ qua stdin → AI tự mở ảnh bằng công cụ đọc file.
+    → (text, usage kiểu Claude)."""
+    import tempfile
+    import truc_tiep as TT
+    model = str((cfg().get("agy") or {}).get("model") or "gemini-4-neon-high")
+    full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai_he_thong(vai)}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
+            + (("ẢNH CẦN XEM (mở TỪNG ảnh bằng công cụ đọc file, đúng thứ tự, trước khi trả lời):\n"
+                + "\n".join(f"{i}) {Path(str(a)).resolve()}" for i, a in enumerate(anh, 1)) + "\n\n") if anh else "")
+            + "Trả lời thẳng bằng nội dung đề bài yêu cầu. Chỉ được đọc file ảnh nêu trên; không chạy lệnh, không ghi/sửa file, không duyệt web.\n")
+    t0 = datetime.datetime.now()
+    with tempfile.TemporaryDirectory(prefix="xv-agy-") as td:
+        cmd = [agy_exe(), "--input-format", "stream-json", "--output-format", "stream-json", "--model", model,
+               "--disable-slash-commands", "--print-timeout", f"{int(timeout)}s"]
+        for d in sorted({str(Path(str(a)).resolve().parent) for a in anh or []}):
+            cmd += ["--add-dir", d]
+        pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                              errors="replace", cwd=td)
+        try:
+            out, err = pr.communicate(json.dumps({"event": "user", "message": {"content": full}}, ensure_ascii=False) + "\n", timeout=timeout + 30)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
+            pr.communicate()
+            raise RuntimeError(f"Antigravity quá {timeout}s ({vai}) — đã dừng")
+    ket, chay, buoc = {}, "", 0
+    for line in out.splitlines():
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+        if ev.get("event") == "init":
+            chay = str((ev.get("init") or {}).get("model") or "")
+        elif ev.get("event") == "step_update" and (ev.get("step_update") or {}).get("step_type") == "tool":
+            buoc += 1
+        elif ev.get("event") == "result":
+            ket = ev.get("result") or {}
+    msg = str(ket.get("response") or "").strip()
+    u = ket.get("usage") or {}
+    usage = {"input_tokens": int(u.get("input_tokens") or 0), "cache_creation_input_tokens": 0,
+             "cache_read_input_tokens": int(u.get("cache_read_tokens") or 0),
+             "output_tokens": int(u.get("output_tokens") or 0) + int(u.get("thinking_tokens") or 0)}
+    import su_kien as _sk
+    _sk.noi_them(HUB / "lich-su" / "token.csv", _sk.dong_csv([
+        t0.strftime("%Y-%m-%d %H:%M:%S"), vai, model, "", round((datetime.datetime.now() - t0).total_seconds(), 1),
+        usage["input_tokens"], 0, usage["cache_read_input_tokens"], usage["output_tokens"], 0, int(ket.get("num_turns") or 0), len(anh or []), "agy",
+        getattr(VIEC, "video", ""), MA_LO]), ma_hoa="utf-8-sig",
+        dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
+    _ghi_so(usage)
+    loi = str(ket.get("error") or "") + " " + (err or "")[-500:]
+    if ket.get("status") != "SUCCESS" or not msg:
+        if re.search(r"invalid model|unknown model", loi, re.I):
+            raise RuntimeError(f"Antigravity không có model \"{model}\" — đổi model trong Cài đặt: {loi[:200]}")
+        if re.search(r"quota|rate limit|resource.?exhausted|limit reached|429", loi, re.I):
+            raise HetHanMuc("Antigravity (Gemini) đã hết hạn mức: " + loi[:200])
+        if re.search(r"login|sign in|unauthenti|not authenticated|401", loi, re.I):
+            raise HetHanMuc("Antigravity CLI chưa đăng nhập (mở PowerShell, chạy agy để đăng nhập): " + loi[:200])
+        raise RuntimeError(f"Antigravity lỗi ({vai}, {ket.get('status')}): {(loi.strip() or out[-300:])[:300]}")
+    if chay and chay != model:                          # không chấp nhận âm thầm đổi model
+        raise RuntimeError(f"Antigravity chạy model \"{chay}\" thay vì \"{model}\" — không chấp nhận")
+    tt = TT.hien_tai()
+    if tt is not None:
+        try:
+            tt.chu(msg)
+        except Exception:
+            pass
+    return msg, usage
 
 
 class GptChuaDangNhap(HetHanMuc):
@@ -456,7 +532,9 @@ def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
 def _goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
     if nao_ai() == "gpt":
         return _goi_gpt(vai, prompt, anh, effort, timeout)
-    cl = cfg().get("claude", {})
+    if nao_ai() == "agy":
+        return _goi_agy(vai, prompt, anh, timeout)
+    cl =cfg().get("claude", {})
     model = model or cl.get("model", "opus"); effort = effort or cl.get("effort", "high")
     prompt_goc = prompt
     nhung = bool(anh) and cfg().get("anh_nhung", True)          # mặc định gửi ảnh nhúng thẳng (1 lượt); anh_nhung=false → cách cũ
