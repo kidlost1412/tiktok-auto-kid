@@ -503,7 +503,7 @@
         if (expired() || insFail >= 3) break;
         const j = await call('insight', S.videoInsightUrl(t.item_id), {});
         const ins = j ? S.parseVideoInsight(j) : null;
-        if (ins && ins.ok) { insFail = 0; byId.get(t.item_id).insight = { avg_watch_s: ins.avg_watch_s, finish_rate: ins.finish_rate, total_watch_s: ins.total_watch_s, new_followers: ins.new_followers, traffic: ins.traffic }; }
+        if (ins && ins.ok) { insFail = 0; byId.get(t.item_id).insight = { avg_watch_s: ins.avg_watch_s, finish_rate: ins.finish_rate, total_watch_s: ins.total_watch_s, new_followers: ins.new_followers, traffic: ins.traffic, giu: ins.giu }; }
         else if (!ins || !ins.empty) insFail++;
         await gap();
       }

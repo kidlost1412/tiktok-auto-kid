@@ -15,7 +15,7 @@ TẢI FILE (máy khác không đọc được ổ P:):
   GET  /trypost/videos/{id}/anh-bia   jpg
 config.trypost.nghe_lan: false (mặc định) = chỉ 127.0.0.1; true = nghe 0.0.0.0 (chỉ bật khi app chạy trên máy khác trong LAN).
 Đường dẫn file trả về là TƯƠNG ĐỐI trong hub, dấu /."""
-import csv, datetime, hashlib, json, re, threading
+import csv, datetime, hashlib, json, os, re, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
@@ -274,9 +274,23 @@ class H(BaseHTTPRequestHandler):
                 _ghi_trang_thai(vid, {"trang_thai": "loi", "ly_do": str(b.get("ly_do", ""))[:300], "luc": now})
             return self._json({"ok": True})
         if parts == ["trypost", "so-lieu"]:
-            f = LS / "so-lieu.csv"; cot = ["luc_nhan", "id", "kenh", "luot_xem_24h", "luot_xem_72h", "thich", "binh_luan", "chia_se", "don", "luc"]
+            f = LS / "so-lieu.csv"; cot = ["luc_nhan", "id", "kenh", "luot_xem_24h", "luot_xem_72h", "thich", "binh_luan", "chia_se", "don", "luc",
+                                           "thoi_luong_s", "xem_tb_s", "xem_het", "giu"]
             with _lock:
                 moi = not f.exists()
+                if not moi:                            # file từ bản cũ (ít cột hơn) → viết lại đầu cột, giữ nguyên các dòng cũ
+                    with open(f, encoding="utf-8-sig", newline="") as fh:
+                        cu = list(csv.reader(fh))
+                    if cu and cu[0] != cot:
+                        dau = cu[0]
+                        tmp = f.with_name(f.name + ".tam")
+                        with open(tmp, "w", newline="", encoding="utf-8-sig") as fh:
+                            w = csv.writer(fh)
+                            w.writerow(cot)
+                            for r in cu[1:]:
+                                d = dict(zip(dau, r))
+                                w.writerow([d.get(k, "") for k in cot])
+                        os.replace(tmp, f)
                 with open(f, "a", newline="", encoding="utf-8-sig") as fh:
                     w = csv.writer(fh)
                     if moi:

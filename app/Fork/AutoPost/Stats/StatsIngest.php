@@ -71,6 +71,7 @@ final class StatsIngest
                     'total_watch_s' => $insight['total_watch_s'] ?? $stat->total_watch_s,
                     'new_followers' => $insight['new_followers'] ?? $stat->new_followers,
                     'traffic' => $insight['traffic'] !== [] ? $insight['traffic'] : $stat->traffic,
+                    'retention' => $insight['retention'] !== [] ? $insight['retention'] : $stat->retention,
                     'insight_at' => $now,
                 ]);
             }
@@ -178,6 +179,8 @@ final class StatsIngest
                 'total_watch_s' => $stat->total_watch_s,
                 'new_followers' => $stat->new_followers,
                 'traffic' => $stat->traffic,
+                'giu' => $stat->retention ?: null,
+                'duration_s' => $stat->duration_ms ? round($stat->duration_ms / 1000, 1) : null,
                 'at' => $stat->insight_at->toIso8601String(),
             ], fn (mixed $v): bool => $v !== null);
         }
@@ -255,6 +258,16 @@ final class StatsIngest
 
             $finish = $float($in['finish_rate'] ?? null);
 
+            // Đường giữ chân: tỉ lệ người còn xem ở giây 0, 1, 2… (0–1), tối đa 61 điểm.
+            $retention = [];
+            foreach (is_array($in['giu'] ?? null) ? array_slice(array_values($in['giu']), 0, 61) : [] as $g) {
+                if (! is_numeric($g)) {
+                    $retention = [];
+                    break;
+                }
+                $retention[] = round(min(1.0, max(0.0, (float) $g)), 3);
+            }
+
             $out[] = [
                 'item_id' => $id,
                 'desc' => is_string($v['desc'] ?? null) ? mb_substr($v['desc'], 0, 2200) : '',
@@ -271,6 +284,7 @@ final class StatsIngest
                     'total_watch_s' => $float($in['total_watch_s'] ?? null),
                     'new_followers' => is_numeric($in['new_followers'] ?? null) ? (int) $in['new_followers'] : null,
                     'traffic' => $traffic,
+                    'retention' => count($retention) > 1 ? $retention : [],
                 ],
             ];
         }

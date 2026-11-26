@@ -61,7 +61,12 @@ def _tom_tat(ma, cho="bien_kich"):
 
 def _so_lieu(ma):
     """Đoạn số liệu TikTok gửi biên kịch: "" nếu nhóm chưa đủ video / view quá nhỏ."""
-    return _tom_tat(ma) if _cong_so_lieu(ma) else ""
+    try:
+        from hieu_qua import giu_chan
+        giu = giu_chan(ma)
+    except Exception:
+        giu = ""
+    return "\n".join(x for x in ((_tom_tat(ma) if _cong_so_lieu(ma) else ""), giu) if x)
 
 
 CAM_CHU = ["số 1", "số một", "nhất thị trường", "duy nhất", "chết"]    # chủ quyết định: nội dung TikTok không giới hạn, chỉ cấm các tuyên bố này; 23/11 Kid: không bao giờ "chết"

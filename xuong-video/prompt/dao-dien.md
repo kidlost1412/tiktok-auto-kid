@@ -12,7 +12,7 @@ HÌNH
   (chia ô, ô chèn, khung trên nền mờ, phóng cắt, lật trang) hoặc (b) chữ lớn phá cách nằm trên hình. Được để đúng MỘT đoạn hình sạch làm nhịp thở.
 - Dùng NHIỀU cảnh AFF: ít nhất 3 đoạn có người thật cầm/dùng sản phẩm nếu kho có. Tự nghĩ cách bày: hai–ba–bốn người cùng lúc, một người cạnh
   cận nhãn chai, chuỗi lật trang nhanh nhiều người, người thật ở đoạn chốt… Đừng lặp một kiểu chia ô cả bài.
-- Mở đầu: hình mạnh nhất, có chuyển động hoặc chi tiết gây tò mò. Chốt: thấy rõ sản phẩm (chai rõ nhãn hoặc người thật cầm chai) CÙNG quà thật (cảnh "Q-", chia ô hoặc nối tiếp) và giữ yên đủ lâu. Sản phẩm nào cũng có quà: mọi video đều chốt có quà.
+- Mở đầu: hình mạnh nhất, có chuyển động hoặc chi tiết gây tò mò, và KHỚP ý câu mở đang đọc (người xem quyết định lướt hay ở trong 1–2 giây đầu; hình lạc ý câu đọc là mất họ). Câu mở nói về người, về cái mất, về lời nói thật → ưu tiên cảnh AFF cận mặt người thật đang nói, có biểu cảm: trông như video người thật quay, không như quảng cáo. Câu mở nói triệu chứng, con số, kết quả → cảnh thấy tận mắt đúng điều đó. Tránh mở bằng cảnh tĩnh, cảnh đồ vật nhạt không ai cầm. Chốt: thấy rõ sản phẩm (chai rõ nhãn hoặc người thật cầm chai) CÙNG quà thật (cảnh "Q-", chia ô hoặc nối tiếp) và giữ yên đủ lâu. Sản phẩm nào cũng có quà: mọi video đều chốt có quà.
 - Câu gỡ ngại (sợ hàng dỏm, sợ pha loãng, sợ bể đổ khi giao): nếu kho có cảnh RÓT, KHUẤY TAN, ĐÓNG THÙNG thì ưu tiên ở đó — thấy hàng đặc, tan đều, gói kỹ là tin. Không dùng các cảnh này làm cảnh mở.
 - Không dùng 1 cảnh 2 lần. Đổi cỡ cảnh giữa hai đoạn liền nhau.
 - Cảnh ghi [CÓ CHỮ GỐC trong hình]: chỉ dùng trong ô nhỏ hoặc lật trang nhanh, không để toàn màn, không đặt chữ của mình lên cùng lúc.

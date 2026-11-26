@@ -73,6 +73,11 @@
     let traffic = [];
     const t = obj(o.video_traffic_source_percent_realtime);
     const tv = t.value && !Array.isArray(t.value) ? t.value.value : t.value;
+    // retention curve: list[{timestamp: ms into the video (string), value: share still watching 0-1}] -> giu[i] = share at second i (max 61)
+    const rt = obj(o.video_retention_rate_realtime);
+    const rl = Array.isArray(obj(rt.value).list) ? rt.value.list : rt.list;
+    const giu = Array.isArray(rl) ? rl.map((e) => ({ t: num(obj(e).timestamp), v: num(obj(e).value) })).filter((e) => e.t !== null && e.v !== null && e.t >= 0)
+      .sort((a, b) => a.t - b.t).slice(0, 61).map((e) => Math.round(Math.min(1, Math.max(0, e.v)) * 1000) / 1000) : [];
     if (Array.isArray(tv)) traffic = tv.map((e) => ({ key: String(obj(e).key || obj(e).str_value || '').slice(0, 40), value: num(obj(e).value) })).filter((e) => e.key && e.value !== null).slice(0, 12);
     const has = [avg, fin, tot, nf, views].some((v) => v !== null) || traffic.length > 0 || num(st.play_count) !== null;
     if (!has) return { ok: false, empty: true };
@@ -80,7 +85,7 @@
     return {
       ok: true, empty: false, avg_watch_s: rnd(avg, 2), finish_rate: rnd(fin, 4), total_watch_s: rnd(tot, 1), new_followers: nf === null ? null : Math.trunc(nf),
       views: views === null ? num(st.play_count) : Math.trunc(views),
-      likes: num(st.digg_count), comments: num(st.comment_count), shares: num(st.share_count), saves: num(st.collect_count), traffic,
+      likes: num(st.digg_count), comments: num(st.comment_count), shares: num(st.share_count), saves: num(st.collect_count), traffic, giu: giu.length > 1 ? giu : [],
     };
   }
 

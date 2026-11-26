@@ -18,6 +18,7 @@ class VideoStat extends Model
     {
         return [
             'traffic' => 'array',
+            'retention' => 'array',
             'posted_at' => 'datetime',
             'insight_at' => 'datetime',
             'collected_at' => 'datetime',

@@ -32,6 +32,20 @@ def _so(x):
         return None
 
 
+def _so_thuc(x):
+    try:
+        v = float(x)
+        return v if v >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _giu(s):
+    """"1 0.7 0.26 0.18" → [1.0, 0.7, 0.26, 0.18] (tỉ lệ người còn xem ở giây 0, 1, 2…); sai/thiếu → []."""
+    v = [_so_thuc(x) for x in str(s or "").split()]
+    return [min(1.0, x) for x in v] if len(v) >= 4 and None not in v else []
+
+
 def _cau_mo(loi):
     m = re.split(r"(?<=[.!?])\s+", (loi or "").strip(), maxsplit=1)
     return re.sub(r"\[[^\]]*\]", "", m[0]).strip()[:140] if m and m[0] else ""
@@ -49,6 +63,9 @@ def _doc_so_lieu():
             if not vid:
                 continue
             d = out.setdefault(vid, {"xem24": None, "xem72": None, "tuong_tac": 0, "kenh": r.get("kenh") or ""})
+            giu = _giu(r.get("giu"))
+            if giu:                                   # giữ chân: lấy bản gửi sau cùng (TikTok cập nhật dần trong 7 ngày đầu)
+                d.update(giu=giu, xem_tb=_so_thuc(r.get("xem_tb_s")), xem_het=_so_thuc(r.get("xem_het")), thoi_luong=_so_thuc(r.get("thoi_luong_s")))
             for k, cot in (("xem24", "luot_xem_24h"), ("xem72", "luot_xem_72h")):
                 v = _so(r.get(cot))
                 if v is not None:
@@ -96,7 +113,7 @@ def cap_nhat():
                     _khong_ho_so[vid] = time.time()
                     continue                      # video không do hub này làm / hồ sơ đã mất → bỏ
                 r = db[vid] = hs; doi = True
-            for k in ("xem24", "xem72", "tuong_tac", "kenh"):
+            for k in ("xem24", "xem72", "tuong_tac", "kenh", "giu", "xem_tb", "xem_het", "thoi_luong"):
                 if s.get(k) is not None and r.get(k) != s[k]:
                     r[k] = s[k]; doi = True
         if doi:
@@ -174,13 +191,52 @@ def tom_tat(ma, cho="bien_kich"):
     return "\n".join(dong) if len(dong) > 1 else ""
 
 
+MIN_XEM_GIU, MIN_VIDEO_GIU = 100, 4        # đường giữ chân của video < 100 view là nhiễu; cần ≥ 4 video mới tóm tắt
+
+
+def giu_chan(ma, cho="bien_kich"):
+    """Đường giữ chân thật (TikTok Studio) → chẩn đoán người xem bỏ ở HOOK hay ở THÂN + câu mở giữ chân tốt/kém nhất.
+    Không phụ thuộc cổng view của tom_tat (giữ chân có ích cả khi view còn thấp). "" nếu chưa đủ video."""
+    if not _cai()["bat"]:
+        return ""
+    tat_ca, rieng = _ban_ghi(ma)
+    co = lambda ds: [r for r in ds if len(r.get("giu") or []) >= 4 and (_diem(r) or 0) >= MIN_XEM_GIU]
+    rieng_g, tat_ca_g = co(rieng), co(tat_ca)
+    nguon = rieng_g if len(rieng_g) >= MIN_VIDEO_GIU else tat_ca_g
+    if len(nguon) < MIN_VIDEO_GIU:
+        return ""
+    md = lambda xs: statistics.median(xs) if xs else None
+    g = [md([r["giu"][i] for r in nguon]) for i in (1, 2, 3)]
+    ty = md([r["xem_tb"] / r["thoi_luong"] for r in nguon if r.get("xem_tb") and r.get("thoi_luong")])
+    het = md([r["xem_het"] for r in nguon if r.get("xem_het") is not None])
+    pc = lambda x: f"{round(x * 100)}%"
+    pham_vi = "của sản phẩm này" if nguon is rieng_g else "của mọi sản phẩm"
+    dong = [f"GIỮ CHÂN THẬT ({len(nguon)} video ≥ {MIN_XEM_GIU} view {pham_vi}): còn xem ở giây 1: {pc(g[0])}, giây 2: {pc(g[1])}, giây 3: {pc(g[2])}"
+            + (f"; xem trung bình {pc(ty)} độ dài video" if ty is not None else "") + (f"; xem hết {pc(het)}" if het is not None else "") + "."]
+    if g[2] < 0.35:
+        dong.append("Chẩn đoán: đa số người xem bỏ đi trong 3 giây đầu → chỗ yếu nhất là HOOK (câu mở + chữ mở + hình đầu). "
+                    + ("Câu đầu phải chạm đúng cái người nghe đang mất hay đang muốn ngay từ chữ đầu, không dạo đầu." if cho == "bien_kich" else
+                       "Hình đầu phải khớp ý câu mở và có thứ để nhìn ngay khung đầu (người thật, chuyển động, chi tiết lạ); chữ mở to, hiện ngay."))
+    elif ty is not None and ty < 0.4:
+        dong.append("Chẩn đoán: giữ được 3 giây đầu nhưng người xem rớt dần ở thân bài → hook ổn, cần thân bài vào ý bán nhanh hơn, mỗi câu một ý mới."
+                    if cho == "bien_kich" else "Chẩn đoán: hook giữ được nhưng rớt ở thân → giữa bài đổi cảnh/bố cục có nhịp, chữ lớn ở ý đáng nhớ, không để đoạn dài đứng yên.")
+    if cho == "bien_kich":
+        xep = sorted((r for r in nguon if r.get("cau_mo") and r.get("ma") == ma), key=lambda r: r["giu"][3], reverse=True)
+        if len(xep) >= 4:
+            dong.append("Câu mở GIỮ CHÂN TỐT nhất ở giây 3 (học cách mở, không chép):")
+            dong += [f'  • "{r["cau_mo"]}" — còn {pc(r["giu"][3])}' for r in xep[:2]]
+            dong.append("Câu mở bị BỎ nhiều nhất ở giây 3 (tránh kiểu mở này):")
+            dong += [f'  • "{r["cau_mo"]}" — còn {pc(r["giu"][3])}' for r in xep[-2:]]
+    return "\n".join(dong)
+
+
 def bao_cao(ma):
     """Cho giao diện: số video có số liệu (của sản phẩm / tất cả), ngưỡng, tóm tắt đang đưa cho AI."""
     c = _cai()
     tat_ca, rieng = _ban_ghi(ma)
     xep = sorted(rieng, key=_diem, reverse=True)
     return {"bat": c["bat"], "can": c["mau_tong"], "n": len(rieng), "n_tat_ca": len(tat_ca),
-            "bien_kich": tom_tat(ma), "dao_dien": tom_tat(ma, "dao_dien"),
+            "bien_kich": tom_tat(ma), "dao_dien": tom_tat(ma, "dao_dien"), "giu": giu_chan(ma),
             "top": [{"cau_mo": r.get("cau_mo"), "xem": _diem(r), "goc": r.get("goc"), "dang": r.get("dang"), "ngay": r.get("ngay")} for r in xep[:5]]}
 
 
@@ -191,3 +247,4 @@ if __name__ == "__main__":       # xem thử: python hieu_qua.py <mã sản ph�
     if len(sys.argv) > 1:
         print("--- biên kịch ---\n" + (tom_tat(sys.argv[1]) or "(chưa đủ số liệu)"))
         print("--- đạo diễn ---\n" + (tom_tat(sys.argv[1], "dao_dien") or "(chưa đủ số liệu)"))
+        print("--- giữ chân ---\n" + (giu_chan(sys.argv[1]) or "(chưa đủ số liệu)"))

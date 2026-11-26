@@ -753,8 +753,8 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
     so_gu = f"=== SỔ GU CỦA CHỦ HÀNG (bắt buộc tôn trọng) ===\n{so_gu}\n\n" if so_gu else ""      # chưa có sổ gu → không gửi khung trống
     sp_ngan = {k: sp.get(k) for k in ("ten_goi", "ten_ngan", "su_that_duoc_noi", "qua_tang", "khong_duoc_noi", "nhan_dien_chai") if sp.get(k)}
     try:                                  # số liệu thật: gu/công thức dựng nào từng ra nhiều view (gợi ý, không phải luật)
-        from hieu_qua import tom_tat
-        hq = tom_tat(ma, "dao_dien")
+        from hieu_qua import tom_tat, giu_chan
+        hq = "\n".join(x for x in (tom_tat(ma, "dao_dien"), giu_chan(ma, "dao_dien")) if x)
     except Exception:
         hq = ""
     ctx = dict(

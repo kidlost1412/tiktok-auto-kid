@@ -78,6 +78,8 @@ final class HubReporter
         $video->loadMissing('socialAccount');
         $username = (string) $video->socialAccount?->username;
         $last = $stats['h72'] ?? $stats['h24'] ?? $stats['latest'] ?? [];
+        $in = (array) ($stats['insight'] ?? []);
+        $giu = is_array($in['giu'] ?? null) ? $in['giu'] : [];
 
         $this->queue('so-lieu', (string) $video->hub_id, [
             'id' => (string) $video->hub_id,
@@ -89,6 +91,11 @@ final class HubReporter
             'chia_se' => $last['shares'] ?? null,
             // TikTok Auto Kid không có số đơn hàng.
             'don' => null,
+            // Giữ chân (TikTok Studio, video ≤ 7 ngày): thời gian xem trung bình, tỉ lệ xem hết, đường giữ chân từng giây.
+            'thoi_luong_s' => $in['duration_s'] ?? null,
+            'xem_tb_s' => $in['avg_watch_s'] ?? null,
+            'xem_het' => $in['finish_rate'] ?? null,
+            'giu' => $giu !== [] ? implode(' ', $giu) : null,
             'luc' => now()->toIso8601String(),
         ]);
     }

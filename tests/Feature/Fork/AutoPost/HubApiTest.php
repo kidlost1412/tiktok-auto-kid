@@ -160,6 +160,17 @@ it('số liệu 24h/72h được gửi lên hub, không ghi so-lieu.csv', functi
     expect(is_file($this->hub.'/ra/2026-11-10/so-lieu.csv'))->toBeFalse();
 });
 
+it('số liệu gửi hub kèm giữ chân: xem trung bình, xem hết, đường giữ chân', function (): void {
+    hubFake(['hub.test/*' => Http::response(['ok' => true])]);
+    $acc = SocialAccount::factory()->create(['username' => 's']);
+    $v = AutoVideo::create(['hub_id' => 'v2', 'hash' => 'h2', 'path' => $this->hub.'/ra/2026-11-10/v2.mp4', 'batch_date' => '2026-11-10', 'file_name' => 'v2.mp4', 'source' => 'hub', 'status' => 'posted', 'social_account_id' => $acc->id, 'posted_at' => now()->subDays(2)]);
+
+    app(HubReporter::class)->stats($v, ['h24' => ['views' => 199], 'insight' => ['avg_watch_s' => 2.58, 'finish_rate' => 0.0167, 'duration_s' => 20.3, 'giu' => [1, 0.7, 0.26, 0.18]]]);
+
+    Http::assertSent(fn ($r) => str_ends_with($r->url(), '/so-lieu') && $r['id'] === 'v2' && $r['xem_tb_s'] === 2.58
+        && $r['xem_het'] === 0.0167 && $r['thoi_luong_s'] === 20.3 && $r['giu'] === '1 0.7 0.26 0.18');
+});
+
 it('trang Kho hiện trạng thái hub và ẩn lưu giữ', function (): void {
     $account = Account::factory()->create();
     $owner = User::factory()->create(['account_id' => $account->id]);

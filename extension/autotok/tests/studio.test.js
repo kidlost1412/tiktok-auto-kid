@@ -87,6 +87,13 @@ test('parseVideoInsight reads watch time, finish rate, traffic and new followers
   assert.equal(r.traffic.length, 3);
 });
 
+test('parseVideoInsight reads the retention curve per second (shape seen live 26/11)', () => {
+  const list = [{ timestamp: '2000', value: 0.26 }, { timestamp: '0', value: 1 }, { timestamp: '1000', value: 0.7 }, { timestamp: '3000', value: 0.18 }];
+  const r = S.parseVideoInsight({ ...INSIGHT, video_retention_rate_realtime: { is_after_7d: false, value: { list } } });
+  assert.deepEqual(r.giu, [1, 0.7, 0.26, 0.18]);
+  assert.deepEqual(S.parseVideoInsight(INSIGHT).giu, []);       // a single point is not a curve
+});
+
 test('parseVideoInsight: a video still being processed is "empty", never zeros', () => {
   const r = S.parseVideoInsight({ video_info: {}, video_per_duration_realtime: {}, video_finish_rate_realtime: {}, item_search_terms: {} });
   assert.equal(r.ok, false);

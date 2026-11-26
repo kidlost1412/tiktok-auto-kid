@@ -2383,7 +2383,7 @@ async function taiHq() {
   const esc = x => String(x ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   if (r.top && r.top.length) $('#hqTop').innerHTML = '<div class="tbl-wrap"><table class="tbl" style="width:100%"><thead><tr><th>Câu mở</th><th>Góc</th><th>Dạng</th><th class="num">View 24h</th></tr></thead><tbody>'
     + r.top.map(x => `<tr><td class="wrap">${esc(x.cau_mo)}</td><td>${esc(x.goc)}</td><td>${esc(x.dang)}</td><td class="num"><b>${esc(x.xem)}</b></td></tr>`).join('') + '</tbody></table></div>';
-  $('#hqTxt').textContent = [r.bien_kich && ('Biên kịch:\n' + r.bien_kich), r.dao_dien && ('Đạo diễn:\n' + r.dao_dien)].filter(Boolean).join('\n\n') || '(chưa đủ số liệu — AI làm như bình thường)';
+  $('#hqTxt').textContent = [r.bien_kich && ('Biên kịch:\n' + r.bien_kich), r.dao_dien && ('Đạo diễn:\n' + r.dao_dien), r.giu && ('Giữ chân (gửi cả biên kịch và đạo diễn):\n' + r.giu)].filter(Boolean).join('\n\n') || '(chưa đủ số liệu — AI làm như bình thường)';
 }
 function ctMo(k) {
   SPV.ct = k;

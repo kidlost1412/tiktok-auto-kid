@@ -75,7 +75,7 @@ test('stats endpoint stores per-video numbers, snapshots, followers and matches 
         'account' => ['followers' => 1500, 'follower_history' => [1400, 1450]],
         'videos' => [
             ['item_id' => '7570000000000000001', 'desc' => 'hello', 'post_time' => now()->subHours(2)->timestamp, 'duration_ms' => 20000, 'views' => 120, 'likes' => 9, 'comments' => 2, 'shares' => 1, 'saves' => 3,
-                'insight' => ['avg_watch_s' => 3.26, 'finish_rate' => 0.0207, 'total_watch_s' => 400.5, 'new_followers' => 2, 'traffic' => [['key' => 'For You', 'value' => 0.9]]]],
+                'insight' => ['avg_watch_s' => 3.26, 'finish_rate' => 0.0207, 'total_watch_s' => 400.5, 'new_followers' => 2, 'traffic' => [['key' => 'For You', 'value' => 0.9]], 'giu' => [1, 0.7, 0.26, 'x' => 0.18]]],
             ['item_id' => '7570000000000000002', 'post_time' => now()->subDays(3)->timestamp, 'views' => 5],
             ['item_id' => 'bad'],
         ],
@@ -87,6 +87,8 @@ test('stats endpoint stores per-video numbers, snapshots, followers and matches 
     expect(AccountStat::query()->first()->followers)->toBe(1500);
 
     $s = $video->fresh()->stats;
+    expect($stat->retention)->toEqual([1, 0.7, 0.26, 0.18]);
+    expect($s["insight"]["giu"])->toEqual([1, 0.7, 0.26, 0.18])->and($s["insight"]["duration_s"])->toEqual(20);
     expect($s['latest']['views'])->toBe(120)->and($s['insight']['finish_rate'])->toBe(0.0207)
         ->and($s['link'])->toBe('https://www.tiktok.com/@shop.demo/video/7570000000000000001');
 });

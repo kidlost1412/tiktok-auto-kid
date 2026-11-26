@@ -18,7 +18,7 @@ DAO_DIEN, MAY = "dao_dien", "may"
 
 # (id, câu hỏi cho giám khảo, người sửa được, nặng?) — thứ tự = thứ tự ưu tiên khi chọn 3 lỗi nặng nhất
 MUC = [
-    ("hook", "MÓC CÂU: hai khung đầu (hình + chữ mở) khiến người đang lướt dừng lại; chữ mở gây tò mò, không lặp nguyên câu đọc, không chỉ là tên sản phẩm", DAO_DIEN, True),
+    ("hook", "MÓC CÂU: hai khung đầu (hình + chữ mở) khiến người đang lướt dừng lại; hình đầu khớp ý câu mở đang đọc (không lấy cảnh lạc ý hay cảnh tĩnh nhạt); chữ mở gây tò mò, không lặp nguyên câu đọc, không chỉ là tên sản phẩm", DAO_DIEN, True),
     ("nhan_ro", "NHÃN RÕ: khi lời nhắc tên sản phẩm thì thấy chai/can với nhãn đọc được", DAO_DIEN, True),
     ("chot_chai", "CHỐT CÓ CHAI: đoạn chốt thấy rõ chai/can sản phẩm", DAO_DIEN, True),
     ("hinh_hop_loi", "HÌNH HỢP LỜI: hình ở từng câu khớp điều đang nói (đủ phù hợp là được, không khắt khe)", DAO_DIEN, False),
