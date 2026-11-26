@@ -30,12 +30,27 @@ def ds_tk(c=None):
     return (c if c is not None else cfg()).get("tai_khoan_gpt") or [dict(MAC_DINH)]
 
 
+def _them_path(e):
+    """App mở từ launcher có thể mang PATH cũ (thiếu npm/node của người dùng) → nối thư mục npm + nodejs để tìm thấy codex."""
+    p = e.get("PATH") or e.get("Path") or ""
+    co = {x.strip().rstrip("\\").lower() for x in p.split(";") if x.strip()}
+    them = [d for d in (os.path.expandvars(r"%APPDATA%\npm"), os.path.expandvars(r"%ProgramFiles%\nodejs"))
+            if os.path.isdir(d) and d.rstrip("\\").lower() not in co]
+    if them:
+        e.pop("Path", None)
+        e["PATH"] = ";".join([p] + them if p else them)
+    return e
+
+
 def codex_exe():
-    return cfg().get("duong_dan", {}).get("codex") or shutil.which("codex") or "codex"
+    p = cfg().get("duong_dan", {}).get("codex") or shutil.which("codex", path=_them_path(dict(os.environ))["PATH"])
+    if not p:
+        raise RuntimeError("Không tìm thấy Codex CLI trên máy — cài bằng lệnh: npm install -g @openai/codex")
+    return p
 
 
 def env(tk):
-    e = dict(os.environ)
+    e = _them_path(dict(os.environ))
     if tk.get("thu_muc"):
         e["CODEX_HOME"] = str(Path(tk["thu_muc"]).resolve())
     else:
@@ -348,7 +363,11 @@ def mo_dang_nhap(ma):
         pr = _DANG_NHAP.get("pr")
         if pr is not None and pr.poll() is None:
             return {"ok": False, "loi": f"Đang có cửa sổ đăng nhập ChatGPT ({_DANG_NHAP['ma']}) — đăng nhập xong hoặc đóng nó rồi thử lại"}
-        pr = subprocess.Popen(["cmd", "/k", codex_exe(), "login"], cwd=str(HUB), env=env(tk),
+        try:
+            exe = codex_exe()
+        except RuntimeError as e:
+            return {"ok": False, "loi": str(e)}
+        pr = subprocess.Popen(["cmd", "/k", exe, "login"], cwd=str(HUB), env=env(tk),
                               creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
         _DANG_NHAP.update(ma=ma, pr=pr)
     return {"ok": True}
