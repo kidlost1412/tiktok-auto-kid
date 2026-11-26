@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).parent))
 from ai import goi, lay_json  # noqa: E402
+import phieu  # noqa: E402
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
@@ -51,7 +52,12 @@ def soat(ma):
     f = HUB / "san-pham" / ma / "canh.json"
     shots = json.loads(f.read_text(encoding="utf-8"))
     lai = "--lai" in sys.argv
-    can = [s["id"] for s in shots if ("soat" not in s or (lai and ("chu_muc" not in s["soat"] or "nhan" not in s["soat"]))) and (HUB / "san-pham" / ma / "_khung" / f"{s['id']}.jpg").exists()]
+    co_anh = lambda s: (HUB / "san-pham" / ma / "_khung" / f"{s['id']}.jpg").exists()
+    can = [s["id"] for s in shots if ("soat" not in s or (lai and ("chu_muc" not in s["soat"] or "nhan" not in s["soat"]))) and co_anh(s)]
+    # kho kiểu 3: phiếu đã có mọi trường soát trừ KHUNG NHÃN → cảnh thấy SP chính mà chưa định vị chai thì soát riêng để lấy "nhan"
+    chi_nhan = {s["id"] for s in shots if s.get("kieu") == 3 and s.get("nhan_can_hop") and not (s.get("soat") or {}).get("nhan")
+                and not s.get("nhan_da_tim") and s["id"] not in can and co_anh(s)}
+    can += sorted(chi_nhan)
     n = COLS * ROWS
     nhom = [can[i:i + n] for i in range(0, len(can), n)]
     print(f"{ma}: soát {len(can)} cảnh / {len(nhom)} tờ")
@@ -73,6 +79,10 @@ def soat(ma):
     for s in shots:
         if int(s["id"]) in kq:
             x = kq[int(s["id"])]
+            if s["id"] in chi_nhan:                  # chỉ bù khung nhãn, giữ các trường phiếu v3 đã ghi; đã tìm mà không thấy → null + đánh dấu
+                s["soat"]["nhan"] = phieu._nhan(x.get("nhan"))[0]        # kiểm 4 số 0–1 + nới mép như phiếu kiểu 2
+                s["nhan_da_tim"] = True
+                continue
             s["soat"] = {k: x.get(k) for k in ("mat", "chu_muc", "hang_khac", "dep", "nhan", "ghi")}
     f.write_text(json.dumps(shots, ensure_ascii=False, indent=1), encoding="utf-8")
     ok = [s for s in shots if s.get("soat") and not bad(s)]
@@ -85,7 +95,7 @@ def bad(s, chinh=True):
     if s.get("cam"):                                          # kho kiểu 3: luật cấm chung phieu_v3.cam (giá/quà trên hình, SP khác đọc được tên, mờ, chữ che)
         return True
     x = s.get("soat") or {}
-    chu = x.get("chu_muc", 2 if x.get("chu") else 0)
+    chu = x.get("chu_muc", 2 if x.get("chu") else 0) or 0         # AI bỏ trống → coi như không có chữ
     return bool(chu >= 2 or (x.get("dep") or 3) <= 1)        # Kid 14/11: có hàng hãng khác làm nền vẫn dùng (chỉ không làm cảnh chai chốt — xem bo_cuc.la_chai)
 
 

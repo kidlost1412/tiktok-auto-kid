@@ -133,6 +133,8 @@ def tuy_chon(rng, shot=None, vien="white"):
          "ox": round(rng.uniform(0.15, 0.85), 2), "oy": round(rng.uniform(0.2, 0.7), 2), "z": rng.choice([1.25, 1.35, 1.45])}
     p, ax, ay = punch_an_toan(round(rng.uniform(0.04, 0.10), 3), round(rng.uniform(0, 1), 3), round(rng.uniform(0, 1), 3),
                               ((shot or {}).get("soat") or {}).get("nhan"))
+    if (shot or {}).get("nhan_can_hop") and not ((shot or {}).get("soat") or {}).get("nhan"):
+        p = 0.0                                           # kho kiểu 3: có chai SP mà chưa định vị nhãn → không phóng, khỏi cắt mất nhãn
     o.update(punch=p, ax=ax, ay=ay, toc_do=rng.choice([0.92, 0.96, 1.0, 1.04, 1.08]), hue=rng.choice([-2, -1, 0, 1, 2]),
              tp=round(rng.uniform(0.98, 1.03), 3), huong=rng.choice([-1, 1]), truc=rng.choice(["x", "y"]))
     return o

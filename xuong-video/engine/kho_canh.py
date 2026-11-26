@@ -130,6 +130,8 @@ def _gop_v3(cu, v3_shots, file_v3, so, sp_dir):
             dung_o.add(i); dung_n.add(j)
             n, o = moi_f[j], cu_f[i]
             n["id"] = o["id"]
+            if o.get("kieu") == 3 and o.get("dep") == n.get("dep") and o.get("nhan_da_tim"):    # cùng khung ảnh → giữ khung nhãn đã soát
+                n["soat"]["nhan"] = (o.get("soat") or {}).get("nhan"); n["nhan_da_tim"] = True
             if o.get("dep") != n.get("dep"):
                 (sp_dir / "_khung" / f"{o['id']}.jpg").unlink(missing_ok=True)     # giữ id nhưng mốc đổi → cắt lại ảnh
         for j, n in enumerate(moi_f):

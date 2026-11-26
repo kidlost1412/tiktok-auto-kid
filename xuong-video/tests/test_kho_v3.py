@@ -237,5 +237,62 @@ class NapKhoV3Test(unittest.TestCase):
         self.assertEqual(sorted(x["id"] for x in self._canh()), sorted(c0))
 
 
+class PhongChaiChuaDinhViTest(unittest.TestCase):
+    def test_co_chai_thieu_hop_khong_phong(self):
+        import random, bo_cuc
+        for i in range(20):
+            o = bo_cuc.tuy_chon(random.Random(i), {"nhan_can_hop": True, "soat": {"nhan": None}})
+            self.assertEqual(o["punch"], 0.0)
+        self.assertTrue(any(bo_cuc.tuy_chon(random.Random(i), {"soat": {"nhan": None}})["punch"] > 0 for i in range(5)))   # kho cũ: như trước
+
+
+class KhungNhanV3Test(NapKhoV3Test):
+    """Phiếu v3 không có tọa độ nhãn → soát kho bù RIÊNG trường nhan, không thay các trường phiếu đã ghi."""
+    def setUp(self):
+        super().setUp()
+        self._shub = soat_kho.HUB; soat_kho.HUB = self.hub
+
+    def tearDown(self):
+        soat_kho.HUB = self._shub
+        super().tearDown()
+
+    def _soat(self, tra):
+        from unittest import mock
+        from PIL import Image
+        (self.sp / "_khung").mkdir(exist_ok=True)
+        for x in self._canh():
+            Image.new("RGB", (27, 48)).save(self.sp / "_khung" / f"{x['id']}.jpg")
+        with mock.patch.object(soat_kho, "goi", side_effect=lambda *a, **k: (json.dumps(tra(a[1])), {})), \
+                mock.patch.object(soat_kho, "dung_prompt", side_effect=lambda sp, ids: " ".join(ids)), mock.patch.object(sys, "argv", ["x"]):
+            soat_kho.soat("tc")
+
+    def test_co_chai_thieu_hop_chi_bu_nhan(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1, nguoi={"kieu": "dung_noi", "mat_ro": True, "noi_vao_may": True},
+                                 viec=[{"ma": "noi_vao_may", "vat": None, "dich": None}]), _doan(3.1, 7, vat_thay=[])], 7)
+        kc.nap("tc")
+        hoi = []
+        self._soat(lambda p: hoi.append(p) or [{"id": i, "mat": 0, "chu_muc": 2, "hang_khac": True, "dep": 1, "nhan": [0.2, 0.2, 0.6, 0.8], "ghi": "x"}
+                                              for i in p.split()])
+        c = {x["id"]: x for x in self._canh()}
+        a = sorted([x for x in c.values() if x["file"] == "a.mp4"], key=lambda x: x["tu"])
+        self.assertEqual(a[0]["soat"]["mat"], 2); self.assertEqual(a[0]["soat"]["chu_muc"], 0)      # phiếu giữ nguyên
+        self.assertTrue(a[0]["nhan_da_tim"]); self.assertLess(a[0]["soat"]["nhan"][0], 0.2)       # đã nới mép
+        self.assertNotIn(a[1]["id"], " ".join(hoi))                                                # không thấy SP → không hỏi
+        kc.nap("tc")                                                                               # nạp lại: giữ khung nhãn
+        a2 = {x["id"]: x for x in self._canh()}[a[0]["id"]]
+        self.assertEqual(a2["soat"]["nhan"], a[0]["soat"]["nhan"])
+        hoi.clear(); self._soat(lambda p: hoi.append(p) or [])
+        self.assertNotIn(a[0]["id"], " ".join(hoi))                                                # không hỏi lại
+
+    def test_tim_khong_thay_nhan_la_null_da_tim(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 7)], 7)
+        kc.nap("tc")
+        self._soat(lambda p: [{"id": i, "nhan": None} for i in p.split()])
+        x = [x for x in self._canh() if x["file"] == "a.mp4"][0]
+        self.assertIsNone(x["soat"]["nhan"]); self.assertTrue(x["nhan_da_tim"])
+
+
 if __name__ == "__main__":
     unittest.main()
