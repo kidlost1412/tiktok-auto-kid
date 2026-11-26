@@ -187,8 +187,16 @@ def _noi_id(ls, f_noi):
             return [i]
         return [z for j in bang[i] for z in giai(j, da + (i,))]
 
-    def doi(ids):
-        return list(dict.fromkeys(z for i in ids for z in giai(i)))
+    def doi(ids):       # chỉ khử trùng id SINH RA từ bảng nối; id không đổi giữ nguyên thứ tự + lần lặp (mo_chot_gan đọc id cuối)
+        ra, da = [], set()
+        for i in ids:
+            g = giai(i)
+            if g == [i]:
+                ra.append(i); continue
+            for z in g:
+                if z not in da:
+                    da.add(z); ra.append(z)
+        return ra
     return [{**r, "ids": doi(r["ids"]), "phu": doi(r["phu"])} for r in ls]
 
 

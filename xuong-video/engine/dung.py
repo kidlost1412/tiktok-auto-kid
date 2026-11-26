@@ -161,12 +161,15 @@ def render(plan, voice, shots, kho, out_path, music=None):
         extra = tds[i] if i < len(segs) - 1 else 0
         d = sg["dur"] + extra
         L = layouts[i]; opt = BC.tuy_chon(rng, sg["shot"], vien)
-        if L == "day" and (sg.get("doi_khung") or sg["dur"] > 2.8):    # khung toàn màn nguyên gốc > 2,8 s → đổi khung giữa đoạn (không đổi kiểu)
-            BC.dat_doi_khung(opt, (sg["shot"].get("soat") or {}).get("nhan"))
+        nhan_ = (sg["shot"].get("soat") or {}).get("nhan")
+        khoa_nhan = sg["shot"].get("nhan_can_hop") and not nhan_       # kho kiểu 3: có chai SP mà chưa định vị nhãn → không phóng nửa sau
+        if L == "day" and not khoa_nhan and (sg.get("doi_khung") or sg["dur"] > 2.8):    # khung toàn màn nguyên gốc > 2,8 s → đổi khung giữa đoạn (không đổi kiểu)
+            BC.dat_doi_khung(opt, nhan_)
         scmd, k = ["ffmpeg", "-v", "error", "-y"], 0
         sh_ = sg["shot"]; con = float(sh_.get("den", sh_["tu"] + sh_["dai"])) - float(sg["src_start"])   # phần cảnh còn được dùng
-        if 0.3 < con < d - 0.1:              # không đọc lố sang đoạn đã loại (lỗi rà soát #16): quay chậm ≤ 1,6 lần, thiếu nữa thì giữ khung cuối
-            opt["cham"] = round(min(1.6, d / con), 3); doc = con
+        if 0.3 < con < (d + 0.05 if sh_.get("kieu") == 3 else d - 0.1):   # kiểu 3: mép cảnh sát đoạn cấm → không đọc lố dù chỉ 0,1 s
+            # không đọc lố sang đoạn đã loại (lỗi rà soát #16): quay chậm ≤ 1,6 lần, thiếu nữa thì giữ khung cuối
+            opt["cham"] = round(max(1.0, min(1.6, d / con)), 3); doc = con
         else:
             doc = d + 0.05
             v = float(opt.get("toc_do") or 1.0)      # cảnh còn dài hơn cần → đổi tốc độ 0,92–1,08 (khác nhịp với đoạn cùng cảnh ở video khác)

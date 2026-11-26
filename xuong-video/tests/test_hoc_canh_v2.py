@@ -418,6 +418,19 @@ class HocKhoV2Test(unittest.TestCase):
         r = self._chay(gia.runner_gia(log), chi=["khong-co.mp4"])                      # không video nào hợp lệ → không có gì để học
         self.assertEqual((r["da_hoc"], len(log)), (0, 0)); self.assertEqual(hc.JOB["thong_bao"], "Kho đã đủ mô tả.")
 
+    def test_hoc_lai_kieu_cu_khong_ghi_de_phieu_v3(self):
+        import phieu_v3
+        from test_kho_v3 import _video, _doan
+        self._videos(2); log = []
+        self._chay(gia.runner_gia(log))
+        f3 = self.kho / "_mo-ta" / ("v1.mp4" + phieu_v3.DUOI)
+        f3.write_text(json.dumps(phieu_v3.mo_ta(_video([_doan(0, 20), _doan(20, 40)]), "v1.mp4", 40.0), ensure_ascii=False), encoding="utf-8")
+        goc = f3.read_text(encoding="utf-8")
+        r = self._chay(gia.runner_gia(log), chi=["v1.mp4"], kieu3=False)      # cờ kiểu 3 tắt, bấm "Học lại video này"
+        self.assertEqual(r["da_hoc"], 1)
+        self.assertEqual(f3.read_text(encoding="utf-8"), goc)                 # phiếu v3 nguyên vẹn
+        self.assertEqual(self._mo_ta("v1.mp4")["kieu"], 2)
+
     def test_chi_hoc_video_chua_co_mo_ta(self):
         self._videos(2); log = []
         r = self._chay(gia.runner_gia(log), chi=["v1.mp4"])

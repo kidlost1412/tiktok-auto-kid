@@ -1607,6 +1607,8 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                 for r in dict.fromkeys(str(x).replace("\\", "/") for x in chi):
                     if r in ton:
                         k, f = cu.get(r) or (0, hong.get(r))
+                        if k == 3:                                   # đang học kiểu cũ: không ghi đè phiếu v3 → ghi vào <video>.mo-ta.json
+                            k, f = 0, None
                         viec.append((r, f, 1 if k == 1 else 0))
             elif lai:                                                        # học lại mọi video chưa phải kiểu 2
                 co = {r for r, _f, _k in viec}

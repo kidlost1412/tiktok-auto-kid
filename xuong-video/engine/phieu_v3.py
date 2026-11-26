@@ -176,7 +176,7 @@ def cam(doan, vat):
     vat = _vat(vat)
     ly = []
     gq = doan.get("gia_qua") or {}
-    if gq.get("chu_dan") or gq.get("tren_vat") or any(x.get("loai") in ("gia", "qua_km") for x in doan.get("chu_dan") or []):
+    if gq.get("chu_dan") or gq.get("tren_vat") or gq.get("chu_dan", []) is None or gq.get("tren_vat", []) is None or any(x.get("loai") in ("gia", "qua_km") for x in doan.get("chu_dan") or []):
         ly.append("gia_qua")
     if any((vat.get(x.get("id")) or {}).get("la", "").startswith("sp_khac") and x.get("ten_doc") for x in doan.get("vat_thay") or []):
         ly.append("sp_khac")

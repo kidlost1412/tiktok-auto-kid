@@ -76,7 +76,7 @@ def canh_pool(ma, tien_to="V-"):
     out = []
     for s in json.loads((d / "canh.json").read_text(encoding="utf-8")):
         x0 = s.get("soat") or {}
-        if not x0 or bad(s) or x0.get("nhan") or x0.get("hang_khac") or {"chai_ro", "nhan_can", "kho_hang"} & set(s.get("vai_tro", [])):
+        if not x0 or bad(s) or x0.get("nhan") or x0.get("hang_khac") or s.get("nhan_can_hop") or {"chai_ro", "nhan_can", "kho_hang"} & set(s.get("vai_tro", [])):
             continue
         x = dict(s); x["id"] = tien_to + s["id"]; x["file"] = str(Path(sp["kho_video"]) / s["file"])
         x.setdefault("dep", [s["tu"], s.get("den", s["tu"] + s["dai"])])

@@ -3,7 +3,7 @@ python kho_canh.py <ma-san-pham>
 → san-pham/<ma>/canh.json (giữ tương thích máy dựng: id, file, tu, den, dai, crop, vai_tro) + san-pham/<ma>/_khung/<id>.jpg
 Lọc: điểm < 3, chữ chèn sẵn, sản phẩm hãng khác, người nói vào máy (lời đọc AI sẽ lệch khẩu hình), file trong loai_tru.
 Không đụng video gốc."""
-import json, subprocess, sys
+import json, os, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -66,6 +66,18 @@ def _doc_v3(kho, bo_file, bo):
     return kq
 
 
+def _k(f):
+    """Khóa so đường dẫn video: dấu /, không phân biệt hoa/thường (Windows coi Vườn.MP4 và vườn.mp4 là một file)."""
+    return Path(str(f)).as_posix().casefold()
+
+
+def _ghi(p, text):
+    """Ghi nguyên tử: .tmp rồi thay → mất điện/đầy đĩa giữa chừng không để lại JSON dở."""
+    t = p.with_name(p.name + ".tmp")
+    t.write_text(text, encoding="utf-8")
+    os.replace(t, p)
+
+
 def _iou(x, y):
     giao = min(x[1], y[1]) - max(x[0], y[0])
     return max(0.0, giao) / (max(x[1], y[1]) - min(x[0], y[0]))
@@ -75,30 +87,36 @@ def _moc(x):
     return x.get("goc") or [x["tu"], x["den"]]
 
 
-def _ban_chup(sp_dir, giu=10):
-    """Sao kho đang dùng (canh.json + bộ đếm + bảng nối id) vào _ban-chup/<giờ>/ trước khi ghi — để quay lui."""
+TRUOC_V3 = "-truoc-v3"
+
+
+def _ban_chup(sp_dir, giu=10, truoc_v3=False):
+    """Sao kho đang dùng (canh.json + bộ đếm + bảng nối id) vào _ban-chup/<giờ>/ trước khi ghi — để quay lui.
+    truoc_v3: kho lúc này CHƯA có cảnh kiểu 3 (lần chuyển tắt → bật) → tên đuôi -truoc-v3, giữ mãi; kho trống vẫn chụp (thư mục rỗng)."""
     import datetime, shutil
     co = [sp_dir / n for n in ("canh.json", "canh-id.json", "canh-id-noi.json") if (sp_dir / n).exists()]
-    if not co:
+    if not co and not truoc_v3:
         return None
-    ten = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    ten = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f") + (TRUOC_V3 if truoc_v3 else "")
     d, i = sp_dir / "_ban-chup" / ten, 0
     while d.exists():                                   # đồng hồ Windows thô → 2 lần nạp sát nhau trùng tên: không ghi đè bản cũ
         i += 1; d = sp_dir / "_ban-chup" / f"{ten}-{i:02d}"
     d.mkdir(parents=True)
     for f in co:
         shutil.copy2(f, d / f.name)
-    for cu in sorted((sp_dir / "_ban-chup").iterdir())[1:-giu]:      # bản đầu tiên (trước khi bật kiểu 3) luôn giữ để quay lui
+    for cu in [x for x in sorted((sp_dir / "_ban-chup").iterdir()) if not x.name.endswith(TRUOC_V3)][:-giu]:   # bản trước-khi-bật luôn giữ
         shutil.rmtree(cu, ignore_errors=True)
     return d
 
 
 def quay_lui(ma, ban=None):
-    """Tắt kho kiểu 3 của sản phẩm và trả canh.json về bản chụp (mặc định: bản cũ nhất còn giữ trước lần bật). Lịch sử dùng cảnh không bị đụng."""
+    """Tắt kho kiểu 3 của sản phẩm và trả canh.json về bản chụp (mặc định: bản chụp ngay trước LẦN BẬT GẦN NHẤT). Lịch sử dùng cảnh không bị đụng.
+    Bộ đếm id giữ nguyên (không lùi) → cảnh nạp sau này không nhận lại id kiểu 3 đã nằm trong lịch sử."""
     import shutil
     sp_dir = HUB / "san-pham" / ma
     chup = sorted((sp_dir / "_ban-chup").iterdir()) if (sp_dir / "_ban-chup").exists() else []
-    d = sp_dir / "_ban-chup" / ban if ban else (chup[0] if chup else None)
+    truoc = [x for x in chup if x.name.endswith(TRUOC_V3)]
+    d = sp_dir / "_ban-chup" / ban if ban else (truoc[-1] if truoc else chup[0] if chup else None)
     f_sp = sp_dir / "san-pham.json"
     sp = json.loads(f_sp.read_text(encoding="utf-8"))
     sp["kho_v3"] = False
@@ -120,10 +138,10 @@ def _gop_v3(cu, v3_shots, file_v3, so, sp_dir):
     giu, noi = [], {}
     theo_file = {}
     for x in v3_shots:
-        theo_file.setdefault(x["file"], []).append(x)
+        theo_file.setdefault(_k(x["file"]), []).append(x)
     for f in file_v3:
-        cu_f = [y for y in cu if Path(y["file"]).as_posix() == f]
-        moi_f = theo_file.get(f, [])
+        cu_f = [y for y in cu if _k(y["file"]) == _k(f)]
+        moi_f = theo_file.get(_k(f), [])
         cap = sorted(((_iou(_moc(o), _moc(n)), o["id"], i, j) for i, o in enumerate(cu_f) for j, n in enumerate(moi_f)),
                      key=lambda t: (-t[0], t[1], t[3]))
         dung_o, dung_n = set(), set()
@@ -160,6 +178,7 @@ def nap(ma):
     file_kieu2 = set()           # video đã học kiểu 2 (phiếu): cảnh kiểu cũ còn sót của các video này sẽ bị thay
     shots, bo = [], {"diem": 0, "chu_chen": 0, "hang_khac": 0, "nguoi_noi": 0, "khong_file": 0, "trung": 0}
     v3 = _doc_v3(kho, bo_file, bo) if sp.get("kho_v3") else {}      # cờ theo SP, mặc định tắt → y như cũ
+    v3k = {_k(f) for f in v3}
     for mt in sorted(x for x in (kho / "_mo-ta").rglob("*.mo-ta.json")
                      if not any(part.startswith("_") for part in x.relative_to(kho / "_mo-ta").parts[:-1])):   # bỏ _goc-gemini (bản sao lưu)
         try:
@@ -177,7 +196,7 @@ def nap(ma):
             bo["khong_file"] += 1; continue
         if not (kho / f).exists():
             f = str(Path(f2))
-        if Path(f).as_posix() in v3:     # đã có phiếu v3 hợp lệ → mô tả cũ không dùng (vẫn giữ file để quay lui)
+        if _k(f) in v3k:                 # đã có phiếu v3 hợp lệ → mô tả cũ không dùng (vẫn giữ file để quay lui)
             continue
         if d.get("kieu") == 2:
             file_kieu2.add(f)
@@ -242,18 +261,32 @@ def nap(ma):
     v3_shots = []
     for f, d in v3.items():
         vat = d["phieu_v3"]["vat"]
-        for c in d["canh_quay"]:
-            g = c["v3"]
-            a, b = float(g["tu"]), float(g["den"])
+        try:
+            dai_v = float(d.get("thoi_luong_s") or 0) or 1e9
+        except Exception:
+            dai_v = 1e9
+        ds = [(c["v3"], phieu_v3.shot_cu(c["v3"], vat, sp)) for c in d["canh_quay"]]
+        # đoạn cấm + bo_qua: phiếu cho phép mép chồng ≤ 0,3 s → cắt phần chồng khỏi đoạn sạch, kẻo lóe giá/quà ở mép cảnh
+        xau = [(float(g["tu"]), float(g["den"])) for g, s0 in ds if s0["cam"]] + \
+              [(float(b["tu"]), float(b["den"])) for b in d["phieu_v3"].get("bo_qua") or []]
+        for g, s0 in ds:
+            if s0["cam"]:            # cảnh cấm (giá/quà trên hình, hàng khác đọc được tên, mờ, chữ che) KHÔNG vào kho → đạo diễn, máy dự phòng, ô phụ, giám khảo sửa đều không lấy được
+                bo["v3_cam"] = bo.get("v3_cam", 0) + 1; continue
+            a, b = max(0.0, float(g["tu"])), min(dai_v, float(g["den"]))
+            for x0, x1 in xau:
+                if x0 < b and x1 > a:
+                    if x0 <= a:
+                        a = x1
+                    elif x1 >= b:
+                        b = x0
             if b - a < 1.0:
                 bo["v3_ngan"] = bo.get("v3_ngan", 0) + 1; continue
             dau = 0.3 if a < 0.3 else 0
             dung = {x.get("id") for x in g.get("vat_thay") or []} | {x.get("vat") for x in g.get("viec") or []}
-            shot = {"id": None, "file": f, "tu": round(a + dau, 2), "den": round(b, 2), "dai": round(b - a - dau, 2), "goc": [a, b],
-                    "crop": sp.get("cat_khung", {}).get(f), "kieu": 3, **phieu_v3.shot_cu(g, vat, sp),
-                    "v3": g, "vat": [x for x in vat if x.get("id") in dung]}
-            if shot["cam"]:          # cảnh cấm (giá/quà trên hình, hàng khác đọc được tên, mờ, chữ che) KHÔNG vào kho → đạo diễn, máy dự phòng, ô phụ, giám khảo sửa đều không lấy được
-                bo["v3_cam"] = bo.get("v3_cam", 0) + 1; continue
+            shot = {"id": None, "file": f, "tu": round(a + dau, 2), "den": round(b, 2), "dai": round(b - a - dau, 2), "goc": [float(g["tu"]), float(g["den"])],
+                    "crop": sp.get("cat_khung", {}).get(f), "kieu": 3, **s0, "v3": g, "vat": [x for x in vat if x.get("id") in dung]}
+            k0, k1 = max(shot["tu"], shot["dep"][0]), min(shot["den"], shot["dep"][1])
+            shot["dep"] = [round(k0, 2), round(k1, 2)] if k1 > k0 else [shot["tu"], shot["den"]]
             v3_shots.append(shot)
     f_id = sp_dir / "canh-id.json"
     try:
@@ -261,26 +294,29 @@ def nap(ma):
     except Exception:
         cuoi = -1
     f_cu = sp_dir / "canh.json"
-    moi_v3 = []
-    if v3 and not f_cu.exists():
+    f_noi = sp_dir / "canh-id-noi.json"
+    cu = json.loads(f_cu.read_text(encoding="utf-8")) if f_cu.exists() else None
+    id_goc = [int(x["id"]) for x in cu or [] if str(x.get("id", "")).isdigit()]
+    moi_v3, bang = [], None
+    if v3:
+        _ban_chup(sp_dir, truoc_v3=not any(x.get("kieu") == 3 for x in cu or []))
+    if v3 and cu is None:
         so = max(len(shots), cuoi + 1)
         for x in v3_shots:
             x["id"] = f"{so:04d}"; so += 1
         shots += v3_shots
-    if v3:
-        _ban_chup(sp_dir)
-    if f_cu.exists():
-        cu = json.loads(f_cu.read_text(encoding="utf-8"))
+    if cu is not None:
+        if not sp.get("kho_v3") and any(x.get("kieu") == 3 for x in cu):     # đã tắt kiểu 3 → bỏ cảnh kiểu 3 + bảng nối, mô tả cũ nạp lại
+            cu = [x for x in cu if x.get("kieu") != 3]
+            bang = {}
         theo_khoa = {(x["file"], round(x["tu"], 1)): x for x in cu}
-        so = max([int(x["id"]) for x in cu] + [-1, cuoi if v3 else -1]) + 1
+        so = max(id_goc + [-1, cuoi]) + 1                # bộ đếm bền: không cấp lại id đã từng có (kể cả sau quay lui / tắt)
         if v3:                                       # video có phiếu v3: thay trọn tập cảnh, giữ id theo IoU
             moi_v3, noi, so = _gop_v3(cu, v3_shots, set(v3), so, sp_dir)
-            cu = [x for x in cu if Path(x["file"]).as_posix() not in v3]
+            cu = [x for x in cu if _k(x["file"]) not in v3k]
             theo_khoa = {(x["file"], round(x["tu"], 1)): x for x in cu}
-            f_noi = sp_dir / "canh-id-noi.json"
             bang = json.loads(f_noi.read_text(encoding="utf-8")) if f_noi.exists() else {}
             bang.update(noi)
-            f_noi.write_text(json.dumps(bang, ensure_ascii=False, indent=1), encoding="utf-8")
         moi_khoa = {(x["file"], round(x["tu"], 1)) for x in shots}
         # cảnh cũ: bỏ nếu file gốc không còn hoặc đã đưa vào loai_tru (lỗi rà soát #9); video đã học kiểu 2 thì chỉ giữ cảnh có trong mô tả mới
         gop = [x for x in cu if x["file"] not in bo_file and ((kho / x["file"]).exists() or Path(x["file"]).is_absolute() and Path(x["file"]).exists())
@@ -299,9 +335,14 @@ def nap(ma):
         id_cu = {y["id"] for y in cu}
         print(f"  giữ {sum(1 for x in gop if x['id'] in id_cu)} cảnh cũ (id + kết quả soát), cảnh mới: {sum(1 for x in gop if x['id'] not in id_cu)}, bỏ {len(cu) - sum(1 for x in gop if x['id'] in id_cu)}")
         shots = gop + moi_v3
-    if v3:
-        f_id.write_text(json.dumps({"cuoi": max([int(x["id"]) for x in shots] + [cuoi])}), encoding="utf-8")
-    f_cu.write_text(json.dumps(shots, ensure_ascii=False, indent=1), encoding="utf-8")
+    _ghi(f_cu, json.dumps(shots, ensure_ascii=False, indent=1))
+    if bang is not None:
+        if bang:
+            _ghi(f_noi, json.dumps(bang, ensure_ascii=False, indent=1))
+        else:
+            f_noi.unlink(missing_ok=True)
+    if v3 or f_id.exists():
+        _ghi(f_id, json.dumps({"cuoi": max([int(x["id"]) for x in shots if str(x["id"]).isdigit()] + id_goc + [cuoi])}))
     print(f"{ma}: {len(shots)} cảnh dùng được; bỏ {bo}")
     return shots, kho
 

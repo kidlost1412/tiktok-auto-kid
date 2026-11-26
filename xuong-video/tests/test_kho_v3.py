@@ -307,5 +307,104 @@ class KhungNhanV3Test(NapKhoV3Test):
         self.assertIsNone(x["soat"]["nhan"]); self.assertTrue(x["nhan_da_tim"])
 
 
+class RaSoatChatGPTTest(NapKhoV3Test):
+    """Lỗi bản rà 26/11 (ChatGPT) — mỗi test một lỗi đã sửa."""
+    def _bat(self, doan, dai=7, bo_qua=()):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        v = _video(doan, bo_qua)
+        (self.kho / "_mo-ta" / f"a.mp4{p3.DUOI}").write_text(json.dumps(p3.mo_ta(v, "a.mp4", dai), ensure_ascii=False), encoding="utf-8")
+        return kc.nap("tc")[0]
+
+    def test_cat_mep_chong_doan_cam(self):
+        gia = {"chu_dan": [{"tu": 3.2, "den": 4.5, "trich": None}], "tren_vat": [], "loi": []}
+        s = self._bat([_doan(0, 3.2), _doan(3.0, 5, gia_qua=gia), _doan(5, 7)])
+        a = sorted([x for x in s if x["file"] == "a.mp4"], key=lambda x: x["tu"])
+        self.assertEqual(len(a), 2)
+        self.assertLessEqual(a[0]["den"], 3.0)                             # 0,2 s có giá ở mép bị cắt
+        self.assertLessEqual(a[0]["dep"][1], a[0]["den"])
+
+    def test_cat_mep_bo_qua(self):
+        s = self._bat([_doan(0, 4.2), _doan(6, 7)], bo_qua=[{"tu": 4.0, "den": 6, "ly_do": "màn hình đen"}])
+        self.assertLessEqual(min(x["den"] for x in s if x["file"] == "a.mp4" and x["tu"] < 1), 4.0)
+
+    def test_kenh_gia_chua_kiem_la_cam(self):
+        x = _doan(0, 4, gia_qua={"chu_dan": [], "tren_vat": None, "loi": []})
+        self.assertIn("gia_qua", p3.cam(x, _video([])["vat"]))
+
+    def test_tat_co_bo_canh_v3_va_bang_noi(self):
+        c0 = sorted(x["id"] for x in kc.nap("tc")[0])
+        self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 4.5), _doan(4.5, 5.8), _doan(5.8, 7)], 7)
+        kc.nap("tc"); ids_v3 = {x["id"] for x in self._canh() if x.get("kieu") == 3}
+        self._sp({"kho_v3": False})                                          # tắt công tắc trên app (không quay lui)
+        kc.nap("tc")
+        c = self._canh()
+        self.assertFalse(any(x.get("kieu") == 3 for x in c))
+        self.assertFalse((self.sp / "canh-id-noi.json").exists())
+        self.assertEqual(len([x for x in c if x["file"] == "a.mp4"]), 2)      # mô tả cũ nạp lại
+        self.assertFalse({x["id"] for x in c} & ids_v3 - set(c0))           # id mới không trùng id kiểu 3 đã cấp
+
+    def test_bo_dem_khong_lui_khi_id_cao_nhat_bi_bo(self):
+        kc.nap("tc")
+        cao = max(int(x["id"]) for x in self._canh())
+        self._sp({"kho_v3": True})
+        gia = {"chu_dan": [{"tu": 4, "den": 5, "trich": None}], "tren_vat": [], "loi": []}
+        self._v3("b.mp4", [_doan(0, 5, gia_qua=gia)], 5)                    # cảnh id cao nhất (b.mp4) bị cấm → bỏ
+        kc.nap("tc")
+        self.assertGreaterEqual(json.loads((self.sp / "canh-id.json").read_text(encoding="utf-8"))["cuoi"], cao)
+
+    def test_quay_lui_ve_ban_truoc_lan_bat_gan_nhat(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 7)], 7)
+        kc.nap("tc"); kc.quay_lui("tc"); kc.nap("tc")
+        (self.kho / "c.mp4").write_bytes(b"x")                              # thêm video giữa hai lần bật
+        (self.kho / "_mo-ta" / "c.mp4.mo-ta.json").write_text(json.dumps({"video": "c.mp4", "cay_trong": [], "canh_quay": [
+            {"tu_s": 0, "den_s": 4, "diem": 4, "hinh": "vườn", "the": []}]}), encoding="utf-8")
+        kc.nap("tc"); truoc = [x["id"] for x in self._canh()]
+        self._sp({"kho_v3": True}); kc.nap("tc")
+        kc.quay_lui("tc")
+        self.assertEqual([x["id"] for x in self._canh()], truoc)            # có c.mp4: bản trước lần bật THỨ HAI
+
+    def test_quay_lui_kho_trong_truoc_khi_bat(self):
+        self._sp({"kho_v3": True})
+        self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 7)], 7)
+        kc.nap("tc")
+        kc.quay_lui("tc")
+        self.assertFalse((self.sp / "canh.json").exists())                  # về đúng trạng thái trước: chưa có kho
+
+    def test_hoa_thuong_ten_file(self):
+        kc.nap("tc"); self._sp({"kho_v3": True})
+        v = _video([_doan(0, 3.1), _doan(3.1, 7)])
+        (self.kho / "_mo-ta" / f"A.MP4{p3.DUOI}").write_text(json.dumps(p3.mo_ta(v, "A.MP4", 7), ensure_ascii=False), encoding="utf-8")
+        if not (self.kho / "A.MP4").exists():
+            self.skipTest("hệ tệp phân biệt hoa/thường")
+        kc.nap("tc")
+        a = [x for x in self._canh() if x["file"].casefold() == "a.mp4"]
+        self.assertTrue(a and all(x.get("kieu") == 3 for x in a))           # cảnh cũ "a.mp4" không sống sót song song
+
+    def test_noi_id_giu_thu_tu_va_lap(self):
+        f = self.sp / "canh-id-noi.json"
+        f.write_text(json.dumps({"0009": ["0100", "0101"]}), encoding="utf-8")
+        ls = dd._noi_id([{"ngay": None, "ids": ["A", "B", "A"], "phu": []}, {"ngay": None, "ids": ["0009", "C", "0009"], "phu": []}], f)
+        self.assertEqual(ls[0]["ids"], ["A", "B", "A"])                     # chốt vẫn là A
+        self.assertEqual(ls[1]["ids"], ["0100", "0101", "C"])
+
+    def test_kho_phu_khong_muon_canh_co_chai(self):
+        import kho_chung
+        old = kho_chung.SP; kho_chung.SP = self.hub / "san-pham"
+        try:
+            self._sp({"kho_v3": True})
+            self._v3("a.mp4", [_doan(0, 3.1), _doan(3.1, 7)], 7)
+            kc.nap("tc")
+            c = self._canh()
+            for x in c:
+                x["soat"] = {**(x.get("soat") or {}), "nhan": None, "mat": 0, "chu_muc": 0}; x["vai_tro"] = ["vuon"]
+            c[0]["nhan_can_hop"] = False                                     # đối chứng: cảnh không thấy chai vẫn cho mượn
+            (self.sp / "canh.json").write_text(json.dumps(c), encoding="utf-8")
+            self.assertEqual([x["id"] for x in kho_chung.canh_pool("tc")], ["V-" + c[0]["id"]])
+        finally:
+            kho_chung.SP = old
+
+
 if __name__ == "__main__":
     unittest.main()

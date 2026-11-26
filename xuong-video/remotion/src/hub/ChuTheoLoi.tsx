@@ -63,11 +63,15 @@ const TuChinh: React.FC<{b: LoiKhoi; px: number; t: number}> = ({b, px, t}) => {
   const {fps} = useVideoConfig();
   const base: React.CSSProperties = {fontFamily: b.font, fontWeight: 900, fontSize: px, lineHeight: LH, whiteSpace: 'nowrap', ...matChu(b, px, t)};
   if (t < 0) return <div style={{...base, opacity: 0}}>{b.key}</div>;
-  if (b.mode === 'roi') {              // từng chữ cái rơi từ trên xuống, nảy nhẹ khi chạm (2 khung/chữ)
+  // NFC: dấu tiếng Việt dạng tổ hợp không bị tách thành chữ riêng; nhịp từng chữ co lại khi từ dài để chữ cuối kịp hiện trước khi khối hết
+  const chu = Array.from(b.key.normalize('NFC'));
+  const con = Math.max(1, b.f1 - b.kf - 8);
+  if (b.mode === 'roi') {              // từng chữ cái rơi từ trên xuống, nảy nhẹ khi chạm (≤ 2 khung/chữ)
     const {khung, mat} = tachMat(base);
-    return <div style={khung}>{Array.from(b.key).map((c, i) => {
-      const s = spring({frame: t - i * 2, fps, config: {damping: 11, stiffness: 210}});
-      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i * 2 ? clamp(s * 1.6, 0, 1) : 0, transform: `translateY(${(1 - s) * -px * 0.55}px)`,
+    const n = Math.min(2, Math.max(0.4, con / chu.length));
+    return <div style={khung}>{chu.map((c, i) => {
+      const s = spring({frame: t - i * n, fps, config: {damping: 11, stiffness: 210}});
+      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i * n ? clamp(s * 1.6, 0, 1) : 0, transform: `translateY(${(1 - s) * -px * 0.55}px)`,
         whiteSpace: 'pre'}}>{c}</span>;
     })}</div>;
   }
@@ -94,9 +98,10 @@ const TuChinh: React.FC<{b: LoiKhoi; px: number; t: number}> = ({b, px, t}) => {
   if (b.mode === 'type') {             // từng chữ cái bật ra trái → phải (~1 chữ/khung), chữ mới nhỏ nhô lên rồi hạ
     // Mặt chữ đặt trên TỪNG chữ cái: chữ bóng (background-clip:text) đặt ở khối cha + chữ con có transform → Chrome dồn các chữ thành một cục (lỗi Kid 26/11)
     const {khung, mat} = tachMat(base);
-    return <div style={khung}>{Array.from(b.key).map((c, i) => {
-      const u = clamp((t - i) / 3, 0, 1);
-      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i ? 1 : 0, transform: `translateY(${(1 - u) * -px * 0.12}px) scale(${0.7 + 0.3 * u})`,
+    const n = Math.min(1, Math.max(0.3, con / chu.length));
+    return <div style={khung}>{chu.map((c, i) => {
+      const u = clamp((t - i * n) / 3, 0, 1);
+      return <span key={i} style={{...mat, display: 'inline-block', opacity: t >= i * n ? 1 : 0, transform: `translateY(${(1 - u) * -px * 0.12}px) scale(${0.7 + 0.3 * u})`,
         whiteSpace: 'pre'}}>{c}</span>;
     })}</div>;
   }
