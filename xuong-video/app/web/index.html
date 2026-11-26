@@ -712,8 +712,9 @@ details.kt-tech .stat{margin-top:12px}
           <select id="durChon"><option value="10-15">10–15 giây</option><option value="15-20">15–20 giây</option><option value="20-25">20–25 giây (mặc định)</option><option value="25-30">25–30 giây</option><option value="30-40">30–40 giây</option><option value="tuy">Tuỳ chỉnh</option></select>
           <div class="dur-in hidden" id="durTuy">Từ <input type="number" id="durMin" min="10" max="57" step="1" value="20"> đến <input type="number" id="durMax" min="13" max="60" step="1" value="25"> giây <span>(10–60 giây, cách nhau ít nhất 3)</span></div>
           <p class="note" style="margin:8px 0 0">AI viết lời vừa đủ dài cho khoảng này; mỗi sản phẩm tự nhớ lựa chọn (tự động cũng dùng).</p></div>
-        <div><label for="tkDung">Chạy bằng tài khoản Claude</label><select id="tkDung" disabled><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
-        <div class="f-tg"><label class="tg"><input type="checkbox" id="tkChuyen" class="sw" disabled> Hết thì tự đổi tài khoản</label></div>
+        <div><label for="prNao">AI làm video</label><select id="prNao"><option value="claude">Claude</option><option value="gpt">ChatGPT</option><option value="agy">Antigravity (Gemini)</option></select><p class="note" id="prNaoMoTa" style="margin:6px 0 0"></p></div>
+        <div><label for="tkDung" id="tkDungNhan">Chạy bằng tài khoản Claude</label><select id="tkDung" disabled><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
+        <div class="f-tg" id="tkChuyenO"><label class="tg"><input type="checkbox" id="tkChuyen" class="sw" disabled> Hết thì tự đổi tài khoản</label></div>
       </div>
       <div class="khothem hidden" id="khoThem"></div>
       <div class="cta-row">
@@ -752,7 +753,7 @@ details.kt-tech .stat{margin-top:12px}
       </div>
     <div class="card mt">
       <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
-        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = Claude (đạo diễn, giám khảo, biên kịch). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
+        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = AI làm video (Claude / ChatGPT / Antigravity: biên kịch, đạo diễn). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
         <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở hoặc thu gọn bảng chi phí từng lô" aria-label="Mở hoặc thu gọn bảng chi phí từng lô"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
       <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
     </div>
@@ -765,7 +766,7 @@ details.kt-tech .stat{margin-top:12px}
         <button class="btn ghost sm ic-only gapToggle" id="tdToggle" data-gap-key="tdBody" title="Mở hoặc thu gọn mục tự động giữ kho" aria-label="Mở hoặc thu gọn mục tự động giữ kho"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
     <div class="hidden" id="tdBody">
     <p class="help">App tự đếm video còn <b>tồn</b> (đã bấm Ưng và chưa đăng — đúng số video app TikTok Auto lấy đăng được). Tồn xuống dưới mức tối thiểu → tự làm thêm 1 lô, không vượt mức tối đa/ngày.
-      App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức Claude → tự nghỉ 60 phút rồi thử lại.<br>
+      App phải đang mở (để máy chạy qua đêm cũng được). Hết hạn mức AI làm video → tự nghỉ 60 phút rồi thử lại.<br>
       <b>Đã làm</b> = tổng video đã làm · <b>Còn tồn</b> = video đã Ưng và chưa đăng (đỏ = dưới mức; video chưa duyệt không tính — bật "Tự duyệt theo điểm" nếu muốn video mới tự được Ưng) · <b>Giữ tồn ít nhất</b> = tồn xuống dưới số này thì tự làm thêm ·
       <b>Tối đa / ngày</b> = trần mỗi ngày · <b>Mỗi lần làm</b> = mỗi lượt tự làm bao nhiêu video (vd. 10 → làm 10 video rồi kiểm lại).</p>
     <div class="tbl-wrap" style="margin-top:16px"><table class="tbl td" id="tdBang"></table></div>
@@ -1023,6 +1024,7 @@ details.kt-tech .stat{margin-top:12px}
     <div class="card" style="grid-column:1/-1">
       <div class="ch"><span class="chip"><svg class="i"><use href="#i-key"/></svg></span>
         <div class="t"><h2>Tài khoản AI</h2><p class="sub">Mỗi bên quản lý riêng: Claude, ChatGPT, Antigravity.</p></div></div>
+      <div class="row" style="gap:12px;align-items:flex-end;margin:4px 0 12px;flex-wrap:wrap"><div style="min-width:240px"><label for="aiNao">AI làm video (biên kịch, đạo diễn, soát kho)</label><select id="aiNao"><option value="claude">Claude</option><option value="gpt">ChatGPT</option><option value="agy">Antigravity (Gemini)</option></select></div><p class="note" id="aiNaoMoTa" style="margin:0 0 10px"></p></div>
       <div class="subtabs" id="aiTabs" role="tablist" style="margin-top:4px">
         <button type="button" data-ai="cl" class="on" role="tab" aria-selected="true">Claude</button>
         <button type="button" data-ai="gpt" role="tab" aria-selected="false">ChatGPT</button>
@@ -1037,10 +1039,9 @@ details.kt-tech .stat{margin-top:12px}
           tài khoản nào hết thì tự chuyển sang tài khoản khác, chỉ dừng khi mọi tài khoản đều hết.</p>
       </div>
       <div id="aiGpt" class="hidden">
-        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">ChatGPT qua Codex CLI. Bật "AI làm video = ChatGPT" thì biên kịch, đạo diễn, soát kho dùng ChatGPT thay Claude.</p>
+        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">ChatGPT qua Codex CLI. Chọn "AI làm video = ChatGPT" ở trên thì biên kịch, đạo diễn, soát kho dùng ChatGPT.</p>
           <div class="row" style="gap:8px"><button class="btn ghost" id="btnKiemGpt"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnThemGpt"><svg class="i"><use href="#i-plus"/></svg>Thêm tài khoản</button></div></div>
         <div class="grid g2e" style="gap:16px;margin-bottom:16px">
-          <div><label for="gptNao">AI làm video</label><select id="gptNao"><option value="claude">Claude (mặc định)</option><option value="gpt">ChatGPT</option></select></div>
           <div><label for="gptDung">Chạy bằng tài khoản ChatGPT</label><select id="gptDung"><option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option></select></div>
           <div><label for="gptModel">Model ChatGPT</label><select id="gptModel"></select></div>
           <div><label for="gptEffort">Độ suy nghĩ</label><select id="gptEffort"><option value="low">Thấp</option><option value="medium">Vừa</option><option value="high">Cao</option><option value="xhigh">Rất cao</option><option value="max">Tối đa</option></select></div>
@@ -1050,8 +1051,12 @@ details.kt-tech .stat{margin-top:12px}
           Danh sách model lấy thẳng từ gói của tài khoản. Codex chạy sai model thì báo lỗi chứ không tự đổi model khác. Hạn mức ChatGPT không tốn câu hỏi để kiểm.</p>
       </div>
       <div id="aiAgy" class="hidden">
-        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">Học cảnh và giám khảo chạy bằng Antigravity (Gemini). Đăng nhập trong chính app Antigravity.</p>
+        <div class="row" style="justify-content:space-between;gap:12px;margin-bottom:12px"><p class="note" style="margin:0">Học cảnh và giám khảo luôn chạy bằng app Antigravity (Gemini). Làm video bằng Antigravity thì dùng Antigravity CLI (agy).</p>
           <div class="row" style="gap:8px"><button class="btn ghost" id="btnKiemAgy"><svg class="i"><use href="#i-refresh"/></svg>Làm mới</button><button class="btn go" id="btnMoAgy"><svg class="i"><use href="#i-play"/></svg>Mở Antigravity</button></div></div>
+        <div class="grid g2e" style="gap:16px;margin-bottom:16px">
+          <div><label for="agyModel">Model Gemini khi làm video</label><select id="agyModel"><option value="">Đang đọc…</option></select></div>
+          <div><label>Antigravity CLI (agy)</label><p class="note" id="agyCli" style="margin:6px 0 0">Đang kiểm…</p></div>
+        </div>
         <div id="agyChiTiet" class="note">Đang kiểm…</div>
         <p class="help" style="margin-top:16px">Muốn đổi tài khoản: mở Antigravity → đăng xuất → đăng nhập tài khoản khác → bấm Làm mới. Không dùng nhiều tài khoản xoay vòng: Google cấm và có thể khoá tài khoản.
           Sau mỗi lô học cảnh, hub đọc lại model Antigravity thực sự đã chạy; lệch model so với model đã chọn thì báo ngay ở phần Học cảnh.</p>
@@ -1086,8 +1091,8 @@ details.kt-tech .stat{margin-top:12px}
       <div class="card"><div class="ch"><span class="chip"><svg class="i"><use href="#i-sliders"/></svg></span>
         <div class="t"><h2>Chất lượng AI</h2><p class="sub">Bản AI, độ kỹ và số đạo diễn mỗi lời đọc</p></div></div>
         <div class="grid g2e" style="gap:16px">
-          <div><label for="cdModel">Bản AI</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
-          <div><label for="cdEffort">Độ kỹ của AI (Cao = kỹ hơn, tốn hạn mức hơn)</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
+          <div><label for="cdModel">Bản Claude (khi AI làm video = Claude)</label><select id="cdModel"><option value="opus">Opus 5.5 (cao cấp nhất)</option><option value="sonnet">Sonnet 5.5 (nhanh, tiết kiệm)</option></select></div>
+          <div><label for="cdEffort">Độ kỹ của Claude (Cao = kỹ hơn, tốn hạn mức hơn)</label><select id="cdEffort"><option value="high">Cao</option><option value="medium">Vừa</option><option value="low">Thấp</option></select></div>
           <div><label for="cdPer">Mỗi lời đọc dùng cho</label><select id="cdPer"><option value="1">1 video</option><option value="2">2 video (2 đạo diễn)</option><option value="3">3 video (3 đạo diễn)</option></select></div>
           <div><label for="cdDungLai">Vòng sửa sau giám khảo</label><select id="cdDungLai"><option value="0">Tắt — giám khảo chỉ chấm, ghi bài học</option><option value="1">Bật — bản chưa đạt được đạo diễn sửa và dựng lại 1 lần (giữ bản điểm cao hơn)</option></select></div>
           <div><label for="cdCoChu">Cỡ phụ đề (1 = mặc định, 0.7–1.6)</label><input type="number" id="cdCoChu" min="0.7" max="1.6" step="0.05" value="1"></div>
@@ -1174,7 +1179,7 @@ details.kt-tech .stat{margin-top:12px}
 const $ = s => document.querySelector(s);
 // Gọi hub. Lỗi mạng / quá thời gian / trả lời không phải JSON → ném ApiLoi (không còn thất bại im lặng); hub trả {ok:false, loi} thì vẫn trả về như cũ.
 class ApiLoi extends Error { constructor(m, mang) { super(m); this.mang = !!mang; } }
-const API_DAI = /\/api\/(doc-nhan|tai-khoan|gpt-|agy-tk|giong|anh-khung|anh-sp|kiem-dinh|thu-muc|shop|prompt\/xem-thu|nhac-tai|chuan-bi-kho|video)/;   // việc vốn lâu (AI đọc nhãn, kiểm hạn mức…): chờ tới 2 phút
+const API_DAI = /\/api\/(doc-nhan|tai-khoan|gpt-|agy-tk|agy-cli|giong|anh-khung|anh-sp|kiem-dinh|thu-muc|shop|prompt\/xem-thu|nhac-tai|chuan-bi-kho|video)/;   // việc vốn lâu (AI đọc nhãn, kiểm hạn mức…): chờ tới 2 phút
 async function api(u, b, ms) {
   const ac = new AbortController(), tg = setTimeout(() => ac.abort(), ms || (API_DAI.test(u) ? 120000 : 20000));
   let res, r;
@@ -1811,7 +1816,7 @@ async function capNhatThat() {
     : td.da_xong ? `Lô gần nhất xong ${td.xong}/${td.tong} video` : (td.tong ? `Lô gần nhất dừng ở ${td.xong}/${td.tong}` : 'Chưa chạy'));
   veCacLo(dangLo);
   setH($('#trangThai'), td.het_han_muc && !chay
-    ? `<div class="errbox">${ic('alert')} Hết hạn mức Claude. Vào <a href="#" data-go="cd">Cài đặt → Đăng nhập / Đổi tài khoản</a>, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '');
+    ? `<div class="errbox">${ic('alert')} Hết hạn mức ${NAO_TEN[ST.nao] || 'Claude'}. Vào <a href="#" data-go="cd">Cài đặt → Tài khoản AI</a> để đăng nhập / đổi tài khoản / đổi AI, rồi bấm Bắt đầu làm để làm tiếp.</div>` : '');
   const lg = $('#log'), dinh = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 30;
   if (setH(lg, (ST.nhat_ky.length ? ST.nhat_ky : ['(chưa có nhật ký)']).map(l => `<div class="${mau(l)}">${esc(l)}</div>`).join('')) && dinh) lg.scrollTop = lg.scrollHeight;
   setT($('#stLuot'), ST.token.luot); setT($('#stVideo'), ST.token.video);
@@ -1822,7 +1827,8 @@ async function capNhatThat() {
   setT($('#stMoc'), ST.token.moc && ST.token.moc !== '00:00' ? '(từ ' + ST.token.moc + ')' : '');
   setT($('#stUsd'), ST.token.luot ? `Quy đổi ≈ ${ST.token.usd} USD (CLI tự tính để so độ hao hạn mức; gói đăng ký không bị trừ tiền)` +
     (ST.token.video ? ` · ≈ ${Math.round(ST.token.token / ST.token.video / 1000)}k token/video` : '') : ''); setT($('#stToken'), soGon(ST.token.token));
-  setT($('#hdrSub'), `Ê-kíp AI · ${ST.claude.model === 'opus' ? 'Opus 5.5' : 'Sonnet 5.5'} · độ kỹ ${({high: 'cao', medium: 'vừa', low: 'thấp'})[ST.claude.effort] || ''}`);
+  setT($('#hdrSub'), 'Ê-kíp AI · ' + (ST.nao_mo_ta || 'Claude'));
+  veNaoChon();
   uocTinh();
 }
 $('#btnDemLai').onclick = async () => { if (!await hoi({tieuDe: 'Đếm lại từ bây giờ?', noiDung: 'Số "Hôm nay" sẽ về 0 và đếm lại từ lúc này.', nutCo: 'Đếm lại'})) return; await api('/api/dem-lai', {}); toast('Đã đặt lại'); capNhat(); };
@@ -1853,19 +1859,21 @@ async function taiTk(moi) {
         <button class="btn ghost sm dz" style="margin-left:auto" data-bo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
   };
   await stSan().catch(() => {});
+  const naoKhac = ST.nao && ST.nao !== 'claude';
   const sel = $('#tkDung'), giu = ST.tai_khoan_dung || sel.value;
   const optH = '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => {
     const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
     const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
     const het = t.het_den && t.het_den * 1000 > Date.now();
     return `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : t.bi_chan ? 'gói bị tắt quyền' : het ? 'hết hạn mức' : `5 giờ ${p ?? '—'}${p == null ? '' : '%'} · tuần ${w ?? '—'}${w == null ? '' : '%'}`}</option>`; }).join('');
-  if (setH(sel, optH) || !sel._ok || sel.value !== giu) sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
-  sel._ok = true; sel.disabled = false;
-  if (ST.claude) { $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; $('#tkChuyen')._ok = true; }
+  if (!naoKhac) { sel._nao = 'claude'; if (setH(sel, optH) || !sel._ok || sel.value !== giu) sel.value = [...sel.options].some(o => o.value === giu) ? giu : 'tu_dong';
+  sel._ok = true; sel.disabled = false; }
+  if (ST.claude && !naoKhac) { $('#tkChuyen').checked = ST.tu_chuyen !== false; $('#tkChuyen').disabled = false; $('#tkChuyen')._ok = true; }
   setH($('#tkChiTiet'), ds.length ? `<div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.'));
   const mini = (p, nhan) => { const c = p === null ? '' : p >= 90 ? 'var(--red)' : p >= 70 ? 'var(--amber)' : '';
     return `<div class="lr"><span>${nhan}</span><b style="color:${c}">${p === null ? '—' : p + '%'}</b></div><div class="bar sm"><i style="width:${p || 0}%;${c ? 'background:' + c : ''}"></i></div>`; };
-  setH($('#tkBox'), '<div class="sec-h"><h3>Tài khoản Claude</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm">' + ds.map(t => {
+  if (naoKhac) veNaoSx().catch(() => {});
+  else setH($('#tkBox'), '<div class="sec-h"><h3>Tài khoản Claude</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm">' + ds.map(t => {
     const p = t.five_hour && !(t.five_hour.reset * 1000 < Date.now()) ? Math.round(t.five_hour.pct * 100) : null;
     const w = t.seven_day && !(t.seven_day.reset * 1000 < Date.now()) ? Math.round(t.seven_day.pct * 100) : null;
     const het = t.het_den && t.het_den * 1000 > Date.now();
@@ -1880,6 +1888,45 @@ async function taiTk(moi) {
   document.querySelectorAll('[data-bo]').forEach(b => b.onclick = async () => { if (!await hoi({tieuDe: 'Bỏ "' + b.dataset.ten + '" khỏi hub?', noiDung: 'Phiên đăng nhập của tài khoản này sẽ được cất đi; thêm lại thì phải đăng nhập lại.', nutCo: 'Bỏ tài khoản', nguyHiem: true})) return;
     const r = await api('/api/tai-khoan-bo/' + b.dataset.bo, {}); if (r.ok && ST.tai_khoan_dung === b.dataset.bo) ST.tai_khoan_dung = 'tu_dong';
     toast(r.ok ? 'Đã bỏ tài khoản' : r.loi); taiTk(true); });
+}
+// ---- AI làm video: 1 lựa chọn chung (Sản xuất + Cài đặt) ----
+const NAO_TEN = {claude: 'Claude', gpt: 'ChatGPT', agy: 'Antigravity'};
+function veNaoChon() {
+  const n = ST.nao || 'claude';
+  for (const id of ['#prNao', '#aiNao']) if ($(id) && $(id).value !== n && document.activeElement !== $(id)) $(id).value = n;
+  setT($('#prNaoMoTa'), ST.nao_mo_ta ? 'Đang dùng: ' + ST.nao_mo_ta : ''); setT($('#aiNaoMoTa'), ST.nao_mo_ta ? 'Đang dùng: ' + ST.nao_mo_ta : '');
+  setT($('#tkDungNhan'), n === 'gpt' ? 'Chạy bằng tài khoản ChatGPT' : n === 'agy' ? 'Tài khoản Antigravity' : 'Chạy bằng tài khoản Claude');
+  $('#tkChuyenO').classList.toggle('hidden', n !== 'claude');
+}
+async function doiNao(v) {
+  const r = await api('/api/gpt-cai-dat', {nao: v});
+  if (r && r.ok === false) return toast(r.loi || 'Không đổi được', 'loi');
+  toast(`Từ lô sau: biên kịch, đạo diễn, soát kho dùng ${NAO_TEN[v]}` + (v === 'agy' ? ' (chậm hơn Claude ~3 lần, không tốn hạn mức Claude)' : ''));
+  try { ST = await api('/api/trang-thai'); } catch (e) {}
+  veNaoChon(); $('#tkBox')._h = null; taiTk().catch(() => {});
+}
+$('#prNao').onchange = () => doiNao($('#prNao').value);
+$('#aiNao').onchange = () => doiNao($('#aiNao').value);
+async function veNaoSx() {                     // AI = ChatGPT / Antigravity: ô tài khoản + thẻ hạn mức ở Sản xuất đổi theo
+  const sel = $('#tkDung'), mini = (p, nhan) => `<div class="lr"><span>${nhan}</span><b>${p === null ? '—' : p + '%'}</b></div><div class="bar sm"><i style="width:${p || 0}%"></i></div>`;
+  const pc = o => o && !(o.reset && o.reset * 1000 < Date.now()) ? Math.round((o.pct || 0) * 100) : null;
+  const nao = ST.nao;
+  if (nao === 'gpt') {
+    const r = await api('/api/gpt-ds'), ds = r.ds || [];
+    if (ST.nao !== nao) return;
+    setH(sel, '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => `<option value="${esc(t.ma)}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)} — ${!t.dang_nhap ? 'chưa đăng nhập' : `5 giờ ${pc(t.five_hour) ?? '—'}% · tuần ${pc(t.seven_day) ?? '—'}%`}</option>`).join(''));
+    sel.value = [...sel.options].some(o => o.value === r.dung) ? r.dung : 'tu_dong'; sel.disabled = false; sel._nao = 'gpt';
+    setH($('#tkBox'), '<div class="sec-h"><h3>Tài khoản ChatGPT</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm">' + ds.map(t => `<div><div class="hd"><b>${esc(t.ten)}</b>${!t.dang_nhap ? '<span class="pill r dot">chưa đăng nhập</span>' : t.het ? '<span class="pill r dot">hết</span>' : '<span class="pill g dot">sẵn sàng</span>'}</div>
+      ${t.dang_nhap ? mini(pc(t.five_hour), 'Phiên 5 giờ') + mini(pc(t.seven_day), 'Cả tuần') : '<div class="note" style="font-size:12px">Vào <a href="#" data-go="cd">Cài đặt → Tài khoản AI → ChatGPT</a> để đăng nhập</div>'}</div>`).join('') + '</div>');
+  } else {
+    const [a, cli] = await Promise.all([api('/api/agy-tk'), api('/api/agy-cli').catch(() => ({}))]);
+    if (ST.nao !== nao) return;
+    setH(sel, `<option value="agy">${esc(a.email || 'Tài khoản Google của Antigravity')}</option>`); sel.value = 'agy'; sel.disabled = true; sel._nao = 'agy';
+    setH($('#tkBox'), '<div class="sec-h"><h3>Antigravity (Gemini)</h3><span class="note">hạn mức đã dùng</span></div><div class="tkm"><div><div class="hd"><b>' + esc(a.email || 'Tài khoản Google') + '</b>'
+      + (cli.co ? '<span class="pill g dot">agy sẵn sàng</span>' : '<span class="pill r dot">chưa cài / chưa đăng nhập agy</span>') + '</div>'
+      + mini(pc(a.gemini_5h), 'Gemini · 5 giờ') + mini(pc(a.gemini_tuan), 'Gemini · tuần')
+      + `<div class="note" style="font-size:12px">${cli.co ? '' : 'Xem Cài đặt → Tài khoản AI → Antigravity. '}Hạn mức đọc từ app Antigravity${a.mo ? '' : ' (đang tắt)'}.</div></div></div>`);
+  }
 }
 // ---- Tài khoản AI: 3 tab riêng (Claude / ChatGPT / Antigravity) ----
 function aiTab(k) {
@@ -1909,7 +1956,6 @@ async function taiGpt(moi) {
         <button class="btn ghost sm dz" style="margin-left:auto" data-gbo="${t.ma}" data-ten="${esc(t.ten)}">Bỏ</button></div></div>`;
   };
   setH($('#gptChiTiet'), ds.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">${ds.map(the).join('')}</div>` : rong('user', 'Chưa có tài khoản', 'Bấm "Thêm tài khoản" để thêm.'));
-  $('#gptNao').value = r.nao === 'gpt' ? 'gpt' : 'claude';
   setH($('#gptDung'), '<option value="tu_dong">Tự động (tài khoản còn dư nhiều nhất)</option>' + ds.map(t => `<option value="${t.ma}" ${!t.dang_nhap ? 'disabled' : ''}>${esc(t.ten)}${!t.dang_nhap ? ' — chưa đăng nhập' : ''}</option>`).join(''));
   $('#gptDung').value = [...$('#gptDung').options].some(o => o.value === r.dung) ? r.dung : 'tu_dong';
   const tk = ds.find(t => t.ma === r.dung) || ds.find(t => t.dang_nhap && t.models && t.models.length) || ds[0] || {};
@@ -1921,6 +1967,7 @@ async function taiGpt(moi) {
   const m = ms.find(x => x.id === r.model), ef = m && m.effort && m.effort.length ? m.effort : ['low', 'medium', 'high', 'xhigh', 'max'];
   setH($('#gptEffort'), ef.filter(e => EFF_TEN[e]).map(e => `<option value="${e}">${EFF_TEN[e]}</option>`).join(''));
   $('#gptEffort').value = ef.includes(r.effort) ? r.effort : (m && m.effort_mac_dinh) || ef[0];
+  if ($('#gptEffort').value && $('#gptEffort').value !== r.effort) api('/api/gpt-cai-dat', {effort: $('#gptEffort').value}).catch(() => {});
   document.querySelectorAll('[data-gdung]').forEach(b => b.onclick = async () => { await api('/api/gpt-cai-dat', {dung: b.dataset.gdung});
     toast(b.dataset.gdung === 'tu_dong' ? 'Hub tự chọn tài khoản ChatGPT còn dư' : 'Hub sẽ chạy ChatGPT bằng tài khoản này'); taiGpt(); });
   document.querySelectorAll('[data-gdn]').forEach(b => b.onclick = async () => { const x = await api('/api/gpt-dang-nhap/' + b.dataset.gdn, {});
@@ -1937,13 +1984,22 @@ $('#btnKiemGpt').onclick = () => taiGpt(true);
 $('#btnThemGpt').onclick = async () => { const ten = await hoi({tieuDe: 'Thêm tài khoản ChatGPT', noiDung: 'Đặt tên để dễ nhận ra (vd. ChatGPT 2).', oNhap: true, goiY: 'ChatGPT 2', nutCo: 'Thêm'}); if (ten === null) return;
   const r = await api('/api/gpt-them', {ten}); if (!r.ok) return toast(r.loi || 'Không thêm được', 'loi');
   toast('Đã thêm — đang mở cửa sổ đăng nhập cho tài khoản mới'); await taiGpt(true);
-  await api('/api/gpt-dang-nhap/' + r.ma, {}); theoDoiGpt(); };
-$('#gptNao').onchange = async () => { const v = $('#gptNao').value; await api('/api/gpt-cai-dat', {nao: v});
-  toast(v === 'gpt' ? 'Từ lô sau: biên kịch, đạo diễn, soát kho dùng ChatGPT' : 'Từ lô sau: dùng lại Claude'); };
+  const x = await api('/api/gpt-dang-nhap/' + r.ma, {}); if (x.ok === false) return toast(x.loi || 'Không mở được cửa sổ đăng nhập', 'loi'); theoDoiGpt(); };
 $('#gptDung').onchange = async () => { await api('/api/gpt-cai-dat', {dung: $('#gptDung').value}); toast('Đã lưu'); taiGpt(); };
 $('#gptModel').onchange = async () => { await api('/api/gpt-cai-dat', {model: $('#gptModel').value}); toast('Đã đổi model ChatGPT'); $('#gptChiTiet')._h = null; taiGpt(); };
 $('#gptEffort').onchange = async () => { await api('/api/gpt-cai-dat', {effort: $('#gptEffort').value}); toast('Đã đổi độ suy nghĩ'); };
+async function taiAgyCli(moi) {
+  const c = await api('/api/agy-cli' + (moi ? '?moi=1' : ''));
+  setH($('#agyCli'), c.co ? `<span class="pill g dot">Đã cài · ${c.models.length} model Gemini</span>` : `<span class="pill r dot">${esc(c.loi || 'Chưa cài')}</span><br><span style="font-size:12px">Mở PowerShell từ menu Start, chạy: <code>irm https://antigravity.google/cli/install.ps1 | iex</code>, rồi chạy <code>agy</code> để đăng nhập.</span>`);
+  const ms = c.models.length ? c.models : [{id: c.model, ten: c.model}];
+  if (!ms.some(m => m.id === c.model)) ms.unshift({id: c.model, ten: c.model + ' (CLI không có)'});
+  setH($('#agyModel'), ms.map(m => `<option value="${esc(m.id)}">${esc(m.ten)}</option>`).join('')); $('#agyModel').value = c.model;
+}
+$('#agyModel').onchange = async () => { const r = await api('/api/gpt-cai-dat', {agy_model: $('#agyModel').value});
+  if (r && r.ok === false) { toast(r.loi, 'loi'); return taiAgyCli(); }
+  toast('Đã đổi model Gemini làm video'); try { ST = await api('/api/trang-thai'); veNaoChon(); } catch (e) {} };
 async function taiAgy(moi) {
+  taiAgyCli(moi).catch(e => setT($('#agyCli'), 'Không đọc được: ' + (e.message || e)));
   const a = await api('/api/agy-tk' + (moi ? '?moi=1' : ''));
   if (!a.mo) return setH($('#agyChiTiet'), rong('user', 'Antigravity đang tắt', 'Bấm "Mở Antigravity" rồi Làm mới để xem tài khoản và hạn mức.'));
   const md = (a.models || []).map(m => `<div class="lr"><span>${esc(m.ten || m.id)}</span><b>${m.con == null ? '—' : 'còn ' + Math.round(m.con * 100) + '%'}</b></div>`).join('');
@@ -1964,7 +2020,8 @@ function theoDoiDangNhap() {        // sau khi mở cửa sổ đăng nhập: ki
   _dnTimer = setInterval(() => { if (++n > 22) return clearInterval(_dnTimer); if (!document.hidden) taiTk(true).catch(() => {}); }, 8000);
 }
 setInterval(() => { if (!document.hidden) taiTk().catch(() => {}); }, 60000);   // tự làm mới số hạn mức mỗi 60 giây
-$('#tkDung').onchange = async () => { await api('/api/cai-dat', {tai_khoan_dung: $('#tkDung').value}); ST.tai_khoan_dung = $('#tkDung').value;
+$('#tkDung').onchange = async () => { if ($('#tkDung')._nao === 'gpt' && ST.nao === 'gpt') { await api('/api/gpt-cai-dat', {dung: $('#tkDung').value}); return toast($('#tkDung').value === 'tu_dong' ? 'Hub tự chọn tài khoản ChatGPT còn dư' : 'Hub sẽ chạy ChatGPT bằng tài khoản này'); }
+  await api('/api/cai-dat', {tai_khoan_dung: $('#tkDung').value}); ST.tai_khoan_dung = $('#tkDung').value;
   toast($('#tkDung').value === 'tu_dong' ? 'Hub tự chọn tài khoản còn dư' : 'Hub sẽ chạy bằng tài khoản đã chọn'); };
 $('#tkChuyen').onchange = async () => {
   const bat = $('#tkChuyen').checked, r = await api('/api/cai-dat', {tu_chuyen: bat});

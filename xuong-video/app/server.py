@@ -697,6 +697,8 @@ def prompt_xem_thu(ten, ma_sp, text=None):
 
 
 def chuan_bi_kho(ma):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", str(ma or "")) or not (HUB / "san-pham" / ma).is_dir():   # mã đi vào lệnh cmd → chỉ nhận mã sản phẩm có thật
+        return {"ok": False, "loi": "Mã sản phẩm không hợp lệ."}
     j = KHO_JOB.get(ma)
     if j and j.poll() is None:
         return {"ok": False, "loi": "Đang chuẩn bị kho rồi."}
@@ -1423,7 +1425,7 @@ class H(BaseHTTPRequestHandler):
             return self._json({"prompt_moi": prompt_so_ban_moi(), "dang_chay": dang_chay() or ngoai, "chay_ngoai_app": ngoai,
                                "bat_dau": (RUN.get(gan) or {}).get("bat_dau") or next((x["bat_dau"] for x in cac_lo if x["ma"] == gan), None), "tien_do": td,
                                "cac_lo": cac_lo, "hang_cho": [dict(x, ten=dieu_phoi.ten_sp(x["ma"])) for x in dieu_phoi.hang_cho()], "suc_may": suc_may.suc_may(),
-                               "nhat_ky": lines[-120:], "claude": c.get("claude", {}), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
+                               "nhat_ky": lines[-120:], "claude": c.get("claude", {}), **_nao_ai(), "san_pham": san_pham_ds(), "thoi_luong_mac_dinh": thoi_luong_mac_dinh(),
                                "token": token_hom_nay(), "cho_duyet": so_cho_duyet(),
                                "tai_khoan_dung": c.get("tai_khoan_dung", "tu_dong"), "tu_duyet": c.get("tu_duyet", {"bat": False, "dat_tu": 7, "bo_duoi": 0}), "tu_chuyen": c.get("tu_chuyen", True), "video_moi_giong": c["lo"]["video_moi_giong"],
                                "co_chu": (c.get("phu_de") or {}).get("co_chu", 1.0), "dung_lai": bool(c.get("dung_lai"))})
@@ -1456,11 +1458,18 @@ class H(BaseHTTPRequestHandler):
                                "cho_duyet": so_cho_duyet()})
         if u.path == "/api/tai-khoan-ds":
             return self._json(tai_khoan_ds("moi" in parse_qs(u.query)))
+        if u.path.startswith(("/api/gpt-", "/api/agy-")) and \
+                (self.headers.get("Host") or "").lower() not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}"):
+            return self._json({"ok": False, "loi": "Yêu cầu không hợp lệ"}, 403)
         if u.path == "/api/gpt-ds":                     # tài khoản ChatGPT (Codex CLI): đăng nhập, gói, hạn mức 5 giờ/tuần, model gói cho dùng
             sys.path.insert(0, str(CODE / "engine")); import tk_gpt
             c = cfg(); g = c.get("gpt") or {}
             return self._json({"ds": tk_gpt.ds("moi" in q), "dung": c.get("tai_khoan_gpt_dung") or "tu_dong", "nao": c.get("ai_nao") or "claude",
                                "model": g.get("model") or "gpt-6.2-sol", "effort": g.get("effort") or "high"})
+        if u.path == "/api/agy-cli":                    # Antigravity CLI (agy) cho ê-kíp làm video: có cài không + model Gemini + model đang chọn
+            sys.path.insert(0, str(CODE / "engine"))
+            import ai
+            return self._json(dict(ai.agy_models(moi="moi" in (u.query or "")), model=ai.agy_model(), nao=ai.nao_ai()))
         if u.path == "/api/agy-tk":                     # Antigravity: tài khoản đang đăng nhập + hạn mức Gemini (chỉ đọc)
             sys.path.insert(0, str(CODE / "engine")); import hoc_canh
             return self._json(hoc_canh.trang_thai_agy_day_du(nho="moi" not in q))
@@ -1709,8 +1718,15 @@ class H(BaseHTTPRequestHandler):
                     return self._json({"ok": False, "loi": str(e)[:200]})
             if u.path == "/api/gpt-cai-dat":
                 c = cfg()
-                if b.get("nao") in ("claude", "gpt"):
+                if b.get("nao") in ("claude", "gpt", "agy"):
                     c["ai_nao"] = b["nao"]
+                if b.get("agy_model"):
+                    sys.path.insert(0, str(CODE / "engine"))
+                    import ai
+                    ds_m = [m["id"] for m in ai.agy_models().get("models") or []]
+                    if b["agy_model"] not in ds_m:
+                        return self._json({"ok": False, "loi": "Antigravity CLI không có model này"})
+                    c.setdefault("agy", {})["model"] = b["agy_model"]
                 if "dung" in b:
                     c["tai_khoan_gpt_dung"] = str(b["dung"])
                 if b.get("model"):
@@ -1828,6 +1844,16 @@ def _cua_so_dang_mo(x):
         return False
 
 
+def _nao_ai():
+    """AI đang làm video (Cài đặt → Tài khoản AI) cho trang Sản xuất: mã + mô tả model."""
+    try:
+        sys.path.insert(0, str(CODE / "engine"))
+        import ai
+        return {"nao": ai.nao_ai(), "nao_mo_ta": ai.mo_ta_nao()}
+    except Exception:
+        return {"nao": "claude", "nao_mo_ta": ""}
+
+
 def _vong_kiem_han_muc():
     """Nền: mỗi ~7 phút kiểm hạn mức từng tài khoản (tuần tự, mỗi lần 1 câu rất ngắn). Lô đang chạy → bỏ qua (lô tự cập nhật hạn mức)."""
     time.sleep(45)                                   # chờ app lên xong rồi mới kiểm lần đầu
@@ -1838,7 +1864,7 @@ def _vong_kiem_han_muc():
                     sys.path.insert(0, str(CODE / "engine"))
                     import ai
                     st = ai.doc_trang_thai()
-                    for tk in list(ai.ds_tai_khoan()):
+                    for tk in (list(ai.ds_tai_khoan()) if ai.nao_ai() == "claude" else []):     # đang dùng ChatGPT/Antigravity → không tốn câu hỏi Claude
                         if dang_chay():
                             break
                         if not _cua_so_dang_mo(st.get(tk["ma"]) or {}):

@@ -32,7 +32,7 @@ class HeThongDaoDien(unittest.TestCase):
         gui, dong = {}, []
 
         class P:
-            pid = 1
+            pid, returncode = 1, 0
             def __init__(s, *a, **k): pass
             def communicate(s, full, timeout=None):
                 gui["full"] = full

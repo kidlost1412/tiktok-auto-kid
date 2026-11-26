@@ -350,9 +350,67 @@ def nao_ai():
     return "gpt" if v in ("gpt", "chatgpt", "codex", "openai") else "claude"
 
 
+TEN_NAO = {"claude": "Claude", "gpt": "ChatGPT", "agy": "Antigravity"}
+EFF_VI = {"low": "thấp", "medium": "vừa", "high": "cao", "xhigh": "rất cao", "max": "tối đa", "ultra": "cực đại"}
+
+
+def ten_nao():
+    """Tên ngắn bộ não đang dùng (cho nhật ký / thông báo): Claude / ChatGPT / Antigravity."""
+    return TEN_NAO[nao_ai()]
+
+
+def mo_ta_nao():
+    """Mô tả đầy đủ cho nhật ký lô + đầu trang Sản xuất: bộ não · model · độ suy nghĩ."""
+    n, c = nao_ai(), cfg()
+    if n == "agy":
+        return f"Antigravity · {agy_model()}"
+    if n == "gpt":
+        g = c.get("gpt") or {}
+        return f"ChatGPT · {g.get('model') or 'gpt-6.2-sol'} · {EFF_VI.get(g.get('effort') or 'high', g.get('effort'))}"
+    cl = c.get("claude") or {}
+    return f"Claude · {'Opus 5.5' if cl.get('model', 'opus') == 'opus' else 'Sonnet 5.5'} · {EFF_VI.get(cl.get('effort') or 'high', cl.get('effort'))}"
+
+
+def agy_model():
+    return str(os.environ.get("XUONG_AGY_MODEL") or (cfg().get("agy") or {}).get("model") or "gemini-4-neon-high")
+
+
 def agy_exe():
     p = (cfg().get("duong_dan") or {}).get("agy") or os.path.expandvars(r"%LOCALAPPDATA%\agy\bin\agy.exe")
-    return p if Path(p).exists() else "agy"
+    return p if Path(p).exists() else (shutil_which("agy") or "agy")
+
+
+def shutil_which(x):
+    import shutil
+    return shutil.which(x)
+
+
+_AGY_DS = {"t": 0, "v": None}
+
+
+def agy_models(moi=False):
+    """Antigravity CLI có cài không + model Gemini nó cho chạy (`agy models`, nhớ 10 phút). → {co, models: [{id, ten}], loi}."""
+    if not moi and _AGY_DS["v"] is not None and time.time() - _AGY_DS["t"] < 600:
+        return _AGY_DS["v"]
+    v = {"co": False, "models": [], "loi": None}
+    exe = agy_exe()
+    if not Path(exe).exists() and not shutil_which("agy"):
+        v["loi"] = "Chưa cài Antigravity CLI (agy)"
+    else:
+        try:
+            r = subprocess.run([exe, "models"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=40,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            for dong in (r.stdout or "").splitlines():
+                mid, _, ten = dong.partition("\t")
+                if mid.strip().startswith("gemini-") and ten.strip():
+                    v["models"].append({"id": mid.strip(), "ten": ten.strip()})
+            v["co"] = bool(v["models"])
+            if not v["co"]:
+                v["loi"] = ((r.stderr or r.stdout or "").strip()[-200:] or "agy không trả danh sách model") + " — mở PowerShell chạy agy để đăng nhập"
+        except Exception as e:
+            v["loi"] = f"agy lỗi: {e}"[:200]
+    _AGY_DS.update(t=time.time(), v=v)
+    return v
 
 
 def _goi_agy(vai, prompt, anh=None, timeout=1200):
@@ -361,7 +419,7 @@ def _goi_agy(vai, prompt, anh=None, timeout=1200):
     → (text, usage kiểu Claude)."""
     import tempfile
     import truc_tiep as TT
-    model = str((cfg().get("agy") or {}).get("model") or "gemini-4-neon-high")
+    model = agy_model()
     full = (f"=== LỜI DẶN HỆ THỐNG (vai: {vai_he_thong(vai)}) ===\n{he_thong(vai)}\n\n=== ĐỀ BÀI ===\n{prompt}\n\n"
             + (("ẢNH CẦN XEM (mở TỪNG ảnh bằng công cụ đọc file, đúng thứ tự, trước khi trả lời):\n"
                 + "\n".join(f"{i}) {Path(str(a)).resolve()}" for i, a in enumerate(anh, 1)) + "\n\n") if anh else "")
@@ -369,16 +427,18 @@ def _goi_agy(vai, prompt, anh=None, timeout=1200):
     t0 = datetime.datetime.now()
     with tempfile.TemporaryDirectory(prefix="xv-agy-") as td:
         cmd = [agy_exe(), "--input-format", "stream-json", "--output-format", "stream-json", "--model", model,
-               "--disable-slash-commands", "--print-timeout", f"{int(timeout)}s"]
+               "--disable-slash-commands", "--sandbox", "--print-timeout", f"{int(timeout)}s"]
         for d in sorted({str(Path(str(a)).resolve().parent) for a in anh or []}):
             cmd += ["--add-dir", d]
-        pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                              errors="replace", cwd=td)
+        try:
+            pr = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                                  errors="replace", cwd=td, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except OSError as e:
+            raise HetHanMuc(f"Chưa cài Antigravity CLI (agy) hoặc không chạy được: {e}"[:200])
         try:
             out, err = pr.communicate(json.dumps({"event": "user", "message": {"content": full}}, ensure_ascii=False) + "\n", timeout=timeout + 30)
         except subprocess.TimeoutExpired:
-            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
-            pr.communicate()
+            _giet_cay(pr)
             raise RuntimeError(f"Antigravity quá {timeout}s ({vai}) — đã dừng")
     ket, chay, buoc = {}, "", 0
     for line in out.splitlines():
@@ -428,6 +488,15 @@ class GptChuaDangNhap(HetHanMuc):
     pass
 
 
+def _giet_cay(pr):
+    """Quá giờ: tắt cả cây tiến trình (shim .cmd → node → codex/agy), chờ thu pipe có hạn chót — không treo luồng gọi."""
+    subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    try:
+        pr.communicate(timeout=15)
+    except Exception:
+        pass
+
+
 def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
     """Gọi ChatGPT qua `codex exec`, nhiều tài khoản (tk_gpt): chọn tài khoản còn dư nhất; hết hạn mức / mất đăng nhập → thử tài khoản kế tiếp 1 lần.
     config "gpt": {"model": "gpt-6.2-sol", "effort": "high"}; effort vai truyền vào (vd. "low" cho gom bài học) được giữ. → (text, usage kiểu Claude)."""
@@ -435,28 +504,26 @@ def _goi_gpt(vai, prompt, anh=None, effort=None, timeout=1200):
     g = cfg().get("gpt") or {}
     model = str(g.get("model") or "gpt-6.2-sol")
     effort = str(effort if effort in ("low", "medium", "high", "xhigh", "max", "ultra") and effort != "high" else (g.get("effort") or "high"))
-    da_thu = []
+    da_thu, thieu = [], []
     while True:
         try:
             tk = tk_gpt.chon(bo_qua=da_thu)
         except HetHanMuc as e:
+            if thieu and len(thieu) == len(da_thu):     # chỉ còn tài khoản không có model này
+                raise RuntimeError(f"Không tài khoản ChatGPT nào có model \"{model}\" ({'; '.join(thieu)}) — đổi model trong Cài đặt")
             raise HetHanMuc(str(e) + (f" (đã thử: {', '.join(da_thu)})" if da_thu else ""))
         ds_model = [m["id"] for m in (tk_gpt.doc_trang_thai().get(tk["ma"], {}).get("models") or []) if m.get("id")]
         if ds_model and model not in ds_model:
-            raise RuntimeError(f"Tài khoản ChatGPT {tk['ma']} không có model \"{model}\" (có: {', '.join(ds_model)}) — đổi model trong Cài đặt")
+            thieu.append(f"{tk['ma']} có: {', '.join(ds_model)}"); da_thu.append(tk["ma"]); continue
         try:
             return _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout)
         except GptChuaDangNhap:
             tk_gpt.mark_chua_dang_nhap(tk["ma"])
             da_thu.append(tk["ma"])
-            if len(da_thu) >= 2:
-                raise
         except HetHanMuc:
             tk_gpt.mark_het(tk["ma"])
             tk_gpt.lam_moi_nen(tk["ma"], 0)               # đọc giờ mở lại thật của tài khoản này
             da_thu.append(tk["ma"])
-            if len(da_thu) >= 2:
-                raise
 
 
 def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
@@ -481,10 +548,9 @@ def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
         try:
             out, err = pr.communicate(full, timeout=timeout)
         except subprocess.TimeoutExpired:
-            subprocess.run(["taskkill", "/PID", str(pr.pid), "/T", "/F"], capture_output=True)
-            pr.communicate()
+            _giet_cay(pr)
             raise RuntimeError(f"ChatGPT quá {timeout}s ({vai}) — đã dừng")
-    msg, u, loi = "", {}, ""
+    msg, u, loi, hong = "", {}, "", False
     tt = TT.hien_tai()
     for line in out.splitlines():
         try:
@@ -503,6 +569,7 @@ def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
             u = ev.get("usage") or {}
         elif k in ("error", "turn.failed"):
             loi = str(ev.get("message") or (ev.get("error") or {}).get("message") or line)[:300]
+            hong = True
     usage = {"input_tokens": max(0, int(u.get("input_tokens") or 0) - int(u.get("cached_input_tokens") or 0)), "cache_creation_input_tokens": 0,
              "cache_read_input_tokens": int(u.get("cached_input_tokens") or 0), "output_tokens": int(u.get("output_tokens") or 0),
              "reasoning_output_tokens": int(u.get("reasoning_output_tokens") or 0)}
@@ -514,6 +581,8 @@ def _goi_gpt_1(tk, vai, prompt, anh, model, effort, timeout):
         dau=_sk.dong_csv(["luc", "vai", "model", "effort", "giay", "vao", "vao_cache_tao", "vao_cache_doc", "ra", "usd_uoc", "luot", "so_anh", "tai_khoan", "video", "lo"]))
     _ghi_so(usage)
     txt = loi + " " + (err or "")[-500:]
+    if hong or pr.returncode != 0:                   # có chữ dở rồi mới hỏng → coi như không có câu trả lời (không dùng kết quả dở)
+        msg = ""
     if not msg and re.search(r"not supported when using codex with a chatgpt account", txt, re.I):
         raise RuntimeError(f"Model \"{model}\" không dùng được với tài khoản ChatGPT {tk['ma']}: {loi[:200]} — đổi model trong Cài đặt")
     if not msg and re.search(r"usage limit|rate limit|limit reached|quota|too many requests", txt, re.I):

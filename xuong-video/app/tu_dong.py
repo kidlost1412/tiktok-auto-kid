@@ -10,6 +10,22 @@ from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, ghi_json
 LS = HUB / "lich-su"
 sys.path.insert(0, str(CODE / "engine"))
 from kho_chung import la_kho_chung   # noqa: E402  (kho cảnh dùng chung: không bán, không tự làm video)
+
+
+def _nao():
+    try:
+        from ai import nao_ai
+        return nao_ai()
+    except Exception:
+        return "claude"
+
+
+def _ten_ai():
+    try:
+        from ai import ten_nao
+        return ten_nao()
+    except Exception:
+        return "AI"
 TRANG_THAI = {"lan_kiem": None, "lan_kiem_toi": None, "nghi_den": None, "ly_do_nghi": None, "ghi": "Chưa bật"}
 F_NGHI = LS / "tu-dong-nghi.json"              # bền qua lần khởi động lại app: giờ nghỉ, số lần lô lỗi liên tiếp, số lô tự động hôm nay
 BACKOFF_PHUT = (10, 30, 60)                    # lô tự động lỗi (thoát khác 0 / ra 0 video): nghỉ 10 → 30 → 60 phút (lần sau nữa vẫn 60)
@@ -243,8 +259,8 @@ def _xet_lo_da_xong(cau, now):
         loi = any("XONG: 0 video" in l for l in nk) or rc not in (None, 0)
         if dong_het and dong_het != TRANG_THAI.get("da_nghi_vi"):      # mọi tài khoản đều hết → nghỉ tới giờ reset sớm nhất (1 lần cho mỗi lần báo)
             TRANG_THAI["da_nghi_vi"] = dong_het
-            st = _doc(LS / "tai-khoan.json", {})
-            resets = [v.get("het_den") for v in st.values() if v.get("het_den") and v["het_den"] > time.time()]
+            st = _doc(LS / ("tai-khoan-gpt.json" if _nao() == "gpt" else "tai-khoan.json"), {}) if _nao() != "agy" else {}   # Antigravity: không có sổ → 60 phút
+            resets = [v.get("het_den") for v in st.values() if isinstance(v, dict) and v.get("het_den") and v["het_den"] > time.time()]
             TRANG_THAI["nghi_den"] = datetime.datetime.fromtimestamp(min(resets)) if resets else now + datetime.timedelta(minutes=60)
             TRANG_THAI["ly_do_nghi"] = None
             TRANG_THAI["ghi"] = f"Mọi tài khoản hết hạn mức — nghỉ tới {TRANG_THAI['nghi_den']:%H:%M}"
@@ -280,7 +296,7 @@ def _vong(dang_chay, chay, log_file, ma_thoat=None, cau=None):
                 TRANG_THAI["ghi"] = "Đang tắt"
             elif TRANG_THAI["nghi_den"] and now < TRANG_THAI["nghi_den"]:
                 TRANG_THAI["ghi"] = (f"{TRANG_THAI['ly_do_nghi']} — nghỉ tới {TRANG_THAI['nghi_den']:%H:%M}" if TRANG_THAI.get("ly_do_nghi")
-                                     else f"Hết hạn mức Claude — nghỉ tới {TRANG_THAI['nghi_den']:%H:%M} (đổi tài khoản để chạy ngay)")
+                                     else f"Hết hạn mức {_ten_ai()} — nghỉ tới {TRANG_THAI['nghi_den']:%H:%M} (đổi tài khoản để chạy ngay)")
             elif _xet_lo_da_xong(cau, now):
                 pass                                     # vừa đặt nghỉ chung (hết hạn mức) → lượt này không bật lô mới
             else:

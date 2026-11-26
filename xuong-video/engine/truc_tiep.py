@@ -684,22 +684,30 @@ def nhip(**chi_tiet):
 
 
 # ---------------------------------------------------------------- vai Claude (ai.goi) → vai hợp đồng
+def _ten_ai():
+    try:
+        from ai import ten_nao
+        return ten_nao()
+    except Exception:
+        return "AI"
+
+
 def mo_ta_vai(vai):
     """Tên vai gọi Claude ('biên kịch', 'đạo diễn xxx', 'giám khảo', 'đọc nhãn', 'soát kho cảnh', 'gom bài học'...) → (vai hợp đồng, câu 'viec')."""
     v = str(vai or "").strip().lower()
     if v.startswith("biên kịch"):
-        return "bien-kich", "Đang hỏi Claude: viết lời đọc"
+        return "bien-kich", "Đang hỏi " + _ten_ai() + ": viết lời đọc"
     if v.startswith("đạo diễn"):
-        return "dao-dien", "Đang hỏi Claude: lên bảng dựng"
+        return "dao-dien", "Đang hỏi " + _ten_ai() + ": lên bảng dựng"
     if v.startswith("giám khảo"):
-        return "giam-khao", "Đang hỏi Claude: xem và chấm video"
+        return "giam-khao", "Đang hỏi " + _ten_ai() + ": xem và chấm video"
     if v.startswith("gom bài học"):
-        return "giam-khao", "Đang hỏi Claude: gom bài học"
+        return "giam-khao", "Đang hỏi " + _ten_ai() + ": gom bài học"
     if v.startswith("đọc nhãn"):
-        return "doc-nhan", "Đang hỏi Claude: đọc nhãn sản phẩm"
+        return "doc-nhan", "Đang hỏi " + _ten_ai() + ": đọc nhãn sản phẩm"
     if v.startswith("soát kho"):
-        return "soat-kho", "Đang hỏi Claude: soát kho cảnh"
-    return "he-thong", "Đang hỏi Claude: " + (str(vai or "").strip() or "việc nền")
+        return "soat-kho", "Đang hỏi " + _ten_ai() + ": soát kho cảnh"
+    return "he-thong", "Đang hỏi " + _ten_ai() + ": " + (str(vai or "").strip() or "việc nền")
 
 
 def _dong_het():

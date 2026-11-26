@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).parent))
-from ai import goi, lay_json  # noqa: E402
+from ai import goi, lay_json, HetHanMuc  # noqa: E402
 import phieu  # noqa: E402
 
 import sys as _s0; from pathlib import Path as _P0
@@ -69,6 +69,8 @@ def soat(ma):
             try:
                 txt, u = goi("soát kho cảnh", dung_prompt(sp, ids), anh=[anh])
                 return {int(x["id"]): x for x in lay_json(txt) if isinstance(x, dict) and str(x.get("id", "")).isdigit()}   # id có thể 3 hoặc 4 chữ số
+            except HetHanMuc:
+                raise                                  # hết hạn mức / chưa đăng nhập / chưa cài CLI: thử lại vô ích → dừng cả bước
             except Exception as e:
                 print(f"  tờ {k} lỗi lần {lan + 1}: {str(e)[:150]}")
         return {}

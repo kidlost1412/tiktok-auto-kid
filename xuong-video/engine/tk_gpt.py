@@ -42,10 +42,35 @@ def _them_path(e):
     return e
 
 
+def _tim_codex():
+    """Tìm codex theo nhiều đường (app chạy dưới launcher từng không thấy dù PATH có npm): PATH → thư mục npm của người dùng → `where`."""
+    p = shutil.which("codex", path=_them_path(dict(os.environ))["PATH"])
+    if p:
+        return p
+    goc = [os.environ.get("APPDATA"), os.path.join(os.environ.get("USERPROFILE") or "", "AppData", "Roaming"),
+           str(Path.home() / "AppData" / "Roaming")]
+    for g in filter(None, goc):
+        for ten in ("codex.cmd", "codex.exe"):
+            f = os.path.join(g, "npm", ten)
+            if os.path.isfile(f):
+                return f
+    try:
+        r = subprocess.run(["where", "codex"], capture_output=True, text=True, timeout=10,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        for dong in r.stdout.splitlines():
+            if dong.strip().lower().endswith((".cmd", ".exe")) and os.path.isfile(dong.strip()):
+                return dong.strip()
+    except Exception:
+        pass
+    return None
+
+
 def codex_exe():
-    p = cfg().get("duong_dan", {}).get("codex") or shutil.which("codex", path=_them_path(dict(os.environ))["PATH"])
+    p = cfg().get("duong_dan", {}).get("codex")
+    p = p if p and os.path.isfile(p) else _tim_codex()
     if not p:
-        raise RuntimeError("Không tìm thấy Codex CLI trên máy — cài bằng lệnh: npm install -g @openai/codex")
+        raise RuntimeError("Không tìm thấy Codex CLI trên máy — mở PowerShell từ menu Start (không mở trong app Claude) rồi chạy: "
+                           "npm install -g @openai/codex")
     return p
 
 
@@ -223,7 +248,9 @@ def lam_moi(ma, timeout=25):
     if not t["models"] and cu.get("models") and t["dang_nhap"]:
         t["models"] = cu["models"]
     kv = dict(t); kv["het_den"] = None
-    if t["het"]:                                      # hết → khoá tới giờ mở lại gần nhất đã biết (hoặc giờ đã đánh dấu / +1 giờ)
+    if t["five_hour"] is None and t["seven_day"] is None and (cu.get("het_den") or 0) > time.time():
+        kv["het"], kv["het_den"] = True, cu["het_den"]
+    elif t["het"]:                                      # hết → khoá tới giờ mở lại gần nhất đã biết (hoặc giờ đã đánh dấu / +1 giờ)
         rs = [w["reset"] for w in (t["five_hour"], t["seven_day"]) if w and w["pct"] >= 1.0 and w["reset"] > time.time()]
         kv["het_den"] = max(rs) if rs else (cu.get("het_den") if (cu.get("het_den") or 0) > time.time() else time.time() + 3600)
     ghi(ma, **kv)
@@ -254,7 +281,19 @@ def ds(moi=False):
     Cache quá 5 phút (hoặc moi=True) → đọc lại song song."""
     tks, st = ds_tk(), doc_trang_thai()
     cu = [t["ma"] for t in tks if moi or time.time() - (st.get(t["ma"], {}).get("cap_nhat") or 0) > CACHE_GIAY]
-    ths = [threading.Thread(target=lambda m=m: lam_moi(m), daemon=True) for m in cu]
+    with _lock:
+        cu = [m for m in cu if m not in _DANG_LAM_MOI]
+        _DANG_LAM_MOI.update(cu)
+
+    def chay(m):
+        try:
+            lam_moi(m)
+        except Exception:
+            pass
+        finally:
+            with _lock:
+                _DANG_LAM_MOI.discard(m)
+    ths = [threading.Thread(target=chay, args=(m,), daemon=True) for m in cu]
     for th in ths:
         th.start()
     for th in ths:

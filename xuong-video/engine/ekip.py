@@ -138,15 +138,15 @@ def segs_may_dung(voice, sc, sp, shots, tranh, rng):
     return segs_theo_luat(sents, total, shots, per, rng, yc)
 
 
+def _ten_ngan():
+    from ai import ten_nao
+    return ten_nao()
+
+
 def _ten_nao():
     """Tên bộ não AI đang dùng cho nhật ký lô."""
-    from ai import nao_ai
-    if nao_ai() == "agy":
-        return f"Antigravity {(CFG.get('agy') or {}).get('model') or 'gemini-4-neon-high'}"
-    if nao_ai() == "gpt":
-        g = CFG.get("gpt") or {}
-        return f"ChatGPT {g.get('model') or 'gpt-6.2-sol'} {g.get('effort') or 'high'}"
-    return f"{CFG['claude']['model']} {CFG['claude']['effort']}"
+    from ai import mo_ta_nao
+    return mo_ta_nao()
 
 
 def chay(ma_sp, so_video, log, music_pick, lam_lai=None):
@@ -156,6 +156,9 @@ def chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         log(f"⛔ Đang có một lô {ma_sp} khác chạy — không chạy chồng (đợi lô kia xong)."); return
     try:
         import ai as _ai
+        os.environ.setdefault("XUONG_AI", _ai.nao_ai())                  # chốt AI cho cả lô (tiến trình riêng): anh đổi AI giữa lô → áp dụng từ lô sau
+        if _ai.nao_ai() == "agy":
+            os.environ.setdefault("XUONG_AGY_MODEL", _ai.agy_model())
         _ai.MA_LO = ma_sp                  # token.csv ghi cột "lo" → báo cáo chi phí tách riêng từng lô chạy song song
         _chay(ma_sp, so_video, log, music_pick, lam_lai)
     finally:
@@ -233,7 +236,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 tt_bk.cap(buoc=f"Bài {len(scripts)}/{n_loi}", tien_do=min(1.0, len(scripts) / max(1, n_loi)))
                 tt_bk.ket("ok" if scripts else "loi")
         except HetHanMuc as e:
-            SK.ghi("he-thong", "het-han-muc", "Hết hạn mức Claude khi viết lời")
+            SK.ghi("he-thong", "het-han-muc", f"Hết hạn mức {_ten_ngan()} khi viết lời")
             log(f"⛔ HẾT HẠN MỨC CLAUDE khi viết lời: {e}. Đổi tài khoản rồi chạy lại."); return
         log(f"Biên kịch xong: {len(scripts)} lời đạt kiểm")
         SK.ghi("bien-kich", "xong", f"Viết xong {len(scripts)} lời", so=len(scripts))
@@ -385,7 +388,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             lo_dung.extend(id_canh_chinh(segs) + id_canh_phu(segs))    # video sau trong cùng lô cũng tránh các cảnh này
             (t["work"] / "bang-dung.json").write_text(json.dumps(edl, ensure_ascii=False, indent=1), encoding="utf-8")
         except HetHanMuc:
-            het_han["v"] = True; SK.ghi("he-thong", "het-han-muc", "Hết hạn mức Claude khi lên bảng dựng"); raise
+            het_han["v"] = True; SK.ghi("he-thong", "het-han-muc", f"Hết hạn mức {_ten_ngan()} khi lên bảng dựng"); raise
         except Exception as e:
             log(f"  đạo diễn lỗi ({t['gu']}): {str(e)[:160]} → máy tự dựng theo luật")
             SK.ghi("dao-dien", "loi", f"Đạo diễn lỗi, máy tự dựng: {str(e)[:80]}", video=f'{t["vname"]}-{t["j"]}')
@@ -500,7 +503,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                 return
             if not co_tai_khoan():
                 het_han["v"] = True
-                log("⛔ Mọi tài khoản Claude đang hết hạn mức → ngừng mua giọng cho các lời còn lại (chưa tốn tiền giọng cho video không dựng được).")
+                log(f"⛔ Mọi tài khoản {_ten_ngan()} đang hết hạn mức → ngừng mua giọng cho các lời còn lại (chưa tốn tiền giọng cho video không dựng được).")
                 SK.ghi("he-thong", "het-han-muc", "Hết hạn mức: ngừng thu giọng")
                 return
             moi = viec_tu_loi(i0, scripts[i0:i0 + n_sc_dot])
@@ -607,7 +610,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
                                 shutil.move(str(fo), out_dir / "_ban-chua-dat" / fo.name)
         except HetHanMuc as e:
             het_msg = str(e)[:160]
-            SK.ghi("he-thong", "het-han-muc", "Hết hạn mức Claude", chi_tiet=het_msg)
+            SK.ghi("he-thong", "het-han-muc", f"Hết hạn mức {_ten_ngan()}", chi_tiet=het_msg)
         except Exception as e:
             log(f"  ⚠ đợt {n_dot} gặp lỗi: {type(e).__name__}: {str(e)[-200:]} → bỏ qua đợt này, làm tiếp")
             SK.ghi("he-thong", "loi", f"Đợt {n_dot} gặp lỗi: {type(e).__name__}")
@@ -859,7 +862,7 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     f = HUB / "lich-su" / "token.csv"
     if not f.exists():
         return
-    bd = datetime.datetime.fromtimestamp(t0)
+    bd = datetime.datetime.fromtimestamp(t0).replace(microsecond=0)     # token.csv ghi tới giây → lượt gọi trong cùng giây bắt đầu lô vẫn được tính
     rows = []
     for x in _csv.DictReader(open(f, encoding="utf-8-sig")):
         try:
@@ -870,7 +873,8 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     tok = lambda r: int(r.get("vao") or 0) + int(r.get("vao_cache_tao") or 0) + int(r.get("vao_cache_doc") or 0) + int(r.get("ra") or 0)
     tong = sum(tok(r) for r in rows); usd = sum(float(r.get("usd_uoc") or 0) for r in rows)
     phut = (time.time() - t0) / 60
-    log(f"💰 CHI PHÍ LÔ: {len(rows)} lượt AI · {tong:,} token (≈ {usd:.2f} USD quy đổi)".replace(",", ".") +
+    co_gia = any(not str(r.get("tai_khoan") or "").startswith(("gpt:", "agy")) for r in rows)   # chỉ Claude CLI tự báo giá quy đổi
+    log(f"💰 CHI PHÍ LÔ: {len(rows)} lượt AI · {tong:,} token".replace(",", ".") + (f" (≈ {usd:.2f} USD quy đổi)" if co_gia else "") +
         (f" · {tong // max(1, made):,} token/video · {phut / max(1, made):.1f} phút/video".replace(",", ".") if made else ""))
     theo_vai = {}
     for r in rows:
@@ -901,7 +905,24 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     except Exception:
         pass
     st = doc_trang_thai(); ten = {t["ma"]: t["ten"] for t in ds_tai_khoan()}
+    try:                                             # ChatGPT ghi "gpt:<mã>" → đọc hạn mức từ sổ tài khoản ChatGPT
+        import tk_gpt
+        st_g = tk_gpt.doc_trang_thai()
+        for t in tk_gpt.ds_tk():
+            st["gpt:" + t["ma"]] = st_g.get(t["ma"], {}); ten["gpt:" + t["ma"]] = t["ten"]
+    except Exception:
+        pass
     for ma in sorted({r.get("tai_khoan") or "tk1" for r in rows}):
-        x = st.get(ma, {}); n = sum(1 for r in rows if (r.get("tai_khoan") or "tk1") == ma)
+        n = sum(1 for r in rows if (r.get("tai_khoan") or "tk1") == ma)
+        if ma == "agy":                              # Antigravity: hạn mức Gemini đọc từ app Antigravity (bản nhớ, không mở app)
+            try:
+                import hoc_canh as _hc
+                a = _hc.trang_thai_agy_day_du(nho=True) or {}
+                g5, gt = a.get("gemini_5h") or {}, a.get("gemini_tuan") or {}
+                log(f"   Antigravity: {n} lượt" + (f" · Gemini đã dùng 5 giờ {round((g5.get('pct') or 0) * 100)}% · tuần {round((gt.get('pct') or 0) * 100)}%" if g5 or gt else ""))
+            except Exception:
+                log(f"   Antigravity: {n} lượt")
+            continue
+        x = st.get(ma, {})
         h5 = round(((x.get("five_hour") or {}).get("pct") or 0) * 100); h7 = round(((x.get("seven_day") or {}).get("pct") or 0) * 100)
         log(f"   {ten.get(ma, ma)}: {n} lượt · hiện đã dùng 5 giờ {h5}% · tuần {h7}%")

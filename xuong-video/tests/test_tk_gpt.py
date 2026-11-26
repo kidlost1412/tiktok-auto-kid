@@ -197,7 +197,7 @@ class ExecGia:
     def __call__(self, cmd, **kw):
         self.ghi.append((cmd, kw.get("env") or {}))
         out, err = self.kich_ban(kw.get("env") or {})
-        p = mock.Mock(); p.pid = 1; p.communicate.return_value = (out, err)
+        p = mock.Mock(); p.pid = 1; p.returncode = 0; p.communicate.return_value = (out, err)
         return p
 
 

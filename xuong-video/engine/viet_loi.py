@@ -10,7 +10,7 @@ import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
 from duong_dan import CODE, DATA as HUB, cfg as cfg_hub, cfg_tho, khung_giay, khung_am_tiet, glob_kem
 CFG = cfg_hub()
-from ai import goi, lay_json, HetHanMuc  # noqa: E402
+from ai import goi, lay_json, HetHanMuc, ten_nao  # noqa: E402
 import su_kien as SK  # noqa: E402  (tự thoại của Biên kịch ở Khu Tự Trị: chỉ ghi sự kiện, nuốt mọi lỗi)
 import truc_tiep as TT  # noqa: E402  (việc trực tiếp của Biên kịch: ekip mở sẵn, viet() chỉ cập nhật bước + dòng thật)
 import prompt_mau  # noqa: E402
@@ -856,7 +856,7 @@ def viet(ma_sp, so_ban, log=print):
         qc = [_chon(qcs, dem_q, None, random) for _ in range(need)] if qcs else None
         for q in qc or []:
             dem_q[q] += 1
-        log(f"  gọi Claude viết {need} bản (lần {tries})…")
+        log(f"  gọi {ten_nao()} viết {need} bản (lần {tries})…")
         SK.ghi("bien-kich", "nghi", f"Nặn {need} bài (lần {tries})", buoc="goi", so=need, lan=tries)
         try:
             items = lay_json(goi("biên kịch", build_prompt(sp_for_ai, need, [t["goc"] for t in truc], used, recent_styles(), [t["than"] for t in truc],
