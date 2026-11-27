@@ -617,7 +617,10 @@ def chon_phu(sg, n, shots, rng, used):
         return [{"shot": s, "src_start": mot} for _ in range(n)]
     out = []
     for _ in range(n):
-        pool = [s for s in (hay if rng.random() < 0.6 and hay else ok) if (s["file"], int(s["tu"])) not in used] or ok
+        ds = hay if rng.random() < 0.6 and hay else ok
+        da_f = {f for f, _ in used}                   # Kid 27/11: mỗi clip gốc (cùng người, cùng áo) một lần trong video; hết clip khác mới lấy lại
+        pool = [s for s in ds if s["file"] not in da_f] or [s for s in ok if s["file"] not in da_f] or \
+            [s for s in ds if (s["file"], int(s["tu"])) not in used] or ok
         s = rng.choice(pool)
         used.add((s["file"], int(s["tu"])))
         slack = max(0.0, s["dai"] - sg["dur"] - 0.3)

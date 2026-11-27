@@ -148,7 +148,8 @@ def render(plan, voice, shots, kho, out_path, music=None):
     ghi_bc = []
     layouts = BC.chon_bo_cuc(segs, rng, st.get("nhip", "vua")) if not plan.get("khong_bo_cuc") else ["day"] * len(segs)
     layouts = [sg.get("bo_cuc") or L for sg, L in zip(segs, layouts)]
-    used_phu = {(sg["shot"]["file"], int(sg["shot"]["tu"])) for sg in segs}
+    used_phu = {(sg["shot"]["file"], int(sg["shot"]["tu"])) for sg in segs} | \
+               {(p["file"], int(p["tu"])) for sg in segs for p in sg.get("phu_shots") or []}      # cả ô phụ đạo diễn chọn: máy bù không lấy lại clip gốc đó
     if not plan.get("khong_bo_cuc"):       # trần/sàn bố cục áp lên mọi lựa chọn (đạo diễn hay máy) — xem bo_cuc.ep_bo_cuc
         layouts, ghi_bc = BC.ep_bo_cuc(segs, layouts, rng, lambda sg, n: [p["shot"] for p in BC.chon_phu(sg, n, shots, rng, used_phu)],
                                        khung=(plan.get("phong_cach") or {}).get("khung_dung"), kho_canh=shots, used=used_phu)

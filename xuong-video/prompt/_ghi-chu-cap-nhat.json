@@ -30,7 +30,8 @@
   "1.2.42": "Đạo diễn giờ xem mỗi cảnh qua 3 khung (đầu, giữa, cuối đoạn dùng được) thay vì 1 ảnh, và được chọn trong nhiều cảnh hơn mỗi câu, nên ít chọn nhầm cảnh có ảnh đại diện không đúng với clip thật.",
   "1.2.44": "Mọi video đều chốt có quà thật của món đó; khối chốt ghi đúng một mức quà và đổi cách viết, kiểu khối giữa các video thay vì luôn \"QUÀ TẶNG THEO ĐƠN\".",
   "2.0.0": "Đạo diễn xem mỗi cảnh qua 6 khung và tự chọn kiểu dựng đặc biệt (thẻ xoay, dải trôi, thẻ hiện rồi mất, chồng thẻ, thẻ rơi), video sau khác video trước. Âm thanh dùng đúng chỗ: tiếng mở tự chọn theo câu mở (đùng nhẹ không đè lời, rít đĩa khi mở bằng đối lập, ting khi mở bằng con số), màn trập khi hình lóe, còi sai chỉ khi chữ nói cái sai. Câu gỡ ngại ưu tiên cảnh rót, khuấy tan, đóng thùng nếu kho có.",
-  "2.4.0": "Cảnh mở phải khớp ý câu mở đang đọc (người xem quyết định ở 1–2 giây đầu). Câu mở nói về người, cái mất, lời nói thật thì ưu tiên cảnh người thật cận mặt có biểu cảm; câu mở nói triệu chứng, con số thì cảnh thấy tận mắt điều đó; tránh mở bằng cảnh tĩnh nhạt."
+  "2.4.0": "Cảnh mở phải khớp ý câu mở đang đọc (người xem quyết định ở 1–2 giây đầu). Câu mở nói về người, cái mất, lời nói thật thì ưu tiên cảnh người thật cận mặt có biểu cảm; câu mở nói triệu chứng, con số thì cảnh thấy tận mắt điều đó; tránh mở bằng cảnh tĩnh nhạt.",
+  "2.4.1": "Cảnh cắt từ cùng một video gốc (cùng người, cùng áo) được đánh dấu cho đạo diễn; mỗi video gốc chỉ lấy một cảnh trong cả video, kể cả ô phụ, dải trôi, lật trang, để không thành một người xài mãi."
  },
  "so-tay-editor": {
   "1.2.13": "Đạo diễn bớt khuôn 'ô trên nền mờ': cảnh toàn màn là chính, mỗi video một ý dựng chủ đạo, có khoảng thở, không nhồi chữ và hiệu ứng.",

@@ -710,10 +710,23 @@ def am_cho_dao_dien():
         return "- khong: không có âm"
 
 
-COT_DS = "Cột: id | vai trò | cỡ cảnh | mô tả | nói: lời người trong clip lúc đó (chỉ để hiểu cảnh) | dài (s)"
+COT_DS = ("Cột: id | vai trò | cỡ cảnh | mô tả | nói: lời người trong clip lúc đó (chỉ để hiểu cảnh) | dài (s) | [clip Gx] = cắt từ CÙNG một video gốc"
+          " (cùng người, cùng áo): mỗi clip chỉ dùng MỘT cảnh trong video")
 
 
-def dong_ds(i, s):
+def nhom_clip(ds):
+    """{id: "G1"…} cho các cảnh ứng viên cắt từ cùng một video gốc (≥ 2 cảnh cùng file). Cảnh một mình không gắn nhãn."""
+    theo = {}
+    for s in ds:
+        if s.get("file"):
+            theo.setdefault(str(s["file"]), []).append(s["id"])
+    out = {}
+    for k, ids in enumerate((v for v in theo.values() if len(v) >= 2), 1):
+        out.update({i: f"G{k}" for i in ids})
+    return out
+
+
+def dong_ds(i, s, nhom=None):
     """1 dòng cảnh ứng viên gửi đạo diễn: id | vai trò[ | NGƯỜI NÓI…] | cỡ cảnh (nếu biết) | mô tả[ | nói: …] | dài.
     Cảnh học kiểu 2 (có phiếu): mô tả đầy đủ ≤ 90 ký tự + lời đang nói; cảnh cũ giữ cách ghi cũ."""
     kieu2 = s.get("kieu") == 2
@@ -725,7 +738,7 @@ def dong_ds(i, s):
     cot.append(mo + (f" [cây: {', '.join(TEN_CAY[c] for c in cay)}]" if cay else "") + (" [CÓ CHỮ GỐC trong hình]" if ((s_ := (s.get("soat") or {})).get("chu_muc") or 0) >= 1 else ""))
     if kieu2 and s.get("noi"):
         cot.append("nói: " + str(s["noi"])[:80])
-    cot.append(str(s["dai"]))
+    cot.append(str(s["dai"]) + (f" [clip {nhom}]" if nhom else ""))
     return " | ".join(cot)
 
 
@@ -744,6 +757,7 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
     if ra_boi is not None:
         ra_boi.update(boi)
     ids = list(chon)
+    nhom = nhom_clip([chon[i] for i in ids])
     try:                                       # công thức đưa đạo diễn: bỏ 2 công thức dùng nhiều nhất hôm nay
         ct_ds = ct_cho_dao_dien(list(used_sigs or []))
     except RuntimeError:
@@ -761,7 +775,7 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
         gu=GU[gu_key], so_gu=so_gu, bai_hoc=bai_hoc_cho(ma), so_tay=SO_TAY(), sp=json.dumps(sp_ngan, ensure_ascii=False),
         cau="\n".join(f"[{k}] {s['s']:.1f}–{s['e']:.1f}s: {s['text']}" for k, s in enumerate(sents)),
         total=total, nhan=script.get("nhan_tu", []),
-        ds=COT_DS + "\n" + "\n".join(dong_ds(i, chon[i]) for i in ids),
+        ds=COT_DS + "\n" + "\n".join(dong_ds(i, chon[i], nhom.get(chon[i]["id"])) for i in ids),
         goi_y=json.dumps({k: v for k, v in enumerate(per)}),
         bo_cuc=chr(10).join(f"- {k}: {v['mo_ta']} (cảnh phụ: {v['phu']}" + (f"–{v['phu_toi_da']}" if v['phu_toi_da'] != v['phu'] else "") + ")" for k, v in BC.mo_ta_bo_cuc().items()) + _goi_y_dac_biet(),
         tu=tu_danh_so(sents), khoi_mo_ta=khoi_cho_dao_dien(), am=am_cho_dao_dien(),
@@ -887,7 +901,49 @@ def segs_tu_bang(edl, sents, total, shots):
     segs, sua2 = _bu_bo_cuc(segs, shots, used, met)
     own = sum(1 for s in shots if s.get("soat") and not bad(s) and not str(s["id"]).startswith(("Q-", "V-")))
     segs, sua3 = gioi_han_kho_them(segs, shots, used, None if own >= KHO_NHO else TY_KHO_THEM_NHO)   # kho riêng nhỏ: kho chung được nhiều hơn
-    return segs, sua + sua2 + sua3
+    sua4 = mot_clip_mot_lan(segs, shots, used, met)
+    return segs, sua + sua2 + sua3 + sua4
+
+
+def mot_clip_mot_lan(segs, shots, used, met=None):
+    """Kid 27/11: nhiều cảnh cắt từ CÙNG một video gốc (cùng người, cùng áo) trong một video → người xem thấy một người xài mãi.
+    Mỗi clip gốc chỉ một lần trong video (cả cảnh chính lẫn ô phụ). Lần thứ hai trở đi → đổi sang cảnh của clip chưa dùng, cùng loại
+    (AFF↔AFF, chai↔chai; câu chốt vẫn phải chai). Kho hết clip khác thì giữ nguyên. Giữ trước: câu chốt, câu mở, rồi theo thứ tự. Trả ghi chú."""
+    met = met or {}
+    n = len(segs)
+    if not n:
+        return []
+    f_of = lambda s: str(s.get("file") or s.get("id"))
+    dep_ = lambda s: (s.get("soat") or {}).get("dep") or 3
+    xet = [(i, None) for i in [n - 1, 0] + list(range(1, n - 1)) if 0 <= i < n]
+    xet = list(dict.fromkeys(xet)) + [(i, j) for i in range(n) for j in range(len(segs[i].get("phu_shots") or []))]
+    da, sua = set(), []
+    for i, j in xet:
+        sg = segs[i]
+        cu = sg["shot"] if j is None else sg["phu_shots"][j]
+        if f_of(cu) not in da:
+            da.add(f_of(cu)); continue
+        if j is None:
+            pool = [s for s in shots if s["id"] not in used and f_of(s) not in da and not bad(s) and la_chai(s) == la_chai(cu)
+                    and nguoi_noi(s) <= nguoi_noi(cu)]
+            if i == n - 1:
+                pool = [s for s in pool if la_chai(s) and not nguoi_noi(s)]
+        else:
+            q = str(cu.get("id", "")).startswith("Q-")
+            pool = [s for s in shots if s["id"] not in used and f_of(s) not in da and not bad(s, chinh=False)
+                    and str(s.get("id", "")).startswith("Q-") == q]
+            pool = [s for s in pool if BC.vua_o_hep(s, sg.get("bo_cuc"))] or pool
+        pool = [s for s in pool if la_aff(s) == la_aff(cu)] or pool
+        if not pool:
+            da.add(f_of(cu)); continue             # kho không còn clip khác cùng loại → giữ (kho quá nhỏ)
+        moi = min(pool, key=lambda s: met.get(s["id"], 0) - 0.5 * dep_(s))
+        used.add(moi["id"]); da.add(f_of(moi))
+        if j is None:
+            _dat_canh(sg, moi)
+        else:
+            sg["phu_shots"][j] = moi
+        sua.append(f"đoạn {i}{'' if j is None else ' ô phụ'}: {cu['id']}→{moi['id']} (cùng clip gốc với cảnh khác)")
+    return sua
 
 
 def _dat_canh(sg, moi):
