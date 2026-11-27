@@ -436,6 +436,20 @@ def _el_client():
     return client()
 
 
+_HM_GIONG = {"t": 0, "v": None}
+
+
+def han_muc_giong(moi=False):
+    """Hạn mức ký tự ElevenLabs (nhớ 5 phút; moi=1 đọc lại)."""
+    if not _khoa_hien_tai():
+        return {"loi": "Chưa có khoá ElevenLabs."}
+    if moi or not _HM_GIONG["v"] or time.time() - _HM_GIONG["t"] > 300:
+        sys.path.insert(0, str(CODE / "engine"))
+        from giong import han_muc_giong as _hm
+        _HM_GIONG["v"], _HM_GIONG["t"] = _hm(), time.time()
+    return dict(_HM_GIONG["v"])
+
+
 def _voice_dict(v):
     lb = getattr(v, "labels", None) or {}
     return {"id": getattr(v, "voice_id", "") or "", "ten": getattr(v, "name", "") or "", "loai": getattr(v, "category", "") or "",
@@ -1534,6 +1548,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(nhac_trang_thai())
         if u.path == "/api/khoa-giong":
             return self._json(khoa_giong_trang_thai())
+        if u.path == "/api/han-muc-giong":
+            return self._json(han_muc_giong(q.get("moi", [""])[0] == "1"))
         if u.path == "/api/giong":
             return self._json(giong_trang_thai())
         if u.path == "/api/giong-mau":
@@ -1855,22 +1871,30 @@ def _nao_ai():
 
 
 def _vong_kiem_han_muc():
-    """Nền: mỗi ~7 phút kiểm hạn mức từng tài khoản (tuần tự, mỗi lần 1 câu rất ngắn). Lô đang chạy → bỏ qua (lô tự cập nhật hạn mức)."""
+    """Nền: mỗi ~7 phút kiểm hạn mức từng tài khoản. Trước hết đọc nhanh không tốn lượt (mọi lúc, cả khi đang làm video / đang dùng AI khác);
+    tài khoản nào đọc nhanh không được mới dùng cách cũ (1 câu rất ngắn) — cách cũ bỏ qua khi lô đang chạy."""
     time.sleep(45)                                   # chờ app lên xong rồi mới kiểm lần đầu
     while True:
+        con = []
         try:
-            if not dang_chay() and _KIEM_LOCK.acquire(blocking=False):
+            sys.path.insert(0, str(CODE / "engine"))
+            import ai
+            con = [tk for tk in ai.ds_tai_khoan() if not ai.doc_han_muc_nhanh(tk["ma"])]
+        except Exception as e:
+            print("Đọc nhanh hạn mức lỗi:", str(e)[:120])
+        try:
+            if con and not dang_chay() and _KIEM_LOCK.acquire(blocking=False):
                 try:
                     sys.path.insert(0, str(CODE / "engine"))
                     import ai
                     st = ai.doc_trang_thai()
-                    for tk in (list(ai.ds_tai_khoan()) if ai.nao_ai() == "claude" else []):     # đang dùng ChatGPT/Antigravity → không tốn câu hỏi Claude
+                    for tk in (con if ai.nao_ai() == "claude" else []):     # đang dùng ChatGPT/Antigravity → không tốn câu hỏi Claude
                         if dang_chay():
                             break
                         if not _cua_so_dang_mo(st.get(tk["ma"]) or {}):
                             continue                 # cửa sổ 5 giờ đã reset / chưa dùng: gọi lúc này = mở cửa sổ mới vô ích
                         try:
-                            ai.kiem_han_muc(tk["ma"])
+                            ai.kiem_han_muc(tk["ma"], nhanh=False)
                         except Exception as e:
                             print(f"[{datetime.datetime.now():%H:%M:%S}] Kiểm hạn mức {tk.get('ma')} lỗi: {str(e)[:120]}")
                 finally:

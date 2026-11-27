@@ -165,8 +165,63 @@ def chay(ma_sp, so_video, log, music_pick, lam_lai=None):
         nha_khoa_lo(token, lay_f_khoa(ma_sp))
 
 
+def anh_han_muc(eleven=True):
+    """Ảnh chụp hạn mức lúc này: {ma_tk: {"h5": %, "tuan": %}} (Claude, ChatGPT "gpt:<mã>", Antigravity "agy") + "_eleven": ký tự đã dùng.
+    Cửa sổ đã qua giờ reset → 0%. Lỗi ở nguồn nào thì bỏ nguồn đó."""
+    now, out = time.time(), {}
+    pct = lambda w: None if not w else (0 if (w.get("reset") or now + 1) < now else round((w.get("pct") or 0) * 100))
+    try:
+        from ai import doc_trang_thai, doc_han_muc_nhanh, ds_tai_khoan
+        for t in ds_tai_khoan():                      # đọc số mới nhất, không tốn lượt (lỗi → dùng số đã nhớ)
+            doc_han_muc_nhanh(t["ma"], timeout=8)
+        for ma, x in doc_trang_thai().items():
+            out[ma] = {"h5": pct(x.get("five_hour")), "tuan": pct(x.get("seven_day"))}
+    except Exception:
+        pass
+    try:
+        import tk_gpt
+        for ma, x in tk_gpt.doc_trang_thai().items():
+            out["gpt:" + ma] = {"h5": pct(x.get("five_hour")), "tuan": pct(x.get("seven_day"))}
+    except Exception:
+        pass
+    try:
+        if os.environ.get("XUONG_AI") == "agy":
+            import hoc_canh as _hc
+            a = _hc.trang_thai_agy_day_du(nho=False) or {}
+            out["agy"] = {"h5": pct(a.get("gemini_5h")), "tuan": pct(a.get("gemini_tuan"))}
+    except Exception:
+        pass
+    if eleven:
+        try:
+            from giong import han_muc_giong
+            e = han_muc_giong()
+            if "dung" in e:
+                out["_eleven"] = e
+        except Exception:
+            pass
+    return out
+
+
+def hao_han_muc(truoc, sau, tk_dung):
+    """Mỗi tài khoản lô đã dùng: {ma: {"h5": [trước, sau], "tuan": [trước, sau]}}; ElevenLabs: {"_eleven": [đã dùng trước, sau, giới hạn]}."""
+    out = {}
+    for ma in tk_dung:
+        a, b = (truoc or {}).get(ma) or {}, (sau or {}).get(ma) or {}
+        if b:
+            out[ma] = {k: [a.get(k), b.get(k)] for k in ("h5", "tuan")}
+    ea, eb = (truoc or {}).get("_eleven"), (sau or {}).get("_eleven")
+    if ea and eb:
+        out["_eleven"] = [ea["dung"], eb["dung"], eb["gioi_han"]]
+    return out
+
+
+_HM_TRUOC = {}       # hạn mức lúc lô bắt đầu (mỗi lô một tiến trình)
+
+
 def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
     t_bat_dau = time.time()
+    global _HM_TRUOC
+    _HM_TRUOC = anh_han_muc()
     day = datetime.date.today().isoformat()
     out_dir = Path(CFG["duong_dan"]["ra"]) / day
     tam = out_dir / "_tam" / datetime.datetime.now().strftime(f"lo-{ma_sp}-%H%M%S")      # thư mục tạm riêng cho từng lô (có mã sản phẩm: 2 lô chạy song song không đụng nhau)
@@ -866,7 +921,8 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
     rows = []
     for x in _csv.DictReader(open(f, encoding="utf-8-sig")):
         try:
-            if datetime.datetime.fromisoformat(x["luc"]) >= bd and (x.get("lo") or ma_sp) == ma_sp:      # nhiều lô song song: chỉ tính lượt gọi của lô này
+            lo = x.get("lo") or (x.get(None) or [""])[0]     # token.csv tạo trước khi có cột "lo": tiêu đề cũ → giá trị nằm ở cột thừa
+            if datetime.datetime.fromisoformat(x["luc"]) >= bd and (lo or ma_sp) == ma_sp:      # nhiều lô song song: chỉ tính lượt gọi của lô này
                 rows.append(x)
         except Exception:
             pass
@@ -891,16 +947,24 @@ def bao_chi_phi(t0, made, log, ma_sp=""):
                 pass
     if ky_tu:
         log(f"   giọng ElevenLabs: {ky_tu:,} ký tự".replace(",", ".") + (f" (≈ {ky_tu // max(1, made)} ký tự/video, 1 giọng dùng chung nhiều video)" if made else ""))
+    tk_dung = {}
+    for r in rows:
+        tk_dung[r.get("tai_khoan") or "tk1"] = tk_dung.get(r.get("tai_khoan") or "tk1", 0) + 1
+    hao = {}
+    try:
+        hao = hao_han_muc(_HM_TRUOC, anh_han_muc(), tk_dung)
+        if "_eleven" in hao:
+            a, b, gh = hao["_eleven"]
+            log(f"   ElevenLabs (số tài khoản tự trừ): lô này {b - a:,} ký tự · đã dùng {b:,}/{gh:,} · còn {max(0, gh - b):,}".replace(",", "."))
+    except Exception:
+        pass
     try:                                             # lưu lại để app hiện bảng các lô
-        tk_dung = {}
-        for r in rows:
-            tk_dung[r.get("tai_khoan") or "tk1"] = tk_dung.get(r.get("tai_khoan") or "tk1", 0) + 1
         SK.noi_them(HUB / "lich-su" / "lo.jsonl", json.dumps(
             {"bat_dau": bd.isoformat(timespec="seconds"), "ket_thuc": datetime.datetime.now().isoformat(timespec="seconds"),
              "san_pham": ma_sp, "video": made, "luot_ai": len(rows), "token": tong,
              "token_vao": sum(int(r.get("vao") or 0) + int(r.get("vao_cache_tao") or 0) + int(r.get("vao_cache_doc") or 0) for r in rows),
              "token_ra": sum(int(r.get("ra") or 0) for r in rows), "usd_quy_doi": round(usd, 2),
-             "ky_tu_giong": ky_tu, "phut": round(phut, 1), "theo_vai": theo_vai, "tai_khoan": tk_dung},
+             "ky_tu_giong": ky_tu, "phut": round(phut, 1), "theo_vai": theo_vai, "tai_khoan": tk_dung, "han_muc": hao},
             ensure_ascii=False) + "\n", giu_dong=2000, toi_da_byte=400_000)
     except Exception:
         pass

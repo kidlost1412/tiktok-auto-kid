@@ -161,6 +161,7 @@ def _dung_ekip(td, so_video, so_loi, dao_dien, tao_giong, chon_tk=lambda: object
         ("kho_them_cua", lambda *a, **k: []), ("canh_qua", lambda *a, **k: {}))]
     p.append(mock.patch("ai.chon_tai_khoan", lambda *a, **k: chon_tk()))
     p.append(mock.patch.object(ekip.SK, "ghi", lambda *a, **k: None))
+    p.append(mock.patch.object(ekip, "anh_han_muc", lambda *a, **k: {}))     # không gọi mạng (Claude / ElevenLabs) khi thử
     for x in p:
         x.start()
     try:

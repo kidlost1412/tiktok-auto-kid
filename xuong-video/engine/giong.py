@@ -51,6 +51,22 @@ def client():
     return _client
 
 
+def han_muc_giong(timeout=10):
+    """Hạn mức ký tự (credit) ElevenLabs của tài khoản, đọc thẳng từ API: {dung, gioi_han, con, reset (unix), goi} hoặc {loi}.
+    Đây là số ElevenLabs tự trừ (đúng tuyệt đối), khác số app tự đếm theo độ dài lời."""
+    try:
+        s = client().user.subscription.get(request_options={"timeout_in_seconds": timeout, "max_retries": 0})
+        dung, gh = int(s.character_count or 0), int(s.character_limit or 0)
+        return {"dung": dung, "gioi_han": gh, "con": max(0, gh - dung), "reset": getattr(s, "next_character_count_reset_unix", None),
+                "goi": str(getattr(s, "tier", "") or "")}
+    except ThieuKhoaGiong as e:
+        return {"loi": str(e)}
+    except Exception as e:
+        t = str(e)
+        return {"loi": "Khoá ElevenLabs chưa có quyền đọc tài khoản (bật quyền User → Read khi tạo khoá)." if "permission" in t.lower() or "401" in t
+                else f"Không đọc được hạn mức ElevenLabs ({type(e).__name__})."}
+
+
 def words_from_alignment(chars, starts, ends):
     """Gộp ký tự thành từ, bỏ phần [tag]."""
     words, cur, s, e, in_tag = [], "", None, None, False
@@ -151,6 +167,9 @@ def tao_giong(text, voice_id, out_dir, ten, doc=None):
                 ghi_nguyen_tu(raw_js, json.dumps(al, ensure_ascii=False))
         except Exception:
             raw.write_bytes(audio)                        # đĩa lỗi lặt vặt: vẫn đủ để ffmpeg chạy tiếp lần này
+        import datetime as _dt, su_kien as _sk           # ghi sổ NGAY lúc mua (mỗi lần mua một dòng): hậu kỳ lỗi, chạy lại dùng bản lưu thì không ghi lần nữa
+        _sk.noi_them(HUB / "lich-su" / "giong.csv", _sk.dong_csv([_dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ten, len(noi), ""]),
+                     ma_hoa="utf-8-sig", dau=_sk.dong_csv(["luc", "ten", "ky_tu", "giay"]), giu_dong=4000, toi_da_byte=400_000)
         if not al:
             raise RuntimeError("ElevenLabs không trả mốc thời gian từng chữ (đã lưu âm thanh gốc " + raw.name + ")")
     words = words_from_alignment(al["characters"], al["starts"], al["ends"])
@@ -167,8 +186,5 @@ def tao_giong(text, voice_id, out_dir, ten, doc=None):
         raise RuntimeError("ffprobe không đọc được độ dài giọng — âm thanh gốc vẫn còn, chạy lại sẽ không mua lại")
     info = {"audio": str(final), "words": words, "dur": round(dur, 3), "text": text, "voice_id": voice_id,
             "ky_tu": len(noi), "meta": str(meta)}                   # ký tự gửi ElevenLabs (tính phí theo ký tự)
-    import datetime as _dt, su_kien as _sk
-    _sk.noi_them(HUB / "lich-su" / "giong.csv", _sk.dong_csv([_dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ten, len(noi), round(dur, 2)]),
-                 ma_hoa="utf-8-sig", dau=_sk.dong_csv(["luc", "ten", "ky_tu", "giay"]), giu_dong=4000, toi_da_byte=400_000)
     ghi_nguyen_tu(meta, json.dumps(info, ensure_ascii=False, indent=1))
     return info

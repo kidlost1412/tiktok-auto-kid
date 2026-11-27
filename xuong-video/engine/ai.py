@@ -655,8 +655,48 @@ def _goi(vai, prompt, anh=None, model=None, effort=None, timeout=1200):
         return res, u
 
 
-def kiem_han_muc(ma):
-    """Gọi 1 câu rất ngắn (Sonnet, suy nghĩ thấp) bằng đúng tài khoản để lấy hạn mức mới nhất."""
+URL_HAN_MUC = "https://api.anthropic.com/api/oauth/usage"
+
+
+def doc_han_muc_nhanh(ma, timeout=15):
+    """Đọc hạn mức 5 giờ / tuần KHÔNG tốn lượt (cùng chỗ lệnh /usage của Claude Code đọc), bằng phiên đăng nhập sẵn có của tài khoản.
+    Ghi vào tai-khoan.json như hạn mức CLI báo. Phiên hết hạn / mạng lỗi / dạng trả về lạ → None (bên gọi tự dùng cách cũ)."""
+    import urllib.request
+    tk = next((t for t in ds_tai_khoan() if t["ma"] == ma), None)
+    if not tk:
+        return None
+    d = Path(tk["thu_muc"]).resolve() if tk.get("thu_muc") else Path.home() / ".claude"
+    try:
+        o = json.loads((d / ".credentials.json").read_text(encoding="utf-8")).get("claudeAiOauth") or {}
+        if not o.get("accessToken") or (o.get("expiresAt") or 0) / 1000 < time.time() + 60:
+            return None                                   # hết hạn: không tự làm mới phiên (để CLI làm lúc gọi thật)
+        rq = urllib.request.Request(URL_HAN_MUC, headers={"Authorization": "Bearer " + o["accessToken"],
+                                                          "anthropic-beta": "oauth-2025-04-20", "User-Agent": "claude-cli"})
+        j = json.loads(urllib.request.urlopen(rq, timeout=timeout).read())
+    except Exception:
+        return None
+    kv = {}
+    for k in ("five_hour", "seven_day"):
+        w = j.get(k)
+        if isinstance(w, dict) and w.get("utilization") is not None:
+            try:
+                rs = datetime.datetime.fromisoformat(str(w.get("resets_at")).replace("Z", "+00:00")).timestamp() if w.get("resets_at") else None
+            except ValueError:
+                rs = None
+            kv[k] = {"pct": round(float(w["utilization"]) / 100, 4), "reset": rs}
+    if not kv:
+        return None
+    kv["cap_nhat"] = time.time(); kv["dang_nhap"] = True
+    _ghi_trang_thai(ma, **kv)
+    return doc_trang_thai().get(ma, {})
+
+
+def kiem_han_muc(ma, nhanh=True):
+    """Hạn mức mới nhất: đọc nhanh không tốn lượt; không được thì gọi 1 câu rất ngắn (Sonnet, suy nghĩ thấp) bằng đúng tài khoản."""
+    if nhanh:
+        x = doc_han_muc_nhanh(ma)
+        if x:
+            return x
     tk = next((t for t in ds_tai_khoan() if t["ma"] == ma), None)
     if not tk:
         return {"loi": "không có tài khoản"}

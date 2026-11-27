@@ -745,7 +745,7 @@ details.kt-tech .stat{margin-top:12px}
           <div class="stat s3">
             <div><b id="stLuot">—</b><span>lượt gọi AI</span></div>
             <div><b id="stToken">—</b><span>token đã dùng</span></div>
-            <div><b id="stKyTu">—</b><span>ký tự giọng (ElevenLabs)</span></div>
+            <div><b id="stKyTu">—</b><span>ký tự giọng (ElevenLabs)</span><span class="note" id="stKyTuCon" style="display:block;font-size:12px"></span></div>
           </div>
           <p class="note" id="stUsd" style="margin:12px 0 0"></p>
         </details>
@@ -753,7 +753,7 @@ details.kt-tech .stat{margin-top:12px}
       </div>
     <div class="card mt">
       <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
-        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = AI làm video (Claude / ChatGPT / Antigravity: biên kịch, đạo diễn). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền.</p></div>
+        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = AI làm video (Claude / ChatGPT / Antigravity: biên kịch, đạo diễn). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền. Cột hạn mức: % đã dùng lúc lô bắt đầu → lúc lô xong; nhiều lô chạy cùng lúc trên một tài khoản thì số này gồm cả phần của lô kia.</p></div>
         <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở hoặc thu gọn bảng chi phí từng lô" aria-label="Mở hoặc thu gọn bảng chi phí từng lô"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
       <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
     </div>
@@ -1084,6 +1084,7 @@ details.kt-tech .stat{margin-top:12px}
       <div class="card"><div class="ch"><span class="chip g"><svg class="i"><use href="#i-mic"/></svg></span>
         <div class="t"><h2>Khoá ElevenLabs (giọng đọc)</h2><p class="sub">Bắt buộc để làm video</p></div></div>
         <div class="note" id="kgTrangThai">Đang kiểm…</div>
+        <div id="kgHanMuc" style="margin-top:12px"></div>
         <div class="row nowrap" style="margin-top:12px;gap:8px"><input type="password" id="kgKhoa" placeholder="Khoá API ElevenLabs" aria-label="Khoá API ElevenLabs" autocomplete="off" spellcheck="false" style="flex:1;min-width:0">
           <button class="btn go" id="btnLuuKg"><svg class="i"><use href="#i-save"/></svg>Lưu khoá</button></div>
         <p class="note">Lấy khoá ở elevenlabs.io → Profile → API Keys. Khoá được lưu vào file .env trong thư mục dữ liệu hub, chỉ hiện 4 ký tự cuối.</p>
@@ -1712,7 +1713,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = async () => {
   if (b.dataset.tab === 'gu') taiGu();
   if (b.dataset.tab === 'pm') taiPm();
   if (b.dataset.tab === 'cd') taiCd();
-  if (b.dataset.tab === 'sx') { taiLo().catch(() => {}); taiTuDong().catch(() => {}); }
+  if (b.dataset.tab === 'sx') { taiLo().catch(() => {}); taiTuDong().catch(() => {}); taiHmGiong().catch(() => {}); }
   cnNgay(); chuaVe();
 });
 
@@ -2981,6 +2982,20 @@ async function taiTp() { TP = await api('/api/trypost'); $('#tpDiaChi').textCont
 async function taiKg() {
   let r; try { r = await api('/api/khoa-giong'); } catch (e) { return; }
   $('#kgTrangThai').innerHTML = r.co ? `<span class="pill g dot">Đã có khoá</span> ${r.cuoi ? '<span class="pc-code" style="display:inline">đuôi …' + esc(r.cuoi) + '</span>' : ''}` : '<span class="pill r dot">Chưa có khoá</span> Chưa làm video được cho tới khi dán khoá.';
+  if (r.co) taiHmGiong();
+}
+async function taiHmGiong(moi) {
+  let h; try { h = await api('/api/han-muc-giong' + (moi ? '?moi=1' : '')); } catch (e) { return; }
+  const n = x => (+x || 0).toLocaleString('vi-VN');
+  const txt = h.loi ? `<div class="note">${esc(h.loi)}</div>` : (() => {
+    const p = h.gioi_han ? Math.round(h.dung / h.gioi_han * 100) : 0, c = p >= 90 ? 'var(--red)' : p >= 70 ? 'var(--amber)' : '';
+    const d = h.reset ? new Date(h.reset * 1000) : null, rs = d ? d.getDate() + '/' + (d.getMonth() + 1) : '';
+    return `<div class="lr"><span>Đã dùng ${n(h.dung)} / ${n(h.gioi_han)} ký tự${h.goi ? ' · gói ' + esc(h.goi) : ''}</span><b style="color:${c}">${p}%</b></div>
+      <div class="bar sm"><i style="width:${p}%;${c ? 'background:' + c : ''}"></i></div>
+      <div class="note" style="margin-top:6px">Còn <b>${n(h.con)}</b> ký tự${rs ? ' · làm mới ngày ' + rs : ''} · khoảng ${n(Math.floor(h.con / 450))} lời đọc nữa (≈ 450 ký tự/lời). Số do ElevenLabs trả về, đúng như trên elevenlabs.io.</div>`; })();
+  setH($('#kgHanMuc'), txt + '<button class="btn ghost sm" id="btnHmGiong" style="margin-top:8px">Đọc lại</button>');
+  $('#btnHmGiong').onclick = () => taiHmGiong(true);
+  const o = $('#stKyTuCon'); if (o) setT(o, h.loi ? '' : `ElevenLabs còn ${n(h.con)} / ${n(h.gioi_han)} ký tự`);
 }
 $('#btnLuuKg').onclick = async () => {
   const k = $('#kgKhoa').value.trim(); if (!k) return toast('Dán khoá vào ô trước đã');
@@ -3097,14 +3112,23 @@ $('#btnKiemTk').onclick = () => taiTk(true);
 
 async function taiLo() {
   const ds = await api('/api/lo'); const k = soGon;
-  const cot = [['Lúc'], ['Sản phẩm'], ['Video', 1], ['Thời gian', 1], ['Phút/video', 1], ['Lượt AI', 1], ['Token (vào / ra)', 1], ['Token/video', 1], ['Ký tự giọng', 1], ['Ký tự/video', 1], ['≈ USD', 1], ['Tài khoản']];
+  const cot = [['Lúc'], ['Sản phẩm'], ['Video', 1], ['Thời gian', 1], ['Phút/video', 1], ['Lượt AI', 1], ['Token (vào / ra)', 1], ['Token/video', 1], ['Ký tự giọng', 1], ['Ký tự/video', 1], ['≈ USD', 1], ['Tài khoản'], ['Hạn mức trước → sau lô']];
   setH($('#loBang'), !ds.length ? `<tbody><tr><td class="empty-td">${rong('coins', 'Chưa có lô nào được ghi', 'Lô mới sẽ tự hiện ở đây.')}</td></tr></tbody>` :
     '<thead><tr>' + cot.map(([t, n]) => `<th${n ? ' class="num"' : ''}>${t}</th>`).join('') + '</tr></thead><tbody>' +
     ds.map(l => `<tr><td class="note" style="color:var(--ink2)">${l.bat_dau.slice(5, 16).replace('T', ' ')}</td><td><b>${esc(l.san_pham)}</b></td>
       <td class="num"><b>${l.video}</b></td><td class="num">${l.phut} phút</td><td class="num">${l.video ? (l.phut / l.video).toLocaleString('vi-VN', {maximumFractionDigits: 1}) : '—'}</td><td class="num">${l.luot_ai}</td>
       <td class="num">${k(l.token)} <span class="note">(${k(l.token_vao)} / ${k(l.token_ra)})</span></td><td class="num"><b>${l.video ? k(l.token / l.video) : '—'}</b></td>
       <td class="num">${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td class="num">${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '—'}</td>
-      <td class="num">${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => esc(a) + ': ' + n).join(', ')}</td></tr>`).join('') + '</tbody>');
+      <td class="num">${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => esc(tenTk(a)) + ': ' + n + ' lượt').join(', ')}</td>
+      <td class="note">${hmLo(l.han_muc)}</td></tr>`).join('') + '</tbody>');
+}
+function tenTk(a) { return a === 'agy' ? 'Antigravity' : a.startsWith('gpt:') ? 'ChatGPT ' + a.slice(4) : 'Claude ' + a; }
+function hmLo(h) {
+  if (!h) return '—';
+  const cs = ([a, b]) => a == null || b == null ? '?' : b < a ? `${a}→${b}% (đã reset)` : `${a}→${b}% <b>(+${b - a})</b>`;
+  const ds = Object.entries(h).filter(([k]) => k !== '_eleven').map(([k, v]) => `${esc(tenTk(k))}: 5 giờ ${cs(v.h5)} · tuần ${cs(v.tuan)}`);
+  if (h._eleven) { const [a, b, g] = h._eleven; ds.push(`ElevenLabs: +${(b - a).toLocaleString('vi-VN')} ký tự, còn ${Math.max(0, g - b).toLocaleString('vi-VN')}`); }
+  return ds.join('<br>') || '—';
 }
 // Anh đang sửa ô nào trong mục Tự động (chưa bấm Lưu) thì vòng làm mới 60 giây KHÔNG ghi đè ô đó —
 // chỉ cập nhật dòng trạng thái. Lưu xong (hoặc bấm công tắc Bật tự động, tự lưu luôn) mới nạp lại cả bảng.
@@ -3147,7 +3171,7 @@ $('#tdBat').addEventListener('change', async () => {      // công tắc chính:
 ['#tdPhut', '#tdBang'].forEach(s => { const el = $(s); el.addEventListener('input', () => { TD_BAN = true; banVe(); }); el.addEventListener('change', () => { TD_BAN = true; banVe(); }); });
 // Vòng làm mới: bỏ qua khi tab ẩn; lỗi mạng thoáng qua không làm vỡ vòng.
 const lap = (fn, ms) => setInterval(() => { if (!document.hidden) Promise.resolve().then(fn).catch(() => {}); }, ms);
-capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); }); lap(() => { if (tabHien() === 'sx') taiLo(); }, 60000); lap(() => { if (tabHien() === 'sx') taiTuDong(); }, 60000); cnLich();
+capNhat().then(() => { taiTuDong(); taiTk(); taiLo(); taiHmGiong().catch(() => {}); }); lap(() => { if (tabHien() === 'sx') taiLo(); }, 60000); lap(() => { if (tabHien() === 'sx') taiTuDong(); }, 60000); cnLich();
 
 // mở thẳng tab: ?tab=kho  hoặc  #tab=kho  hoặc  #kho
 (() => {
