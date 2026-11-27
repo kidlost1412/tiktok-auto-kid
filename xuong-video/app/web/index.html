@@ -204,6 +204,12 @@ input.sw:checked::after{transform:translateX(16px)}
 .bar{height:8px;background:var(--sec);border-radius:4px;overflow:hidden}
 .bar>i{display:block;height:100%;width:0;border-radius:inherit;background:var(--pri);transition:width .4s var(--ease)}
 .bar.sm{height:6px}
+.hm-tk{min-width:280px}.hm-tk+.hm-tk{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.hm-tk .hd{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+.hm-d{display:grid;grid-template-columns:76px 1fr;white-space:nowrap;gap:2px 8px;align-items:center;font-size:12px;margin-top:4px}
+.hm-d .bar{display:flex;height:8px}.hm-d .bar>i{transition:none;border-radius:0}
+.hm-d .bar>i.cu{background:color-mix(in srgb,var(--ink) 28%,transparent)}.hm-d .bar>i.lo{background:var(--pri)}
+.hm-d .ct{grid-column:2;color:var(--ink2)}
 .log{background:var(--log-bg);color:var(--log-ink);border:1px solid var(--log-line);border-radius:12px;padding:16px;height:330px;overflow:auto;font:400 13px/1.7 var(--mono);white-space:pre-wrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .log .ok{color:var(--log-ok)} .log .bad{color:var(--log-bad)} .log .warn{color:var(--log-warn)}
 .log{scrollbar-color:#3A3E4C transparent}
@@ -753,7 +759,7 @@ details.kt-tech .stat{margin-top:12px}
       </div>
     <div class="card mt">
       <div class="ch"><span class="chip a"><svg class="i"><use href="#i-coins"/></svg></span>
-        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = AI làm video (Claude / ChatGPT / Antigravity: biên kịch, đạo diễn). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền. Cột hạn mức: % đã dùng lúc lô bắt đầu → lúc lô xong; nhiều lô chạy cùng lúc trên một tài khoản thì số này gồm cả phần của lô kia.</p></div>
+        <div class="t"><h2>Chi phí từng lô</h2><p class="sub">Token = AI làm video (Claude / ChatGPT / Antigravity: biên kịch, đạo diễn). Ký tự = ElevenLabs (1 giọng dùng chung nhiều video). USD chỉ là quy đổi để so — gói đăng ký không trừ tiền. Cột "Lô này tốn hạn mức": thanh xám = đã dùng trước lô, thanh màu = lô này lấy, phần trống = còn lại. Nhiều lô chạy cùng lúc trên một tài khoản thì phần màu gồm cả lô kia.</p></div>
         <div class="act"><button class="btn ghost sm ic-only gapToggle" id="loToggle" data-gap-key="loBody" title="Mở hoặc thu gọn bảng chi phí từng lô" aria-label="Mở hoặc thu gọn bảng chi phí từng lô"><svg class="i gapChev"><use href="#i-chev"/></svg></button></div></div>
       <div class="tbl-wrap tall hidden" id="loBody"><table class="tbl lo" id="loBang"></table></div>
     </div>
@@ -3112,23 +3118,34 @@ $('#btnKiemTk').onclick = () => taiTk(true);
 
 async function taiLo() {
   const ds = await api('/api/lo'); const k = soGon;
-  const cot = [['Lúc'], ['Sản phẩm'], ['Video', 1], ['Thời gian', 1], ['Phút/video', 1], ['Lượt AI', 1], ['Token (vào / ra)', 1], ['Token/video', 1], ['Ký tự giọng', 1], ['Ký tự/video', 1], ['≈ USD', 1], ['Tài khoản'], ['Hạn mức trước → sau lô']];
+  const cot = [['Lúc'], ['Sản phẩm'], ['Video', 1], ['Thời gian', 1], ['Phút/video', 1], ['Lượt AI', 1], ['Token (vào / ra)', 1], ['Token/video', 1], ['Ký tự giọng', 1], ['Ký tự/video', 1], ['≈ USD', 1], ['Lô này tốn hạn mức']];
   setH($('#loBang'), !ds.length ? `<tbody><tr><td class="empty-td">${rong('coins', 'Chưa có lô nào được ghi', 'Lô mới sẽ tự hiện ở đây.')}</td></tr></tbody>` :
     '<thead><tr>' + cot.map(([t, n]) => `<th${n ? ' class="num"' : ''}>${t}</th>`).join('') + '</tr></thead><tbody>' +
     ds.map(l => `<tr><td class="note" style="color:var(--ink2)">${l.bat_dau.slice(5, 16).replace('T', ' ')}</td><td><b>${esc(l.san_pham)}</b></td>
       <td class="num"><b>${l.video}</b></td><td class="num">${l.phut} phút</td><td class="num">${l.video ? (l.phut / l.video).toLocaleString('vi-VN', {maximumFractionDigits: 1}) : '—'}</td><td class="num">${l.luot_ai}</td>
       <td class="num">${k(l.token)} <span class="note">(${k(l.token_vao)} / ${k(l.token_ra)})</span></td><td class="num"><b>${l.video ? k(l.token / l.video) : '—'}</b></td>
       <td class="num">${(l.ky_tu_giong || 0).toLocaleString('vi-VN')}</td><td class="num">${l.video ? Math.round((l.ky_tu_giong || 0) / l.video) : '—'}</td>
-      <td class="num">${l.usd_quy_doi}</td><td class="note">${Object.entries(l.tai_khoan || {}).map(([a, n]) => esc(tenTk(a)) + ': ' + n + ' lượt').join(', ')}</td>
-      <td class="note">${hmLo(l.han_muc)}</td></tr>`).join('') + '</tbody>');
+      <td class="num">${l.usd_quy_doi}</td><td>${hmLo(l)}</td></tr>`).join('') + '</tbody>');
 }
 function tenTk(a) { return a === 'agy' ? 'Antigravity' : a.startsWith('gpt:') ? 'ChatGPT ' + a.slice(4) : 'Claude ' + a; }
-function hmLo(h) {
-  if (!h) return '—';
-  const cs = ([a, b]) => a == null || b == null ? '?' : b < a ? `${a}→${b}% (đã reset)` : `${a}→${b}% <b>(+${b - a})</b>`;
-  const ds = Object.entries(h).filter(([k]) => k !== '_eleven').map(([k, v]) => `${esc(tenTk(k))}: 5 giờ ${cs(v.h5)} · tuần ${cs(v.tuan)}`);
-  if (h._eleven) { const [a, b, g] = h._eleven; ds.push(`ElevenLabs: +${(b - a).toLocaleString('vi-VN')} ký tự, còn ${Math.max(0, g - b).toLocaleString('vi-VN')}`); }
-  return ds.join('<br>') || '—';
+function hmLo(l) {
+  // mỗi tài khoản: tên + số lượt, rồi thanh "đã dùng trước lô | lô này lấy | còn lại" cho phiên 5 giờ và cả tuần
+  const h = l.han_muc || {}, so = x => (+x || 0).toLocaleString('vi-VN');
+  const thanh = (a, b, g, chu) => {             // a, b: đã dùng trước / sau lô (cùng đơn vị với g)
+    const c = x => Math.max(0, Math.min(100, x / g * 100));
+    const lo = b >= a ? b - a : b;              // giữa lô cửa sổ làm mới → tính từ 0
+    return `<div class="bar"><i class="cu" style="width:${c(b >= a ? a : 0)}%"></i><i class="lo" style="width:${c(lo)}%"></i></div><span class="ct">${chu(lo, Math.max(0, g - b), b < a)}</span>`;
+  };
+  const pt = (lo, con, rs) => `lô này lấy <b>${lo}%</b> · còn <b>${con}%</b>${rs ? ' (đã làm mới giữa lô)' : ''}`;
+  const tk = Object.entries(l.tai_khoan || {}).map(([a, n]) => {
+    const v = h[a]; let d = '';
+    for (const [k, nhan] of [['h5', 'Phiên 5 giờ'], ['tuan', 'Cả tuần']])
+      if (v && v[k] && v[k][0] != null && v[k][1] != null) d += `<span>${nhan}</span>${thanh(v[k][0], v[k][1], 100, pt)}`;
+    return `<div class="hm-tk"><div class="hd"><b>${esc(tenTk(a))}</b><span class="note">${n} lượt AI</span></div>${d ? `<div class="hm-d">${d}</div>` : ''}</div>`;
+  });
+  if (h._eleven) { const [a, b, g] = h._eleven;
+    tk.push(`<div class="hm-tk"><div class="hd"><b>Giọng ElevenLabs</b></div><div class="hm-d"><span>Ký tự</span>${thanh(a, b, g, (lo, con) => `lô này lấy <b>${so(lo)}</b> ký tự · còn <b>${so(con)}</b>`)}</div></div>`); }
+  return tk.join('') || '—';
 }
 // Anh đang sửa ô nào trong mục Tự động (chưa bấm Lưu) thì vòng làm mới 60 giây KHÔNG ghi đè ô đó —
 // chỉ cập nhật dòng trạng thái. Lưu xong (hoặc bấm công tắc Bật tự động, tự lưu luôn) mới nạp lại cả bảng.
