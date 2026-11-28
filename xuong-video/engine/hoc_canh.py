@@ -15,6 +15,7 @@ import kiem_mo_ta as km
 import cat_canh
 import phieu
 import phieu_v3
+import ban_nhe as BN
 
 import sys as _s0; from pathlib import Path as _P0
 _s0.path.insert(0, str(_P0(__file__).resolve().parents[1] / "engine"))
@@ -1711,15 +1712,39 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         try:
             if not kiem_mo():
                 raise ChuaMo(_msg_chua_mo())
-            ma_rel, viec_ai, ten_file = {}, [], {}
-            for i, v in enumerate(vids, 1):
-                viec_ai.append({"ma": f"V{i}", "src": str((kho / v["rel"]).resolve()), "dai": v["dai"], "sai": v["loi"] if lan > 1 else []})
+            ma_rel, viec_ai, ten_file, khuc_cua, i = {}, [], {}, {}, 0
+            for v in vids:
+                v["bo"] = False
+                goc = (kho / v["rel"]).resolve()
+                kh = None
+                if BN.can_nhe(goc):                    # Antigravity chỉ đọc file < 100 MB → AI xem bản nhẹ (mốc giờ giữ đúng file gốc)
+                    try:
+                        cap(thong_bao=f"Đang làm bản nhẹ cho video nặng {Path(v['rel']).name}…")
+                        kh = v["nhe"] = v.get("nhe") or BN.lam(goc, v["dai"], kho / "_tam" / "ban-nhe", do_dai)
+                    except Exception as e:
+                        v["loi"], v["bo"] = [f"Không làm được bản nhẹ của video nặng: {str(e)[:150]}"], True
+                        continue
+                if kh and len(kh) > 1:                 # video nặng và dài: mỗi khúc một mã, ghép lại sau
+                    khuc_cua[v["rel"]] = []
+                    for k, c in enumerate(kh, 1):
+                        i += 1
+                        key = f"{v['rel']}#khuc{k}"
+                        viec_ai.append({"ma": f"V{i}", "src": c["src"], "dai": c["dai"], "sai": (v.get("sai_khuc") or {}).get(key, []) if lan > 1 else []})
+                        ma_rel[f"v{i}"] = key
+                        khuc_cua[v["rel"]].append((key, c["lech"], c["dai"]))
+                    continue
+                i += 1
+                viec_ai.append({"ma": f"V{i}", "src": kh[0]["src"] if kh else str(goc), "dai": v["dai"], "sai": v["loi"] if lan > 1 else []})
                 ma_rel[f"v{i}"] = v["rel"]
                 ma_rel.setdefault(v["rel"].lower(), v["rel"])
                 ten_file.setdefault(Path(v["rel"]).name.lower(), []).append(v["rel"])
             for n, rs in ten_file.items():
                 if len(rs) == 1:
                     ma_rel.setdefault(n, rs[0])
+            if not viec_ai:
+                for v in vids:
+                    ket_thuc_v3(v, lan == 2)
+                return
             id_lo = f"v3-{so:02d}{'' if lan == 1 else 'b'}-" + hashlib.sha1("|".join(v["rel"] for v in vids).encode("utf-8")).hexdigest()[:6]
             thu_muc = kho / "_tam" / "hoc-canh" / id_lo
             thu_muc.mkdir(parents=True, exist_ok=True)
@@ -1732,7 +1757,7 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
             lam_lai = "" if lan == 1 else " (làm lại video lỗi)"
             tieu_de = f"Xưởng Video · {ten} · phiếu kiểu 3 lô {so}/{tong_lo}" + lam_lai
             kw = {"project": pj} if pj else {}
-            han = min(HAN_LO_TOI_DA_S, HAN_MOI_VIDEO_S * len(vids) + HAN_THEM_S)          # hạn theo SỐ VIDEO, truyền rõ (chay_lo mặc định đếm file đầu ra)
+            han = min(HAN_LO_TOI_DA_S, HAN_MOI_VIDEO_S * len(viec_ai) + HAN_THEM_S)       # hạn theo SỐ VIDEO (khúc), truyền rõ (chay_lo mặc định đếm file đầu ra)
             with TT.viec("hoc-canh", f"Antigravity đang điền phiếu kiểu 3 lô {so}/{tong_lo}" + lam_lai, sp=ten,
                          buoc=f"Lô {so}/{tong_lo}", video=", ".join(Path(v["rel"]).name for v in vids)) as tt_hc:
                 tt_hc.cap(chi_tiet={"video": len(vids), "han_s": int(han)})
@@ -1756,10 +1781,21 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
                     if forms is None:
                         forms, ly_chung = {}, "file kết quả không phải JSON đúng dạng {mã video: phiếu}"
                     tt_hc.cap(viec=f"Đã nhận phiếu lô {so}/{tong_lo}", tien_do=1.0)
+            loi_khuc = {}
+            for rel, ks in khuc_cua.items():                                            # video cắt khúc: kiểm từng khúc theo giờ khúc, đạt hết mới ghép
+                fs = [forms.pop(key, None) for key, _l, _d in ks]
+                sai = {key: ([ly_chung or "phiếu thiếu mã khúc này"] if f is None else phieu_v3.kiem_video(f, d)) for f, (key, _l, d) in zip(fs, ks)}
+                if any(sai.values()):
+                    loi_khuc[rel] = [f"khúc {n}: {e}" for n, (key, _l, _d) in enumerate(ks, 1) for e in sai[key]]
+                    next(v for v in vids if v["rel"] == rel)["sai_khuc"] = sai
+                else:
+                    forms[rel] = BN.ghep([(f, l) for f, (_k, l, _d) in zip(fs, ks)])
             for v in vids:                                                              # kiểm + ghi TỪNG video: video tốt của lô được giữ dù video khác hỏng
+                if v.get("bo"):
+                    continue
                 form = forms.get(v["rel"])
                 try:
-                    loi = [ly_chung or "phiếu thiếu mã video này"] if form is None else phieu_v3.kiem_video(form, v["dai"])
+                    loi = loi_khuc[v["rel"]] if v["rel"] in loi_khuc else [ly_chung or "phiếu thiếu mã video này"] if form is None else phieu_v3.kiem_video(form, v["dai"])
                 except Exception as e:
                     loi = [f"phiếu không kiểm được: {type(e).__name__} {str(e)[:100]}"]
                 if not loi:
@@ -1793,7 +1829,9 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
 
     def chay_cac_lo_v3(ds, lan, pj):
         k = max(1, min(SO_VIDEO_LO_V3, co_lo()))
-        cac = [[(v, None) for v in ds[i:i + k]] for i in range(0, len(ds), k)]
+        dai_ = [v for v in ds if BN.nhieu_khuc(kho / v["rel"], v["dai"])]           # video nặng + dài (cắt khúc) đi một mình một lô
+        thuong = [v for v in ds if v not in dai_]
+        cac = [[(v, None)] for v in dai_] + [[(v, None) for v in thuong[i:i + k]] for i in range(0, len(thuong), k)]
         kq["lo"] += len(cac)
         with ThreadPoolExecutor(max_workers=song_song) as ex:
             fs = [ex.submit(contextvars.copy_context().run, chay_mot_lo_v3, c, i + 1, len(cac), pj, lan) for i, c in enumerate(cac)]
@@ -1816,11 +1854,14 @@ def hoc_kho(ma_hoac_kho, model=None, runner=chay_lo, do_dai=km.do_dai_video, khi
         cap(giai_doan="hoc", thong_bao=f"Antigravity đang xem {len(vids)} video và điền phiếu kiểu 3…")
         pj = tim_project(kho) if project is not False else None
         kq["project"] = pj
-        chay_cac_lo_v3(vids, 1, pj)
-        con = [v for v in vids if not v["xong"]]
-        if con and not st["dung_vi"] and not huy.is_set():
-            cap(thong_bao=f"Hỏi lại {len(con)} video chưa đạt…")
-            chay_cac_lo_v3(con, 2, pj)
+        try:
+            chay_cac_lo_v3(vids, 1, pj)
+            con = [v for v in vids if not v["xong"]]
+            if con and not st["dung_vi"] and not huy.is_set():
+                cap(thong_bao=f"Hỏi lại {len(con)} video chưa đạt…")
+                chay_cac_lo_v3(con, 2, pj)
+        finally:
+            shutil.rmtree(kho / "_tam" / "ban-nhe", ignore_errors=True)          # bản nhẹ chỉ để học: xong là xoá
 
     ten_sp = ten_sp_cho_phieu(ma) if ma else "sản phẩm của chủ hàng"
     try:
