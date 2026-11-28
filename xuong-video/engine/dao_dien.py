@@ -711,7 +711,11 @@ def am_cho_dao_dien():
 
 
 COT_DS = ("Cột: id | vai trò | cỡ cảnh | mô tả | nói: lời người trong clip lúc đó (chỉ để hiểu cảnh) | dài (s) | [clip Gx] = cắt từ CÙNG một video gốc"
-          " (cùng người, cùng áo): mỗi clip chỉ dùng MỘT cảnh trong video")
+          " (cùng người, cùng áo): mỗi clip chỉ dùng MỘT cảnh trong video. AFF (sau vai trò) = người thật cầm/nói về sản phẩm")
+# Video khung "chữ theo lời": máy tự làm hết chữ trên hình (dung_remotion bỏ "khoi") → không gửi danh mục khối, đỡ token đầu vào lẫn phần AI nghĩ
+KHOI_CHU_THEO_LOI = ('(VIDEO NÀY DỰNG KHUNG "CHỮ THEO LỜI": máy tự làm toàn bộ chữ trên hình theo lời đọc, tự né mặt người và nhãn chai, tự gắn quà ở cuối. '
+                     'KHÔNG viết khối chữ — để "khoi": []; bỏ qua phần CHỮ. Chỉ cần "nhan_tu" (2–4 từ phóng to) và dồn sức chọn cảnh, bố cục, nhịp cắt.)')
+_RE_PHAN_CHU = re.compile(r"\nCHỮ\r?\n.*?(?=Danh mục khối chữ:)", re.S)
 
 
 def nhom_clip(ds):
@@ -731,7 +735,7 @@ def dong_ds(i, s, nhom=None):
     Cảnh học kiểu 2 (có phiếu): mô tả đầy đủ ≤ 90 ký tự + lời đang nói; cảnh cũ giữ cách ghi cũ."""
     kieu2 = s.get("kieu") == 2
     mo = (s.get("mo_ta") or "")[:90] if kieu2 and s.get("mo_ta") else ((s.get("soat") or {}).get("ghi") or s.get("mo_ta", "")[:60])
-    cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | AFF người thật cầm/nói về sản phẩm" if la_aff(s) else "")]
+    cot = [str(i), ",".join(s.get("vai_tro", [])) + (" | AFF" if la_aff(s) else "")]
     if s.get("co_canh"):
         cot.append(str(s["co_canh"]))
     cay = sorted(cay_trong(" ".join(map(str, s.get("cay") or []))))
@@ -742,7 +746,7 @@ def dong_ds(i, s, nhom=None):
     return " | ".join(cot)
 
 
-def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None, ra_boi=None):
+def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None, ra_boi=None, khung=None):
     """Dữ liệu điền vào mẫu prompt/dao-dien.md → (ctx, sents, total, ids cảnh ứng viên). Không ghi file, không gọi AI.
     tranh: list cảnh đã dùng ở lô này (hoặc set kiểu cũ). anh_em: list có thứ tự cảnh chính của video anh em cùng lời. used_sigs: chữ ký công thức hôm nay
     (đạo diễn không được mời 2 công thức dùng nhiều nhất). ra_boi (dict) nhận {met, mo, chot, anh_em} để segs_tu_bang dùng cùng số liệu (qua edl["_boi"])."""
@@ -789,14 +793,24 @@ def ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y="", tranh=(), 
         cuoi=len(sents) - 1, n=len(sents),
         so_lieu_tiktok=("\n\n=== SỐ LIỆU THẬT TỪ TIKTOK (gợi ý khi chọn bố cục/nhịp, không phải luật) ===\n" + hq) if hq else "",
         gop_y_giam_khao=f"\n\n=== GIÁM KHẢO YÊU CẦU SỬA BẢN TRƯỚC (bắt buộc làm theo) ===\n{gop_y}" if gop_y else "")
+    if khung == "chu_theo_loi":
+        ctx.update(khoi_mo_ta=KHOI_CHU_THEO_LOI, data_spec="")
     return ctx, sents, total, ids
 
 
-def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None):
+def de_dao_dien(ctx, khung=None):
+    """Đề bài đạo diễn đã điền. Khung "chữ theo lời": cắt luôn phần luật CHỮ của mẫu (chỉ khi mẫu còn đúng mốc; mẫu Kid sửa khác thì giữ nguyên)."""
+    mau = prompt_mau.doc("dao-dien")[0]
+    if khung == "chu_theo_loi":
+        mau = _RE_PHAN_CHU.sub("\n", mau, count=1)
+    return prompt_mau.dung("dao-dien", mau, ctx)
+
+
+def dao_dien(ma, sp, voice, script, shots, gu_key, work, rng, gop_y="", tranh=(), qua=None, chung=None, anh_em=None, used_sigs=None, khung=None):
     boi = {}
-    ctx, sents, total, ids = ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y, tranh, qua, chung, anh_em, used_sigs, boi)
+    ctx, sents, total, ids = ctx_dao_dien(ma, sp, voice, script, shots, gu_key, rng, gop_y, tranh, qua, chung, anh_em, used_sigs, boi, khung)
     anh = to_ung_vien(ma, ids, Path(work) / f"ung-vien-{gu_key}.jpg")
-    p = prompt_mau.dien("dao-dien", **ctx)
+    p = de_dao_dien(ctx, khung)
     txt, _ = goi(f"đạo diễn {gu_key}", p, anh=anh)
     edl = lay_json(txt)
     if not isinstance(edl, dict):

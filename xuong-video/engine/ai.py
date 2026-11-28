@@ -122,11 +122,14 @@ def chon_tai_khoan(bo_qua=()):
             o = x.get(w) or {}
             return 0.0 if (o.get("reset") or 0) < now else float(o.get("pct") or 0)   # quá giờ reset → coi như mới
         dung = max(pct("five_hour"), pct("seven_day"))
-        ung.append((dung >= NGUONG_DOI, dung, tk))
+        rs5 = (x.get("five_hour") or {}).get("reset") or 0
+        dang_mo = pct("five_hour") > 0 and rs5 > now          # phiên 5 giờ đang chạy: phần còn lại sẽ mất khi làm mới
+        # dùng nốt phiên đang mở, phiên sắp làm mới trước; tài khoản chưa mở phiên để dành (chọn cái ít dùng tuần nhất)
+        ung.append(((dung >= NGUONG_DOI, 0, rs5) if dang_mo else (dung >= NGUONG_DOI, 1, pct("seven_day")), tk))
     if not ung:
         return None
-    ung.sort(key=lambda z: (z[0], z[1]))
-    return ung[0][2]
+    ung.sort(key=lambda z: z[0])
+    return ung[0][1]
 
 
 _RE_BI_CHAN = re.compile(r"organization has disabled|disabled claude subscription access|ask your admin to enable", re.I)   # gói bị tổ chức tắt quyền dùng Claude Code

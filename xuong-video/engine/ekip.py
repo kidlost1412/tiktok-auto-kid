@@ -438,7 +438,7 @@ def _chay(ma_sp, so_video, log, music_pick, lam_lai=None):
             VIEC.video = f'{t["vname"]}-{t["j"]}'            # token.csv biết lượt gọi này thuộc video nào
             VIEC.so, VIEC.pha = t.setdefault("token", {}), ("sua_dao_dien" if t.get("_cu") else "dao_dien")
             edl, sents, total = dao_dien(ma_sp, sp, t["voice"], t["sc"], shots, t["gu"], t["work"], t["rng"], gop_y or t.get("gop_y", ""),
-                                         tranh=lo_dung, qua=qua, chung=chung, anh_em=t.get("anh_em_ds"), used_sigs=used_sigs)
+                                         tranh=lo_dung, qua=qua, chung=chung, anh_em=t.get("anh_em_ds"), used_sigs=used_sigs, khung=t.get("khung"))
             segs, sua = segs_tu_bang(edl, sents, total, shots + [x for ds in qua.values() for x in ds] + chung)
             lo_dung.extend(id_canh_chinh(segs) + id_canh_phu(segs))    # video sau trong cùng lô cũng tránh các cảnh này
             (t["work"] / "bang-dung.json").write_text(json.dumps(edl, ensure_ascii=False, indent=1), encoding="utf-8")

@@ -771,6 +771,27 @@ def tat_giong_may(item, sp, plain, sents):
     return errs
 
 
+_RE_GOI_DAU = re.compile(r"^((?:\s*\[[^\]]*\]\s*)*)(?:các bác|bà con|cô chú|anh em)\s+ơi\s*[,!.]?\s*", re.I)
+
+
+def bo_tieng_goi_dau(text):
+    """'[tag] Các bác ơi, lá vàng…' → '[tag] Lá vàng…' (hook vào thẳng ý). Chỉ bỏ khi có 'ơi' (tiếng gọi thật, không phải chủ ngữ 'bà con trồng…')."""
+    m = _RE_GOI_DAU.match(text)
+    if not m or len(re.findall(r"\w+", text[m.end():])) < 4:
+        return text
+    con = text[m.end():]
+    return m.group(1) + con[:1].upper() + con[1:]
+
+
+def bot_ba_cham(text, toi_da=2):
+    """Giữ 2 dấu '…' đầu, các dấu sau thành ',' (chữ liền sau viết thường)."""
+    dem = [0]
+    def _f(m):
+        dem[0] += 1
+        return m.group(0) if dem[0] <= toi_da else "," + m.group(2) + m.group(3).lower()
+    return re.sub(r"(…|\.\.\.)(\s*)(\w?)", _f, text)
+
+
 def check(item, sp, used_norm, log=None):
     """→ (lỗi[], các câu). Lỗi không rỗng = loại bản. log(msg): ghi các nhận xét không loại bản."""
     errs = []
@@ -784,7 +805,10 @@ def check(item, sp, used_norm, log=None):
         tags.append(t)
         return f"[{t}]"
     text = re.sub(r"\[([^\]]*)\]", _tag, item.get("text", ""))
+    text = bot_ba_cham(bo_tieng_goi_dau(bo_chet(text)))     # lỗi vặt máy tự sửa được → sửa luôn, không loại bài (mỗi lần loại = 1 lượt gọi Claude viết bù)
     item["text"] = text
+    if isinstance(item.get("dong"), list):
+        item["dong"] = [bo_chet(d) for d in item["dong"]]
     if len(set(tags)) < 3:
         errs.append(f"chỉ {len(set(tags))} tag khác nhau (cần ít nhất 3)")
     plain = re.sub(r"\[[^\]]*\]", "", text)
@@ -890,7 +914,7 @@ def viet(ma_sp, so_ban, log=print):
             for s in sents:
                 used_norm.add(norm(s)); used.append(s)
             it["dang"] = t["than"]
-            it["chu_mo"] = gon_chu_mo(it.get("chu_mo"))
+            it["chu_mo"] = gon_chu_mo(bo_chet(it.get("chu_mo")) if it.get("chu_mo") else it.get("chu_mo"))
             it["don_ban"] = gon_don_ban(it.get("don_ban"))
             it["y_hinh"] = gon_y_hinh(it.get("y_hinh"), len(sents))       # hỏng/thiếu thì thôi, không làm hỏng bản
             it["hook_thu"] = gon_hook_thu(it.get("hook_thu"))
